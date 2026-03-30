@@ -1,0 +1,374 @@
+{
+  "schema_version": 2,
+  "rules": [
+    {
+      "rule_id": "csharpsquid:S1481",
+      "title": "移除未使用的局部变量",
+      "category": "cleanup",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["deterministic"],
+      "pr_mode": "auto",
+      "max_changed_lines": 4
+    },
+    {
+      "rule_id": "csharpsquid:S1854",
+      "title": "移除未使用的赋值",
+      "category": "cleanup",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["deterministic"],
+      "pr_mode": "auto",
+      "max_changed_lines": 4
+    },
+    {
+      "rule_id": "csharpsquid:S125",
+      "title": "移除被注释掉的代码段",
+      "category": "cleanup",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": [],
+      "pr_mode": "auto",
+      "max_changed_lines": 12
+    },
+    {
+      "rule_id": "external_roslyn:CS0219",
+      "title": "变量已被赋值但未使用",
+      "category": "cleanup",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["deterministic"],
+      "pr_mode": "auto",
+      "max_changed_lines": 4
+    },
+    {
+      "rule_id": "csharpsquid:S4487",
+      "title": "移除未读取的 private 字段",
+      "category": "cleanup",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["agent", "llm"],
+      "pr_mode": "auto",
+      "max_changed_lines": 10,
+      "complexity_level": "simple",
+      "agent_config": {
+        "max_turns": 5,
+        "max_token_budget": 128000,
+        "max_files": 1,
+        "strategy_hint": "私有字段不涉及跨文件引用，直接移除字段声明及其无用赋值，保持最小化修改。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S2681",
+      "title": "多行代码块必须使用大括号",
+      "category": "syntax",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": [],
+      "pr_mode": "auto",
+      "max_changed_lines": 6
+    },
+    {
+      "rule_id": "external_roslyn:CS1591",
+      "title": "缺少公开成员的 XML 注释",
+      "category": "documentation",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": [],
+      "pr_mode": "auto",
+      "max_changed_lines": 40,
+      "comment_only": true
+    },
+    {
+      "rule_id": "csharpsquid:S6610",
+      "title": "StartsWith/EndsWith 优先使用 char",
+      "category": "syntax",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": [],
+      "pr_mode": "auto",
+      "max_changed_lines": 2
+    },
+    {
+      "rule_id": "csharpsquid:S1125",
+      "title": "布尔字面量冗余",
+      "category": "syntax",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": [],
+      "pr_mode": "auto",
+      "max_changed_lines": 3
+    },
+    {
+      "rule_id": "csharpsquid:S1066",
+      "title": "可合并的连续 if 语句",
+      "category": "control-flow",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["agent", "llm"],
+      "pr_mode": "auto",
+      "max_changed_lines": 12,
+      "complexity_level": "simple",
+      "agent_config": {
+        "max_turns": 5,
+        "max_token_budget": 128000,
+        "max_files": 1,
+        "strategy_hint": "合并嵌套的 if 条件为 && 表达式，保持相同的逻辑语义。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S1871",
+      "title": "if 两个分支实现不应完全一样",
+      "category": "control-flow",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["agent", "llm"],
+      "pr_mode": "auto",
+      "max_changed_lines": 12,
+      "complexity_level": "simple",
+      "agent_config": {
+        "max_turns": 5,
+        "max_token_budget": 128000,
+        "max_files": 1,
+        "strategy_hint": "合并重复分支，保留一份实现并确保控制流语义不变。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S3260",
+      "title": "未派生的私有类应标记为 sealed",
+      "category": "syntax",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": [],
+      "pr_mode": "auto",
+      "max_changed_lines": 2
+    },
+    {
+      "rule_id": "external_roslyn:CS9236",
+      "title": "Lambda 表达式显式声明参数类型",
+      "category": "syntax",
+      "risk": "low",
+      "enabled": true,
+      "primary_engine": "agent",
+      "fallback_engines": ["llm"],
+      "pr_mode": "auto",
+      "max_changed_lines": 12,
+      "complexity_level": "simple",
+      "agent_config": {
+        "max_turns": 5,
+        "max_token_budget": 128000,
+        "max_files": 1,
+        "strategy_hint": "为 lambda 参数补充显式类型声明，只改动目标表达式，避免波及周边逻辑。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S3267",
+      "title": "循环应简化为 LINQ",
+      "category": "refactor",
+      "risk": "medium",
+      "enabled": true,
+      "primary_engine": "agent",
+      "fallback_engines": ["llm"],
+      "pr_mode": "draft",
+      "max_changed_lines": 18,
+      "fix_scope": "file",
+      "classification_required": true,
+      "verification_policy": "strict_draft",
+      "complexity_level": "moderate",
+      "agent_config": {
+        "max_turns": 6,
+        "max_token_budget": 128000,
+        "max_files": 1,
+        "strategy_hint": "仅在纯内存集合、无副作用、无 IQueryable/EF 风险时，将简单循环安全改写为 LINQ；遇到延迟执行或数据库查询风险时直接跳过。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S6562",
+      "title": "创建 DateTime 时设置 DateTimeKind",
+      "category": "time",
+      "risk": "high",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["agent"],
+      "pr_mode": "draft",
+      "max_changed_lines": 12,
+      "fix_scope": "file",
+      "classification_required": true,
+      "verification_policy": "strict_draft",
+      "complexity_level": "moderate",
+      "agent_config": {
+        "max_turns": 6,
+        "max_token_budget": 128000,
+        "max_files": 1,
+        "strategy_hint": "默认保持 Local 语义；仅在代码上下文明显表达 UTC 意图时才改为 DateTimeKind.Utc。遇到解析、序列化或时区语义不明确的场景时保守处理。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S6561",
+      "title": "避免使用 DateTime.Now 进行基准测试",
+      "category": "time",
+      "risk": "medium",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["agent"],
+      "pr_mode": "draft",
+      "max_changed_lines": 16,
+      "fix_scope": "file",
+      "classification_required": true,
+      "verification_policy": "strict_draft",
+      "complexity_level": "moderate",
+      "agent_config": {
+        "max_turns": 6,
+        "max_token_budget": 128000,
+        "max_files": 1,
+        "strategy_hint": "优先把 DateTime.Now/UtcNow 的基准测试模式改成 Stopwatch；只处理典型起止耗时统计，不要碰业务时间逻辑。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S3776",
+      "title": "方法认知复杂度过高",
+      "category": "architecture",
+      "risk": "high",
+      "enabled": true,
+      "primary_engine": "agent",
+      "fallback_engines": [],
+      "pr_mode": "draft",
+      "max_changed_lines": 40,
+      "fix_scope": "file",
+      "classification_required": true,
+      "verification_policy": "strict_draft",
+      "complexity_level": "complex",
+        "agent_config": {
+          "max_turns": 20,
+          "max_token_budget": 256000,
+          "max_files": 1,
+          "strategy_hint": "通过提取连续且副作用边界清晰的代码块降低复杂度，优先新增 private helper 方法，避免改动对外契约。"
+        }
+    },
+    {
+      "rule_id": "csharpsquid:S107",
+      "title": "方法参数过多",
+      "category": "architecture",
+      "risk": "high",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["agent"],
+      "pr_mode": "draft",
+      "max_changed_lines": 40,
+      "allow_signature_changes": true,
+      "fix_scope": "solution",
+      "classification_required": true,
+      "verification_policy": "strict_draft",
+      "requires_solution_path": true,
+      "complexity_level": "complex",
+      "agent_config": {
+        "max_turns": 12,
+        "max_token_budget": 320000,
+        "max_files": 8,
+        "allowed_operations": ["read_file", "search_in_project", "get_file_outline", "apply_edit", "create_file", "list_files", "run_build", "finish"],
+        "strategy_hint": "优先在同命名空间创建参数对象或 record，并同步更新当前 solution 内所有调用点；遇到接口、端点、override 或 params/ref/out/in 风险时跳过。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S1172",
+      "title": "移除未使用的参数",
+      "category": "signature",
+      "risk": "high",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["agent"],
+      "pr_mode": "draft",
+      "max_changed_lines": 24,
+      "allow_signature_changes": true,
+      "fix_scope": "solution",
+      "classification_required": true,
+      "verification_policy": "strict_draft",
+      "requires_solution_path": true,
+      "complexity_level": "complex",
+      "agent_config": {
+        "max_turns": 8,
+        "max_token_budget": 192000,
+        "max_files": 6,
+        "allowed_operations": ["read_file", "search_in_project", "get_file_outline", "apply_edit", "list_files", "run_build", "finish"],
+        "strategy_hint": "同步删除当前 solution 内未使用参数及其调用点；遇到接口实现、override、Controller Action 或反射敏感成员时跳过。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S4136",
+      "title": "方法重载必须相邻",
+      "category": "layout",
+      "risk": "medium",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["agent"],
+      "pr_mode": "draft",
+      "max_changed_lines": 20,
+      "fix_scope": "file",
+      "classification_required": true,
+      "verification_policy": "strict_draft",
+      "complexity_level": "moderate",
+      "agent_config": {
+        "max_turns": 6,
+        "max_token_budget": 128000,
+        "max_files": 1,
+        "strategy_hint": "仅在单个类型内部重排同名重载方法，保持 XML 注释、特性和其他成员的相对顺序不被破坏。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S6960",
+      "title": "Controller 不应混合职责",
+      "category": "architecture",
+      "risk": "high",
+      "enabled": true,
+      "primary_engine": "agent",
+      "fallback_engines": [],
+      "pr_mode": "draft",
+      "max_changed_lines": 80,
+      "fix_scope": "solution",
+      "classification_required": true,
+      "verification_policy": "strict_draft",
+      "requires_solution_path": true,
+      "complexity_level": "architectural",
+      "agent_config": {
+        "max_turns": 10,
+        "max_token_budget": 256000,
+        "max_files": 8,
+        "allowed_operations": ["read_file", "search_in_project", "get_file_outline", "apply_edit", "create_file", "list_files", "run_build", "finish"],
+        "strategy_hint": "拆分 Controller 时优先保留原路由和依赖注入行为，允许创建新 Controller 文件，但必须维持现有 HTTP 路径不变。"
+      }
+    },
+    {
+      "rule_id": "csharpsquid:S2325",
+      "title": "不访问实例数据的成员应为 static",
+      "category": "oop",
+      "risk": "high",
+      "enabled": true,
+      "primary_engine": "roslyn",
+      "fallback_engines": ["agent"],
+      "pr_mode": "draft",
+      "max_changed_lines": 8,
+      "fix_scope": "file",
+      "classification_required": true,
+      "verification_policy": "strict_draft",
+      "complexity_level": "moderate",
+      "agent_config": {
+        "max_turns": 6,
+        "max_token_budget": 128000,
+        "max_files": 1,
+        "strategy_hint": "仅在确认方法完全不依赖实例状态时补 static；遇到多态、实例成员或复杂上下文时由 Agent 进一步校验。"
+      }
+    }
+  ]
+}

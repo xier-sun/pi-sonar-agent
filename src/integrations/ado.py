@@ -1,0 +1,350 @@
+"""Azure DevOps API Client.
+
+Client for interacting with Azure DevOps REST API.
+Compatible with Windows and Unix systems.
+"""
+
+import base64
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import requests
+
+
+@dataclass
+class PullRequest:
+    """Represents an Azure DevOps pull request."""
+
+    pr_id: int
+    title: str
+    description: str
+    source_branch: str
+    target_branch: str
+    url: str
+    state: str
+
+
+class AzureDevOpsClient:
+    """Client for Azure DevOps REST API."""
+
+    def __init__(
+        self,
+        base_url: str,
+        project: str,
+        pat: str,
+        organization: str | None = None,
+        timeout: int = 30,
+    ):
+        self.base_url = base_url.rstrip("/")
+        self.project = project
+        self.organization = organization
+        self.timeout = timeout
+
+        # For REST API calls
+        self.session = requests.Session()
+        auth = base64.b64encode(f":{pat}".encode()).decode()
+        self.session.headers.update({
+            "Authorization": f"Basic {auth}",
+            "Accept": "application/json",
+        })
+
+    @property
+    def _api_url(self) -> str:
+        """Get the API base URL."""
+        if self.organization:
+            return f"{self.base_url}/{self.project}"
+        return f"{self.base_url}/{self.project}"
+
+    def get_repository(self, repository: str) -> dict[str, Any]:
+        """Get repository details."""
+        url = f"{self._api_url}/_apis/git/repositories/{repository}"
+        response = self.session.get(url, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+
+    def get_remote_url(self, repository: str) -> str:
+        """Get the remote URL for a repository."""
+        repo = self.get_repository(repository)
+        return repo.get("webUrl", repo.get("remoteUrl", ""))
+
+    def create_pull_request(
+        self,
+        repository: str,
+        title: str,
+        description: str,
+        source_branch: str,
+        target_branch: str = "develop",
+        reviewer_email: str | None = None,
+    ) -> PullRequest:
+        """Create a new pull request."""
+        url = f"{self._api_url}/_apis/git/repositories/{repository}/pullrequests"
+
+        body = {
+            "sourceRefName": f"refs/heads/{source_branch}",
+            "targetRefName": f"refs/heads/{target_branch}",
+            "title": title,
+            "description": description,
+        }
+
+        if self.organization:
+            url += "?api-version=7.0"
+            body["repositoryId"] = repository
+
+        response = self.session.post(
+            url, json=body, timeout=self.timeout
+        )
+        response.raise_for_status()
+        data = response.json()
+        pr_id = data.get("pullRequestId", 0)
+        web_url = (
+            data.get("_links", {}).get("web", {}).get("href", "")
+            or data.get("links", {}).get("web", {}).get("href", "")
+            or self._build_pr_web_url(repository, pr_id)
+        )
+
+        if reviewer_email and pr_id > 0:
+            reviewer_id = self.resolve_identity_id(reviewer_email)
+            if reviewer_id:
+                self.add_reviewer(repository, pr_id, reviewer_id)
+
+        return PullRequest(
+            pr_id=pr_id,
+            title=data.get("title", ""),
+            description=data.get("description", ""),
+            source_branch=source_branch,
+            target_branch=target_branch,
+            url=web_url,
+            state=data.get("status", ""),
+        )
+
+    def update_pull_request_description(
+        self,
+        repository: str,
+        pull_request_id: int,
+        description: str,
+    ) -> PullRequest:
+        """Update an existing pull request description."""
+
+        url = (
+            f"{self._api_url}/_apis/git/repositories/{repository}/pullrequests/{pull_request_id}"
+            "?api-version=7.1"
+        )
+        response = self.session.patch(
+            url,
+            json={"description": description},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+        web_url = (
+            data.get("_links", {}).get("web", {}).get("href", "")
+            or data.get("links", {}).get("web", {}).get("href", "")
+            or self._build_pr_web_url(repository, int(data.get("pullRequestId", 0)))
+        )
+        return PullRequest(
+            pr_id=int(data.get("pullRequestId", 0)),
+            title=data.get("title", ""),
+            description=data.get("description", ""),
+            source_branch=data.get("sourceRefName", ""),
+            target_branch=data.get("targetRefName", ""),
+            url=web_url,
+            state=data.get("status", ""),
+        )
+
+    def _build_pr_web_url(self, repository: str, pr_id: int) -> str:
+        """Build a browser-friendly pull request URL."""
+
+        if pr_id <= 0:
+            return ""
+        return f"{self.base_url}/{self.project}/_git/{repository}/pullrequest/{pr_id}"
+
+    def resolve_identity_id(self, identifier: str) -> str | None:
+        """Resolve an Azure DevOps identity ID from email or account name."""
+
+        normalized = str(identifier or "").strip()
+        if not normalized:
+            return None
+
+        candidates = [normalized]
+        if "@" in normalized:
+            local_part = normalized.split("@", 1)[0].strip()
+            if local_part and local_part not in candidates:
+                candidates.append(local_part)
+
+        for candidate in candidates:
+            url = f"{self.base_url}/_apis/Identities"
+            params = {
+                "searchFilter": "General",
+                "filterValue": candidate,
+                "queryMembership": "None",
+                "api-version": "7.1",
+            }
+            response = self.session.get(url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            identities = response.json().get("value", [])
+            if not identities:
+                continue
+
+            exact_match = self._find_exact_identity_match(identities, normalized, candidate)
+            if exact_match:
+                return str(exact_match.get("id", "")).strip() or None
+
+            first_id = str(identities[0].get("id", "")).strip()
+            if first_id:
+                return first_id
+
+        return None
+
+    def _find_exact_identity_match(
+        self,
+        identities: list[dict[str, Any]],
+        original_identifier: str,
+        current_candidate: str,
+    ) -> dict[str, Any] | None:
+        """Find the best exact identity match from a candidate list."""
+
+        original_identifier = original_identifier.lower()
+        current_candidate = current_candidate.lower()
+
+        for identity in identities:
+            properties = identity.get("properties", {}) or {}
+            account = str((properties.get("Account") or {}).get("$value", "")).strip().lower()
+            mail = str((properties.get("Mail") or {}).get("$value", "")).strip().lower()
+            display_name = str(identity.get("providerDisplayName", "")).strip().lower()
+            if original_identifier in {account, mail, display_name}:
+                return identity
+            if current_candidate in {account, mail, display_name}:
+                return identity
+        return None
+
+    def add_reviewer(
+        self,
+        repository: str,
+        pull_request_id: int,
+        reviewer_id: str,
+        is_required: bool = True,
+    ) -> dict[str, Any]:
+        """Add a reviewer to an Azure DevOps pull request."""
+
+        url = (
+            f"{self._api_url}/_apis/git/repositories/{repository}/pullrequests/"
+            f"{pull_request_id}/reviewers/{reviewer_id}"
+        )
+        params = {"api-version": "7.1"}
+        body = {
+            "id": reviewer_id,
+            "isRequired": is_required,
+        }
+        response = self.session.put(url, params=params, json=body, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+
+    def get_pull_requests(
+        self,
+        repository: str,
+        state: str = "active",
+    ) -> list[dict[str, Any]]:
+        """Get pull requests for a repository."""
+        url = f"{self._api_url}/_apis/git/repositories/{repository}/pullrequests"
+        params = {
+            "status": state,
+            "$top": 50,
+        }
+
+        response = self.session.get(url, params=params, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json().get("value", [])
+
+
+class GitClient:
+    """Git operations client using subprocess (works on Windows and Unix)."""
+
+    def __init__(self, workspace_root: Path):
+        self.workspace_root = workspace_root
+
+    def clone(self, remote_url: str, branch: str | None = None) -> Path:
+        """Clone a repository."""
+        repo_name = remote_url.split("/")[-1].replace(".git", "")
+        target_dir = self.workspace_root / repo_name
+
+        if target_dir.exists():
+            return target_dir
+
+        cmd = f"git clone {remote_url}"
+        if branch:
+            cmd += f" -b {branch}"
+
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=str(self.workspace_root),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(f"Clone failed: {result.stderr}")
+
+        return target_dir
+
+    def create_branch(self, branch_name: str, cwd: Path | None = None) -> None:
+        """Create a new branch."""
+        result = subprocess.run(
+            f"git checkout -b {branch_name}",
+            shell=True,
+            cwd=str(cwd or self.workspace_root),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(f"Create branch failed: {result.stderr}")
+
+    def commit_and_push(
+        self,
+        message: str,
+        files: list[str] | None = None,
+        cwd: Path | None = None,
+    ) -> None:
+        """Commit and push changes."""
+        work_dir = cwd or self.workspace_root
+
+        # Add files
+        if files:
+            for f in files:
+                subprocess.run(f"git add {f}", shell=True, cwd=work_dir, check=True)
+        else:
+            subprocess.run("git add -A", shell=True, cwd=work_dir, check=True)
+
+        # Commit
+        result = subprocess.run(
+            f'git commit -m "{message}"',
+            shell=True,
+            cwd=work_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            # Maybe nothing to commit
+            if "nothing to commit" not in result.stdout.lower():
+                raise RuntimeError(f"Commit failed: {result.stderr}")
+            return
+
+        # Push
+        result = subprocess.run(
+            "git push -u origin HEAD",
+            shell=True,
+            cwd=work_dir,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(f"Push failed: {result.stderr}")
