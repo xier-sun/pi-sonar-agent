@@ -1,0 +1,4 @@
+[2026-04-02 10:13:13] Attempt 1/3 started for 20da9e25-9ca9-4a1c-a3b6-87ba9d854db9
+[2026-04-02 10:13:14] Attempt 1 failed: Attempted to exit a cancel scope that isn't the current tasks's current cancel scope
+[2026-04-02 10:13:14] Workspace restored to issue baseline
+[2026-04-02 10:13:14] Issue skipped: Attempted to exit a cancel scope that isn't the current tasks's current cancel scope

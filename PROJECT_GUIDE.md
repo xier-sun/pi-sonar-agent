@@ -261,6 +261,7 @@ PR 相关逻辑涉及：
 
 - [src/fixers/build_gate.py](src/fixers/build_gate.py): 构建命令解析、日志提取、最终构建
 - [src/sonar_mcp/tools.py](src/sonar_mcp/tools.py): MCP 工具
+- [data/csharp-quality-gate.md](data/csharp-quality-gate.md): C# 修改质量门禁，C# issue 会自动注入到修复 prompt
 
 ## 11. 测试
 

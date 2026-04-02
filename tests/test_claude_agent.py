@@ -6,6 +6,14 @@ from pi_sonar_agent.agent.claude_agent import (
     ClaudeFixAgent,
     SonarIssue,
 )
+from pi_sonar_agent.agent.rule_policies import (
+    CONDITIONAL_CHAIN_SCOPE_MODE,
+    CONTROL_BLOCK_SCOPE_MODE,
+    DECLARATION_COMMENT_SCOPE_MODE,
+    EXPRESSION_REWRITE_SCOPE_MODE,
+    LOOP_REWRITE_SCOPE_MODE,
+)
+from pi_sonar_agent.agent.rule_validators import validate_rule_fix
 
 
 def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
@@ -22,6 +30,7 @@ def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
     prompt = ClaudeFixAgent._build_user_prompt(
         issue,
         "  51 | if (condition) { ... }",
+        "异步方法必须使用 async/await。",
         "- 只允许修改第 45-80 行的目标方法。",
         {
             "name": "Cognitive Complexity of methods should not be too high",
@@ -37,11 +46,196 @@ def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
     assert "嵌套条件和循环会提高认知复杂度。" in prompt
     assert "【SonarQube 修复建议】" in prompt
     assert "提取私有方法，减少嵌套层级。" in prompt
+    assert "【C# 代码质量门禁】" in prompt
+    assert "异步方法必须使用 async/await。" in prompt
     assert "【允许修改范围】" in prompt
     assert "只允许修改第 45-80 行的目标方法。" in prompt
     assert "不要顺手修复本文件中其他位置的相同规则问题" in prompt
     assert "【推荐构建命令】" in prompt
     assert 'dotnet build "src/Foo.sln"' in prompt
+
+
+def test_load_csharp_quality_gate_only_for_csharp_files() -> None:
+    csharp_issue = SonarIssue(
+        key="issue-cs",
+        rule="csharpsquid:S6562",
+        message="DateTime 应显式指定 Kind",
+        line=3,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    text_issue = SonarIssue(
+        key="issue-txt",
+        rule="generic:rule",
+        message="文本问题",
+        line=1,
+        component="BI:notes.txt",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    csharp_gate = ClaudeFixAgent._load_csharp_quality_gate(csharp_issue)
+    text_gate = ClaudeFixAgent._load_csharp_quality_gate(text_issue)
+
+    assert "C# 代码质量与架构规范门禁" in csharp_gate
+    assert "异步标准" in csharp_gate
+    assert text_gate == ""
+
+
+def test_build_agent_extra_args_uses_bare_for_third_party_provider() -> None:
+    extra_args = ClaudeFixAgent._build_agent_extra_args(
+        {
+            "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+            "ANTHROPIC_API_KEY": "token",
+        }
+    )
+
+    assert extra_args == {"bare": None}
+
+
+def test_build_agent_extra_args_keeps_default_mode_for_first_party_provider() -> None:
+    extra_args = ClaudeFixAgent._build_agent_extra_args(
+        {
+            "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
+            "ANTHROPIC_API_KEY": "token",
+        }
+    )
+
+    assert extra_args == {}
+
+
+def test_build_sdk_child_env_strips_model_env_for_third_party_provider() -> None:
+    child_env = ClaudeFixAgent._build_sdk_child_env(
+        {
+            "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+            "ANTHROPIC_API_KEY": "token",
+            "ANTHROPIC_CUSTOM_MODEL_OPTION": "glm-4.7",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.7",
+            "CLAUDE_MODEL": "glm-4.7",
+        }
+    )
+
+    assert child_env["ANTHROPIC_BASE_URL"] == "https://open.bigmodel.cn/api/anthropic"
+    assert child_env["ANTHROPIC_API_KEY"] == "token"
+    assert "ANTHROPIC_CUSTOM_MODEL_OPTION" not in child_env
+    assert "ANTHROPIC_DEFAULT_SONNET_MODEL" not in child_env
+    assert "CLAUDE_MODEL" not in child_env
+
+
+def test_resolve_sdk_model_uses_env_for_third_party_provider() -> None:
+    raw_env = {
+        "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+        "ANTHROPIC_API_KEY": "token",
+    }
+    child_env = ClaudeFixAgent._build_sdk_child_env(raw_env)
+
+    sdk_model = ClaudeFixAgent._resolve_sdk_model(raw_env, child_env, "glm-4.7")
+
+    assert sdk_model is None
+    assert child_env["CLAUDE_MODEL"] == "glm-4.7"
+
+
+def test_load_csharp_quality_gate_prefers_skill_file_and_appends_xml_doc_constraints(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    issue = SonarIssue(
+        key="issue-cs-skill",
+        rule="csharpsquid:S6562",
+        message="DateTime 应显式指定 Kind",
+        line=3,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    skill_file = tmp_path / "SKILL.md"
+    skill_file.write_text(
+        "\n".join(
+            [
+                "---",
+                "name: csharp-quality-gate",
+                "description: demo",
+                "---",
+                "",
+                "# C# 代码质量与架构规范门禁",
+                "",
+                "* **[强制] XML 文档注释**：所有公开的类、方法、属性、实体都必须有完整的 XML 文档注释。",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(ClaudeFixAgent, "QUALITY_GATE_PATHS", (skill_file,))
+
+    gate = ClaudeFixAgent._load_csharp_quality_gate(issue)
+
+    assert "name: csharp-quality-gate" not in gate
+    assert "# C# 代码质量与架构规范门禁" in gate
+    assert "所有公开的类、方法、属性、实体都必须有完整的 XML 文档注释" in gate
+    assert "不要给 `private` 或 `internal` 的辅助方法添加残缺的 XML 文档注释" in gate
+
+
+def test_build_user_prompt_includes_rule_specific_guards() -> None:
+    issue = SonarIssue(
+        key="issue-guards",
+        rule="csharpsquid:S3267",
+        message="循环可简化为 LINQ",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  18 | foreach (var item in items) { ... }",
+        "",
+        "- 只允许修改第 18-24 行。",
+        {
+            "name": "Loops should be simplified with LINQ expressions",
+            "description": "某些循环可以被 LINQ 表达式替代。",
+            "how_to_fix": "在安全时使用 LINQ。",
+        },
+        'dotnet build "src/Foo.sln"',
+    )
+
+    assert "【当前规则的额外约束】" in prompt
+    assert "IQueryable" in prompt
+    assert "await" in prompt
+    assert "不要为了满足规则把简单循环改成更难读" in prompt
+
+
+def test_rule_validator_rejects_unresolved_nested_ternary() -> None:
+    message = validate_rule_fix(
+        validator_name="nested_ternary_removed",
+        issue_line=3,
+        file_content="\n".join(
+            [
+                "var result = foo",
+                "    ? (bar ? 1 : 0)",
+                "    : 2;",
+            ]
+        ),
+    )
+
+    assert "nested ternary expression still exists" in message
+    assert "csharpsquid:S3358" in message
+
+
+def test_rule_validator_accepts_single_level_ternary() -> None:
+    message = validate_rule_fix(
+        validator_name="nested_ternary_removed",
+        issue_line=2,
+        file_content="\n".join(
+            [
+                "var parsed = int.TryParse(value, out var temp) ? temp : 0;",
+                "var result = hasValue ? parsed : 0;",
+            ]
+        ),
+    )
+
+    assert message == ""
 
 
 def test_fix_issue_fails_when_agent_makes_no_changes(monkeypatch, tmp_path) -> None:
@@ -79,12 +273,43 @@ def test_fix_issue_fails_when_agent_makes_no_changes(monkeypatch, tmp_path) -> N
 
     assert result.success is False
     assert result.error == "Agent completed without modifying any files"
+    assert result.retryable_failure is True
+    assert result.failure_kind == "no_change"
+
+
+def test_fix_issue_skips_policy_managed_rule_before_running_agent(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-skip",
+        rule="csharpsquid:S107",
+        message="方法参数过多",
+        line=12,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: (_ for _ in ()).throw(AssertionError("skip rule should not read rule details")),
+    )
+
+    result = agent.fix_issue(issue, tmp_path)
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.failure_kind == "policy_skip"
+    assert "默认跳过" in result.skip_reason
 
 
 def test_builtin_tool_policy_allows_editing_tools_without_bash() -> None:
     assert BUILTIN_FIX_TOOLS == ["Read", "Edit", "MultiEdit", "Write", "Grep", "Glob"]
     assert "Bash" not in BUILTIN_FIX_TOOLS
-    assert "mcp__sonar-fix__run_build" in MCP_FIX_TOOLS
+    assert MCP_FIX_TOOLS == []
+    assert "mcp__sonar-fix__git_add" not in MCP_FIX_TOOLS
+    assert "mcp__sonar-fix__git_commit" not in MCP_FIX_TOOLS
+    assert "mcp__sonar-fix__git_push" not in MCP_FIX_TOOLS
 
 
 def test_fix_issue_fails_when_local_build_verification_fails(monkeypatch, tmp_path) -> None:
@@ -136,6 +361,484 @@ def test_fix_issue_fails_when_local_build_verification_fails(monkeypatch, tmp_pa
     assert result.build_command == 'dotnet build "src/Foo.sln"'
     assert result.build_output == "compile failed"
     assert result.build_verification_failed is True
+    assert result.retryable_failure is True
+    assert result.failure_kind == "build"
+
+
+def test_fix_issue_retries_when_rule_specific_validation_fails(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-3d",
+        rule="csharpsquid:S3358",
+        message="嵌套三元运算符",
+        line=2,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text(
+        "\n".join(
+            [
+                "var value = foo",
+                "    ? (bar ? 1 : 0)",
+                "    : 2;",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: ["src/Foo.cs"]),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    def fake_run(func) -> None:
+        source_file.write_text(
+            "\n".join(
+                [
+                    "var value = foo",
+                    "    ? (bar ? 1 : 0)",
+                    "    : 2;",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(claude_agent_module.anyio, "run", fake_run)
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    monkeypatch.setattr(
+        claude_agent_module.subprocess,
+        "run",
+        lambda *args, **kwargs: FakeCompletedProcess(),
+    )
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is False
+    assert result.retryable_failure is True
+    assert result.failure_kind == "rule_validation"
+    assert "nested ternary expression still exists" in result.build_output
+
+
+def test_fix_issue_retries_when_run_build_tool_crashes(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-build-tool",
+        rule="csharpsquid:S6580",
+        message="DateTime.TryParse 应指定 format provider",
+        line=4,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: ["src/Foo.cs"]),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    class FakeToolUseBlock:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    class FakeAssistantMessage:
+        def __init__(self) -> None:
+            self.content = [FakeToolUseBlock("mcp__sonar-fix__run_build")]
+
+    async def fake_receive_response():
+        yield FakeAssistantMessage()
+        raise RuntimeError("Command failed with exit code 3 (exit code: 3)\nError output: build stderr")
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def query(self, prompt):
+            return None
+
+        def receive_response(self):
+            return fake_receive_response()
+
+    monkeypatch.setattr(claude_agent_module, "AssistantMessage", FakeAssistantMessage)
+    monkeypatch.setattr(claude_agent_module, "ToolUseBlock", FakeToolUseBlock)
+    monkeypatch.setattr(claude_agent_module, "ClaudeSDKClient", lambda options: FakeClient())
+
+    class FakeCompletedProcess:
+        returncode = 1
+        stdout = "build stdout"
+        stderr = "src/Foo.cs(4,1): error CS0103: name not found [Foo.csproj]"
+
+    monkeypatch.setattr(
+        claude_agent_module.subprocess,
+        "run",
+        lambda *args, **kwargs: FakeCompletedProcess(),
+    )
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is False
+    assert result.error == "Build tool execution failed"
+    assert result.retryable_failure is True
+    assert result.build_verification_failed is True
+    assert result.failure_kind == "build_tool"
+    assert "run_build 工具执行异常" in result.build_output
+    assert "本地回退构建 Exit code: 1" in result.build_output
+    assert "error CS0103: name not found" in result.build_output
+
+
+def test_fix_issue_retries_when_model_first_response_times_out(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-model-timeout",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=4,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: []),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    monkeypatch.setattr(
+        claude_agent_module.anyio,
+        "run",
+        lambda func: (_ for _ in ()).throw(TimeoutError("模型在 120 秒内没有返回首个响应")),
+    )
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is False
+    assert result.retryable_failure is True
+    assert result.failure_kind == "model_timeout"
+    assert result.error == "Model response timed out"
+    assert "没有返回首个响应" in result.build_output
+
+
+def test_fix_issue_retries_when_forbidden_tool_is_used(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-forbidden-tool",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=4,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: ["src/Foo.cs"]),
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_attempt_head_changed",
+        staticmethod(lambda workspace_path: False),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    class FakeToolUseBlock:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    class FakeAssistantMessage:
+        def __init__(self) -> None:
+            self.content = [FakeToolUseBlock("mcp__sonar-fix__git_commit")]
+
+    class FakeResultMessage:
+        def __init__(self) -> None:
+            self.total_cost_usd = 0.1
+            self.is_error = False
+            self.result = ""
+            self.errors = []
+
+    async def fake_receive_response():
+        yield FakeAssistantMessage()
+        yield FakeResultMessage()
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def query(self, prompt):
+            return None
+
+        def receive_response(self):
+            return fake_receive_response()
+
+    monkeypatch.setattr(claude_agent_module, "AssistantMessage", FakeAssistantMessage)
+    monkeypatch.setattr(claude_agent_module, "ToolUseBlock", FakeToolUseBlock)
+    monkeypatch.setattr(claude_agent_module, "ResultMessage", FakeResultMessage)
+    monkeypatch.setattr(claude_agent_module, "ClaudeSDKClient", lambda options: FakeClient())
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_run_local_build_fallback",
+        classmethod(lambda cls, workspace_path, build_command: (True, "fallback build ok")),
+    )
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is False
+    assert result.retryable_failure is True
+    assert result.failure_kind == "forbidden_tool"
+    assert result.error == "Forbidden tool used during issue fix"
+    assert "git_commit" in result.build_output
+    assert "fallback build ok" in result.build_output
+
+
+def test_collect_modified_files_detects_attempt_local_commit(monkeypatch, tmp_path) -> None:
+    import subprocess
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+
+    tracked_file = repo / "tracked.cs"
+    tracked_file.write_text("class Foo {}\n", encoding="utf-8")
+    subprocess.run(["git", "add", "tracked.cs"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo, check=True)
+
+    ClaudeFixAgent._capture_attempt_workspace_state(repo)
+    try:
+        tracked_file.write_text("class Foo { int Value => 1; }\n", encoding="utf-8")
+        subprocess.run(["git", "add", "tracked.cs"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-m", "attempt"], cwd=repo, check=True)
+
+        changed_files = ClaudeFixAgent._collect_modified_files(repo)
+
+        assert changed_files == ["tracked.cs"]
+        assert ClaudeFixAgent._attempt_head_changed(repo) is True
+    finally:
+        ClaudeFixAgent._cleanup_attempt_workspace_state(repo)
+
+
+def test_fix_issue_runs_local_build_before_scope_rejection(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-3b",
+        rule="csharpsquid:S3358",
+        message="嵌套三元运算符",
+        line=3,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: ["src/Foo.cs"]),
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_validate_issue_edit_scope",
+        staticmethod(
+            lambda workspace_path, issue, scope, **kwargs: "Issue changes exceeded the allowed Sonar edit scope."
+        ),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    monkeypatch.setattr(claude_agent_module.anyio, "run", lambda func: None)
+
+    class FakeCompletedProcess:
+        returncode = 1
+        stdout = ""
+        stderr = "src/Foo.cs(3,1): error CS0103: name not found [Foo.csproj]"
+
+    monkeypatch.setattr(
+        claude_agent_module.subprocess,
+        "run",
+        lambda *args, **kwargs: FakeCompletedProcess(),
+    )
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is False
+    assert result.error == "Issue changes failed local build verification"
+    assert "error CS0103: name not found" in result.build_output
+    assert "Issue changes exceeded the allowed Sonar edit scope." in result.build_output
+    assert result.retryable_failure is True
+    assert result.failure_kind == "build"
+
+
+def test_fix_issue_scope_validation_ignores_previous_successful_changes_in_same_file(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-3c",
+        rule="csharpsquid:S6562",
+        message="DateTime 应显式指定 Kind",
+        line=7,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    private int _value = 1;",
+                "",
+                "    public void Demo()",
+                "    {",
+                "        var now = DateTime.Now;",
+                "    }",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    # Simulate a previous issue that already modified the same file before the current issue starts.
+    source_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    private int _value = 2;",
+                "",
+                "    public void Demo()",
+                "    {",
+                "        var now = DateTime.Now;",
+                "    }",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: ["src/Foo.cs"]),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    def fake_run(func) -> None:
+        source_file.write_text(
+            "\n".join(
+                [
+                    "class Foo",
+                    "{",
+                    "    private int _value = 2;",
+                    "",
+                    "    public void Demo()",
+                    "    {",
+                    "        var now = DateTime.UtcNow;",
+                    "    }",
+                    "}",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(claude_agent_module.anyio, "run", fake_run)
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    monkeypatch.setattr(
+        claude_agent_module.subprocess,
+        "run",
+        lambda *args, **kwargs: FakeCompletedProcess(),
+    )
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is True
+    assert result.build_passed is True
+    assert "allowed Sonar edit scope" not in result.build_output
 
 
 def test_scope_validation_rejects_out_of_scope_lines() -> None:
@@ -144,19 +847,184 @@ def test_scope_validation_rejects_out_of_scope_lines() -> None:
             key="issue-4",
             rule="csharpsquid:S6562",
             message="DateTime 应显式指定 Kind",
-            line=20,
+            line=4,
             component="BI:src/Foo.cs",
             severity="MAJOR",
             issue_type="CODE_SMELL",
         ),
-        [f"line {index}" for index in range(1, 41)],
+        [
+            "public void Demo()",
+            "{",
+            '    var name = "demo";',
+            "    var cuffOffDate = new DateTime(",
+            "        2024,",
+            "        6,",
+            "        1);",
+            "    var another = DateTime.Now;",
+            "}",
+        ],
     )
 
     changed_lines = ClaudeFixAgent._extract_changed_line_numbers(
-        "@@ -20,1 +20,1 @@\n@@ -32,1 +32,1 @@\n"
+        "@@ -4,1 +4,1 @@\n@@ -8,1 +8,1 @@\n"
     )
     offending_lines = ClaudeFixAgent._find_out_of_scope_lines(scope, changed_lines)
 
-    assert scope.start_line == 12
-    assert scope.validation_end_line == 28
-    assert offending_lines == [32]
+    assert scope.start_line == 4
+    assert scope.validation_start_line == 4
+    assert scope.validation_end_line == 7
+    assert offending_lines == [8]
+
+
+def test_build_issue_edit_scope_supports_control_block_scope() -> None:
+    scope = ClaudeFixAgent._build_issue_edit_scope(
+        SonarIssue(
+            key="issue-block",
+            rule="csharpsquid:S2681",
+            message="多行代码块必须使用大括号",
+            line=2,
+            component="BI:src/Foo.cs",
+            severity="MAJOR",
+            issue_type="CODE_SMELL",
+        ),
+        [
+            "public void Demo()",
+            "if (enabled)",
+            "    Run();",
+            "return;",
+        ],
+    )
+
+    assert scope.mode == CONTROL_BLOCK_SCOPE_MODE
+    assert scope.start_line == 2
+    assert scope.end_line == 3
+    assert scope.validation_start_line == 2
+    assert scope.validation_end_line == 4
+
+
+def test_build_issue_edit_scope_supports_declaration_comment_scope() -> None:
+    scope = ClaudeFixAgent._build_issue_edit_scope(
+        SonarIssue(
+            key="issue-doc",
+            rule="external_roslyn:CS1591",
+            message="公开成员缺少 XML 注释",
+            line=4,
+            component="BI:src/Foo.cs",
+            severity="MAJOR",
+            issue_type="CODE_SMELL",
+        ),
+        [
+            "namespace Demo",
+            "{",
+            "    [HttpGet]",
+            "    public IActionResult List(",
+            "        int id)",
+            "    {",
+            "        return Ok(id);",
+            "    }",
+            "}",
+        ],
+    )
+
+    assert scope.mode == DECLARATION_COMMENT_SCOPE_MODE
+    assert scope.start_line == 3
+    assert scope.end_line == 6
+    assert scope.validation_start_line == 1
+    assert scope.validation_end_line == 9
+
+
+def test_build_issue_edit_scope_supports_conditional_chain_scope() -> None:
+    scope = ClaudeFixAgent._build_issue_edit_scope(
+        SonarIssue(
+            key="issue-conditional",
+            rule="csharpsquid:S1871",
+            message="两个分支实现相同",
+            line=7,
+            component="BI:src/Foo.cs",
+            severity="MAJOR",
+            issue_type="CODE_SMELL",
+        ),
+        [
+            "if (a)",
+            "{",
+            "    Foo();",
+            "}",
+            "else if (b)",
+            "{",
+            "    Foo();",
+            "}",
+            "else",
+            "{",
+            "    Foo();",
+            "}",
+        ],
+    )
+
+    assert scope.mode == CONDITIONAL_CHAIN_SCOPE_MODE
+    assert scope.start_line == 1
+    assert scope.end_line == 12
+    assert scope.validation_start_line == 1
+    assert scope.validation_end_line == 12
+
+
+def test_build_issue_edit_scope_supports_expression_rewrite_scope() -> None:
+    scope = ClaudeFixAgent._build_issue_edit_scope(
+        SonarIssue(
+            key="issue-expression",
+            rule="csharpsquid:S3358",
+            message="嵌套三元运算符",
+            line=5,
+            component="BI:src/Foo.cs",
+            severity="MAJOR",
+            issue_type="CODE_SMELL",
+        ),
+        [
+            "var result = items.Select(x => new",
+            "{",
+            "    Name = x.Name,",
+            "    Score = foo",
+            "        ? (bar ? 1 : 0)",
+            "        : 2,",
+            "}).ToList();",
+        ],
+    )
+
+    assert scope.mode == EXPRESSION_REWRITE_SCOPE_MODE
+    assert scope.start_line == 1
+    assert scope.end_line == 7
+    assert scope.validation_start_line == 1
+    assert scope.validation_end_line == 7
+
+
+def test_build_issue_edit_scope_supports_loop_rewrite_scope() -> None:
+    scope = ClaudeFixAgent._build_issue_edit_scope(
+        SonarIssue(
+            key="issue-loop",
+            rule="csharpsquid:S3267",
+            message="循环可简化为 LINQ",
+            line=4,
+            component="BI:src/Foo.cs",
+            severity="MAJOR",
+            issue_type="CODE_SMELL",
+        ),
+        [
+            "private static string? FindMatch(IEnumerable<Item> items, string target)",
+            "{",
+            "    foreach (var item in items)",
+            "    {",
+            "        if (item.Name == target)",
+            "        {",
+            "            return item.Name;",
+            "        }",
+            "    }",
+            "",
+            "    return null;",
+            "}",
+        ],
+    )
+
+    assert scope.mode == LOOP_REWRITE_SCOPE_MODE
+    assert scope.start_line == 3
+    assert scope.end_line == 11
+    assert scope.validation_start_line == 3
+    assert scope.validation_end_line == 12

@@ -10,6 +10,7 @@ from pi_sonar_agent.core.model_env import (
     build_agent_env,
     load_project_env,
     resolve_agent_model,
+    validate_agent_env,
 )
 from pi_sonar_agent.fixers.build_gate import resolve_build_command
 from rich.console import Console
@@ -56,6 +57,12 @@ def fix(
     sonar_token = require_env("SONARQUBE_TOKEN")
     sonar_org = os.getenv("SONARQUBE_ORG")
     workspace_root = os.getenv("WORKSPACE_ROOT", ".agent_workspaces")
+    model_env_errors = validate_agent_env()
+    if model_env_errors:
+        console.print("[red]Error:[/red] Invalid model configuration:")
+        for error in model_env_errors:
+            console.print(f"  - {error}")
+        raise typer.Exit(code=1)
 
     # Create agent
     agent = ClaudeFixAgent(
@@ -128,6 +135,12 @@ def list_issues(
     sonar_host = require_env("SONARQUBE_HOST", "http://localhost:9000")
     sonar_token = require_env("SONARQUBE_TOKEN")
     sonar_org = os.getenv("SONARQUBE_ORG")
+    model_env_errors = validate_agent_env()
+    if model_env_errors:
+        console.print("[red]Error:[/red] Invalid model configuration:")
+        for error in model_env_errors:
+            console.print(f"  - {error}")
+        raise typer.Exit(code=1)
 
     agent = ClaudeFixAgent(
         sonar_host=sonar_host,

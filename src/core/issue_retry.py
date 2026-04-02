@@ -14,6 +14,11 @@ from pi_sonar_agent.agent.claude_agent import (
     FixResult,
     SonarIssue,
 )
+from pi_sonar_agent.agent.rule_policies import (
+    EXPRESSION_REWRITE_SCOPE_MODE,
+    LOOP_REWRITE_SCOPE_MODE,
+    get_rule_policy,
+)
 from pi_sonar_agent.fixers.build_gate import format_build_failure_report
 
 DEFAULT_MAX_BUILD_RETRIES = 3
@@ -23,6 +28,7 @@ DEFAULT_MAX_BUILD_RETRIES = 3
 class WorkspaceBaseline:
     """Snapshot of the workspace state before an issue attempt starts."""
 
+    head_commit: str
     snapshot_dir: Path
     patch_path: Path
     untracked_root: Path
@@ -121,14 +127,129 @@ def _build_retry_guidance(errors: list[CompilerErrorContext]) -> list[str]:
     return guidance
 
 
-def build_retry_feedback(workspace_path: Path, result: FixResult) -> str:
+def _build_scope_retry_constraints(issue: SonarIssue | None) -> list[str]:
+    """Build rule-aware retry constraints for scope violations."""
+
+    if issue is None:
+        return [
+            "- 只保留 Sonar 指向的那一处修改。",
+            "- 不要顺手修改本文件其他相同写法或同类规则的位置。",
+            "- 如果这是行级问题，只修改包含 issue 行的那条语句。",
+        ]
+
+    policy = get_rule_policy(issue.rule)
+    if policy.scope_mode == EXPRESSION_REWRITE_SCOPE_MODE:
+        return [
+            "- 只保留当前 issue 对应表达式附近的改动，不要顺手修改同方法中的其他表达式。",
+            "- 可以在附近引入局部变量、if/else 或语句 lambda，但不要新增类级 private/helper 方法。",
+            "- 如果 issue 位于 LINQ Select/匿名对象初始化中，优先改写成语句 lambda，并在 lambda 内 return 原对象。",
+        ]
+
+    if policy.scope_mode == LOOP_REWRITE_SCOPE_MODE:
+        return [
+            "- 只重写当前 foreach/for/while 语句块，不要顺手改同方法中的其他循环。",
+            "- 如果循环后紧跟着与该查找/过滤逻辑配套的 return 或 throw，可以一并改写；不要扩展到后续无关语句。",
+            "- 优先保持语义等价，再考虑用 Any、FirstOrDefault、Where 等 LINQ 形式替换循环。",
+        ]
+
+    return [
+        "- 只保留 Sonar 指向的那一处修改。",
+        "- 不要顺手修改本文件其他相同写法或同类规则的位置。",
+        "- 如果这是行级问题，只修改包含 issue 行的那条语句。",
+    ]
+
+
+def build_retry_feedback(
+    workspace_path: Path,
+    result: FixResult,
+    issue: SonarIssue | None = None,
+) -> str:
     """Build concise retry feedback for the next model attempt."""
 
     errors = _extract_compiler_errors(workspace_path, result.build_output)
+    raw_output = str(result.build_output or "").strip()
+    has_scope_violation = "Issue changes exceeded the allowed Sonar edit scope." in raw_output
+    build_tool_failed = result.failure_kind == "build_tool"
+    forbidden_tool_failed = result.failure_kind == "forbidden_tool"
+    model_timeout_failed = result.failure_kind == "model_timeout"
     if not errors:
+        if raw_output:
+            if model_timeout_failed:
+                return "\n".join(
+                    [
+                        "上次尝试在等待模型首响应时超时，请先确认当前模型网关或 provider 可正常返回工具调用响应：",
+                        raw_output,
+                        "重试约束:",
+                        "- 不要更换构建命令，先确认模型能正常返回第一条消息。",
+                        "- 如果连续超时，优先检查 .env 中的模型 endpoint、token 和 provider 兼容性。",
+                    ]
+                )
+            if forbidden_tool_failed:
+                sections = [
+                    "上次尝试使用了被禁止的工具，或污染了当前 issue 的 Git 基线；本次必须严格按下面约束重试：",
+                    raw_output,
+                    "重试约束:",
+                    "- 严禁使用 Bash、git_add、git_commit、git_push 或任何自行提交/推送动作。",
+                    "- 修复阶段只能直接编辑代码并运行推荐构建命令，提交由外层流程统一处理。",
+                    "- 先根据下面的本地构建输出修复问题，再重新运行推荐构建命令验证。",
+                ]
+                if has_scope_violation:
+                    sections.extend(
+                        [
+                            "范围约束:",
+                            *_build_scope_retry_constraints(issue),
+                        ]
+                    )
+                return "\n".join(sections)
+            if build_tool_failed:
+                sections = [
+                    "上次尝试在运行构建工具时异常退出，请先处理下面的异常信息和本地回退构建输出：",
+                    raw_output,
+                    "重试约束:",
+                    "- 先修复 stderr 或回退构建输出中暴露的问题，再重新运行推荐构建命令。",
+                    "- 如果回退构建已经通过，也要再次运行构建，确认修改后的代码仍然稳定。",
+                ]
+                if has_scope_violation:
+                    sections.extend(
+                        [
+                            "范围约束:",
+                            *_build_scope_retry_constraints(issue),
+                        ]
+                    )
+                return "\n".join(sections)
+            if has_scope_violation:
+                return "\n".join(
+                    [
+                        "上次尝试修改了 Sonar 指定范围之外的代码，请严格缩小修改范围：",
+                        raw_output,
+                        "重试约束:",
+                        *_build_scope_retry_constraints(issue),
+                    ]
+                )
+            return raw_output
+        if result.error == "Agent completed without modifying any files":
+            return "\n".join(
+                [
+                    "上次尝试没有实际修改任何文件。",
+                    "这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。",
+                    "重试约束:",
+                    "- 不要只做分析或解释，必须提交实际代码修改。",
+                    "- 修改后立即使用推荐构建命令验证。",
+                    "- 如果这是行级问题，只修改 Sonar 指向的那条语句。",
+                ]
+            )
         return result.error or ""
 
-    sections: list[str] = ["上次尝试引入了以下关键编译错误，请先修复这些错误："]
+    sections: list[str] = []
+    if model_timeout_failed:
+        sections.append("上次尝试在等待模型首响应时超时。")
+        sections.append("先确认当前模型 provider/网关与 Claude SDK 工具调用协议兼容，再继续重试。")
+    if forbidden_tool_failed:
+        sections.append("上次尝试使用了被禁止的工具，或污染了当前 issue 的 Git 基线。")
+        sections.append("这次严禁使用 Bash、git_add、git_commit、git_push；只允许直接编辑代码并运行推荐构建命令。")
+    if build_tool_failed:
+        sections.append("上次尝试在运行构建工具时异常退出；已附加本地回退构建结果。")
+    sections.append("上次尝试引入了以下关键编译错误，请先修复这些错误：")
     for index, item in enumerate(errors[:12], start=1):
         sections.append(
             f"{index}. {item.code} at {item.file_path}:{item.line}:{item.column}\n"
@@ -142,7 +263,37 @@ def build_retry_feedback(workspace_path: Path, result: FixResult) -> str:
         sections.append("重试约束:")
         sections.extend(f"- {item}" for item in guidance)
 
+    if has_scope_violation:
+        sections.extend(
+            [
+                "另外，上次修改还越过了 Sonar 允许范围：",
+                raw_output,
+                "范围约束:",
+                *_build_scope_retry_constraints(issue),
+            ]
+        )
+
     return "\n".join(sections)
+
+
+def _build_final_skip_reason(result: FixResult, attempts: int) -> str:
+    """Build a stable final skip reason after retries are exhausted."""
+
+    if result.failure_kind == "build":
+        return f"Build verification failed after {attempts} attempt(s)"
+    if result.failure_kind == "scope":
+        return f"Issue changes exceeded allowed scope after {attempts} attempt(s)"
+    if result.failure_kind == "no_change":
+        return f"Agent completed without modifying any files after {attempts} attempt(s)"
+    if result.failure_kind == "rule_validation":
+        return f"Rule-specific validation failed after {attempts} attempt(s)"
+    if result.failure_kind == "build_tool":
+        return f"Build tool execution failed after {attempts} attempt(s)"
+    if result.failure_kind == "forbidden_tool":
+        return f"Forbidden tool usage polluted the issue attempt after {attempts} attempt(s)"
+    if result.failure_kind == "model_timeout":
+        return f"Model response timed out after {attempts} attempt(s)"
+    return f"Issue fix failed after {attempts} attempt(s)"
 
 
 def _run_git_command(
@@ -187,6 +338,8 @@ def capture_workspace_baseline(
     patch_path = snapshot_dir / "tracked.patch"
     untracked_root = snapshot_dir / "untracked"
     untracked_root.mkdir(parents=True, exist_ok=True)
+    head_commit_result = _run_git_command(workspace_path, ["rev-parse", "HEAD"])
+    head_commit = (head_commit_result.stdout or "").strip()
 
     diff_result = _run_git_command(workspace_path, ["diff", "--binary", "--no-color", "HEAD"])
     patch_path.write_text(diff_result.stdout or "", encoding="utf-8")
@@ -204,6 +357,7 @@ def capture_workspace_baseline(
             shutil.copy2(source, target)
 
     return WorkspaceBaseline(
+        head_commit=head_commit,
         snapshot_dir=snapshot_dir,
         patch_path=patch_path,
         untracked_root=untracked_root,
@@ -214,7 +368,7 @@ def capture_workspace_baseline(
 def restore_workspace_baseline(workspace_path: Path, baseline: WorkspaceBaseline) -> None:
     """Restore the workspace to the baseline captured before the issue attempt."""
 
-    _run_git_command(workspace_path, ["reset", "--hard", "HEAD"])
+    _run_git_command(workspace_path, ["reset", "--hard", baseline.head_commit])
     _run_git_command(workspace_path, ["clean", "-fd"])
 
     patch_text = baseline.patch_path.read_text(encoding="utf-8") if baseline.patch_path.exists() else ""
@@ -307,6 +461,10 @@ def process_issue_with_retries(
                 logger.write(f"Attempt {attempt} succeeded: {result.summary}")
                 return result
 
+            if result.skipped and result.failure_kind == "policy_skip":
+                logger.write(f"Issue skipped by policy: {result.skip_reason or result.error or 'policy skip'}")
+                return result
+
             logger.write(f"Attempt {attempt} failed: {result.error or 'unknown error'}")
             failure_report = ""
             if result.build_output:
@@ -321,17 +479,18 @@ def process_issue_with_retries(
                 if failure_report:
                     logger.write("Build failure report:\n" + failure_report)
 
-            next_retry_feedback = build_retry_feedback(workspace_path, result)
+            next_retry_feedback = build_retry_feedback(workspace_path, result, issue)
             restore_workspace_baseline(workspace_path, baseline)
             logger.write("Workspace restored to issue baseline")
 
-            if result.build_verification_failed and attempt < max_build_retries:
+            should_retry = result.retryable_failure or result.build_verification_failed
+            if should_retry and attempt < max_build_retries:
                 retry_feedback = next_retry_feedback or failure_report or (result.error or "")
-                logger.write(f"Retrying issue after build failure, next attempt: {attempt + 1}")
+                logger.write(f"Retrying issue after recoverable failure, next attempt: {attempt + 1}")
                 continue
 
-            if result.build_verification_failed:
-                result.skip_reason = f"Build verification failed after {attempt} attempt(s)"
+            if should_retry:
+                result.skip_reason = _build_final_skip_reason(result, attempt)
             else:
                 result.skip_reason = result.error or "Issue fix failed"
             result.error = result.skip_reason

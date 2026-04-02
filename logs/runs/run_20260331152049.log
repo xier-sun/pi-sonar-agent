@@ -1,0 +1,334 @@
+[INFO] 运行日志: logs/runs/run_20260331152049.log
+[INFO] Reviewer: pengxiru@neware.com.cn (source: targets.json.reviewer_email)
+[INFO] DingTalk UserId: 17556530801301497 (source: targets.json.dingtalk_userid)
+[INFO] 正在获取 SonarQube issues...
+[INFO] 发现 37 个 issues
+[INFO] 限制处理 3 个
+[INFO] 准备仓库...
+[INFO] 已清理 16 个旧工作区
+  - .agent_workspaces/fix_BI_20260331095031
+  - .agent_workspaces/fix_BI_20260329174613
+  - .agent_workspaces/fix_BI_20260329182354
+  - .agent_workspaces/fix_BI_20260329183806
+  - .agent_workspaces/fix_BI_20260329185337
+  - .agent_workspaces/fix_BI_20260329185836
+  - .agent_workspaces/fix_BI_20260329191305
+  - .agent_workspaces/fix_BI_20260329193447
+  - .agent_workspaces/fix_BI_20260329200204
+  - .agent_workspaces/fix_BI_20260330170558
+  - .agent_workspaces/fix_BI_20260329223950
+  - .agent_workspaces/fix_BI_20260329220901
+  - .agent_workspaces/fix_BI_20260329212824
+  - .agent_workspaces/fix_BI_20260329204145
+  - .agent_workspaces/fix_BI_20260329202629
+  - .agent_workspaces/fix_BI_20260329201430
+Cloning into '.agent_workspaces\fix_BI_20260331152049'...
+Updating files:   9% (880/9750)
+Updating files:  10% (975/9750)
+Updating files:  11% (1073/9750)
+Updating files:  12% (1170/9750)
+Updating files:  13% (1268/9750)
+Updating files:  14% (1365/9750)
+Updating files:  15% (1463/9750)
+Updating files:  16% (1560/9750)
+Updating files:  17% (1658/9750)
+Updating files:  18% (1755/9750)
+Updating files:  18% (1767/9750)
+Updating files:  19% (1853/9750)
+Updating files:  20% (1950/9750)
+Updating files:  21% (2048/9750)
+Updating files:  22% (2145/9750)
+Updating files:  23% (2243/9750)
+Updating files:  24% (2340/9750)
+Updating files:  25% (2438/9750)
+Updating files:  26% (2535/9750)
+Updating files:  27% (2633/9750)
+Updating files:  28% (2730/9750)
+Updating files:  28% (2822/9750)
+Updating files:  29% (2828/9750)
+Updating files:  30% (2925/9750)
+Updating files:  31% (3023/9750)
+Updating files:  32% (3120/9750)
+Updating files:  33% (3218/9750)
+Updating files:  34% (3315/9750)
+Updating files:  35% (3413/9750)
+Updating files:  36% (3510/9750)
+Updating files:  37% (3608/9750)
+Updating files:  38% (3705/9750)
+Updating files:  39% (3803/9750)
+Updating files:  39% (3807/9750)
+Updating files:  40% (3900/9750)
+Updating files:  41% (3998/9750)
+Updating files:  42% (4095/9750)
+Updating files:  43% (4193/9750)
+Updating files:  44% (4290/9750)
+Updating files:  45% (4388/9750)
+Updating files:  46% (4485/9750)
+Updating files:  47% (4583/9750)
+Updating files:  48% (4680/9750)
+Updating files:  48% (4755/9750)
+Updating files:  49% (4778/9750)
+Updating files:  50% (4875/9750)
+Updating files:  51% (4973/9750)
+Updating files:  52% (5070/9750)
+Updating files:  53% (5168/9750)
+Updating files:  54% (5265/9750)
+Updating files:  55% (5363/9750)
+Updating files:  56% (5460/9750)
+Updating files:  57% (5558/9750)
+Updating files:  57% (5618/9750)
+Updating files:  58% (5655/9750)
+Updating files:  59% (5753/9750)
+Updating files:  60% (5850/9750)
+Updating files:  61% (5948/9750)
+Updating files:  62% (6045/9750)
+Updating files:  63% (6143/9750)
+Updating files:  64% (6240/9750)
+Updating files:  65% (6338/9750)
+Updating files:  66% (6435/9750)
+Updating files:  67% (6533/9750)
+Updating files:  68% (6630/9750)
+Updating files:  68% (6718/9750)
+Updating files:  69% (6728/9750)
+Updating files:  70% (6825/9750)
+Updating files:  71% (6923/9750)
+Updating files:  72% (7020/9750)
+Updating files:  73% (7118/9750)
+Updating files:  74% (7215/9750)
+Updating files:  75% (7313/9750)
+Updating files:  76% (7410/9750)
+Updating files:  77% (7508/9750)
+Updating files:  78% (7605/9750)
+Updating files:  79% (7703/9750)
+Updating files:  80% (7800/9750)
+Updating files:  81% (7898/9750)
+Updating files:  81% (7981/9750)
+Updating files:  82% (7995/9750)
+Updating files:  83% (8093/9750)
+Updating files:  84% (8190/9750)
+Updating files:  85% (8288/9750)
+Updating files:  86% (8385/9750)
+Updating files:  87% (8483/9750)
+Updating files:  88% (8580/9750)
+Updating files:  89% (8678/9750)
+Updating files:  90% (8775/9750)
+Updating files:  91% (8873/9750)
+Updating files:  92% (8970/9750)
+Updating files:  93% (9068/9750)
+Updating files:  94% (9165/9750)
+Updating files:  94% (9241/9750)
+Updating files:  95% (9263/9750)
+Updating files:  96% (9360/9750)
+Updating files:  97% (9458/9750)
+Updating files:  98% (9555/9750)
+Updating files:  99% (9653/9750)
+Updating files:  99% (9667/9750)
+Updating files: 100% (9750/9750)
+Updating files: 100% (9750/9750), done.
+warning: the following paths have collided (e.g. case-sensitive paths
+on a case-insensitive filesystem) and only one from the same
+colliding group is in the working tree:
+
+  'OpenAuth.Core/OpenAuth.App/Engineering/ECN/EcnApp.cs'
+  'OpenAuth.Core/OpenAuth.App/Engineering/Ecn/EcnApp.cs'
+
+[1/3] 修复: csharpsquid:S3776 → OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41
+  Claude: 我将按照流程修复这个认知复杂度问题。首先读取源文件分析问题。...
+  Using tool: mcp__sonar-fix__read_file
+  Using tool: Read
+  Using tool: Glob
+  Using tool: Read
+  Claude: 分析完成。问题的根本原因是 `ProcessAsync` 方法的认知复杂度为34，超过了30的限制。主要复杂度来源是第122-163行的 `foreach` 循环内部包含多层嵌套逻辑（嵌套的 LINQ 查询、条件判断、lambda 表达式等）。
+
+我将通过提取私有方法来降低复杂度：
+
+1. 提取第122-163行的循环处理逻辑为单独方法
+2. 提取第135-144行的固定罚金金额计算逻辑为单独方法...
+  Using tool: mcp__sonar-fix__apply_edit
+  Using tool: Edit
+  Using tool: Edit
+  Claude: 现在验证修复后的代码能否编译通过：...
+  Using tool: mcp__sonar-fix__run_build
+  Using tool: Glob
+  Using tool: mcp__sonar-fix__run_build
+  Done. Cost: $0.1939
+  Claude: 我将开始修复这个认知复杂度问题。首先读取源文件了解当前代码结构。...
+  Using tool: mcp__sonar-fix__read_file
+  Using tool: Read
+  Claude: 分析完代码后，我发现 `ProcessAsync` 方法的认知复杂度主要来自第122-164行的复杂循环体，包含多层嵌套的条件判断和计算逻辑。
+
+我将通过提取辅助方法来降低复杂度，主要提取：
+1. `CalculatePenaltyForOrderGroup` - 处理单个订单组的罚息计算
+2. `CheckIfAllPriceItemsReturned` - 检查有价物料是否全部退完
+3. `C...
+  Using tool: mcp__sonar-fix__apply_edit
+  Using tool: Edit
+  Claude: 现在添加提取的辅助方法：...
+  Using tool: Edit
+  Claude: 我意识到使用了 `dynamic` 会导致类型不匹配问题。让我重新修改，使用更类型安全的方式：...
+  Using tool: Edit
+  Using tool: Edit
+  Claude: 让我重新设计，使用局部函数来避免类型问题：...
+  Using tool: Edit
+  Claude: 现在删除不再需要的辅助方法：...
+  Using tool: Edit
+  Claude: 现在让我验证修改后的代码是否能编译通过：...
+  Using tool: mcp__sonar-fix__run_build
+  Done. Cost: $0.4592
+  [OK] Fixed 1 file(s) (attempt 2)
+
+[2/3] 修复: csharpsquid:S125 → OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:62
+  Claude: 我将帮你修复这个 SonarQube 问题。让我先读取源文件确认问题。...
+  Using tool: mcp__sonar-fix__read_file
+  Using tool: Read
+  Using tool: mcp__sonar-fix__list_files
+  Using tool: mcp__sonar-fix__list_files
+  Using tool: Read
+  Using tool: Glob
+  Using tool: Read
+  Claude: 现在我已经读取了文件，确认了问题。让我分析并修复：
+
+**问题分析：**
+- 第 62 行有一段被注释掉的代码：`//var csOrders = UnitWork.Find<sale_ordr>(x => x.U_ERPFrom == "4" && x.sbo_id == Define.SBO_ID).Select(x => x.DocEntry.Value).ToHashSet();`
+- 这...
+  Using tool: mcp__sonar-fix__apply_edit
+  Using tool: mcp__sonar-fix__apply_edit
+  Claude: 很好！修改已成功应用。现在让我验证修复并运行构建：...
+  Using tool: Read
+  Done. Cost: $0.1491
+  Claude: 我来修复这个 SonarQube 问题。首先读取文件确认问题位置。...
+  Using tool: Read
+  Using tool: mcp__sonar-fix__read_file
+  Using tool: mcp__sonar-fix__list_files
+  Done. Cost: $0.3630
+  [OK] Fixed 1 file(s) (attempt 2)
+
+[3/3] 修复: csharpsquid:S3358 → OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:92
+  Claude: 我将按照步骤修复这个 SonarQube 问题。
+
+首先，读取源文件以确认问题上下文：...
+  Using tool: Read
+  Using tool: mcp__sonar-fix__list_files
+  Using tool: Read
+  Claude: 现在我可以看到问题了。第91-93行有一个嵌套的三元运算符，违反了 SonarQube 规则 S3358。
+
+**问题分析：**
+```csharp
+ResolvedDevEntry = !string.IsNullOrEmpty(x.U_DevEntry)
+    ? (int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0)
+    : ...
+  Using tool: mcp__sonar-fix__apply_edit
+  Claude: 现在我需要添加辅助方法 `ResolveDevEntry`。我将在类的最后添加这个私有方法：...
+  Using tool: mcp__sonar-fix__apply_edit
+  Claude: 很好！现在让我验证修复是否正确，运行构建命令：...
+  Using tool: mcp__sonar-fix__run_build
+  Claude: 让我读取构建结果的尾部来查看构建是否成功：...
+  Using tool: Read
+  Using tool: Read
+  Using tool: Grep
+  Claude: 让我再次运行构建并查看输出摘要：...
+  Using tool: mcp__sonar-fix__run_build
+  Done. Cost: $0.1573
+  Claude: 我将修复这个嵌套三元运算符的 SonarQube 问题。让我先读取源文件确认问题。...
+  Using tool: mcp__sonar-fix__read_file
+  Using tool: Read
+  Claude: 好的，我看到了问题代码。第91-93行有嵌套的三元运算符。我将修复这个问题，将嵌套的三元运算符改写为平铺的多个三元运算符，避免嵌套。...
+  Using tool: mcp__sonar-fix__apply_edit
+  Claude: 现在让我运行构建命令来验证修复是否正确：...
+  Using tool: mcp__sonar-fix__run_build
+  Using tool: mcp__sonar-fix__run_build
+  Claude: 让我查看构建结果的最后部分，确认是否编译成功：...
+  Using tool: mcp__sonar-fix__read_file
+  Claude: 让我使用 Grep 搜索构建输出中的错误信息：...
+  Using tool: Grep
+  Using tool: Glob
+  Using tool: Grep
+  Claude: 让我直接读取修改后的文件，确认修复是否正确：...
+  Using tool: Read
+  Done. Cost: $0.5177
+  Claude: 我将按照步骤修复这个 SonarQube 问题。首先读取源文件确认问题。...
+  Using tool: mcp__sonar-fix__read_file
+  Using tool: Read
+  Using tool: Glob
+  Using tool: Read
+  Claude: 现在我看到了问题。第91-93行有嵌套的三元运算符：
+
+```csharp
+ResolvedDevEntry = !string.IsNullOrEmpty(x.U_DevEntry)
+    ? (int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0)
+    : (x.DocEntry.HasValue && resolvedDevEn...
+  Using tool: mcp__sonar-fix__apply_edit
+  Using tool: Edit
+  Claude: 现在我需要添加辅助方法 `GetResolvedDevEntry`：...
+  Using tool: Edit
+  Claude: 现在让我运行构建命令来验证修复：...
+  Using tool: mcp__sonar-fix__run_build
+  Using tool: Glob
+  Using tool: mcp__sonar-fix__run_build
+  Done. Cost: $0.1263
+  [SKIP] Issue changes exceeded allowed scope after 3 attempt(s)
+  [ISSUE BUILD LOG]
+错误: Issue changes exceeded allowed scope after 3 attempt(s)
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+... (省略前 306 行)
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\DbExtension.cs(284,32): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\MD\Implement\BusinessLabelApiApp.cs(1346,17): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Serve\CompletionReportApp.cs(615,13): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Client\ClientInfoApp.cs(937,26): warning CS1572: XML 注释中有“userGuid”的 param 标记，但是没有该名称的参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Client\ClientInfoApp.cs(3712,26): warning CS1572: XML 注释中有“addClueFollowUpReq”的 param 标记，但是没有该名称的参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Client\ClientInfoApp.cs(3797,26): warning CS1572: XML 注释中有“id”的 param 标记，但是没有该名称的参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Client\ClientInfoApp.cs(3820,26): warning CS1572: XML 注释中有“CardCode”的 param 标记，但是没有该名称的参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Client\ClientInfoApp.cs(3835,26): warning CS1572: XML 注释中有“addClueFollowUpReq”的 param 标记，但是没有该名称的参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Client\ClientInfoApp.cs(4194,26): warning CS1572: XML 注释中有“Id”的 param 标记，但是没有该名称的参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Client\ClientInfoApp.cs(4195,26): warning CS1572: XML 注释中有“CardCode”的 param 标记，但是没有该名称的参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Client\ClientInfoApp.cs(4217,26): warning CS1572: XML 注释中有“Id”的 param 标记，但是没有该名称的参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Client\ClientInfoApp.cs(4322,26): warning CS1572: XML 注释中有“Type”的 param 标记，但是没有该名称的参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\Finance\Request\AddOrUpdateReimburseInfoReq.cs(167,9): warning CS1587: XML 注释没有放在有效语言元素上 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\Sap.Handler\Sap.Handler.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\Sap.Handler\Sap.Handler.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\Sap.Handler\Sap.Handler.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\Sap.Handler\Sap.Handler.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\Sap.Handler\Sap.Handler.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\Sap.Handler\Service\ServiceSaleOrderHandler.cs(33,24): warning CS0414: 字段“ServiceSaleOrderHandler.jobiD”已被赋值，但从未使用过它的值 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\Sap.Handler\Sap.Handler.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.WebApi\Startup.cs(89,26): warning ASP0000: Calling 'BuildServiceProvider' from application code results in an additional copy of singleton services being created. Consider alternatives such as dependency injecting services as parameters to 'Configure'. (https://aka.ms/AA5k895) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.WebApi\Templates\PrintSalesDelivery.cshtml(58,17): warning CS0219: 变量“TotalPrice”已被赋值，但从未使用过它的值 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App.Tests\OpenAuth.App.Tests.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App.Tests\OpenAuth.App.Tests.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App.Tests\OpenAuth.App.Tests.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App.Tests\OpenAuth.App.Tests.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260331152049\OpenAuth.Core\OpenAuth.App.Tests\OpenAuth.App.Tests.csproj]
+    162 个警告
+    0 个错误
+
+已用时间 00:03:59.10
+
+Issue changes exceeded the allowed Sonar edit scope.
+Allowed lines: 90-96
+Changed lines outside scope: 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193
+只允许修复 Sonar 指向的这一处代码，不要顺手修改本文件其他同类位置。
+  [ISSUE LOG] logs\issue_attempts\BI_996dd759-d30a-4041-9cb5-0ccfbe463173_20260331152049.log
+
+[INFO] 修复完成: 成功 2, 跳过 1, 失败 0
+[INFO] 运行构建验证...
+  构建: [OK] 通过
+[INFO] 创建 Pull Request...
+Switched to a new branch 'fix/sonar-liyinglin-20260331152049'
+[fix/sonar-liyinglin-20260331152049 4d08f7def1] fix: 修复 2 个 SonarQube 问题
+ 1 file changed, 35 insertions(+), 25 deletions(-)
+branch 'fix/sonar-liyinglin-20260331152049' set up to track 'origin/fix/sonar-liyinglin-20260331152049'.
+To https://devops.neware.work/DefaultCollection/Neware/_git/BI
+ * [new branch]            fix/sonar-liyinglin-20260331152049 -> fix/sonar-liyinglin-20260331152049
+  PR: https://devops.neware.work/DefaultCollection/Neware/_git/BI/pullrequest/21943
+[INFO] 钉钉通知发送成功
+
+==================================================
+完成! 成功: 2, 跳过: 1, 失败: 0, 构建: 通过
+PR: https://devops.neware.work/DefaultCollection/Neware/_git/BI/pullrequest/21943

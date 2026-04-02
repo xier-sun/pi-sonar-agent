@@ -36,6 +36,7 @@
 - 构建失败日志会输出关键错误和日志尾部，便于定位
 - PR 描述会带运行概览、issue 明细、issue key、跳过原因和重试日志
 - Agent 会限制修改范围，尽量只修 SonarQube 指定的那一块代码
+- C# issue 会自动附带仓库内的质量门禁规范，避免修复后再引入新的命名、异步或结构问题
 
 ## 安装
 
@@ -90,6 +91,11 @@ python3 -m pip install -e ".[dev]"
 - `max_issues`
 - `base_branch`
 - `solution_path`
+
+收件人规则：
+
+- `reviewer_email`：优先使用 `targets.json` 的值；如果没配，则回退到 Sonar `author`
+- `dingtalk_userid`：优先使用 `targets.json` 的值；如果没配，则使用 `.env` 中的 `DB_*` 连接 ERP4，按 `author -> erp4.dingtalkuserdetail.Email -> UserId` 查找
 
 ## 配置优先级
 
@@ -160,7 +166,8 @@ python3 -m pip install -e ".[dev]"
 
 ## 日志与产物
 
-- `.agent_workspaces/`: 每次运行的临时工作区
+- `.agent_workspaces/`: 临时工作区；新一轮运行前会自动只保留最近 1 次历史工作区，其余旧目录会清理
+- `logs/runs/`: 整轮运行日志，控制台输出会同步落盘
 - `logs/issue_attempts/`: 单 issue 重试日志
 
 单 issue 连续 3 次构建失败后，会：
@@ -181,6 +188,6 @@ python3 -m pip install -e ".[dev]"
 
 ## 已知注意点
 
-- 如果钉钉企业应用通知返回 `404`，优先检查 appkey/appsecret、应用类型和实际 token 接口是否匹配
+- 钉钉通知当前会优先尝试企业应用私信，发送到 `dingtalk_userid`；私信失败时会回退到签名 webhook
 - 已被 `abandoned` 的 Azure DevOps PR 不能直接更新描述，需要恢复或重新创建 PR
 - `S3776` 这类认知复杂度问题允许在目标方法范围内重构，但仍会限制改动不要扩散到文件中其他同类位置

@@ -26,6 +26,15 @@ class PullRequest:
     state: str
 
 
+class AzureDevOpsRequestError(RuntimeError):
+    """Rich Azure DevOps request failure with response details."""
+
+    def __init__(self, message: str, *, status_code: int = 0, response_text: str = "") -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.response_text = response_text
+
+
 class AzureDevOpsClient:
     """Client for Azure DevOps REST API."""
 
@@ -61,7 +70,7 @@ class AzureDevOpsClient:
         """Get repository details."""
         url = f"{self._api_url}/_apis/git/repositories/{repository}"
         response = self.session.get(url, timeout=self.timeout)
-        response.raise_for_status()
+        self._raise_for_status_with_details(response, action=f"获取仓库信息失败: {repository}")
         return response.json()
 
     def get_remote_url(self, repository: str) -> str:
@@ -95,7 +104,13 @@ class AzureDevOpsClient:
         response = self.session.post(
             url, json=body, timeout=self.timeout
         )
-        response.raise_for_status()
+        self._raise_for_status_with_details(
+            response,
+            action=(
+                f"创建 Pull Request 失败: {repository} "
+                f"{source_branch} -> {target_branch}"
+            ),
+        )
         data = response.json()
         pr_id = data.get("pullRequestId", 0)
         web_url = (
@@ -136,7 +151,7 @@ class AzureDevOpsClient:
             json={"description": description},
             timeout=self.timeout,
         )
-        response.raise_for_status()
+        self._raise_for_status_with_details(response, action=f"更新 PR 描述失败: PR {pull_request_id}")
         data = response.json()
         web_url = (
             data.get("_links", {}).get("web", {}).get("href", "")
@@ -182,7 +197,7 @@ class AzureDevOpsClient:
                 "api-version": "7.1",
             }
             response = self.session.get(url, params=params, timeout=self.timeout)
-            response.raise_for_status()
+            self._raise_for_status_with_details(response, action=f"解析 ADO 身份失败: {candidate}")
             identities = response.json().get("value", [])
             if not identities:
                 continue
@@ -238,8 +253,49 @@ class AzureDevOpsClient:
             "isRequired": is_required,
         }
         response = self.session.put(url, params=params, json=body, timeout=self.timeout)
-        response.raise_for_status()
+        self._raise_for_status_with_details(response, action=f"添加 PR 审阅人失败: PR {pull_request_id}")
         return response.json()
+
+    @staticmethod
+    def _extract_error_text(response: requests.Response) -> str:
+        """Extract a concise error message from an Azure DevOps HTTP response."""
+
+        try:
+            payload = response.json()
+        except Exception:
+            payload = None
+
+        if isinstance(payload, dict):
+            candidates = [
+                str(payload.get("message", "")).strip(),
+                str(payload.get("error", "")).strip(),
+                str(payload.get("typeName", "")).strip(),
+            ]
+            text = " | ".join(item for item in candidates if item)
+            if text:
+                return text[:1200]
+
+        return (response.text or "").strip()[:1200]
+
+    @classmethod
+    def _raise_for_status_with_details(
+        cls,
+        response: requests.Response,
+        *,
+        action: str,
+    ) -> None:
+        """Raise an actionable error that includes Azure DevOps response details."""
+
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            details = cls._extract_error_text(response)
+            suffix = f" | 响应: {details}" if details else ""
+            raise AzureDevOpsRequestError(
+                f"{action} (HTTP {response.status_code}){suffix}",
+                status_code=response.status_code,
+                response_text=details,
+            ) from exc
 
     def get_pull_requests(
         self,

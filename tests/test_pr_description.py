@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from pi_sonar_agent.core.pr_description import (
+    ADO_PR_DESCRIPTION_SOFT_LIMIT,
     PullRequestIssueSummary,
+    build_local_pr_report_path,
+    build_compact_pull_request_description,
     build_pull_request_description,
+    build_repository_pr_report_path,
+    build_summary_pull_request_description,
+    write_markdown_report,
 )
 
 
@@ -59,3 +67,104 @@ def test_build_pull_request_description_lists_issue_outcomes() -> None:
     assert "Issue Key: issue-skipped-1" in description
     assert "跳过原因: Build verification failed after 3 attempt(s)" in description
     assert "重试日志: logs/issue_attempts/example.log" in description
+
+
+def test_build_compact_pull_request_description_is_shorter_for_large_batches() -> None:
+    issue_summaries = [
+        PullRequestIssueSummary(
+            status="FIXED",
+            rule=f"csharpsquid:S{6500 + index}",
+            file_path=f"OpenAuth.Core/OpenAuth.App/Demo/File{index}.cs",
+            line=100 + index,
+            message="Very long sonar message " * 5,
+            issue_key=f"issue-{index}",
+            attempts=3,
+            summary="经过 3 次尝试后，已完成修复，并通过该 issue 的本地构建验证。",
+            changed_files=(f"OpenAuth.Core/OpenAuth.App/Demo/File{index}.cs",),
+        )
+        for index in range(1, 10)
+    ]
+
+    full_description = build_pull_request_description(
+        author="pengxiru@neware.com.cn",
+        base_branch="401sonarqube",
+        solution_path="OpenAuth.Core/OpenAuth.Core.WebApi.sln",
+        build_command='dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"',
+        test_command=None,
+        successful=9,
+        skipped=1,
+        failed=0,
+        build_passed=True,
+        issue_summaries=issue_summaries,
+    )
+    compact_description = build_compact_pull_request_description(
+        author="pengxiru@neware.com.cn",
+        base_branch="401sonarqube",
+        solution_path="OpenAuth.Core/OpenAuth.Core.WebApi.sln",
+        build_command='dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"',
+        test_command=None,
+        successful=9,
+        skipped=1,
+        failed=0,
+        build_passed=True,
+        issue_summaries=issue_summaries,
+    )
+
+    assert len(compact_description) < len(full_description)
+    assert len(compact_description) < ADO_PR_DESCRIPTION_SOFT_LIMIT
+    assert "PR 描述已切换为精简版" in compact_description
+
+
+def test_build_summary_pull_request_description_is_brief_and_points_to_report() -> None:
+    issue_summaries = [
+        PullRequestIssueSummary(
+            status="FIXED",
+            rule=f"csharpsquid:S{6500 + index}",
+            file_path=f"OpenAuth.Core/OpenAuth.App/Demo/File{index}.cs",
+            line=100 + index,
+            message="Very long sonar message " * 5,
+            issue_key=f"issue-{index}",
+            attempts=3,
+            summary="经过 3 次尝试后，已完成修复，并通过该 issue 的本地构建验证。",
+            changed_files=(f"OpenAuth.Core/OpenAuth.App/Demo/File{index}.cs",),
+        )
+        for index in range(1, 20)
+    ]
+
+    summary_description = build_summary_pull_request_description(
+        author="pengxiru@neware.com.cn",
+        base_branch="401sonarqube",
+        solution_path="OpenAuth.Core/OpenAuth.Core.WebApi.sln",
+        build_command='dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"',
+        test_command=None,
+        successful=16,
+        skipped=10,
+        failed=0,
+        build_passed=True,
+        issue_summaries=issue_summaries,
+        report_path="docs/sonar-reports/BI_pengxiru-neware.com.cn_20260401133434.md",
+    )
+
+    assert "详细修复报告: docs/sonar-reports/BI_pengxiru-neware.com.cn_20260401133434.md" in summary_description
+    assert "逐条 issue 处理结果、跳过原因和重试日志请查看仓库内 Markdown 报告。" in summary_description
+    assert len(summary_description) < ADO_PR_DESCRIPTION_SOFT_LIMIT
+    assert "1. csharpsquid" not in summary_description
+
+
+def test_pr_report_paths_and_writer_use_expected_locations(tmp_path) -> None:
+    repo_path = build_repository_pr_report_path(
+        repository="BI",
+        author="pengxiru@neware.com.cn",
+        run_label="20260401133434",
+    )
+    local_path = build_local_pr_report_path(
+        repository="BI",
+        author="pengxiru@neware.com.cn",
+        run_label="20260401133434",
+    )
+    written_path = write_markdown_report(tmp_path, repo_path, "# Report\n")
+
+    assert repo_path == "docs/sonar-reports/BI_pengxiru-neware.com.cn_20260401133434.md"
+    assert local_path == Path("logs/pr_descriptions/BI_pengxiru-neware.com.cn_20260401133434.md")
+    assert written_path == tmp_path / repo_path
+    assert written_path.read_text(encoding="utf-8") == "# Report\n"

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import mysql.connector
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+
+import mysql.connector
 
 
 @dataclass
@@ -35,6 +35,7 @@ class MySQLClient:
         user: str,
         password: str,
         database: str,
+        connection_timeout: int = 5,
     ):
         self.config = {
             "host": host,
@@ -42,6 +43,7 @@ class MySQLClient:
             "user": user,
             "password": password,
             "database": database,
+            "connection_timeout": connection_timeout,
         }
         self._conn = None
 
@@ -259,6 +261,34 @@ class MySQLClient:
             pr_url=row["pr_url"] or "",
         )
 
+    def lookup_dingtalk_userid_by_email(self, email: str) -> str | None:
+        """Resolve DingTalk user ID from erp4.dingtalkuserdetail by email."""
+        if not self._conn:
+            self.connect()
+
+        normalized_email = email.strip()
+        if not normalized_email:
+            return None
+
+        cursor = self._conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT UserId
+            FROM erp4.dingtalkuserdetail
+            WHERE Email = %s
+            LIMIT 1
+            """,
+            (normalized_email,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+
+        if not row:
+            return None
+
+        user_id = str(row.get("UserId", "")).strip()
+        return user_id or None
+
 
 def create_mysql_client_from_env() -> MySQLClient | None:
     """Create MySQL client from environment variables."""
@@ -269,6 +299,7 @@ def create_mysql_client_from_env() -> MySQLClient | None:
     user = os.getenv("DB_USER", "").strip()
     password = os.getenv("DB_PASSWORD", "").strip()
     database = os.getenv("DB_NAME", "").strip()
+    connection_timeout = os.getenv("DB_CONNECT_TIMEOUT", "").strip()
 
     if not all([host, user, password, database]):
         return None
@@ -279,4 +310,5 @@ def create_mysql_client_from_env() -> MySQLClient | None:
         user=user,
         password=password,
         database=database,
+        connection_timeout=int(connection_timeout) if connection_timeout else 5,
     )

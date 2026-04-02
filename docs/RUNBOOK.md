@@ -75,6 +75,19 @@ python3 -m pip install -e ".[dev]"
 ]
 ```
 
+收件人优先级：
+
+- `reviewer_email`：优先 `targets.json`，未配置时回退 `author`
+- `dingtalk_userid`：优先 `targets.json`，未配置时按 `author` 到 ERP4 的 `dingtalkuserdetail` 表查 `UserId`
+
+如果要启用数据库回退，还需要在 `.env` 中配置：
+
+- `DB_HOST`
+- `DB_PORT`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+
 ## 3. 模型配置
 
 当前项目优先用 `.env` 中的模型配置，不再依赖系统环境变量。
@@ -156,6 +169,7 @@ OPENAI_MODEL=glm-4.7
 - 普通定位型问题：只允许改报错行附近的小范围
 - `S3776` 这类认知复杂度问题：只允许改 Sonar 指向的方法；必要时只能在该方法附近新增 helper
 - 不允许顺手修复同文件里其他相同规则问题
+- 如果是 C# 文件，还会自动附带 [data/csharp-quality-gate.md](../data/csharp-quality-gate.md) 中的编码规范与质量门禁
 
 ## 6. 构建与测试
 
@@ -185,13 +199,20 @@ MSBUILD : error MSB1003: 请指定项目或解决方案文件
 
 - `[ISSUE LOG] logs/issue_attempts/...`
 
+每轮运行开始时还会打印：
+
+- `[INFO] 运行日志: logs/runs/run_<timestamp>.log`
+
+控制台里看到的大部分输出都会同步记录到这个运行日志里。
+
 ## 7. 日志查看顺序
 
 排障时建议按这个顺序看：
 
-1. 终端中的 `[ISSUE BUILD LOG]`
-2. `logs/issue_attempts/<repo>_<issue_key>_<timestamp>.log`
-3. `.agent_workspaces/<run>/` 里保留的工作区
+1. `logs/runs/run_<timestamp>.log`
+2. 终端中的 `[ISSUE BUILD LOG]`
+3. `logs/issue_attempts/<repo>_<issue_key>_<timestamp>.log`
+4. `.agent_workspaces/` 中最近保留的工作区
 
 ## 8. PR 行为
 
@@ -231,6 +252,8 @@ PR 创建前提：
 ```powershell
 .\.venv\Scripts\python.exe run.py --keep-workspace
 ```
+
+即使使用 `--keep-workspace`，新一轮运行开始前也只会保留最近 1 次历史工作区，其余旧工作区会自动清理。
 
 ## 10. 常见误区
 

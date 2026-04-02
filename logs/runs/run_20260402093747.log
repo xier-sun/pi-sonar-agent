@@ -1,0 +1,10 @@
+[INFO] 运行日志: logs/runs/run_20260402093747.log
+[INFO] 正在解析收件人...
+[INFO] Reviewer: pengxiru@neware.com.cn (source: author)
+[INFO] DingTalk UserId: 17556530801301497 (source: targets.json.dingtalk_userid)
+[INFO] Clone Branch: develop (source: fixed)
+[INFO] Target Branch: develop (source: default)
+[INFO] 正在获取 SonarQube issues...
+[INFO] 发现 26 个 issues
+[INFO] 限制处理 26 个
+[INFO] 准备仓库...

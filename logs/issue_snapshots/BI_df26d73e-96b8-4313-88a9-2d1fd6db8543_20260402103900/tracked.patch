@@ -1,0 +1,272 @@
+diff --git a/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs b/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
+index fc1c9b560e..2222b26f0c 100644
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
+@@ -5015,13 +5015,10 @@ namespace OpenAuth.App.Finance
+ 
+                 int SEMaxLimit = 10; // 默认值
+ 
+-                if (category != null && !string.IsNullOrEmpty(category.DtValue))
++                // TryParse 会尝试转换，成功返回 true 并赋值给 result，失败返回 false
++                if (category != null && !string.IsNullOrEmpty(category.DtValue) && int.TryParse(category.DtValue, out int val))
+                 {
+-                    // TryParse 会尝试转换，成功返回 true 并赋值给 result，失败返回 false
+-                    if (int.TryParse(category.DtValue, out int val))
+-                    {
+-                        SEMaxLimit = val;
+-                    }
++                    SEMaxLimit = val;
+                 }
+ 
+                 var grouped = rawList
+diff --git a/OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs b/OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs
+index 2173091f45..e2da3e7da3 100644
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs
+@@ -56,6 +56,7 @@ namespace OpenAuth.App.HumanResource
+         /// <param name="serviceProvider"></param>
+         /// <param name="revelanceManagerApp"></param>
+         /// <param name="configuration"></param>
++        /// <param name="misconductReportApp"></param>
+         public HumanResourceApprovalApp(
+             IUnitWork unitWork,
+             IAuth auth,
+diff --git a/OpenAuth.Core/OpenAuth.App/HumanResource/MisconductReportApp.cs b/OpenAuth.Core/OpenAuth.App/HumanResource/MisconductReportApp.cs
+index 742aeea0b5..71538933ea 100644
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/MisconductReportApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/MisconductReportApp.cs
+@@ -1266,7 +1266,7 @@ namespace OpenAuth.App.HumanResource
+                 orderedCategories.Add(category);
+             }
+ 
+-            var selectedCategory = orderedCategories.Last();
++            var selectedCategory = orderedCategories[orderedCategories.Count - 1];
+             return new BehaviorCategorySelection
+             {
+                 CategoryIds = orderedCategories.Select(x => x.Id).ToList(),
+diff --git a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
+index 457e48b754..a6fa1ad965 100644
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
+@@ -2067,6 +2067,7 @@ namespace OpenAuth.App.HumanResource
+         /// <param name="account"></param>
+         /// <param name="userName"></param>
+         /// <param name="loginUser"></param>
++        /// <param name="hasSubstantiveChange"></param>
+         private void ProcessSocialFundUpdate(
+             DatabaseChangeLists changes,
+             UpdateSocialFundRequest updateRequest,
+@@ -2105,6 +2106,7 @@ namespace OpenAuth.App.HumanResource
+         /// <param name="account"></param>
+         /// <param name="userName"></param>
+         /// <param name="loginUser"></param>
++        /// <param name="hasSubstantiveChange"></param>
+         private void ProcessHousingFundItem(
+             DatabaseChangeLists changes,
+             UpdateSocialFundRequest updateRequest,
+@@ -2165,6 +2167,7 @@ namespace OpenAuth.App.HumanResource
+         /// <param name="account"></param>
+         /// <param name="userName"></param>
+         /// <param name="loginUser"></param>
++        /// <param name="hasSubstantiveChange"></param>
+         private void ProcessSocialSecurityItem(
+             DatabaseChangeLists changes,
+             UpdateSocialFundRequest updateRequest,
+@@ -2592,7 +2595,7 @@ namespace OpenAuth.App.HumanResource
+         /// <returns></returns>
+         private static T DeepClone<T>(T source)
+         {
+-            if (source == null)
++            if (EqualityComparer<T>.Default.Equals(source, default))
+             {
+                 return default;
+             }
+@@ -2899,6 +2902,7 @@ namespace OpenAuth.App.HumanResource
+         /// <param name="account"></param>
+         /// <param name="userName"></param>
+         /// <param name="loginUser"></param>
++        /// <param name="hasSubstantiveChange"></param>
+         private void ProcessSocialFundRefundUpdate(
+             RefundDatabaseChangeLists changes,
+             UpdateSocialReFundRequest updateRequest, // 假设这是 request.EmployeeUpdates 中 DTO 的类型
+@@ -3158,14 +3162,14 @@ namespace OpenAuth.App.HumanResource
+             // 获取当前时间和登录用户ID
+             var now = DateTime.Now;
+             var updateUserId = p.LoginUser?.Id;
+-            
++
+             // 查找所有同类型的记录，不再按UpdateId匹配单条记录
+             var socialsecurityRecords = p.CurrentSecurities?.Where(x => x.Type == p.Type).ToList();
+-            
++
+             if (socialsecurityRecords == null || socialsecurityRecords.Count == 0)
+             {
+                 // 没有找到同类型记录，无论是否有字段更新，都创建新记录以保存处理人和处理时间
+-                // 记录原来没有标注是社保公积金的记录，然后删掉 
++                // 记录原来没有标注是社保公积金的记录，然后删掉
+                 var oldUnspecifiedTypeRecords = p.CurrentSecurities?.Where(x => x.Type != SocialsecurityTypeEnums.Socialsecurity && x.Type != SocialsecurityTypeEnums.Accumulationfunds).ToList();
+                 if (oldUnspecifiedTypeRecords != null && oldUnspecifiedTypeRecords.Any())
+                 {
+@@ -3208,37 +3212,53 @@ namespace OpenAuth.App.HumanResource
+                 foreach (var record in socialsecurityRecords)
+                 {
+                     p.UpdateAction(record); // 执行特定于更新的操作
+-                    
++
+                     // 只有存在实质性变更时，才需要打回已确认状态并更新时间
+-                    if (p.HasSubstantiveChange && p.Type == SocialsecurityTypeEnums.Socialsecurity)
+-                    {
+-                        if (record.SIsPay == "Y")
+-                        {
+-                            record.SIsPay = "N";
+-                        }
+-                        if (record.SIsEnd == "Y")
+-                        {
+-                            record.SIsEnd = "N";
+-                        }
+-                    }
+-                    else if (p.HasSubstantiveChange && p.Type == SocialsecurityTypeEnums.Accumulationfunds)
+-                    {
+-                        if (record.PIsPay == "Y" )
+-                        {
+-                            record.PIsPay = "N";
+-                        }
+-                        if (record.PIsEnd == "Y")
+-                        {
+-                            record.PIsEnd = "N";
+-                        }
+-                    }
+-                    
++                    ResetPaymentConfirmationStatus(record, p.HasSubstantiveChange, p.Type);
++
+                     // 设置更新时间和更新用户ID
+                     ApplyInfoUpdateAuditFields(record, p.OperationScene, now, updateUserId);
+                     p.UpdateSocialsecurityList.Add(record);
+                 }
+             }
+         }
++
++        /// <summary>
++        /// 当存在实质性变更时，重置社保或公积金的已确认状态
++        /// </summary>
++        /// <param name="record">社保公积金记录</param>
++        /// <param name="hasSubstantiveChange">是否存在实质性变更</param>
++        /// <param name="type">记录类型</param>
++        private void ResetPaymentConfirmationStatus(UserSocialsecurity record, bool hasSubstantiveChange, SocialsecurityTypeEnums type)
++        {
++            if (!hasSubstantiveChange)
++            {
++                return;
++            }
++
++            if (type == SocialsecurityTypeEnums.Socialsecurity)
++            {
++                if (record.SIsPay == "Y")
++                {
++                    record.SIsPay = "N";
++                }
++                if (record.SIsEnd == "Y")
++                {
++                    record.SIsEnd = "N";
++                }
++            }
++            else if (type == SocialsecurityTypeEnums.Accumulationfunds)
++            {
++                if (record.PIsPay == "Y")
++                {
++                    record.PIsPay = "N";
++                }
++                if (record.PIsEnd == "Y")
++                {
++                    record.PIsEnd = "N";
++                }
++            }
++        }
+         /// <summary>
+         /// 批量确认社保缴纳
+         /// </summary>
+diff --git a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs
+index 769584ff2e..992b43f9e8 100644
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs
+@@ -315,7 +315,7 @@ namespace OpenAuth.App.HumanResource
+         {
+             if (data == null)
+             {
+-                return null;
++                return new JObject();
+             }
+ 
+             if (data is JObject jObject)
+@@ -358,7 +358,7 @@ namespace OpenAuth.App.HumanResource
+         {
+             if (root == null || propertyNames == null || propertyNames.Length == 0)
+             {
+-                return null;
++                return JValue.CreateNull();
+             }
+ 
+             foreach (var property in root.Properties())
+diff --git a/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs b/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
+index b23423a713..8811395a4a 100644
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
+@@ -397,6 +397,7 @@ namespace OpenAuth.App.HumanResource
+         /// 批量申请合同续签审批
+         /// </summary>
+         /// <param name="req"></param>
++        /// <param name="formFiles"></param>
+         /// <returns></returns>
+         /// <exception cref="InvalidOperationException"></exception>
+         public async Task BatchApply(UserContractApplyReq req, List<IFormFile> formFiles = null)
+@@ -451,6 +452,7 @@ namespace OpenAuth.App.HumanResource
+         /// <param name="signType"></param>
+         /// <param name="req"></param>
+         /// <param name="contract"></param>
++        /// <param name="referenceFileLookup"></param>
+         /// <returns></returns>
+         /// <exception cref="CommonException"></exception>
+         /// <exception cref="InvalidOperationException"></exception>
+@@ -700,6 +702,7 @@ namespace OpenAuth.App.HumanResource
+         /// 重新发起
+         /// </summary>
+         /// <param name="req"></param>
++        /// <param name="formFiles">表单文件</param>
+         /// <returns></returns>
+         /// <exception cref="CommonException"></exception>
+         public async Task ReApply(UserContractUpdateReq req, List<IFormFile> formFiles = null)
+@@ -813,6 +816,7 @@ namespace OpenAuth.App.HumanResource
+         /// </summary>
+         /// <param name="approvalId"></param>
+         /// <param name="attachments"></param>
++        /// <param name="referenceFileLookup"></param>
+         /// <returns></returns>
+         private async Task SyncReferenceAttachments(long approvalId, List<UserContractReferenceAttachmentReq> attachments, Dictionary<string, Queue<IFormFile>> referenceFileLookup)
+         {
+@@ -904,12 +908,9 @@ namespace OpenAuth.App.HumanResource
+                 throw new InvalidOperationException($"参考附件文件名重复：{string.Join('，', duplicateFileNames)}");
+             }
+ 
+-            foreach (var attachment in attachments)
++            if (attachments.Any(a => a.FileName.IsNullOrWhiteSpace()))
+             {
+-                if (attachment.FileName.IsNullOrWhiteSpace())
+-                {
+-                    throw new InvalidOperationException("参考附件文件名不能为空");
+-                }
++                throw new InvalidOperationException("参考附件文件名不能为空");
+             }
+         }
+ 
+diff --git a/OpenAuth.Core/OpenAuth.App/HumanResource/UserRegister/UserRegisterDetail.cs b/OpenAuth.Core/OpenAuth.App/HumanResource/UserRegister/UserRegisterDetail.cs
+index 2e082901e7..ecd0f65ee9 100644
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/UserRegister/UserRegisterDetail.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/UserRegister/UserRegisterDetail.cs
+@@ -561,6 +561,7 @@ namespace OpenAuth.App.HumanResource.UserRegister
+         /// 信息登记更新用户Id
+         /// </summary>
+         public string InfoUpdateUserId { get; set; }
++        /// <summary>
+         /// 确认操作更新时间
+         /// </summary>
+         public DateTime? ConfirmOpsUpdateTime { get; set; }

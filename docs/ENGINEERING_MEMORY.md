@@ -255,17 +255,59 @@
 - 创建 PR 成功
 - 钉钉通知请求 `https://api.dingtalk.com/v1.0/robot/oAuth/token` 返回 `404`
 
-### 当前判断
+### 根因
 
-- 这是外部配置/接口匹配问题，不是主修复链路核心逻辑错误
+- 代码把“企业内部应用私信”错误地打到了一个不存在的机器人 token 接口
+- 当前配置同时存在“企业内部应用”和“机器人 webhook”两套能力，但早期实现没有正确区分
 
-### 建议排查
+### 解决方案
 
-- 确认当前使用的是机器人还是企业内部应用
-- 核对 `DINGTALK_APPKEY` / `DINGTALK_APPSECRET` / `DINGTALK_AGENTID`
-- 确认当前应用对应的 token 接口是否就是这条 URL
+- 企业内部应用私信改为使用：
+  - `https://oapi.dingtalk.com/gettoken`
+  - `https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2`
+- 机器人通知改为使用 `DINGTALK_WEBHOOK`，并支持 `DINGTALK_SECRET` 加签
+- 发送策略改为：
+  - 如果提供了 `dingtalk_userid`，优先发企业应用私信
+  - 私信失败时回退到 webhook
+- 已做过最小真实冒烟，私信和 webhook 都能返回成功
 
-## 16. 当前最重要的稳定性结论
+## 16. 控制台有输出，但运行结束后没有整轮日志
+
+### 症状
+
+- 终端里能看到 issue 处理、构建、PR、通知等输出
+- 但没有一份整轮运行日志可以回看
+
+### 根因
+
+- 早期只有 issue 级日志
+- 主流程里的控制台输出没有 tee 到文件
+
+### 解决方案
+
+- 增加 `logs/runs/run_<timestamp>.log`
+- 主流程和 batch 流程都会把 stdout / stderr 同步写入运行日志
+- PR 阶段的 `git checkout/add/commit/push` 输出也改为捕获后再打印，保证能落盘
+
+## 17. 工作区会越积越多，占用大量磁盘
+
+### 症状
+
+- `.agent_workspaces/` 下残留大量旧目录
+- 多轮运行后占用越来越大
+
+### 根因
+
+- 早期只会在本轮结束时按 `keep_workspace` 决定是否删除“当前工作区”
+- 不会主动清理历史工作区
+
+### 解决方案
+
+- 新一轮运行开始前，自动只保留最近 1 次历史工作区
+- 其余旧工作区自动删除
+- 如果本轮使用 `--keep-workspace`，当前工作区仍可保留到下一轮再参与清理
+
+## 18. 当前最重要的稳定性结论
 
 截至这轮文档整理时，项目已经具备以下稳定行为：
 
@@ -275,8 +317,12 @@
 - 最终构建会使用 `solution_path`
 - PR 描述足够详细
 - 越界修改会被拦住
+- C# issue 会自动携带仓库内质量门禁规范
+- 运行日志会自动落盘
+- 工作区会自动保留最近 1 次，其余清理
+- 钉钉通知支持私信优先、webhook 回退
+- reviewer 和 dingtalk 收件人支持“targets 优先，author 回退”，其中 dingtalk userId 可从 ERP4 查出
 
 仍建议持续观察的点：
 
-- 钉钉通知接口配置
 - 某些复杂 `S3776` 场景下模型仍可能需要更多领域约束

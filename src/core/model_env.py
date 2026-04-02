@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 import dotenv
 
@@ -42,6 +43,22 @@ STANDARD_MODEL_ALIASES = {
 }
 
 
+def _is_official_anthropic_host(base_url: str) -> bool:
+    parsed = urlparse(base_url)
+    host = (parsed.netloc or "").lower()
+    return host.endswith("anthropic.com") or host.endswith("claude.ai")
+
+
+def _should_bridge_auth_token_to_api_key(file_values: dict[str, str]) -> bool:
+    base_url = file_values.get("ANTHROPIC_BASE_URL", "").strip()
+    if not base_url or _is_official_anthropic_host(base_url):
+        return False
+    return bool(
+        file_values.get("ANTHROPIC_AUTH_TOKEN", "").strip()
+        and not file_values.get("ANTHROPIC_API_KEY", "").strip()
+    )
+
+
 def load_project_env(env_file: str | Path = ".env") -> None:
     """Load the project's dotenv file and let it override inherited environment values."""
 
@@ -68,10 +85,45 @@ def resolve_agent_model(env_file: str | Path = ".env") -> str | None:
     file_values = _load_file_values(env_file)
     return (
         file_values.get("ANTHROPIC_MODEL")
+        or file_values.get("ANTHROPIC_CUSTOM_MODEL_OPTION")
+        or file_values.get("ANTHROPIC_DEFAULT_SONNET_MODEL")
+        or file_values.get("ANTHROPIC_DEFAULT_OPUS_MODEL")
+        or file_values.get("ANTHROPIC_DEFAULT_HAIKU_MODEL")
         or file_values.get("CLAUDE_MODEL")
         or file_values.get("OPENAI_MODEL")
         or None
     )
+
+
+def validate_agent_env(env_file: str | Path = ".env") -> list[str]:
+    """Validate model-related environment values before starting the agent."""
+
+    file_values = _load_file_values(env_file)
+    errors: list[str] = []
+
+    base_url = (
+        file_values.get("ANTHROPIC_BASE_URL")
+        or file_values.get("OPENAI_BASE_URL")
+        or ""
+    ).strip()
+    if base_url:
+        if not (base_url.startswith("http://") or base_url.startswith("https://")):
+            errors.append(
+                "模型 endpoint 配置无效："
+                f"{base_url}，必须以 http:// 或 https:// 开头。"
+            )
+        else:
+            parsed = urlparse(base_url)
+            if not parsed.scheme or not parsed.netloc:
+                errors.append(f"模型 endpoint 配置无效：{base_url}")
+            if "/api/coding/paas/v4" in base_url:
+                errors.append(
+                    "当前 ANTHROPIC_BASE_URL 指向 OpenAI 兼容 endpoint："
+                    f"{base_url}。基于 Claude SDK 的运行方式请改用 Anthropic 兼容 endpoint，"
+                    "例如 https://open.bigmodel.cn/api/anthropic。"
+                )
+
+    return errors
 
 
 def _is_standard_model_name(model: str) -> bool:
@@ -102,6 +154,10 @@ def build_agent_env(env_file: str | Path = ".env") -> dict[str, str]:
         if value:
             agent_env[key] = value
 
+    if _should_bridge_auth_token_to_api_key(file_values):
+        agent_env["ANTHROPIC_API_KEY"] = file_values["ANTHROPIC_AUTH_TOKEN"]
+        agent_env["ANTHROPIC_AUTH_TOKEN"] = ""
+
     # Keep the current Claude SDK path working even when users only configure
     # OpenAI-compatible proxy variables in `.env`.
     if "ANTHROPIC_API_KEY" not in file_values and file_values.get("OPENAI_API_KEY"):
@@ -112,7 +168,11 @@ def build_agent_env(env_file: str | Path = ".env") -> dict[str, str]:
     # Keep project-auth configuration authoritative. When the project selects
     # OAuth-style auth tokens, clear any inherited API key so the SDK child
     # process cannot silently fall back to machine-level credentials.
-    if "ANTHROPIC_AUTH_TOKEN" in file_values and "ANTHROPIC_API_KEY" not in file_values:
+    if (
+        "ANTHROPIC_AUTH_TOKEN" in file_values
+        and "ANTHROPIC_API_KEY" not in file_values
+        and not _should_bridge_auth_token_to_api_key(file_values)
+    ):
         agent_env["ANTHROPIC_API_KEY"] = ""
     if "ANTHROPIC_API_KEY" in file_values and "ANTHROPIC_AUTH_TOKEN" not in file_values:
         agent_env["ANTHROPIC_AUTH_TOKEN"] = ""

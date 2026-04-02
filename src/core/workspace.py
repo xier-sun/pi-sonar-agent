@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import shutil
+import stat
 import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 
 @dataclass
@@ -18,6 +19,14 @@ class WorkspaceInfo:
     repository: str
     base_branch: str
     created_at: str
+
+
+@dataclass(frozen=True)
+class WorkspacePruneResult:
+    """Outcome of pruning old workspace directories."""
+
+    removed: tuple[Path, ...]
+    failed: tuple[Path, ...]
 
 
 class RepositoryWorkspaceSession:
@@ -95,7 +104,6 @@ class RepositoryWorkspaceSession:
         import urllib.parse
 
         parsed = urllib.parse.urlparse(remote_url)
-        auth = self.pat  # Use PAT directly for git
         # For Azure DevOps, the format is:
         # https://user:pat@dev.azure.com/org/project/_git/repo
         return f"https://:{self.pat}@{parsed.netloc}{parsed.path}"
@@ -131,7 +139,7 @@ def clone_repository(
 
     target_dir.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd = f"git clone"
+    cmd = "git clone"
     if depth:
         cmd += f" --depth {depth}"
     if branch:
@@ -184,3 +192,56 @@ def get_git_status(workspace_path: Path) -> str:
         timeout=30,
     )
     return result.stdout
+
+
+def _remove_readonly_and_retry(func, path: str, exc_info) -> None:
+    """Clear readonly bit and retry a failed filesystem delete callback."""
+
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
+def _delete_directory(path: Path) -> bool:
+    """Best-effort delete for a workspace directory, with verification."""
+
+    if not path.exists():
+        return True
+
+    for _ in range(3):
+        try:
+            shutil.rmtree(path, onerror=_remove_readonly_and_retry)
+        except FileNotFoundError:
+            return True
+        except Exception:
+            time.sleep(0.2)
+
+        if not path.exists():
+            return True
+
+    return not path.exists()
+
+
+def prune_old_workspaces(workspace_root: str | Path, keep_latest: int = 1) -> WorkspacePruneResult:
+    """Delete older workspace directories while keeping the most recent ones."""
+
+    root = Path(workspace_root)
+    if keep_latest < 0:
+        raise ValueError("keep_latest must be greater than or equal to 0")
+    if not root.exists():
+        return WorkspacePruneResult(removed=(), failed=())
+
+    candidates = [path for path in root.iterdir() if path.is_dir()]
+    candidates.sort(key=lambda path: (path.stat().st_mtime, path.name), reverse=True)
+
+    removed: list[Path] = []
+    failed: list[Path] = []
+    for path in candidates[keep_latest:]:
+        if _delete_directory(path):
+            removed.append(path)
+        else:
+            failed.append(path)
+
+    return WorkspacePruneResult(
+        removed=tuple(removed),
+        failed=tuple(failed),
+    )
