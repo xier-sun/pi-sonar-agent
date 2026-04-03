@@ -5,8 +5,8 @@ from pathlib import Path
 from pi_sonar_agent.core.pr_description import (
     ADO_PR_DESCRIPTION_SOFT_LIMIT,
     PullRequestIssueSummary,
-    build_local_pr_report_path,
     build_compact_pull_request_description,
+    build_local_pr_report_path,
     build_pull_request_description,
     build_repository_pr_report_path,
     build_summary_pull_request_description,

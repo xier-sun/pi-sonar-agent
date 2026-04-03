@@ -4,8 +4,6 @@ Simplified client for interacting with SonarQube REST API.
 Compatible with Windows and Unix systems.
 """
 
-import html
-import re
 from dataclasses import dataclass
 from typing import Any
 

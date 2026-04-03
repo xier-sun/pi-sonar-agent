@@ -1,0 +1,13 @@
+{
+  "success": false,
+  "build_passed": false,
+  "build_verification_failed": true,
+  "retryable_failure": true,
+  "failure_kind": "build",
+  "error": "Issue changes failed local build verification",
+  "skip_reason": "",
+  "build_command": "dotnet build \"tracked.sln\"",
+  "build_output": "C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-147\\test_process_issue_with_retrie0\\repo\\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]",
+  "guardrail_mode": "",
+  "follow_up_log_path": ""
+}

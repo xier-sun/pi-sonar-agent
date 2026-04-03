@@ -1,0 +1,20 @@
+{
+  "attempt_number": 1,
+  "status": "succeeded",
+  "started_at": "2026-04-03T13:12:39.441363+00:00",
+  "finished_at": "2026-04-03T13:14:08.581857+00:00",
+  "duration_seconds": 89.139,
+  "failure_kind": "",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_df38858d-ca69-4a86-9cd1-867e6afca5d7_20260403205446.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260403205446/df38858d-ca69-4a86-9cd1-867e6afca5d7/attempt-01"
+}

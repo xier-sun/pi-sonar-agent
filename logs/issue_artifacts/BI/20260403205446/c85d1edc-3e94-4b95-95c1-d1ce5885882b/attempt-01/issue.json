@@ -1,0 +1,11 @@
+{
+  "issue_key": "c85d1edc-3e94-4b95-95c1-d1ce5885882b",
+  "rule_id": "csharpsquid:S1168",
+  "message": "Return an empty collection instead of null.",
+  "line": 361,
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

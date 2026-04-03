@@ -1,0 +1,276 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
+@@ -2362,22 +2362,9 @@
+                     UserId = systemUserId,
+
+                     Account = account,
+
+                     Name = userName,
+
+-                    UpdateAction = (ss) => {
+
+-                        if (!string.IsNullOrEmpty(updateRequest.SocialSecurityAccount))
+
+-                            ss.SocialsecurityAccount = updateRequest.SocialSecurityAccount;
+
+-                        if (updateRequest.IsInternship && updateRequest.BeginPaymentTime.HasValue)
+
+-                            ss.SBeginPaymentTime = updateRequest.BeginPaymentTime;
+
+-                        if (updateRequest?.Remark != null)
+
+-                            ss.Remark = updateRequest.Remark;
+
+-                    },
+
+-                    CreateCondition = () =>
+
+-                        !string.IsNullOrEmpty(updateRequest.SocialSecurityAccount) ||
+
+-                        (updateRequest.IsInternship && updateRequest.BeginPaymentTime.HasValue),
+
+-                    CreateAction = (ss) => {
+
+-                        ss.SocialsecurityAccount = updateRequest.SocialSecurityAccount ?? "";
+
+-                        ss.SBeginPaymentTime = updateRequest.IsInternship ? updateRequest.BeginPaymentTime : null;
+
+-                        ss.Remark = updateRequest.Remark ?? "";
+
+-                    },
+
++                    UpdateAction = (ss) => UpdateSocialSecurityFields(ss, updateRequest),
+
++                    CreateCondition = () => ShouldCreateSocialSecurity(updateRequest),
+
++                    CreateAction = (ss) => CreateSocialSecurityFields(ss, updateRequest),
+
+                     AddSocialsecurityList = previewAdds,
+
+                     UpdateSocialsecurityList = previewUpdates,
+
+                     DelSocialsecurityList = previewDeletes,
+
+@@ -2396,30 +2383,9 @@
+                     UserId = systemUserId,
+
+                     Account = account,
+
+                     Name = userName,
+
+-                    UpdateAction = (af) => {
+
+-                        if (!string.IsNullOrEmpty(updateRequest.SocialSecurityAccount))
+
+-                            af.SocialsecurityAccount = updateRequest.SocialSecurityAccount;
+
+-                        if (!string.IsNullOrEmpty(updateRequest.ProvidentFundBank))
+
+-                            af.ProvidentFundBank = updateRequest.ProvidentFundBank;
+
+-                        if (!string.IsNullOrEmpty(updateRequest.ProvidentFundBankAccount))
+
+-                            af.ProvidentFundBankAccount = updateRequest.ProvidentFundBankAccount;
+
+-                        if (updateRequest.IsInternship && updateRequest.BeginPaymentTime.HasValue)
+
+-                            af.PBeginPaymentTime = updateRequest.BeginPaymentTime;
+
+-                        if (updateRequest?.Remark != null)
+
+-                            af.Remark = updateRequest.Remark;
+
+-                    },
+
+-                    CreateCondition = () =>
+
+-                        !string.IsNullOrEmpty(updateRequest.SocialSecurityAccount) ||
+
+-                        !string.IsNullOrEmpty(updateRequest.ProvidentFundBank) ||
+
+-                        !string.IsNullOrEmpty(updateRequest.ProvidentFundBankAccount) ||
+
+-                        (updateRequest.IsInternship && updateRequest.BeginPaymentTime.HasValue),
+
+-                    CreateAction = (af) => {
+
+-                        af.SocialsecurityAccount = updateRequest.SocialSecurityAccount ?? "";
+
+-                        af.ProvidentFundBank = updateRequest.ProvidentFundBank ?? "";
+
+-                        af.ProvidentFundBankAccount = updateRequest.ProvidentFundBankAccount ?? "";
+
+-                        af.PBeginPaymentTime = updateRequest.IsInternship ? updateRequest.BeginPaymentTime : null;
+
+-                        af.Remark = updateRequest.Remark ?? "";
+
+-                    },
+
++                    UpdateAction = (af) => UpdateProvidentFundFields(af, updateRequest),
+
++                    CreateCondition = () => ShouldCreateProvidentFund(updateRequest),
+
++                    CreateAction = (af) => CreateProvidentFundFields(af, updateRequest),
+
+                     AddSocialsecurityList = previewAdds,
+
+                     UpdateSocialsecurityList = previewUpdates,
+
+                     DelSocialsecurityList = previewDeletes,
+
+@@ -2431,6 +2397,78 @@
+ 
+
+             previewSecurities.AddRange(previewAdds);
+
+             return previewSecurities;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 更新社保字段
+
++        /// </summary>
+
++        private void UpdateSocialSecurityFields(UserSocialsecurity ss, UpdateSocialFundRequest request)
+
++        {
+
++            if (!string.IsNullOrEmpty(request.SocialSecurityAccount))
+
++                ss.SocialsecurityAccount = request.SocialSecurityAccount;
+
++            if (request.IsInternship && request.BeginPaymentTime.HasValue)
+
++                ss.SBeginPaymentTime = request.BeginPaymentTime;
+
++            if (request?.Remark != null)
+
++                ss.Remark = request.Remark;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 判断是否需要创建社保记录
+
++        /// </summary>
+
++        private bool ShouldCreateSocialSecurity(UpdateSocialFundRequest request)
+
++        {
+
++            return !string.IsNullOrEmpty(request.SocialSecurityAccount) ||
+
++                   (request.IsInternship && request.BeginPaymentTime.HasValue);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 创建社保字段
+
++        /// </summary>
+
++        private void CreateSocialSecurityFields(UserSocialsecurity ss, UpdateSocialFundRequest request)
+
++        {
+
++            ss.SocialsecurityAccount = request.SocialSecurityAccount ?? "";
+
++            ss.SBeginPaymentTime = request.IsInternship ? request.BeginPaymentTime : null;
+
++            ss.Remark = request.Remark ?? "";
+
++        }
+
++
+
++        /// <summary>
+
++        /// 更新公积金字段
+
++        /// </summary>
+
++        private void UpdateProvidentFundFields(UserSocialsecurity af, UpdateSocialFundRequest request)
+
++        {
+
++            if (!string.IsNullOrEmpty(request.SocialSecurityAccount))
+
++                af.SocialsecurityAccount = request.SocialSecurityAccount;
+
++            if (!string.IsNullOrEmpty(request.ProvidentFundBank))
+
++                af.ProvidentFundBank = request.ProvidentFundBank;
+
++            if (!string.IsNullOrEmpty(request.ProvidentFundBankAccount))
+
++                af.ProvidentFundBankAccount = request.ProvidentFundBankAccount;
+
++            if (request.IsInternship && request.BeginPaymentTime.HasValue)
+
++                af.PBeginPaymentTime = request.BeginPaymentTime;
+
++            if (request?.Remark != null)
+
++                af.Remark = request.Remark;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 判断是否需要创建公积金记录
+
++        /// </summary>
+
++        private bool ShouldCreateProvidentFund(UpdateSocialFundRequest request)
+
++        {
+
++            return !string.IsNullOrEmpty(request.SocialSecurityAccount) ||
+
++                   !string.IsNullOrEmpty(request.ProvidentFundBank) ||
+
++                   !string.IsNullOrEmpty(request.ProvidentFundBankAccount) ||
+
++                   (request.IsInternship && request.BeginPaymentTime.HasValue);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 创建公积金字段
+
++        /// </summary>
+
++        private void CreateProvidentFundFields(UserSocialsecurity af, UpdateSocialFundRequest request)
+
++        {
+
++            af.SocialsecurityAccount = request.SocialSecurityAccount ?? "";
+
++            af.ProvidentFundBank = request.ProvidentFundBank ?? "";
+
++            af.ProvidentFundBankAccount = request.ProvidentFundBankAccount ?? "";
+
++            af.PBeginPaymentTime = request.IsInternship ? request.BeginPaymentTime : null;
+
++            af.Remark = request.Remark ?? "";
+
+         }
+
+ 
+
+         /// <summary>

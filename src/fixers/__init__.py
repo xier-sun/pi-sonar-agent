@@ -6,7 +6,7 @@ This module handles:
 - RuleCatalog for looking up rules
 """
 
-from pi_sonar_agent.fixers.rule_profiles import (
+from .rule_profiles import (
     AgentConfig,
     RuleCatalog,
     RuleProfile,

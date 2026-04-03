@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from pi_sonar_agent.agent.claude_agent import (
     BUILTIN_FIX_TOOLS,
     MCP_FIX_TOOLS,
@@ -14,6 +16,7 @@ from pi_sonar_agent.agent.rule_policies import (
     LOOP_REWRITE_SCOPE_MODE,
 )
 from pi_sonar_agent.agent.rule_validators import validate_rule_fix
+from pi_sonar_agent.core.retry_context import RetryContext
 
 
 def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
@@ -53,6 +56,43 @@ def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
     assert "不要顺手修复本文件中其他位置的相同规则问题" in prompt
     assert "【推荐构建命令】" in prompt
     assert 'dotnet build "src/Foo.sln"' in prompt
+
+
+def test_build_user_prompt_renders_structured_retry_context() -> None:
+    issue = SonarIssue(
+        key="issue-retry-context",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    retry_context = RetryContext(
+        source_attempt_number=1,
+        failure_kind="build",
+        error="Issue changes failed local build verification",
+        raw_output="build failed",
+        guidance=("先修复这些编译错误，再确认 Sonar 问题仍然被修复。",),
+    )
+
+    prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  18 | foreach (var item in items) { ... }",
+        "",
+        "- 只允许修改第 18-24 行。",
+        {
+            "name": "Cognitive Complexity of methods should not be too high",
+            "description": "嵌套条件和循环会提高认知复杂度。",
+            "how_to_fix": "提取私有方法，减少嵌套层级。",
+        },
+        'dotnet build "src/Foo.sln"',
+        retry_context=retry_context,
+    )
+
+    assert "【上次尝试的构建失败信息】" in prompt
+    assert "build failed" in prompt
+    assert "请基于这些失败原因重新修复" in prompt
 
 
 def test_load_csharp_quality_gate_only_for_csharp_files() -> None:
@@ -559,6 +599,149 @@ def test_fix_issue_retries_when_model_first_response_times_out(monkeypatch, tmp_
     assert result.failure_kind == "model_timeout"
     assert result.error == "Model response timed out"
     assert "没有返回首个响应" in result.build_output
+
+
+def test_fix_issue_retries_when_follow_up_response_times_out(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-follow-up-timeout",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=4,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: []),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    events: list[str] = []
+
+    class FakeTextBlock:
+        def __init__(self, text: str) -> None:
+            self.text = text
+
+    class FakeAssistantMessage:
+        def __init__(self) -> None:
+            self.content = [FakeTextBlock("still working")]
+
+    async def fake_receive_response():
+        yield FakeAssistantMessage()
+        await asyncio.sleep(1)
+
+    class FakeClient:
+        async def __aenter__(self):
+            events.append("__aenter__")
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            events.append("__aexit__")
+            return None
+
+        async def query(self, prompt):
+            return None
+
+        async def interrupt(self):
+            events.append("interrupt")
+            return None
+
+        def receive_response(self):
+            return fake_receive_response()
+
+    monkeypatch.setattr(claude_agent_module, "AssistantMessage", FakeAssistantMessage)
+    monkeypatch.setattr(claude_agent_module, "TextBlock", FakeTextBlock)
+    monkeypatch.setattr(claude_agent_module, "ClaudeSDKClient", lambda options: FakeClient())
+    monkeypatch.setattr(claude_agent_module, "FOLLOW_UP_RESPONSE_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(claude_agent_module, "ISSUE_HARD_TIMEOUT_SECONDS", 10)
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is False
+    assert result.retryable_failure is True
+    assert result.failure_kind == "model_timeout"
+    assert result.error == "Model response timed out"
+    assert "没有返回后续响应" in result.build_output
+    assert "清理动作: interrupt, close_response_stream, disconnect" in result.build_output
+    assert events == ["__aenter__", "interrupt", "__aexit__"]
+
+
+def test_fix_issue_retries_when_issue_runtime_exceeds_deadline(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-hard-timeout",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=4,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: []),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    events: list[str] = []
+
+    class FakeClient:
+        async def __aenter__(self):
+            events.append("__aenter__")
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            events.append("__aexit__")
+            return None
+
+        async def query(self, prompt):
+            await asyncio.sleep(1)
+
+        async def interrupt(self):
+            events.append("interrupt")
+            return None
+
+        def receive_response(self):
+            raise AssertionError("receive_response should not be reached before deadline")
+
+    monkeypatch.setattr(claude_agent_module, "ClaudeSDKClient", lambda options: FakeClient())
+    monkeypatch.setattr(claude_agent_module, "FIRST_RESPONSE_TIMEOUT_SECONDS", 10)
+    monkeypatch.setattr(claude_agent_module, "FOLLOW_UP_RESPONSE_TIMEOUT_SECONDS", 10)
+    monkeypatch.setattr(claude_agent_module, "ISSUE_HARD_TIMEOUT_SECONDS", 0.01)
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is False
+    assert result.retryable_failure is True
+    assert result.failure_kind == "model_timeout"
+    assert result.error == "Model response timed out"
+    assert "单个 issue 在" in result.build_output
+    assert "清理动作: interrupt, disconnect" in result.build_output
+    assert events == ["__aenter__", "interrupt", "__aexit__"]
 
 
 def test_fix_issue_retries_when_forbidden_tool_is_used(monkeypatch, tmp_path) -> None:

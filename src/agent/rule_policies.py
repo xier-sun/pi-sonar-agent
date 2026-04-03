@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 STATEMENT_SCOPE_MODE = "statement"
 METHOD_SCOPE_MODE = "method"
 CONTROL_BLOCK_SCOPE_MODE = "control_block"

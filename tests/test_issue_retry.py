@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -147,6 +148,9 @@ def test_process_issue_with_retries_skips_after_three_build_failures(tmp_path) -
     assert result.skip_reason == "Build verification failed after 3 attempt(s)"
     assert result.attempts == 3
     assert Path(result.issue_log_path).exists()
+    assert Path(result.artifact_root).exists()
+    assert result.issue_state is not None
+    assert result.issue_state.status.value == "skipped"
     assert tracked_file.read_text(encoding="utf-8") == "previous success\n"
     assert agent.retry_feedbacks[0] == ""
     assert "关键编译错误" in agent.retry_feedbacks[1]
@@ -154,6 +158,22 @@ def test_process_issue_with_retries_skips_after_three_build_failures(tmp_path) -
     assert "出错代码片段" in agent.retry_feedbacks[1]
     assert "不要引用未定义的变量" in agent.retry_feedbacks[1]
     assert "关键编译错误" in agent.retry_feedbacks[2]
+    issue_summary = json.loads((Path(result.artifact_root) / "issue_summary.json").read_text(encoding="utf-8"))
+    assert issue_summary["status"] == "skipped"
+    assert len(issue_summary["attempts"]) == 3
+    assert issue_summary["attempts"][0]["status"] == "retrying"
+    assert issue_summary["attempts"][1]["status"] == "retrying"
+    assert issue_summary["attempts"][2]["status"] == "skipped"
+    second_prompt_context = json.loads(
+        (Path(result.artifact_root) / "attempt-02" / "prompt_context.json").read_text(encoding="utf-8")
+    )
+    assert second_prompt_context["retry_context"]["failure_kind"] == "build"
+    assert second_prompt_context["retry_context"]["source_attempt_number"] == 1
+    assert second_prompt_context["retry_context"]["compiler_errors"][0]["code"] == "CS0103"
+    assert (Path(result.artifact_root) / "attempt-01" / "issue.json").exists()
+    assert (Path(result.artifact_root) / "attempt-01" / "attempt_summary.json").exists()
+    assert (Path(result.artifact_root) / "attempt-01" / "build_result.json").exists()
+    assert (Path(result.artifact_root) / "attempt-01" / "patch.diff").exists()
 
 
 def test_process_issue_with_retries_retries_when_agent_makes_no_changes(tmp_path) -> None:
@@ -386,3 +406,25 @@ def test_build_retry_feedback_includes_model_timeout_constraints(tmp_path) -> No
 
     assert "等待模型首响应时超时" in feedback
     assert ".env 中的模型 endpoint、token 和 provider 兼容性" in feedback
+
+
+def test_build_retry_feedback_distinguishes_follow_up_response_timeout(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-model-timeout-follow-up",
+        file_path="tracked.cs",
+        build_passed=False,
+        build_verification_failed=False,
+        error="Model response timed out",
+        build_command='dotnet build "tracked.sln"',
+        build_output="模型在 180 秒内没有返回后续响应",
+        retryable_failure=True,
+        failure_kind="model_timeout",
+    )
+
+    feedback = build_retry_feedback(repo, result)
+
+    assert "等待模型后续响应时超时" in feedback

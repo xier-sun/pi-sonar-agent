@@ -1,0 +1,16 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs
+@@ -56,6 +56,7 @@
+         /// <param name="serviceProvider"></param>
+
+         /// <param name="revelanceManagerApp"></param>
+
+         /// <param name="configuration"></param>
+
++        /// <param name="misconductReportApp"></param>
+
+         public HumanResourceApprovalApp(
+
+             IUnitWork unitWork,
+
+             IAuth auth,

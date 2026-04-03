@@ -10,6 +10,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from pi_sonar_agent.core.git_gateway import GitRepositoryGateway
+
 
 @dataclass
 class WorkspaceInfo:
@@ -58,30 +60,8 @@ class RepositoryWorkspaceSession:
             shutil.rmtree(workspace_path, ignore_errors=True)
 
         self.workspace_root.mkdir(parents=True, exist_ok=True)
-
-        # Clone with authentication
-        remote_with_auth = self._add_auth_to_remote(self.remote_url)
-
-        result = subprocess.run(
-            f'git clone -b {self.base_branch} --single-branch "{remote_with_auth}" "{workspace_path}"',
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-
-        if result.returncode != 0:
-            # Try without single-branch
-            result = subprocess.run(
-                f'git clone -b {self.base_branch} "{remote_with_auth}" "{workspace_path}"',
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
-
-            if result.returncode != 0:
-                raise RuntimeError(f"Failed to clone repository: {result.stderr}")
+        git_gateway = GitRepositoryGateway(remote_url=self.remote_url, pat=self.pat)
+        git_gateway.clone_branch(workspace_path, self.base_branch)
 
         self._current_workspace = workspace_path
         return workspace_path
@@ -95,18 +75,6 @@ class RepositoryWorkspaceSession:
     def get_current_workspace(self) -> Path | None:
         """Get the current workspace path."""
         return self._current_workspace
-
-    def _add_auth_to_remote(self, remote_url: str) -> str:
-        """Add PAT to remote URL."""
-        if "@" in remote_url:
-            return remote_url
-
-        import urllib.parse
-
-        parsed = urllib.parse.urlparse(remote_url)
-        # For Azure DevOps, the format is:
-        # https://user:pat@dev.azure.com/org/project/_git/repo
-        return f"https://:{self.pat}@{parsed.netloc}{parsed.path}"
 
     def get_file_content(self, file_path: str) -> str:
         """Get content of a file in the workspace."""
@@ -138,34 +106,8 @@ def clone_repository(
         shutil.rmtree(target_dir, ignore_errors=True)
 
     target_dir.parent.mkdir(parents=True, exist_ok=True)
-
-    cmd = "git clone"
-    if depth:
-        cmd += f" --depth {depth}"
-    if branch:
-        cmd += f" -b {branch}"
-
-    if pat:
-        import urllib.parse
-
-        parsed = urllib.parse.urlparse(remote_url)
-        remote_with_auth = f"https://:{pat}@{parsed.netloc}{parsed.path}"
-        cmd += f' "{remote_with_auth}"'
-    else:
-        cmd += f' "{remote_url}"'
-
-    cmd += f' "{target_dir}"'
-
-    result = subprocess.run(
-        cmd,
-        shell=True,
-        capture_output=True,
-        text=True,
-        timeout=300,
-    )
-
-    if result.returncode != 0:
-        raise RuntimeError(f"Clone failed: {result.stderr}")
+    git_gateway = GitRepositoryGateway(remote_url=remote_url, pat=pat)
+    git_gateway.clone_repository(target_dir, branch=branch or None, depth=depth)
 
 
 def get_git_diff(workspace_path: Path) -> str:

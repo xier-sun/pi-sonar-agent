@@ -1,0 +1,18 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/UserRegister/UserRegisterDetail.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/UserRegister/UserRegisterDetail.cs
+@@ -561,7 +561,7 @@
+         /// 信息登记更新用户Id
+
+         /// </summary>
+
+         public string InfoUpdateUserId { get; set; }
+
+-        /// 确认操作更新时间
+
++        /// <summary>
+
+         /// </summary>
+
+         public DateTime? ConfirmOpsUpdateTime { get; set; }
+
+         /// <summary>

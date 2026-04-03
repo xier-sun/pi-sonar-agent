@@ -10,7 +10,6 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-
 # Rules that can be fixed deterministically
 UNUSED_VARIABLE_RULES = {"csharpsquid:S1481", "external_roslyn:CS0219"}
 USELESS_ASSIGNMENT_RULES = {"csharpsquid:S1854"}

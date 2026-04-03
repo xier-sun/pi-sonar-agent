@@ -1,0 +1,2 @@
+[2026-04-03 21:39:57] Attempt 1/3 started for 2bfba801-1e9f-4995-88dd-b2a8e5e244ca
+[2026-04-03 21:39:57] Issue skipped by policy: 规则 csharpsquid:S4136 默认跳过：重排重载成员会产生大范围 diff，建议人工处理。

@@ -6,7 +6,7 @@ import re
 import shutil
 import subprocess
 import time
-from dataclasses import dataclass
+from inspect import signature
 from pathlib import Path
 
 from pi_sonar_agent.agent.claude_agent import (
@@ -19,36 +19,49 @@ from pi_sonar_agent.agent.rule_policies import (
     LOOP_REWRITE_SCOPE_MODE,
     get_rule_policy,
 )
+from pi_sonar_agent.core.artifact_writer import ArtifactWriter
+from pi_sonar_agent.core.follow_up_store import FollowUpStore
+from pi_sonar_agent.core.retry_context import (
+    CompilerErrorContext,
+    RetryContext,
+    ReviewFailureContext,
+    ReviewViolationContext,
+    ScopeViolationContext,
+    render_retry_context,
+)
+from pi_sonar_agent.core.state import (
+    AttemptState,
+    AttemptStatus,
+    IssueState,
+    IssueStatus,
+    RetryReason,
+    WorkspaceBaseline,
+    utc_now_iso,
+)
+from pi_sonar_agent.core.state_store import RunStateStore
 from pi_sonar_agent.fixers.build_gate import format_build_failure_report
 
 DEFAULT_MAX_BUILD_RETRIES = 3
 
 
-@dataclass(frozen=True)
-class WorkspaceBaseline:
-    """Snapshot of the workspace state before an issue attempt starts."""
-
-    head_commit: str
-    snapshot_dir: Path
-    patch_path: Path
-    untracked_root: Path
-    untracked_files: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class CompilerErrorContext:
-    """Structured compiler error with optional source snippet."""
-
-    file_path: str
-    line: int
-    column: int
-    code: str
-    message: str
-    snippet: str = ""
-
-
 def _sanitize_name(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("._-") or "issue"
+
+
+def _build_issue_artifact_root(
+    repository: str,
+    run_label: str,
+    issue_key: str,
+    artifact_root: str = "logs/issue_artifacts",
+) -> Path:
+    """Build the artifact directory for a single issue."""
+
+    return (
+        Path(artifact_root)
+        / _sanitize_name(repository)
+        / _sanitize_name(run_label)
+        / _sanitize_name(issue_key)
+    )
 
 
 def _read_error_snippet(file_path: Path, line: int, radius: int = 2) -> str:
@@ -159,6 +172,100 @@ def _build_scope_retry_constraints(issue: SonarIssue | None) -> list[str]:
     ]
 
 
+def _extract_scope_violation_context(
+    raw_output: str,
+    issue: SonarIssue | None,
+) -> ScopeViolationContext | None:
+    """Extract structured scope violation details from raw build output."""
+
+    if "Issue changes exceeded the allowed Sonar edit scope." not in raw_output:
+        return None
+
+    allowed_lines_match = re.search(r"Allowed lines:\s*(.+)", raw_output)
+    changed_lines_match = re.search(r"Changed lines outside scope:\s*(.+)", raw_output)
+    return ScopeViolationContext(
+        raw_output=raw_output,
+        allowed_lines=(allowed_lines_match.group(1).strip() if allowed_lines_match else ""),
+        changed_lines_outside_scope=(
+            changed_lines_match.group(1).strip() if changed_lines_match else ""
+        ),
+        constraints=tuple(_build_scope_retry_constraints(issue)),
+    )
+
+
+def _extract_review_failure_context(result: FixResult) -> ReviewFailureContext | None:
+    """Extract structured diff-review rejection details from a FixResult."""
+
+    reviewer_result = getattr(result, "reviewer_result", None)
+    if not isinstance(reviewer_result, dict):
+        return None
+    if str(reviewer_result.get("status", "")).strip().lower() != "retry":
+        return None
+
+    violations = tuple(
+        ReviewViolationContext(
+            violation_type=str(item.get("type", "")).strip(),
+            file=str(item.get("file", "")).strip(),
+            reason=str(item.get("reason", "")).strip(),
+            changed_lines=tuple(
+                int(line)
+                for line in item.get("changed_lines", [])
+                if str(line).strip()
+            ),
+            evidence_hunk=str(item.get("evidence_hunk", "")).strip(),
+        )
+        for item in reviewer_result.get("violations", [])
+        if isinstance(item, dict)
+    )
+    constraints = (
+        "只保留完成当前 Sonar issue 所必需的修改。",
+        "不要触碰 Edit Contract 之外的文件或无关代码行。",
+        "把相邻问题记录到 follow-up，而不是混入当前 patch。",
+    )
+    raw_output = str(result.build_output or "").strip()
+    summary = str(reviewer_result.get("summary", "")).strip() or "Diff reviewer rejected the patch."
+    if not raw_output:
+        raw_output = summary
+    return ReviewFailureContext(
+        raw_output=raw_output,
+        summary=summary,
+        constraints=constraints,
+        violations=violations,
+    )
+
+
+def build_retry_context(
+    workspace_path: Path,
+    result: FixResult,
+    issue: SonarIssue | None = None,
+    *,
+    source_attempt_number: int = 0,
+) -> RetryContext:
+    """Build structured retry memory for the next model attempt."""
+
+    raw_output = str(result.build_output or "").strip()
+    compiler_errors = tuple(_extract_compiler_errors(workspace_path, result.build_output))
+    return RetryContext(
+        source_attempt_number=source_attempt_number,
+        failure_kind=result.failure_kind,
+        error=result.error or "",
+        summary=result.summary,
+        build_command=result.build_command,
+        raw_output=raw_output,
+        retryable_failure=result.retryable_failure,
+        build_verification_failed=result.build_verification_failed,
+        changed_files=_normalize_changed_files(result),
+        compiler_errors=compiler_errors,
+        guidance=tuple(_build_retry_guidance(list(compiler_errors))) if compiler_errors else (),
+        scope_violation=_extract_scope_violation_context(raw_output, issue),
+        review_failure=_extract_review_failure_context(result),
+        model_timeout_summary=_summarize_model_timeout(raw_output) if result.failure_kind == "model_timeout" else "",
+        build_tool_failed=result.failure_kind == "build_tool",
+        forbidden_tool_failed=result.failure_kind == "forbidden_tool",
+        model_timeout_failed=result.failure_kind == "model_timeout",
+    )
+
+
 def build_retry_feedback(
     workspace_path: Path,
     result: FixResult,
@@ -166,114 +273,17 @@ def build_retry_feedback(
 ) -> str:
     """Build concise retry feedback for the next model attempt."""
 
-    errors = _extract_compiler_errors(workspace_path, result.build_output)
-    raw_output = str(result.build_output or "").strip()
-    has_scope_violation = "Issue changes exceeded the allowed Sonar edit scope." in raw_output
-    build_tool_failed = result.failure_kind == "build_tool"
-    forbidden_tool_failed = result.failure_kind == "forbidden_tool"
-    model_timeout_failed = result.failure_kind == "model_timeout"
-    if not errors:
-        if raw_output:
-            if model_timeout_failed:
-                return "\n".join(
-                    [
-                        "上次尝试在等待模型首响应时超时，请先确认当前模型网关或 provider 可正常返回工具调用响应：",
-                        raw_output,
-                        "重试约束:",
-                        "- 不要更换构建命令，先确认模型能正常返回第一条消息。",
-                        "- 如果连续超时，优先检查 .env 中的模型 endpoint、token 和 provider 兼容性。",
-                    ]
-                )
-            if forbidden_tool_failed:
-                sections = [
-                    "上次尝试使用了被禁止的工具，或污染了当前 issue 的 Git 基线；本次必须严格按下面约束重试：",
-                    raw_output,
-                    "重试约束:",
-                    "- 严禁使用 Bash、git_add、git_commit、git_push 或任何自行提交/推送动作。",
-                    "- 修复阶段只能直接编辑代码并运行推荐构建命令，提交由外层流程统一处理。",
-                    "- 先根据下面的本地构建输出修复问题，再重新运行推荐构建命令验证。",
-                ]
-                if has_scope_violation:
-                    sections.extend(
-                        [
-                            "范围约束:",
-                            *_build_scope_retry_constraints(issue),
-                        ]
-                    )
-                return "\n".join(sections)
-            if build_tool_failed:
-                sections = [
-                    "上次尝试在运行构建工具时异常退出，请先处理下面的异常信息和本地回退构建输出：",
-                    raw_output,
-                    "重试约束:",
-                    "- 先修复 stderr 或回退构建输出中暴露的问题，再重新运行推荐构建命令。",
-                    "- 如果回退构建已经通过，也要再次运行构建，确认修改后的代码仍然稳定。",
-                ]
-                if has_scope_violation:
-                    sections.extend(
-                        [
-                            "范围约束:",
-                            *_build_scope_retry_constraints(issue),
-                        ]
-                    )
-                return "\n".join(sections)
-            if has_scope_violation:
-                return "\n".join(
-                    [
-                        "上次尝试修改了 Sonar 指定范围之外的代码，请严格缩小修改范围：",
-                        raw_output,
-                        "重试约束:",
-                        *_build_scope_retry_constraints(issue),
-                    ]
-                )
-            return raw_output
-        if result.error == "Agent completed without modifying any files":
-            return "\n".join(
-                [
-                    "上次尝试没有实际修改任何文件。",
-                    "这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。",
-                    "重试约束:",
-                    "- 不要只做分析或解释，必须提交实际代码修改。",
-                    "- 修改后立即使用推荐构建命令验证。",
-                    "- 如果这是行级问题，只修改 Sonar 指向的那条语句。",
-                ]
-            )
-        return result.error or ""
+    return render_retry_context(build_retry_context(workspace_path, result, issue))
 
-    sections: list[str] = []
-    if model_timeout_failed:
-        sections.append("上次尝试在等待模型首响应时超时。")
-        sections.append("先确认当前模型 provider/网关与 Claude SDK 工具调用协议兼容，再继续重试。")
-    if forbidden_tool_failed:
-        sections.append("上次尝试使用了被禁止的工具，或污染了当前 issue 的 Git 基线。")
-        sections.append("这次严禁使用 Bash、git_add、git_commit、git_push；只允许直接编辑代码并运行推荐构建命令。")
-    if build_tool_failed:
-        sections.append("上次尝试在运行构建工具时异常退出；已附加本地回退构建结果。")
-    sections.append("上次尝试引入了以下关键编译错误，请先修复这些错误：")
-    for index, item in enumerate(errors[:12], start=1):
-        sections.append(
-            f"{index}. {item.code} at {item.file_path}:{item.line}:{item.column}\n"
-            f"   错误信息: {item.message}"
-        )
-        if item.snippet:
-            sections.append(f"   出错代码片段:\n{item.snippet}")
 
-    guidance = _build_retry_guidance(errors)
-    if guidance:
-        sections.append("重试约束:")
-        sections.extend(f"- {item}" for item in guidance)
+def _summarize_model_timeout(raw_output: str) -> str:
+    """Summarize the timeout mode for retry feedback."""
 
-    if has_scope_violation:
-        sections.extend(
-            [
-                "另外，上次修改还越过了 Sonar 允许范围：",
-                raw_output,
-                "范围约束:",
-                *_build_scope_retry_constraints(issue),
-            ]
-        )
-
-    return "\n".join(sections)
+    if "没有返回后续响应" in raw_output:
+        return "在等待模型后续响应时超时"
+    if "单个 issue 在" in raw_output:
+        return "在单个 issue 执行过程中超时"
+    return "在等待模型首响应时超时"
 
 
 def _build_final_skip_reason(result: FixResult, attempts: int) -> str:
@@ -283,6 +293,8 @@ def _build_final_skip_reason(result: FixResult, attempts: int) -> str:
         return f"Build verification failed after {attempts} attempt(s)"
     if result.failure_kind == "scope":
         return f"Issue changes exceeded allowed scope after {attempts} attempt(s)"
+    if result.failure_kind == "reviewer":
+        return f"Diff reviewer rejected the patch after {attempts} attempt(s)"
     if result.failure_kind == "no_change":
         return f"Agent completed without modifying any files after {attempts} attempt(s)"
     if result.failure_kind == "rule_validation":
@@ -336,6 +348,8 @@ def capture_workspace_baseline(
     snapshot_dir.mkdir(parents=True, exist_ok=True)
 
     patch_path = snapshot_dir / "tracked.patch"
+    tracked_root = snapshot_dir / "tracked"
+    tracked_root.mkdir(parents=True, exist_ok=True)
     untracked_root = snapshot_dir / "untracked"
     untracked_root.mkdir(parents=True, exist_ok=True)
     head_commit_result = _run_git_command(workspace_path, ["rev-parse", "HEAD"])
@@ -343,6 +357,17 @@ def capture_workspace_baseline(
 
     diff_result = _run_git_command(workspace_path, ["diff", "--binary", "--no-color", "HEAD"])
     patch_path.write_text(diff_result.stdout or "", encoding="utf-8")
+    tracked_result = _run_git_command(
+        workspace_path,
+        ["diff", "--name-only", "--diff-filter=ACDMRTUXB", "-z", "HEAD"],
+    )
+    tracked_files = tuple(path for path in (tracked_result.stdout or "").split("\0") if path)
+    for rel_path in tracked_files:
+        source = workspace_path / rel_path
+        if source.is_file():
+            target = tracked_root / rel_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
 
     untracked_result = _run_git_command(
         workspace_path,
@@ -360,6 +385,8 @@ def capture_workspace_baseline(
         head_commit=head_commit,
         snapshot_dir=snapshot_dir,
         patch_path=patch_path,
+        tracked_root=tracked_root,
+        tracked_files=tracked_files,
         untracked_root=untracked_root,
         untracked_files=untracked_files,
     )
@@ -424,6 +451,144 @@ class IssueAttemptLogger:
             handle.write(f"[{timestamp}] {message}\n")
 
 
+def _invoke_fix_issue(
+    agent: ClaudeFixAgent,
+    issue: SonarIssue,
+    workspace_path: Path,
+    build_command: str,
+    *,
+    retry_feedback: str,
+    retry_context: RetryContext | None,
+) -> FixResult:
+    """Invoke agent.fix_issue while remaining compatible with legacy test doubles."""
+
+    fix_issue_params = signature(agent.fix_issue).parameters
+    if "retry_context" in fix_issue_params:
+        return agent.fix_issue(
+            issue,
+            workspace_path,
+            build_command,
+            retry_feedback=retry_feedback,
+            retry_context=retry_context,
+        )
+    return agent.fix_issue(
+        issue,
+        workspace_path,
+        build_command,
+        retry_feedback=retry_feedback,
+    )
+
+
+def _normalize_changed_files(result: FixResult) -> tuple[str, ...]:
+    """Extract normalized changed files from a FixResult."""
+
+    return tuple(
+        str(change.get("file", "")).replace("\\", "/").lstrip("/")
+        for change in result.changes
+        if str(change.get("file", "")).strip()
+    )
+
+
+def _determine_attempt_status(
+    result: FixResult,
+    *,
+    attempt: int,
+    max_build_retries: int,
+) -> AttemptStatus:
+    """Map the fix result to a structured attempt status."""
+
+    if result.success:
+        return AttemptStatus.SUCCEEDED
+
+    should_retry = result.retryable_failure or result.build_verification_failed
+    if should_retry and attempt < max_build_retries:
+        return AttemptStatus.RETRYING
+    if result.skipped:
+        return AttemptStatus.SKIPPED
+    return AttemptStatus.FAILED
+
+
+def _determine_retry_reason(result: FixResult) -> RetryReason:
+    """Map retry-related flags to a retry reason enum."""
+
+    if result.build_verification_failed:
+        return RetryReason.BUILD_VERIFICATION_FAILED
+    if result.retryable_failure:
+        return RetryReason.RETRYABLE_FAILURE
+    return RetryReason.NONE
+
+
+def _build_attempt_state(
+    *,
+    attempt: int,
+    max_build_retries: int,
+    started_at: str,
+    finished_at: str,
+    duration_seconds: float,
+    result: FixResult,
+    artifact_dir: str,
+) -> AttemptState:
+    """Build a structured attempt state from a FixResult."""
+
+    return AttemptState(
+        attempt_number=attempt,
+        status=_determine_attempt_status(
+            result,
+            attempt=attempt,
+            max_build_retries=max_build_retries,
+        ),
+        started_at=started_at,
+        finished_at=finished_at,
+        duration_seconds=round(duration_seconds, 3),
+        failure_kind=result.failure_kind,
+        retry_reason=_determine_retry_reason(result),
+        retryable_failure=result.retryable_failure,
+        build_passed=result.build_passed,
+        build_verification_failed=result.build_verification_failed,
+        error=result.error or "",
+        skip_reason=result.skip_reason,
+        summary=result.summary,
+        changed_files=_normalize_changed_files(result),
+        issue_log_path=result.issue_log_path,
+        artifact_dir=artifact_dir,
+    )
+
+
+def _build_issue_state(
+    *,
+    issue: SonarIssue,
+    repository: str,
+    run_label: str,
+    result: FixResult,
+    attempts: list[AttemptState],
+    artifact_root: str,
+) -> IssueState:
+    """Build the final issue state after retries are complete."""
+
+    if result.success:
+        status = IssueStatus.FIXED
+    elif result.skipped:
+        status = IssueStatus.SKIPPED
+    else:
+        status = IssueStatus.FAILED
+
+    return IssueState(
+        issue_key=issue.key,
+        repository=repository,
+        run_label=run_label,
+        rule_id=issue.rule,
+        file_path=issue.file_path,
+        line=issue.line,
+        status=status,
+        attempts=tuple(attempts),
+        final_failure_kind=result.failure_kind,
+        final_error=result.error or "",
+        final_skip_reason=result.skip_reason,
+        final_summary=result.summary,
+        artifact_root=artifact_root,
+    )
+
+
 def process_issue_with_retries(
     *,
     agent: ClaudeFixAgent,
@@ -432,38 +597,156 @@ def process_issue_with_retries(
     build_command: str,
     repository: str,
     run_label: str,
+    author: str = "",
+    project_key: str = "",
+    state_store: RunStateStore | None = None,
     max_build_retries: int = DEFAULT_MAX_BUILD_RETRIES,
 ) -> FixResult:
     """Retry a single issue fix on build failure, then roll back only that issue if needed."""
 
     logger = IssueAttemptLogger(repository=repository, issue_key=issue.key, run_label=run_label)
+    artifact_writer = ArtifactWriter()
+    follow_up_store = FollowUpStore()
+    issue_artifact_root = _build_issue_artifact_root(repository, run_label, issue.key)
     baseline = capture_workspace_baseline(
         workspace_path,
         repository=repository,
         issue_key=issue.key,
         run_label=run_label,
     )
+    retry_context: RetryContext | None = None
     retry_feedback = ""
+    attempt_states: list[AttemptState] = []
+
+    def write_attempt_artifacts(
+        *,
+        attempt: int,
+        started_at: str,
+        finished_at: str,
+        duration_seconds: float,
+        result: FixResult,
+    ) -> AttemptState:
+        attempt_root = issue_artifact_root / f"attempt-{attempt:02d}"
+        attempt_state = _build_attempt_state(
+            attempt=attempt,
+            max_build_retries=max_build_retries,
+            started_at=started_at,
+            finished_at=finished_at,
+            duration_seconds=duration_seconds,
+            result=result,
+            artifact_dir=attempt_root.as_posix(),
+        )
+        artifact_writer.write_attempt_artifacts(
+            repository=repository,
+            run_label=run_label,
+            issue=issue,
+            attempt_state=attempt_state,
+            result=result,
+            workspace_path=workspace_path,
+            baseline=baseline,
+            build_command=build_command,
+            retry_feedback=retry_feedback,
+            retry_context=retry_context,
+        )
+        attempt_states.append(attempt_state)
+        return attempt_state
+
+    def finalize_result(result: FixResult) -> FixResult:
+        result.artifact_root = issue_artifact_root.as_posix()
+        issue_state = _build_issue_state(
+            issue=issue,
+            repository=repository,
+            run_label=run_label,
+            result=result,
+            attempts=attempt_states,
+            artifact_root=result.artifact_root,
+        )
+        result.issue_state = issue_state
+        artifact_writer.write_issue_state(issue_state)
+        if state_store is not None:
+            state_store.record_issue_state(
+                issue_state,
+                author=author,
+                project_key=project_key,
+            )
+        return result
 
     try:
         for attempt in range(1, max_build_retries + 1):
+            attempt_started_at = utc_now_iso()
+            attempt_started_monotonic = time.monotonic()
             logger.write(f"Attempt {attempt}/{max_build_retries} started for {issue.key}")
-            result = agent.fix_issue(
+            if state_store is not None:
+                state_store.record_attempt_started(
+                    run_label=run_label,
+                    repository=repository,
+                    author=author,
+                    project_key=project_key,
+                    issue_key=issue.key,
+                    attempt_number=attempt,
+                    build_command=build_command,
+                    retry_context=retry_context.to_dict() if retry_context else None,
+                )
+            result = _invoke_fix_issue(
+                agent,
                 issue,
                 workspace_path,
                 build_command,
                 retry_feedback=retry_feedback,
+                retry_context=retry_context,
             )
             result.attempts = attempt
             result.issue_log_path = str(logger.log_path)
+            queue_path = follow_up_store.append(
+                repository=repository,
+                run_label=run_label,
+                issue_key=issue.key,
+                follow_ups=getattr(result, "follow_ups", ()),
+            )
+            if queue_path is not None:
+                result.follow_up_log_path = queue_path.as_posix()
+            attempt_finished_at = utc_now_iso()
+            attempt_duration_seconds = time.monotonic() - attempt_started_monotonic
 
             if result.success:
                 logger.write(f"Attempt {attempt} succeeded: {result.summary}")
-                return result
+                attempt_state = write_attempt_artifacts(
+                    attempt=attempt,
+                    started_at=attempt_started_at,
+                    finished_at=attempt_finished_at,
+                    duration_seconds=attempt_duration_seconds,
+                    result=result,
+                )
+                if state_store is not None:
+                    state_store.record_attempt_state(
+                        attempt_state,
+                        run_label=run_label,
+                        repository=repository,
+                        author=author,
+                        project_key=project_key,
+                        issue_key=issue.key,
+                    )
+                return finalize_result(result)
 
             if result.skipped and result.failure_kind == "policy_skip":
                 logger.write(f"Issue skipped by policy: {result.skip_reason or result.error or 'policy skip'}")
-                return result
+                attempt_state = write_attempt_artifacts(
+                    attempt=attempt,
+                    started_at=attempt_started_at,
+                    finished_at=attempt_finished_at,
+                    duration_seconds=attempt_duration_seconds,
+                    result=result,
+                )
+                if state_store is not None:
+                    state_store.record_attempt_state(
+                        attempt_state,
+                        run_label=run_label,
+                        repository=repository,
+                        author=author,
+                        project_key=project_key,
+                        issue_key=issue.key,
+                    )
+                return finalize_result(result)
 
             logger.write(f"Attempt {attempt} failed: {result.error or 'unknown error'}")
             failure_report = ""
@@ -479,12 +762,35 @@ def process_issue_with_retries(
                 if failure_report:
                     logger.write("Build failure report:\n" + failure_report)
 
-            next_retry_feedback = build_retry_feedback(workspace_path, result, issue)
+            next_retry_context = build_retry_context(
+                workspace_path,
+                result,
+                issue,
+                source_attempt_number=attempt,
+            )
+            next_retry_feedback = render_retry_context(next_retry_context)
+            attempt_state = write_attempt_artifacts(
+                attempt=attempt,
+                started_at=attempt_started_at,
+                finished_at=attempt_finished_at,
+                duration_seconds=attempt_duration_seconds,
+                result=result,
+            )
+            if state_store is not None:
+                state_store.record_attempt_state(
+                    attempt_state,
+                    run_label=run_label,
+                    repository=repository,
+                    author=author,
+                    project_key=project_key,
+                    issue_key=issue.key,
+                )
             restore_workspace_baseline(workspace_path, baseline)
             logger.write("Workspace restored to issue baseline")
 
             should_retry = result.retryable_failure or result.build_verification_failed
             if should_retry and attempt < max_build_retries:
+                retry_context = next_retry_context
                 retry_feedback = next_retry_feedback or failure_report or (result.error or "")
                 logger.write(f"Retrying issue after recoverable failure, next attempt: {attempt + 1}")
                 continue
@@ -496,7 +802,38 @@ def process_issue_with_retries(
             result.error = result.skip_reason
             result.skipped = True
             logger.write(f"Issue skipped: {result.skip_reason}")
-            return result
+            final_attempt_state = _build_attempt_state(
+                attempt=attempt,
+                max_build_retries=max_build_retries,
+                started_at=attempt_started_at,
+                finished_at=attempt_finished_at,
+                duration_seconds=attempt_duration_seconds,
+                result=result,
+                artifact_dir=(issue_artifact_root / f"attempt-{attempt:02d}").as_posix(),
+            )
+            attempt_states[-1] = final_attempt_state
+            artifact_writer.write_attempt_artifacts(
+                repository=repository,
+                run_label=run_label,
+                issue=issue,
+                attempt_state=final_attempt_state,
+                result=result,
+                workspace_path=workspace_path,
+                baseline=baseline,
+                build_command=build_command,
+                retry_feedback=retry_feedback,
+                retry_context=retry_context,
+            )
+            if state_store is not None:
+                state_store.record_attempt_state(
+                    final_attempt_state,
+                    run_label=run_label,
+                    repository=repository,
+                    author=author,
+                    project_key=project_key,
+                    issue_key=issue.key,
+                )
+            return finalize_result(result)
 
         skipped = FixResult(
             success=False,
@@ -509,6 +846,6 @@ def process_issue_with_retries(
             issue_log_path=str(logger.log_path),
         )
         logger.write(f"Issue skipped: {skipped.skip_reason}")
-        return skipped
+        return finalize_result(skipped)
     finally:
         cleanup_workspace_baseline(baseline)

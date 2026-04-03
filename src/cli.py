@@ -5,6 +5,9 @@ import sys
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
+
 from pi_sonar_agent.agent.claude_agent import ClaudeFixAgent
 from pi_sonar_agent.core.model_env import (
     build_agent_env,
@@ -13,8 +16,6 @@ from pi_sonar_agent.core.model_env import (
     validate_agent_env,
 )
 from pi_sonar_agent.fixers.build_gate import resolve_build_command
-from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 # Load environment variables
 load_project_env()

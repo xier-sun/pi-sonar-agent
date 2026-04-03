@@ -9,8 +9,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
 
 DEFAULT_RULE_PROFILE_PATH = Path("rule_profiles.json")
 

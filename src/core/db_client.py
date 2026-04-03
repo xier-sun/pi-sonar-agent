@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 import mysql.connector
 
@@ -105,6 +107,51 @@ class MySQLClient:
                 FOREIGN KEY (run_id) REFERENCES fix_run_records(id) ON DELETE CASCADE,
                 INDEX idx_issue (issue_key),
                 INDEX idx_run (run_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS fix_state_snapshots (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                run_label VARCHAR(255) NOT NULL,
+                entity_type VARCHAR(50) NOT NULL,
+                entity_key VARCHAR(500) NOT NULL,
+                repository VARCHAR(255),
+                author VARCHAR(255),
+                project_key VARCHAR(255),
+                issue_key VARCHAR(255),
+                attempt_number INT DEFAULT 0,
+                status VARCHAR(50) DEFAULT '',
+                artifact_path VARCHAR(1000),
+                payload_json LONGTEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_state_snapshot (run_label, entity_type, entity_key, attempt_number),
+                INDEX idx_snapshot_run (run_label),
+                INDEX idx_snapshot_issue (issue_key),
+                INDEX idx_snapshot_entity (entity_type, entity_key)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS fix_event_records (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                run_label VARCHAR(255) NOT NULL,
+                event_kind VARCHAR(50) NOT NULL,
+                entity_type VARCHAR(50) NOT NULL,
+                entity_key VARCHAR(500) NOT NULL,
+                repository VARCHAR(255),
+                author VARCHAR(255),
+                project_key VARCHAR(255),
+                issue_key VARCHAR(255),
+                attempt_number INT DEFAULT 0,
+                status VARCHAR(50) DEFAULT '',
+                artifact_path VARCHAR(1000),
+                payload_json LONGTEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_event_run (run_label),
+                INDEX idx_event_issue (issue_key),
+                INDEX idx_event_kind (event_kind)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
 
@@ -230,6 +277,130 @@ class MySQLClient:
         cursor.execute(
             f"UPDATE fix_issue_records SET {', '.join(updates)} WHERE issue_key = %s",
             params,
+        )
+        self._conn.commit()
+        cursor.close()
+
+    def upsert_state_snapshot(
+        self,
+        *,
+        run_label: str,
+        entity_type: str,
+        entity_key: str,
+        payload: dict[str, Any],
+        repository: str = "",
+        author: str = "",
+        project_key: str = "",
+        issue_key: str = "",
+        attempt_number: int = 0,
+        status: str = "",
+        artifact_path: str = "",
+    ) -> None:
+        """Insert or update a structured state snapshot."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor()
+        payload_json = json.dumps(payload, ensure_ascii=False)
+        cursor.execute(
+            """
+            INSERT INTO fix_state_snapshots
+            (
+                run_label,
+                entity_type,
+                entity_key,
+                repository,
+                author,
+                project_key,
+                issue_key,
+                attempt_number,
+                status,
+                artifact_path,
+                payload_json
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                repository = VALUES(repository),
+                author = VALUES(author),
+                project_key = VALUES(project_key),
+                issue_key = VALUES(issue_key),
+                status = VALUES(status),
+                artifact_path = VALUES(artifact_path),
+                payload_json = VALUES(payload_json)
+            """,
+            (
+                run_label,
+                entity_type,
+                entity_key,
+                repository,
+                author,
+                project_key,
+                issue_key,
+                attempt_number,
+                status,
+                artifact_path,
+                payload_json,
+            ),
+        )
+        self._conn.commit()
+        cursor.close()
+
+    def insert_event_record(
+        self,
+        *,
+        run_label: str,
+        event_kind: str,
+        entity_type: str,
+        entity_key: str,
+        payload: dict[str, Any],
+        repository: str = "",
+        author: str = "",
+        project_key: str = "",
+        issue_key: str = "",
+        attempt_number: int = 0,
+        status: str = "",
+        artifact_path: str = "",
+    ) -> None:
+        """Insert a structured lifecycle event."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO fix_event_records
+            (
+                run_label,
+                event_kind,
+                entity_type,
+                entity_key,
+                repository,
+                author,
+                project_key,
+                issue_key,
+                attempt_number,
+                status,
+                artifact_path,
+                payload_json
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                run_label,
+                event_kind,
+                entity_type,
+                entity_key,
+                repository,
+                author,
+                project_key,
+                issue_key,
+                attempt_number,
+                status,
+                artifact_path,
+                json.dumps(payload, ensure_ascii=False),
+            ),
         )
         self._conn.commit()
         cursor.close()

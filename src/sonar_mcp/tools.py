@@ -7,14 +7,12 @@ This module provides MCP tools for:
 - Git operations (commit, push, create PR)
 """
 
-import asyncio
 import os
 import subprocess
 from pathlib import Path
 from typing import Any
 
 from claude_agent_sdk import create_sdk_mcp_server, tool
-
 
 # ============== File Operations Tools ==============
 
@@ -49,7 +47,6 @@ async def read_file(args: dict[str, Any]) -> dict[str, Any]:
         end_idx = min(len(lines), end)
 
         selected_lines = lines[start_idx:end_idx]
-        selected_content = "\n".join(selected_lines)
 
         # Add line numbers for reference
         numbered_lines = [

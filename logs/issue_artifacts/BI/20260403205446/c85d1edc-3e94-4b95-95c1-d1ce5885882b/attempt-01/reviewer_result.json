@@ -1,0 +1,33 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs",
+      "reason": "This hunk changes lines outside the edit contract window 361-361.",
+      "symbol": "statement@361-361",
+      "changed_lines": [
+        372
+      ],
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs\n+++ OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs\n@@ -361 +361 @@\n-                return null;\n+                return JValue.CreateNull();\n@@ -372 +372 @@\n-            return null;\n+            return JValue.CreateNull();"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "c85d1edc-3e94-4b95-95c1-d1ce5885882b",
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs",
+      "symbol": "statement@361-361",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs\n+++ OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs\n@@ -361 +361 @@\n-                return null;\n+                return JValue.CreateNull();\n@@ -372 +372 @@\n-            return null;\n+            return JValue.CreateNull();",
+      "discovered_at": "2026-04-03T13:30:57.317909+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 2,
+    "total_changed_lines": 2
+  }
+}

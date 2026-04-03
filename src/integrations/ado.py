@@ -5,12 +5,13 @@ Compatible with Windows and Unix systems.
 """
 
 import base64
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import requests
+
+from pi_sonar_agent.core.git_gateway import GitRepositoryGateway
 
 
 @dataclass
@@ -315,7 +316,7 @@ class AzureDevOpsClient:
 
 
 class GitClient:
-    """Git operations client using subprocess (works on Windows and Unix)."""
+    """Legacy Git facade backed by the shared repository gateway."""
 
     def __init__(self, workspace_root: Path):
         self.workspace_root = workspace_root
@@ -328,37 +329,15 @@ class GitClient:
         if target_dir.exists():
             return target_dir
 
-        cmd = f"git clone {remote_url}"
-        if branch:
-            cmd += f" -b {branch}"
-
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            cwd=str(self.workspace_root),
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-
-        if result.returncode != 0:
-            raise RuntimeError(f"Clone failed: {result.stderr}")
-
+        gateway = GitRepositoryGateway(remote_url=remote_url)
+        gateway.clone_repository(target_dir, branch=branch)
         return target_dir
 
     def create_branch(self, branch_name: str, cwd: Path | None = None) -> None:
         """Create a new branch."""
-        result = subprocess.run(
-            f"git checkout -b {branch_name}",
-            shell=True,
-            cwd=str(cwd or self.workspace_root),
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-
-        if result.returncode != 0:
-            raise RuntimeError(f"Create branch failed: {result.stderr}")
+        work_dir = cwd or self.workspace_root
+        gateway = GitRepositoryGateway(remote_url=str(work_dir))
+        gateway.create_branch(work_dir, branch_name)
 
     def commit_and_push(
         self,
@@ -368,39 +347,12 @@ class GitClient:
     ) -> None:
         """Commit and push changes."""
         work_dir = cwd or self.workspace_root
-
-        # Add files
-        if files:
-            for f in files:
-                subprocess.run(f"git add {f}", shell=True, cwd=work_dir, check=True)
-        else:
-            subprocess.run("git add -A", shell=True, cwd=work_dir, check=True)
-
-        # Commit
-        result = subprocess.run(
-            f'git commit -m "{message}"',
-            shell=True,
-            cwd=work_dir,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-
-        if result.returncode != 0:
-            # Maybe nothing to commit
-            if "nothing to commit" not in result.stdout.lower():
-                raise RuntimeError(f"Commit failed: {result.stderr}")
-            return
-
-        # Push
-        result = subprocess.run(
-            "git push -u origin HEAD",
-            shell=True,
-            cwd=work_dir,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-
-        if result.returncode != 0:
-            raise RuntimeError(f"Push failed: {result.stderr}")
+        gateway = GitRepositoryGateway(remote_url=str(work_dir))
+        gateway.stage_paths(work_dir, files)
+        try:
+            gateway.commit_all_changes(work_dir, message)
+        except RuntimeError as exc:
+            if "nothing to commit" in str(exc).lower():
+                return
+            raise
+        gateway.push_head(work_dir)

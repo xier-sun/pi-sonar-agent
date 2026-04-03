@@ -1,0 +1,9 @@
+{
+  "attempt_number": 1,
+  "build_command": "dotnet build \"tracked.sln\"",
+  "retry_feedback": "",
+  "retry_context": null,
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-147/test_process_issue_with_retrie1/repo",
+  "baseline_head_commit": "ca53cfacc07842ebf4db35e11bd8d4bf3ee4068c",
+  "guardrail_mode": ""
+}

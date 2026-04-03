@@ -1,5 +1,5 @@
 """Agent module for interacting with Claude Code SDK."""
 
-from pi_sonar_agent.agent.claude_agent import ClaudeFixAgent, SonarIssue, FixResult
+from .claude_agent import ClaudeFixAgent, FixResult, SonarIssue
 
 __all__ = ["ClaudeFixAgent", "SonarIssue", "FixResult"]

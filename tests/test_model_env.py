@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 from claude_agent_sdk import ResultMessage
+
 from pi_sonar_agent.agent.claude_agent import ClaudeFixAgent
 from pi_sonar_agent.core.model_env import (
     build_agent_env,

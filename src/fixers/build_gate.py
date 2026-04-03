@@ -9,13 +9,14 @@ This module handles:
 
 from __future__ import annotations
 
-import base64
 import shutil
 import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from pi_sonar_agent.core.git_gateway import GitRepositoryGateway
 
 
 @dataclass(frozen=True)
@@ -457,42 +458,9 @@ class LocalBuildGate:
         if workspace_path.exists():
             shutil.rmtree(workspace_path, ignore_errors=True)
 
-        # Use git clone with PAT
-        remote_with_auth = self._add_auth_to_remote(self.remote_url)
         log_file.write(f"Cloning {base_branch} branch...\n")
-
-        result = _run_shell_command(
-            f'git clone -b {base_branch} --single-branch "{remote_with_auth}" "{workspace_path}"',
-            cwd=workspace_path.parent,
-            timeout=300,
-        )
-
-        if result.returncode != 0:
-            # Try without single-branch
-            result = _run_shell_command(
-                f'git clone -b {base_branch} "{remote_with_auth}" "{workspace_path}"',
-                cwd=workspace_path.parent,
-                timeout=300,
-            )
-
-            if result.returncode != 0:
-                raise RuntimeError(f"Clone failed: {_combined_process_output(result)}")
-
-    def _add_auth_to_remote(self, remote_url: str) -> str:
-        """Add PAT to remote URL."""
-        if "@" in remote_url:
-            return remote_url
-
-        # Parse URL and insert credentials
-        import urllib.parse
-
-        parsed = urllib.parse.urlparse(remote_url)
-        auth = base64.b64encode(f":{self.pat}".encode()).decode()
-        return remote_url.replace(
-            f"{parsed.scheme}://",
-            f"{parsed.scheme}://:{auth}@",
-            1,
-        )
+        git_gateway = GitRepositoryGateway(remote_url=self.remote_url, pat=self.pat)
+        git_gateway.clone_branch(workspace_path, base_branch)
 
     def _apply_file_changes(
         self,

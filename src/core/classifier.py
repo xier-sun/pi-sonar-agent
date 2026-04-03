@@ -17,7 +17,7 @@ class ComplexityLevel(str, Enum):
     ARCHITECTURAL = "architectural"
 
     @classmethod
-    def from_value(cls, value: str | None) -> "ComplexityLevel | None":
+    def from_value(cls, value: str | None) -> ComplexityLevel | None:
         """Create from value string."""
         normalized = str(value or "").strip().lower()
         if not normalized:

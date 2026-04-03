@@ -1,0 +1,36 @@
+{
+  "issue_key": "7df7fe85-b963-4c91-b06c-850694223ea7",
+  "repository": "BI",
+  "run_label": "20260403205446",
+  "rule_id": "external_roslyn:CS1573",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs",
+  "line": 65,
+  "status": "fixed",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "succeeded",
+      "started_at": "2026-04-03T13:14:08.853221+00:00",
+      "finished_at": "2026-04-03T13:15:35.490757+00:00",
+      "duration_seconds": 86.635,
+      "failure_kind": "",
+      "retry_reason": "none",
+      "retryable_failure": false,
+      "build_passed": true,
+      "build_verification_failed": false,
+      "error": "",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs"
+      ],
+      "issue_log_path": "logs\\issue_attempts\\BI_7df7fe85-b963-4c91-b06c-850694223ea7_20260403205446.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260403205446/7df7fe85-b963-4c91-b06c-850694223ea7/attempt-01"
+    }
+  ],
+  "final_failure_kind": "",
+  "final_error": "",
+  "final_skip_reason": "",
+  "final_summary": "Fixed 1 file(s)",
+  "artifact_root": "logs/issue_artifacts/BI/20260403205446/7df7fe85-b963-4c91-b06c-850694223ea7"
+}
