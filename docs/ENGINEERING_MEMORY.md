@@ -1,328 +1,371 @@
-# 运行问题与解决方案记忆
+# 工程问题记忆
 
-这份文档记录本项目在 `2026-03` 这一轮联调过程中遇到的真实问题、根因和最终处理方式。
-目标不是写变更日志，而是给后续维护者一个“遇到类似症状先看这里”的记忆库。
+这份文档记录的是“这个项目已经踩过哪些坑，现在是怎么约定的”。
+它不是完整变更日志，而是给维护者的排障记忆和工程边界说明。
 
-## 1. 虚拟环境损坏或依赖不全
+如果你想看当前架构全貌，请配合阅读 [PROJECT_GUIDE.md](../PROJECT_GUIDE.md)。
 
-### 症状
-
-- 运行时出现缺少模块
-- `pytest` / `ruff` 无法直接调用
-- 已有 `.venv` 行为异常
-
-### 根因
-
-- 旧虚拟环境状态不一致
-- 依赖未按当前项目版本重新安装
-
-### 解决方案
-
-- 删除 `.venv` 后重建
-- 使用 `pip install -e ".[dev]"` 安装项目和开发依赖
-- 在 Windows 下优先用 `.\.venv\Scripts\python.exe -m pytest`
-
-## 2. `.env` 模型配置未生效，实际跑到了系统环境变量
+## 1. 依赖与虚拟环境
 
 ### 症状
 
-- `.env` 里配的是一套 key / base url
-- 实际运行却提示另外一套模型或鉴权错误
-- `claude auth status` 显示的 key 来源不是当前项目
+- 缺少模块
+- `pytest` / `ruff` 找不到
+- 同一台机器上系统 Python 和项目 Python 行为不一致
 
 ### 根因
 
-- SDK 子进程继承了系统环境中的 `ANTHROPIC_*`
-- 代码最初没有把 `.env` 配置强制覆盖到 Agent 子进程
+- 虚拟环境损坏
+- 依赖没有按当前仓库版本重装
+- 实际运行时没有用仓库内 `.venv`
 
-### 解决方案
+### 当前约定
 
-- `.env` 使用 `override=True` 加载
-- 新增 `build_agent_env()` 显式构造传给 SDK 的模型环境
-- 在 `.env` 使用 `ANTHROPIC_AUTH_TOKEN` 时清空继承的 `ANTHROPIC_API_KEY`
-- 模型只从 `.env` 解析，不再依赖机器级隐藏模型配置
+- 优先使用 `python -m pip install -e ".[dev]"` 安装项目和开发依赖
+- 优先使用 `.\.venv\Scripts\python.exe ...` 运行命令
+- `run.py` 只负责把 `src/` 注入 `sys.path`，不会替你补装依赖
 
-## 3. OpenAI 风格代理无法直接驱动 Claude SDK
+关键文件：
+
+- [pyproject.toml](../pyproject.toml)
+- [run.py](../run.py)
+
+## 2. `.env` 必须压过系统环境
+
+### 旧问题
+
+- `.env` 里明明配了一套模型
+- 实际运行却吃到了机器级 `ANTHROPIC_*` 或 `OPENAI_*`
+
+### 根因
+
+- Claude SDK 子进程会继承当前进程环境
+- 如果不主动整理 child env，就容易被系统环境污染
+
+### 当前约定
+
+- `.env` 由 [src/core/model_env.py](../src/core/model_env.py) 统一加载
+- 模型选择优先来自 `.env`
+- 发给 Claude SDK 的 child env 由 [src/core/claude_adapter.py](../src/core/claude_adapter.py) 再做一次清理
+
+这意味着：
+
+- 问题优先查 `.env`
+- 不要指望机器级环境变量默默生效
+
+## 3. OpenAI 风格代理不是直接给 OpenAI SDK 用的
+
+### 旧问题
+
+- 用户配置了 `OPENAI_API_KEY` / `OPENAI_BASE_URL`
+- 但项目实际走的是 Claude Code SDK
+
+### 根因
+
+- Claude SDK 原生吃的是 Anthropic 风格环境变量
+
+### 当前约定
+
+- 允许用户继续写 `OPENAI_*`
+- [src/core/model_env.py](../src/core/model_env.py) 会把它们映射成 Claude SDK 需要的兼容变量
+- [src/core/claude_adapter.py](../src/core/claude_adapter.py) 会处理第三方 Anthropic 兼容网关下的 CLI 参数和 child env
+
+## 4. `base_branch` 必须真正控制初始 clone
+
+### 旧问题
+
+- 配了 `base_branch`
+- 实际初始 clone 还是固定先拉 `develop`
+
+### 根因
+
+- 早期分支配置只是“clone 后再 fetch/check”的参考值，不是真正的 clone 参数
+
+### 当前约定
+
+- `base_branch` 现在由 [src/core/target_config.py](../src/core/target_config.py) 和 [src/core/git_gateway.py](../src/core/git_gateway.py) 统一解析和执行
+- 单目标入口优先级：CLI > `targets.json` > 默认值
+- 批量入口优先级：target > 默认值
+- preflight 会在真正处理 issue 前通过 [src/core/preflight.py](../src/core/preflight.py) 校验远端分支是否存在
+
+这意味着：
+
+- 分支问题会更早失败
+- 文档里不应该再写“固定 clone develop”
+- 当前 `base_branch` 不从 `.env` 读取
+
+## 5. ADO PAT 必须贯穿 Git 链路，而不是只给 REST API
+
+### 旧问题
+
+- ADO API 能通
+- `git clone` / `git push` 却失败
+
+### 根因
+
+- 早期 PAT 只用于 REST API 请求头
+- Git 操作依赖机器上碰巧已有的凭据缓存
+
+### 当前约定
+
+- 所有正式 Git 操作统一走 [src/core/git_gateway.py](../src/core/git_gateway.py)
+- `clone / branch / add / commit / push` 语义已经收口
+- PAT 会注入 HTTPS remote URL
+- 错误日志会用 redacted URL，避免敏感信息直接落盘
+
+仍需注意：
+
+- 现在的 PAT 方案是“统一且可用”，但不是最理想的长期安全方案
+- 如果后续要继续加强，可以再演进到 `credential helper` 或 `http.extraheader`
+
+## 6. 启动前失败和运行中失败必须分开
+
+### 旧问题
+
+- 分支不存在、工作区不可写、模型配置错误，往往在运行很后面才炸
+
+### 根因
+
+- 早期缺少统一 preflight
+
+### 当前约定
+
+- [src/core/preflight.py](../src/core/preflight.py) 统一负责：
+  - 模型环境校验
+  - `SONARQUBE_*` / `ADO_*` 必填配置校验
+  - 工作区可写校验
+  - 远端基线分支存在校验
+- 正式入口 [src/main.py](../src/main.py) 和 [src/batch_runner.py](../src/batch_runner.py) 都走同一套 preflight
+
+## 7. 单个 issue 必须独立回滚，不能污染整轮运行
+
+### 旧问题
+
+- 一个 issue 修坏代码后，后续 issue 也被污染
+
+### 根因
+
+- 早期缺少 issue 粒度的 Git 基线和回滚
+
+### 当前约定
+
+- [src/core/issue_retry.py](../src/core/issue_retry.py) 会在每个 issue 开始前建立工作区基线
+- 当前 issue 失败时只回滚本 issue 改动
+- 之前成功 issue 的改动必须保留
+- 单 issue 默认最多重试 3 次
+
+## 8. “有改动”不等于“修复成功”
+
+### 旧问题
+
+- Agent 正常退出，或者改到了文件，就被当成成功
+- 实际上可能根本没落有效修改，或者已经把代码改坏
+
+### 根因
+
+- 早期成功判定过于宽松
+
+### 当前约定
+
+- 无文件改动视为失败
+- issue 修复后必须经过 [src/core/fix_verifier.py](../src/core/fix_verifier.py) 的 issue 级构建校验
+- 如果 issue 级构建失败，就进入 retry，而不是计入成功
+
+## 9. retry memory 不能只塞整段 build log
+
+### 旧问题
+
+- 把大段 build log 原样塞回 prompt
+- 模型重试时仍然反复犯同类错误
+
+### 根因
+
+- 没有结构化 retry memory
+
+### 当前约定
+
+- [src/core/retry_context.py](../src/core/retry_context.py) 负责结构化 retry memory
+- 记录的内容包括：
+  - 关键编译错误
+  - scope violation
+  - reviewer rejection
+  - forbidden tool
+  - build tool failure
+  - model timeout
+- [src/core/issue_prompt.py](../src/core/issue_prompt.py) 会把结构化 retry memory 渲染回 prompt
+- `prompt_context.json` 也会写出 `retry_context`
+
+## 10. 超时不是“等一下就好”，必须能取消和清理
+
+### 旧问题
+
+- SDK 卡住时只能等
+- 日志里有心跳，但不会真正中止执行
+
+### 根因
+
+- 早期只保护了首响应，后续工具调用或流式响应卡住时缺少显式 abort
+
+### 当前约定
+
+- [src/core/agent_runtime.py](../src/core/agent_runtime.py) 负责：
+  - client connect timeout
+  - first response timeout
+  - follow-up timeout
+  - issue hard timeout
+- [src/core/claude_adapter.py](../src/core/claude_adapter.py) 负责显式：
+  - `interrupt`
+  - `close_response_stream`
+  - `disconnect`
+
+这意味着日志里看到 timeout 时，不只是“报错返回”，还伴随真正的会话清理。
+
+## 11. 抑制“顺手修”不能只靠 prompt
+
+### 旧问题
+
+- 模型会顺手修同文件里其他相同规则问题
+- 单纯靠 prompt 约束不稳定
+
+### 根因
+
+- 缺少结构化的 issue 级边界控制
+
+### 当前约定
+
+当前采用多层 Guardrail：
+
+- [src/core/issue_planner.py](../src/core/issue_planner.py): 生成 `IssuePlan`
+- [src/core/issue_contract.py](../src/core/issue_contract.py): 声明 `EditContract`
+- [src/core/editor_policy.py](../src/core/editor_policy.py): 推导 patch-only 策略
+- [src/core/diff_reviewer.py](../src/core/diff_reviewer.py): patch 审查
+- [src/core/follow_up_store.py](../src/core/follow_up_store.py): incidental fix 只入队，不混入当前 patch
+- [src/core/scope_guard.py](../src/core/scope_guard.py): legacy scope guard 兼容链路
+
+当前支持两种模式：
+
+- `scope`
+- `contract_review`
+
+默认仍是 `scope`，但新设计能力已经在 `contract_review` 链路中落地。
+
+## 12. C# 规则需要仓库级质量门禁补充
+
+### 旧问题
+
+- 模型只看 Sonar 问题本身，容易修完一个问题又引入新的命名、异步或结构问题
+
+### 根因
+
+- 规则说明不足以覆盖仓库自己的代码规范
+
+### 当前约定
+
+- 对 C# 文件，prompt 会自动附带 [data/csharp-quality-gate.md](../data/csharp-quality-gate.md)
+- [src/core/resource_loader.py](../src/core/resource_loader.py) 会加载仓库级 `CLAUDE.md/AGENTS.md`
+- [CLAUDE.md](../CLAUDE.md) 现在也是长期工程规则的一部分
+
+## 13. PR 说明必须结构化，不能只写一句话
+
+### 旧问题
+
+- reviewer 很难知道修了什么、跳过了什么、为什么失败
+
+### 根因
+
+- 早期 PR 描述太短
+
+### 当前约定
+
+- [src/core/pr_description.py](../src/core/pr_description.py) 负责生成结构化 PR 描述
+- 本地会在 `logs/pr_descriptions/` 保留副本
+- 仓库工作区里也会写一份 PR 详细报告，供 PR 描述引用
+
+## 14. Azure DevOps abandoned PR 不能直接更新
 
 ### 症状
 
-- 用户提供的是 `OPENAI_API_KEY` / `OPENAI_BASE_URL`
-- 代码实际走的是 Claude SDK
+- 更新 PR 描述返回 `400`
 
 ### 根因
 
-- Claude SDK 当前消费的是 Anthropic 风格环境变量
+- 目标 PR 已经处于 `abandoned`
 
-### 解决方案
+### 当前约定
 
-- 如果 `.env` 只有 `OPENAI_*`，自动映射成 `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL`
-- 保持用户只改 `.env` 就能切换网关
+- 不对 abandoned PR 直接打补丁
+- 先恢复，或新建 PR
 
-## 4. 自定义模型名 `glm-4.7` 不被识别
+## 15. 钉钉通知有两套能力，不要混用接口
 
-### 症状
+### 旧问题
 
-- 提示 `selected model (glm-4.7) may not exist`
+- 企业应用私信和机器人 webhook 混着调，导致 `404`
 
-### 根因
+### 当前约定
 
-- Claude Code 会先校验模型名
-- 第三方网关模型名需要 custom option 或 alias 映射
+- 企业应用私信走企业应用接口
+- webhook 走 `DINGTALK_WEBHOOK`
+- 如果 target 已解析出 `dingtalk_userid`，优先尝试私信；失败再回退 webhook
 
-### 解决方案
+关键文件：
 
-- 对非标准模型名自动注册 `ANTHROPIC_CUSTOM_MODEL_OPTION`
-- 支持用 `ANTHROPIC_DEFAULT_SONNET_MODEL` 把默认 `sonnet` 映射到网关模型
+- [src/core/dingtalk.py](../src/core/dingtalk.py)
+- [src/core/recipient_resolution.py](../src/core/recipient_resolution.py)
 
-## 5. `ResultMessage` 二次异常掩盖真实错误
+## 16. 状态、事件、工件必须结构化，不能只靠日志
 
-### 症状
+### 旧问题
 
-- 日志里先有鉴权错误
-- 随后又出现 `'ResultMessage' object has no attribute 'data'`
+- 跑完以后主要靠 console log 回看，很难做状态汇总、二次分析或 DB 同步
 
-### 根因
+### 当前约定
 
-- 代码按旧假设访问了 SDK 当前对象不存在的 `data` 字段
+- [src/core/state.py](../src/core/state.py): run/target/issue/attempt 状态模型
+- [src/core/events.py](../src/core/events.py): `events.jsonl`
+- [src/core/artifact_writer.py](../src/core/artifact_writer.py): 尝试工件
+- [src/core/state_store.py](../src/core/state_store.py): artifact-first + DB optional sync
 
-### 解决方案
+本地工件是第一真相源，数据库只是增强，不是单点依赖。
 
-- 改为从 `result` / `errors` 等真实字段提取错误
-- 让原始错误能直接透出
+## 17. 包结构已经收口，但仍有桥接层
 
-## 6. Windows 下构建输出解码失败
+### 旧问题
 
-### 症状
+- 以前依赖 `__path__` hack 和开发机本地 fallback
+- 包结构不稳定，不利于安装和迁移
 
-- `UnicodeDecodeError: 'gbk' codec can't decode ...`
-- 后续又出现 `stdout + stderr` 的 `TypeError`
+### 当前约定
 
-### 根因
+- [run.py](../run.py) 已经去掉开发机私有 fallback
+- [src/pi_sonar_agent/__init__.py](../src/pi_sonar_agent/__init__.py) 是正式包入口
+- `src/pi_sonar_agent/*` 当前仍保留桥接模块，方便标准化 import 路径
 
-- 子进程默认按本机编码读输出
-- 解码线程异常后，`stdout` 可能变成 `None`
+这意味着：
 
-### 解决方案
+- 对外导入请优先使用 `pi_sonar_agent.*`
+- 阅读真实实现时仍以 `src/core`、`src/agent`、`src/fixers`、`src/integrations` 为主
 
-- 统一子进程输出为 `encoding="utf-8", errors="replace"`
-- 拼接输出前先做空值归一化
+## 18. 质量门禁必须覆盖整仓，而不是只看局部
 
-## 7. 最终构建在仓库根目录裸跑，找不到 `.sln`
+### 旧问题
 
-### 症状
+- 有测试通过，但 lint 和包布局仍可能漂移
 
-- `MSBUILD : error MSB1003: 请指定项目或解决方案文件`
+### 当前约定
 
-### 根因
+- CI 在 [.github/workflows/ci.yml](../.github/workflows/ci.yml)
+- 本地推荐运行：
+  - `python -m ruff check .`
+  - `python -m pytest -q`
+- [pyproject.toml](../pyproject.toml) 已排除 `logs/`、`.agent_workspaces/` 等生成目录
 
-- 最终构建只执行 `dotnet build`
-- 没有把 `solution_path` 拼到命令中
+## 19. 维护时的优先级建议
 
-### 解决方案
+后续如果继续演进，优先遵守这些边界：
 
-- `solution_path` 同时用于 issue 级构建和最终构建
-- `resolve_build_command()` 会把 `.sln` / `.csproj` 自动补到命令后
-
-## 8. 日志里显示成功，但其实一个文件都没改
-
-### 症状
-
-- `Done. Cost: ...`
-- 结果显示 `[OK] Fixed 0 file(s)`
-
-### 根因
-
-- 早期成功判定只看 Agent 是否正常退出
-
-### 解决方案
-
-- “无文件改动”直接视为失败
-- 不再允许 `Fixed 0 file(s)` 进入成功路径
-
-## 9. issue 改坏代码后仍被当成成功
-
-### 症状
-
-- 某个 issue 的 agent 日志里已经出现编译错误
-- 运行摘要仍计入成功
-
-### 根因
-
-- 成功判定只看“改到了文件”
-- 没把 issue 级构建验证失败升级成失败结果
-
-### 解决方案
-
-- issue 修完必须通过本地构建验证
-- issue 级构建失败会触发重试，不再直接计入成功
-
-## 10. 一个 issue 修不好会拖死整轮运行
-
-### 症状
-
-- 某个 issue 把工作区改坏后，后续 issue 也被污染
-
-### 根因
-
-- 早期没有“按 issue 粒度回滚”的机制
-
-### 解决方案
-
-- 每个 issue 开始前保存工作区基线
-- 失败时只回滚当前 issue 的改动
-- 已成功 issue 的改动保留
-- 当前 issue 三次失败后跳过并继续下一个
-
-## 11. 编译报错已经回喂模型，但信息太吵，重试质量不高
-
-### 症状
-
-- 模型重试时反复犯同一类错误
-- issue log 里 error 行重复很多次
-
-### 根因
-
-- 早期只是把大段 build log 原样塞回 prompt
-- 缺少去重、缺少针对性约束
-
-### 解决方案
-
-- 提取唯一的关键编译错误
-- 附带出错文件、行列号和代码片段
-- 根据错误码补约束
-
-例如：
-
-- `CS1963`: 不要在 IQueryable / EF 表达式树里用 `dynamic`
-- `CS0246`: 不要凭空引入未定义的新类型
-- `CS0103`: 不要引用当前作用域中不存在的名称
-
-## 12. 模型会顺手修同文件里其他相同规则的问题
-
-### 症状
-
-- Sonar 指向一处
-- Agent 却把同文件其他同类写法也一起改了
-
-### 根因
-
-- prompt 只强调“修这个 issue”，但没有给出明确的允许修改范围
-- 本地没有做越界修改校验
-
-### 解决方案
-
-- prompt 中加入“允许修改范围”
-- 普通问题只允许修改报错行附近小范围
-- `S3776` 只允许修改目标方法，必要时只允许在该方法附近新增 helper
-- 修复后用 `git diff --unified=0` 校验改动行号，越界直接判失败并重试
-
-## 13. PR 描述过于简略，不利于审阅
-
-### 症状
-
-- PR 里只有非常短的说明
-- reviewer 很难快速理解修了什么、跳过了什么
-
-### 根因
-
-- 早期 PR description 基本只有标题或简单摘要
-
-### 解决方案
-
-- 新增结构化 PR 描述生成器
-- 包含运行概览、issue 明细、issue key、改动文件、跳过原因、issue 日志
-
-## 14. 已创建的 PR 无法再更新描述
-
-### 症状
-
-- 调用更新描述接口返回 `400`
-
-### 根因
-
-- 目标 PR 已处于 `abandoned` 状态
-- Azure DevOps 不允许编辑已废弃 PR
-
-### 解决方案
-
-- 先恢复 PR，或重新创建新的 PR
-- 不能直接对 abandoned PR 打补丁
-
-## 15. 钉钉企业应用通知返回 404
-
-### 症状
-
-- 创建 PR 成功
-- 钉钉通知请求 `https://api.dingtalk.com/v1.0/robot/oAuth/token` 返回 `404`
-
-### 根因
-
-- 代码把“企业内部应用私信”错误地打到了一个不存在的机器人 token 接口
-- 当前配置同时存在“企业内部应用”和“机器人 webhook”两套能力，但早期实现没有正确区分
-
-### 解决方案
-
-- 企业内部应用私信改为使用：
-  - `https://oapi.dingtalk.com/gettoken`
-  - `https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2`
-- 机器人通知改为使用 `DINGTALK_WEBHOOK`，并支持 `DINGTALK_SECRET` 加签
-- 发送策略改为：
-  - 如果提供了 `dingtalk_userid`，优先发企业应用私信
-  - 私信失败时回退到 webhook
-- 已做过最小真实冒烟，私信和 webhook 都能返回成功
-
-## 16. 控制台有输出，但运行结束后没有整轮日志
-
-### 症状
-
-- 终端里能看到 issue 处理、构建、PR、通知等输出
-- 但没有一份整轮运行日志可以回看
-
-### 根因
-
-- 早期只有 issue 级日志
-- 主流程里的控制台输出没有 tee 到文件
-
-### 解决方案
-
-- 增加 `logs/runs/run_<timestamp>.log`
-- 主流程和 batch 流程都会把 stdout / stderr 同步写入运行日志
-- PR 阶段的 `git checkout/add/commit/push` 输出也改为捕获后再打印，保证能落盘
-
-## 17. 工作区会越积越多，占用大量磁盘
-
-### 症状
-
-- `.agent_workspaces/` 下残留大量旧目录
-- 多轮运行后占用越来越大
-
-### 根因
-
-- 早期只会在本轮结束时按 `keep_workspace` 决定是否删除“当前工作区”
-- 不会主动清理历史工作区
-
-### 解决方案
-
-- 新一轮运行开始前，自动只保留最近 1 次历史工作区
-- 其余旧工作区自动删除
-- 如果本轮使用 `--keep-workspace`，当前工作区仍可保留到下一轮再参与清理
-
-## 18. 当前最重要的稳定性结论
-
-截至这轮文档整理时，项目已经具备以下稳定行为：
-
-- `.env` 优先生效
-- 模型网关可配置
-- issue 级重试与回滚可用
-- 最终构建会使用 `solution_path`
-- PR 描述足够详细
-- 越界修改会被拦住
-- C# issue 会自动携带仓库内质量门禁规范
-- 运行日志会自动落盘
-- 工作区会自动保留最近 1 次，其余清理
-- 钉钉通知支持私信优先、webhook 回退
-- reviewer 和 dingtalk 收件人支持“targets 优先，author 回退”，其中 dingtalk userId 可从 ERP4 查出
-
-仍建议持续观察的点：
-
-- 某些复杂 `S3776` 场景下模型仍可能需要更多领域约束
+1. 新增能力先挂到 `RunCoordinator / AgentRuntime / FixVerifier / StateStore` 的清晰层次里
+2. 不要把新的流程编排重新塞回 `ClaudeFixAgent`
+3. 不要绕开 `GitRepositoryGateway` 自己拼 clone/push 逻辑
+4. 不要绕开 `ArtifactWriter` 和 `StateStore` 只写散乱日志
+5. 新的 guardrail 优先加到 `EditContract + DiffReviewer` 链路，而不是继续堆 prompt 文案

@@ -1,46 +1,41 @@
 # pi-sonar-agent
 
-`pi-sonar-agent` 是一个面向 SonarQube 技术债修复的自动化 Agent。
-当前主流程是：
+`pi-sonar-agent` 是一个面向 SonarQube 技术债修复的自动化 Agent。它会围绕“单个 issue 的最小安全修复”运行完整链路：
 
 1. 从 SonarQube 拉取指定作者的 open issues
-2. 克隆 Azure DevOps 仓库到临时工作区
-3. 调用 Claude Code SDK 修复单个 issue
-4. 对每个 issue 做本地构建校验
-5. 失败时按 issue 维度重试并回滚
-6. 对成功保留的改动做最终构建验证
+2. 克隆 Azure DevOps 仓库到本地工作区
+3. 为单个 issue 生成编辑合同并调用 Claude Code SDK 修复
+4. 对当前 issue 做本地构建校验、范围审查和规则校验
+5. 失败时按 issue 粒度回滚并重试
+6. 对保留下来的改动做最终构建验证
 7. 推送分支、创建 PR、添加 reviewer、发送钉钉通知
-
-## 当前推荐入口
-
-- `python run.py`
-- `pi-sonar-agent`
-
-这两个入口都走当前完整工作流。
-
-`src/cli.py` 仍然保留，但更适合开发调试，不是当前推荐的生产入口。
 
 ## 文档导航
 
-- [PROJECT_GUIDE.md](PROJECT_GUIDE.md): 项目结构、执行流程、核心模块说明
-- [docs/RUNBOOK.md](docs/RUNBOOK.md): 运行与配置手册
-- [docs/ENGINEERING_MEMORY.md](docs/ENGINEERING_MEMORY.md): 已踩问题、根因和解决方案记忆
+- [PROJECT_GUIDE.md](PROJECT_GUIDE.md): 当前项目结构、执行流程、核心模块职责
+- [docs/RUNBOOK.md](docs/RUNBOOK.md): 安装、配置、运行、排障手册
+- [docs/ENGINEERING_MEMORY.md](docs/ENGINEERING_MEMORY.md): 已踩问题、根因、当前工程约定
+- [docs/AGENT_REFACTOR_PLAN.md](docs/AGENT_REFACTOR_PLAN.md): 已完成的重构实施记录
 
-## 核心能力
+## 当前推荐入口
 
-- `.env` 优先于系统环境变量，避免机器级 `ANTHROPIC_*` / `OPENAI_*` 污染当前项目配置
-- 支持 Anthropic 兼容网关，以及 OpenAI 风格代理配置映射到 Claude SDK
-- 自定义模型名会自动注册为 Claude Code custom model option
-- `solution_path` 会参与 issue 级构建和最终构建，不再只在仓库根目录裸跑 `dotnet build`
-- 单个 issue 修复失败时最多重试 3 次，只回滚当前 issue 的改动，不影响之前成功的 issue
-- 构建失败日志会输出关键错误和日志尾部，便于定位
-- PR 描述会带运行概览、issue 明细、issue key、跳过原因和重试日志
-- Agent 会限制修改范围，尽量只修 SonarQube 指定的那一块代码
-- C# issue 会自动附带仓库内的质量门禁规范，避免修复后再引入新的命名、异步或结构问题
+- [run.py](run.py)
+- 命令行脚本 `pi-sonar-agent`
+- 批量入口：`python -m pi_sonar_agent.batch_runner data/targets.json`
 
-## 安装
+这三个入口都会进入当前已经收口的共享运行骨架：
 
-### Windows PowerShell
+- [src/main.py](src/main.py)
+- [src/batch_runner.py](src/batch_runner.py)
+- [src/core/run_coordinator.py](src/core/run_coordinator.py)
+
+`src/cli.py` 仍然保留，但更适合开发调试，不是当前生产入口。
+
+## 快速开始
+
+### 1. 安装依赖
+
+Windows PowerShell:
 
 ```powershell
 python -m venv .venv
@@ -49,9 +44,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-如果虚拟环境损坏，直接删除 `.venv` 后重建即可。
-
-### Linux / macOS
+Linux / macOS:
 
 ```bash
 python3 -m venv .venv
@@ -60,16 +53,20 @@ python3 -m pip install --upgrade pip
 python3 -m pip install -e ".[dev]"
 ```
 
-## 基础配置
+`python -m pip install -e ".[dev]"` 的含义是：
 
-至少需要准备两份配置：
+- `.`: 安装当前仓库这个项目
+- `-e`: 以 editable 方式安装，源码改动后无需重新安装
+- `.[dev]`: 同时安装开发依赖，例如 `pytest`、`ruff`
+
+### 2. 准备配置
+
+至少需要：
 
 - `.env`
 - `data/targets.json`
 
-### `.env`
-
-必需项通常包括：
+`.env` 中最少需要这些运行时配置：
 
 - `SONARQUBE_HOST`
 - `SONARQUBE_TOKEN`
@@ -77,11 +74,14 @@ python3 -m pip install -e ".[dev]"
 - `ADO_PROJECT`
 - `ADO_PAT`
 
-模型相关建议优先写在 `.env`，不要依赖系统环境变量。
+模型配置建议统一放在 `.env`，由 [src/core/model_env.py](src/core/model_env.py) 解析。支持两种常见方式：
 
-### `data/targets.json`
+- Anthropic 兼容配置：`ANTHROPIC_*`
+- OpenAI 风格代理：`OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_MODEL`
 
-当前零参数运行会读取 `data/targets.json` 的第一个目标。常用字段：
+如果使用 OpenAI 风格代理，系统会自动映射成 Claude SDK 需要的 `ANTHROPIC_*` 兼容变量。
+
+`data/targets.json` 用于零参数运行或批量运行。常用字段：
 
 - `project_key`
 - `repository`
@@ -90,104 +90,153 @@ python3 -m pip install -e ".[dev]"
 - `dingtalk_userid`
 - `max_issues`
 - `base_branch`
-- `solution_path`
-
-收件人规则：
-
-- `reviewer_email`：优先使用 `targets.json` 的值；如果没配，则回退到 Sonar `author`
-- `dingtalk_userid`：优先使用 `targets.json` 的值；如果没配，则使用 `.env` 中的 `DB_*` 连接 ERP4，按 `author -> erp4.dingtalkuserdetail.Email -> UserId` 查找
-
-## 配置优先级
-
-### 运行目标参数
-
-以下字段按这个优先级解析：
-
-- 命令行参数
-- `.env`
-- `data/targets.json` 第一个目标
-
-适用字段包括：
-
-- `project_key`
-- `repository`
-- `author`
-- `base_branch`
 - `build_command`
 - `test_command`
 - `solution_path`
-- `max_issues`
+- `keep_workspace`
+- `skip_build_gate`
 
-### 模型参数
+一个最小示例：
 
-模型选择只以 `.env` 为准，不再偷偷继承机器级模型设置。
+```json
+[
+  {
+    "project_key": "your_sonar_project_key",
+    "repository": "your_repo",
+    "author": "owner@company.com",
+    "base_branch": "main",
+    "solution_path": "src/YourSolution.sln",
+    "max_issues": 3
+  }
+]
+```
 
-支持的显式模型字段：
+### 3. 运行
 
-- `ANTHROPIC_MODEL`
-- `CLAUDE_MODEL`
-- `OPENAI_MODEL`
-
-如果 `.env` 里只配了 `OPENAI_API_KEY` / `OPENAI_BASE_URL`，系统会自动映射到当前 Claude SDK 实际使用的 `ANTHROPIC_*` 配置。
-
-## 常用运行方式
-
-### 按 `targets.json` 默认目标运行
+按 `data/targets.json` 第一个目标运行：
 
 ```powershell
 .\.venv\Scripts\python.exe run.py
 ```
 
-### 覆盖默认目标
+显式覆盖默认目标：
 
 ```powershell
 .\.venv\Scripts\python.exe run.py `
   --project-key YOUR_PROJECT `
   --repository YOUR_REPO `
   --author you@company.com `
-  --max-issues 3 `
-  --base-branch develop `
-  --solution-path src/YourApp.sln
+  --base-branch main `
+  --solution-path src/YourSolution.sln `
+  --max-issues 1
 ```
 
-### 保留工作区
+批量运行：
 
 ```powershell
-.\.venv\Scripts\python.exe run.py --keep-workspace
+.\.venv\Scripts\python.exe -m pi_sonar_agent.batch_runner data\targets.json
 ```
 
-### 跳过最终构建验证
+## 当前架构要点
 
-```powershell
-.\.venv\Scripts\python.exe run.py --skip-build
-```
+### 运行编排
 
-只建议在链路排障时使用 `--skip-build`。
+- [src/core/run_coordinator.py](src/core/run_coordinator.py): 单目标共享编排器，负责 preflight、仓库准备、issue 循环、最终构建、PR、通知
+- [src/core/target_config.py](src/core/target_config.py): 统一解析单目标和批量目标配置
+- [src/core/preflight.py](src/core/preflight.py): 启动前校验模型环境、必填环境变量、工作区可写、远端基线分支存在
+- [src/core/git_gateway.py](src/core/git_gateway.py): 统一 clone / branch / add / commit / push 语义，并对 PAT 做日志脱敏
 
-## 日志与产物
+### Agent 运行时
 
-- `.agent_workspaces/`: 临时工作区；新一轮运行前会自动只保留最近 1 次历史工作区，其余旧目录会清理
-- `logs/runs/`: 整轮运行日志，控制台输出会同步落盘
+- [src/agent/claude_agent.py](src/agent/claude_agent.py): issue 级修复主入口，负责拼装 issue 上下文并驱动单次 attempt
+- [src/core/agent_runtime.py](src/core/agent_runtime.py): 单次 attempt 的运行时循环、工具策略、超时和取消
+- [src/core/model_gateway.py](src/core/model_gateway.py): 模型网关抽象
+- [src/core/claude_adapter.py](src/core/claude_adapter.py): Claude Code SDK 适配层
+- [src/core/resource_loader.py](src/core/resource_loader.py): 加载 [CLAUDE.md](CLAUDE.md)、仓库级 `CLAUDE.md/AGENTS.md` 和 C# 质量门禁
+
+### 单 Issue 约束链路
+
+- [src/core/issue_planner.py](src/core/issue_planner.py): 为单个 issue 生成 `EditContract`
+- [src/core/issue_contract.py](src/core/issue_contract.py): 结构化编辑合同
+- [src/core/editor_policy.py](src/core/editor_policy.py): 将编辑合同转成 patch-only 工具和 prompt 约束
+- [src/core/diff_reviewer.py](src/core/diff_reviewer.py): patch 审查器，识别越界改动和顺手修
+- [src/core/follow_up_store.py](src/core/follow_up_store.py): 将 incidental fix 记入 follow-up 队列，而不是混进当前 patch
+- [src/core/fix_verifier.py](src/core/fix_verifier.py): issue 级构建、范围校验、diff 审查和规则校验
+
+当前支持两种 Guardrail 模式，由 `ISSUE_GUARDRAIL_MODE` 控制：
+
+- `scope`: 保留 legacy scope 校验
+- `contract_review`: 以 `EditContract + DiffReviewer` 为主
+
+默认值是 `scope`。
+
+### 状态、事件与工件
+
+- [src/core/state.py](src/core/state.py): `run / target / issue / attempt` 状态模型
+- [src/core/events.py](src/core/events.py): `events.jsonl` 生命周期事件
+- [src/core/artifact_writer.py](src/core/artifact_writer.py): 结构化工件输出
+- [src/core/state_store.py](src/core/state_store.py): 工件优先、MySQL 可选同步的状态存储
+- [src/core/retry_context.py](src/core/retry_context.py): 结构化 retry memory
+
+核心产物目录：
+
+- `logs/runs/`: 整轮控制台日志
 - `logs/issue_attempts/`: 单 issue 重试日志
+- `logs/run_artifacts/`: `run_summary.json`、`target_summary.json`、`events.jsonl`
+- `logs/issue_artifacts/`: `issue.json`、`edit_contract.json`、`prompt_context.json`、`patch.diff`、`reviewer_result.json`
+- `logs/follow_ups/`: reviewer 识别到的后续技术债
+- `logs/pr_descriptions/`: PR 详细说明副本
 
-单 issue 连续 3 次构建失败后，会：
+## 配置优先级
 
-1. 回滚当前 issue 的改动
-2. 记录 issue 级日志
-3. 跳过该 issue
-4. 继续处理下一个 issue
+### 单目标入口
 
-## 测试与检查
+- `project_key` / `repository` / `author`: CLI > `.env` > `targets.json`
+- `build_command` / `test_command` / `solution_path`: CLI > `.env` > `targets.json`
+- `max_issues`: CLI > `.env` > `targets.json` > 默认值
+- `base_branch`: CLI `--base-branch` > `targets.json.base_branch` > 默认值 `develop`
+
+注意：当前 `base_branch` 不从 `.env` 读取。
+
+### 批量入口
+
+批量运行时每个 target 直接读取 `targets.json`：
+
+- `base_branch`: `target.base_branch` > 默认值 `develop`
+- `max_issues`: `target.max_issues` > 默认值 `3`
+- `keep_workspace` / `skip_build_gate`: 仅批量入口识别
+
+### 收件人解析
+
+- `reviewer_email`: 优先 `targets.json`
+- `dingtalk_userid`: 优先 `targets.json`
+- 若 `dingtalk_userid` 未配置，系统会尝试用 `.env` 里的 `DB_*` 连接 ERP4，按 `author` 反查钉钉用户
+
+## 验证与质量门禁
+
+本地常用验证命令：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest
-.\.venv\Scripts\python.exe -m ruff check src tests
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-如果命令行里没有 `pytest`，优先使用 `python -m pytest`。
+CI 工作流在 [.github/workflows/ci.yml](.github/workflows/ci.yml)，当前会执行：
 
-## 已知注意点
+- `python -m pip install -e ".[dev]"`
+- `python -m ruff check src tests run.py`
+- `python -m pytest -q`
 
-- 钉钉通知当前会优先尝试企业应用私信，发送到 `dingtalk_userid`；私信失败时会回退到签名 webhook
-- 已被 `abandoned` 的 Azure DevOps PR 不能直接更新描述，需要恢复或重新创建 PR
-- `S3776` 这类认知复杂度问题允许在目标方法范围内重构，但仍会限制改动不要扩散到文件中其他同类位置
+## 当前工程约定
+
+- 对外导入请优先使用 `pi_sonar_agent.*`
+- 真实实现主要仍在 `src/core`、`src/agent`、`src/fixers`、`src/integrations`
+- `src/pi_sonar_agent/*` 当前主要承担标准包入口和桥接职责
+- `run.py` 已经去掉机器私有路径 fallback，可以直接作为本地入口
+
+## 建议下一步阅读
+
+1. [docs/RUNBOOK.md](docs/RUNBOOK.md)
+2. [PROJECT_GUIDE.md](PROJECT_GUIDE.md)
+3. [docs/ENGINEERING_MEMORY.md](docs/ENGINEERING_MEMORY.md)
+4. [docs/AGENT_REFACTOR_PLAN.md](docs/AGENT_REFACTOR_PLAN.md)
