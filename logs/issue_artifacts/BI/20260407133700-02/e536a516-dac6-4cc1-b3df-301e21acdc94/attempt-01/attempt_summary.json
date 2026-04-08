@@ -1,0 +1,20 @@
+{
+  "attempt_number": 1,
+  "status": "retrying",
+  "started_at": "2026-04-07T10:27:13.491815+00:00",
+  "finished_at": "2026-04-07T10:30:41.908810+00:00",
+  "duration_seconds": 208.417,
+  "failure_kind": "build",
+  "retry_reason": "build_verification_failed",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": true,
+  "error": "Issue changes failed local build verification",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_e536a516-dac6-4cc1-b3df-301e21acdc94_20260407133700-02.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/e536a516-dac6-4cc1-b3df-301e21acdc94/attempt-01"
+}

@@ -1,0 +1,20 @@
+{
+  "attempt_number": 2,
+  "status": "retrying",
+  "started_at": "2026-04-08T02:15:13.492153+00:00",
+  "finished_at": "2026-04-08T02:17:53.111619+00:00",
+  "duration_seconds": 159.62,
+  "failure_kind": "build",
+  "retry_reason": "build_verification_failed",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": true,
+  "error": "Issue changes failed local build verification",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_941f6101-03f0-4509-9ff2-6281f2e2028f_20260408095855-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260408095855-01/941f6101-03f0-4509-9ff2-6281f2e2028f/attempt-02"
+}

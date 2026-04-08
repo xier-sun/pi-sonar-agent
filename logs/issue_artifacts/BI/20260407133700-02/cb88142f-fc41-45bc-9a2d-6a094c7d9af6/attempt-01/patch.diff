@@ -1,0 +1,16 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -880,6 +880,7 @@
+                 .Distinct()
+
+                 .ToList();
+
+             data.BatchSlps = await GetBatchSlpsAsync(slpCodes);
+
++            data.RemarkDic = remarkDic;
+
+ 
+
+             return data;
+
+         }

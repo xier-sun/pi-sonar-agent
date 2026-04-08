@@ -44,6 +44,7 @@ def test_send_run_notification_prefers_corp_private_message(monkeypatch) -> None
         author="liyinglin@neware.com.cn",
         total_issues=3,
         successful=2,
+        skipped=0,
         failed=1,
         pr_url="https://example.com/pr/1",
         dingtalk_userid="17556530801301497",
@@ -54,6 +55,8 @@ def test_send_run_notification_prefers_corp_private_message(monkeypatch) -> None
     assert calls[1][1] == "https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2"
     assert calls[1][3]["userid_list"] == "17556530801301497"
     assert calls[1][3]["msg"]["msgtype"] == "markdown"
+    assert "- **跳过修复**: 0 ⏭️" in calls[1][3]["msg"]["markdown"]["text"]
+    assert "- **修复失败**: 1 ❌" in calls[1][3]["msg"]["markdown"]["text"]
 
 
 def test_send_run_notification_falls_back_to_signed_webhook(monkeypatch) -> None:
@@ -90,6 +93,7 @@ def test_send_run_notification_falls_back_to_signed_webhook(monkeypatch) -> None
         author="liyinglin@neware.com.cn",
         total_issues=1,
         successful=1,
+        skipped=0,
         failed=0,
         pr_url="https://example.com/pr/2",
         dingtalk_userid="missing-user",
@@ -100,6 +104,8 @@ def test_send_run_notification_falls_back_to_signed_webhook(monkeypatch) -> None
     assert "timestamp=1000" in calls[2][1]
     assert "sign=" in calls[2][1]
     assert calls[2][3]["msgtype"] == "markdown"
+    assert "- **跳过修复**: 0 ⏭️" in calls[2][3]["markdown"]["text"]
+    assert "- **修复失败**: 0 ❌" in calls[2][3]["markdown"]["text"]
 
 
 def test_send_run_notification_includes_warning_message(monkeypatch) -> None:
@@ -122,6 +128,7 @@ def test_send_run_notification_includes_warning_message(monkeypatch) -> None:
         author="pengxiru@neware.com.cn",
         total_issues=10,
         successful=9,
+        skipped=1,
         failed=1,
         pr_url=None,
         warning_message="PR 创建失败：HTTP 400",
@@ -130,6 +137,8 @@ def test_send_run_notification_includes_warning_message(monkeypatch) -> None:
 
     assert result["errmsg"] == "ok"
     assert calls[0][3]["markdown"]["title"].startswith("[WARN]")
+    assert "- **跳过修复**: 1 ⏭️" in calls[0][3]["markdown"]["text"]
+    assert "- **修复失败**: 1 ❌" in calls[0][3]["markdown"]["text"]
     assert "PR 创建失败：HTTP 400" in calls[0][3]["markdown"]["text"]
 
 

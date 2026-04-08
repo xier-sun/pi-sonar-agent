@@ -1,0 +1,20 @@
+{
+  "attempt_number": 1,
+  "status": "succeeded",
+  "started_at": "2026-04-07T06:53:23.770963+00:00",
+  "finished_at": "2026-04-07T06:57:17.606180+00:00",
+  "duration_seconds": 233.812,
+  "failure_kind": "",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_18b0aa51-7688-4839-a1ea-0a9aa27704aa_20260407133700-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/18b0aa51-7688-4839-a1ea-0a9aa27704aa/attempt-01"
+}

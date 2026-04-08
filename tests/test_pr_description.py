@@ -7,8 +7,8 @@ from pi_sonar_agent.core.pr_description import (
     PullRequestIssueSummary,
     build_compact_pull_request_description,
     build_local_pr_report_path,
+    build_pr_attachment_name,
     build_pull_request_description,
-    build_repository_pr_report_path,
     build_summary_pull_request_description,
     write_markdown_report,
 )
@@ -142,29 +142,34 @@ def test_build_summary_pull_request_description_is_brief_and_points_to_report() 
         failed=0,
         build_passed=True,
         issue_summaries=issue_summaries,
-        report_path="docs/sonar-reports/BI_pengxiru-neware.com.cn_20260401133434.md",
+        report_attachment_name="BI_pengxiru-neware.com.cn_20260401133434.txt",
+        report_attachment_url="https://devops.example/pr/attachments/123",
     )
 
-    assert "详细修复报告: docs/sonar-reports/BI_pengxiru-neware.com.cn_20260401133434.md" in summary_description
-    assert "逐条 issue 处理结果、跳过原因和重试日志请查看仓库内 Markdown 报告。" in summary_description
+    assert "[BI_pengxiru-neware.com.cn_20260401133434.txt](https://devops.example/pr/attachments/123)" in summary_description
+    assert "逐条 issue 处理结果、跳过原因和重试日志请查看 PR 附件中的报告。" in summary_description
     assert len(summary_description) < ADO_PR_DESCRIPTION_SOFT_LIMIT
     assert "1. csharpsquid" not in summary_description
 
 
 def test_pr_report_paths_and_writer_use_expected_locations(tmp_path) -> None:
-    repo_path = build_repository_pr_report_path(
-        repository="BI",
-        author="pengxiru@neware.com.cn",
-        run_label="20260401133434",
-    )
     local_path = build_local_pr_report_path(
         repository="BI",
         author="pengxiru@neware.com.cn",
         run_label="20260401133434",
     )
-    written_path = write_markdown_report(tmp_path, repo_path, "# Report\n")
+    written_path = write_markdown_report(
+        tmp_path,
+        local_path,
+        "# Report\n",
+    )
+    attachment_name = build_pr_attachment_name(
+        repository="BI",
+        author="pengxiru@neware.com.cn",
+        run_label="20260401133434",
+    )
 
-    assert repo_path == "docs/sonar-reports/BI_pengxiru-neware.com.cn_20260401133434.md"
     assert local_path == Path("logs/pr_descriptions/BI_pengxiru-neware.com.cn_20260401133434.md")
-    assert written_path == tmp_path / repo_path
+    assert attachment_name == "BI_pengxiru-neware.com.cn_20260401133434.txt"
+    assert written_path == tmp_path / local_path
     assert written_path.read_text(encoding="utf-8") == "# Report\n"

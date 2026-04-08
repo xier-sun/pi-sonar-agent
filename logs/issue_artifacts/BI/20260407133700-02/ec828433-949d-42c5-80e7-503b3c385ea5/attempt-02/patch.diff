@@ -1,0 +1,16 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -946,7 +946,6 @@
+             public Dictionary<int, SaleOrderPlugin> BatchSaleOrderPlugins { get; set; }
+
+             public Dictionary<int, OSLP> BatchSlps { get; set; }
+
+             public Dictionary<int, SaleOrdrRemark> RemarkDic { get; set; }
+
+-            public List<SaleOrdrRemark> BatchSaleOrderRemark { get; set; }
+
+         }
+
+ 
+
+         /// <summary>

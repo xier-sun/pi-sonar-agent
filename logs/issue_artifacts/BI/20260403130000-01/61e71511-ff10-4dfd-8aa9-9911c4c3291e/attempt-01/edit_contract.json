@@ -1,0 +1,48 @@
+{
+  "issue_key": "61e71511-ff10-4dfd-8aa9-9911c4c3291e",
+  "rule_id": "external_roslyn:CS1573",
+  "guardrail_mode": "scope",
+  "target_files": [
+    "OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs"
+  ],
+  "target_symbols": [
+    {
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs",
+      "symbol": "statement@813-821",
+      "reason": "Sonar issue is located near line 817",
+      "start_line": 813,
+      "end_line": 821
+    }
+  ],
+  "allowed_change_kinds": [
+    "direct-fix",
+    "extract-local",
+    "guard-clause-adjustment"
+  ],
+  "forbidden_change_kinds": [
+    "drive-by-refactor",
+    "whole-file-format",
+    "touch-unrelated-files",
+    "touch-unrelated-tests"
+  ],
+  "validation_plan": [
+    "build",
+    "scope_review",
+    "diff_review"
+  ],
+  "follow_up_policy": "record_only",
+  "review_hints": [
+    "flag unrelated edits in the same file",
+    "record incidental findings instead of editing them"
+  ],
+  "scope_mode": "statement",
+  "target_line_range": [
+    813,
+    821
+  ],
+  "validation_line_range": [
+    813,
+    821
+  ],
+  "patch_only": true
+}

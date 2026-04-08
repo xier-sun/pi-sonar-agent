@@ -1,0 +1,36 @@
+{
+  "issue_key": "20621c0b-e1ba-4aa6-92f3-a8ad7c144f3c",
+  "repository": "BI",
+  "run_label": "20260407133700-02",
+  "rule_id": "external_roslyn:CS1591",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+  "line": 467,
+  "status": "fixed",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "succeeded",
+      "started_at": "2026-04-07T09:39:37.230797+00:00",
+      "finished_at": "2026-04-07T09:43:46.736934+00:00",
+      "duration_seconds": 249.506,
+      "failure_kind": "",
+      "retry_reason": "none",
+      "retryable_failure": false,
+      "build_passed": true,
+      "build_verification_failed": false,
+      "error": "",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+      ],
+      "issue_log_path": "logs\\issue_attempts\\BI_20621c0b-e1ba-4aa6-92f3-a8ad7c144f3c_20260407133700-02.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/20621c0b-e1ba-4aa6-92f3-a8ad7c144f3c/attempt-01"
+    }
+  ],
+  "final_failure_kind": "",
+  "final_error": "",
+  "final_skip_reason": "",
+  "final_summary": "Fixed 1 file(s)",
+  "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/20621c0b-e1ba-4aa6-92f3-a8ad7c144f3c"
+}

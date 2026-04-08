@@ -1,0 +1,11 @@
+{
+  "issue_key": "c95aba2e-5991-4701-857d-5ce8226591d6",
+  "rule_id": "csharpsquid:S107",
+  "message": "Method has 8 parameters, which is greater than the 7 authorized.",
+  "line": 2168,
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

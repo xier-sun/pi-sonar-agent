@@ -1,0 +1,20 @@
+{
+  "attempt_number": 2,
+  "status": "succeeded",
+  "started_at": "2026-04-07T09:21:58.135656+00:00",
+  "finished_at": "2026-04-07T09:26:53.511800+00:00",
+  "duration_seconds": 295.374,
+  "failure_kind": "",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_ea97b5e2-bca2-42b2-b678-a91347eca09d_20260407133700-02.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/ea97b5e2-bca2-42b2-b678-a91347eca09d/attempt-02"
+}

@@ -1,0 +1,1314 @@
+{
+  "run_label": "20260407133700-01",
+  "project_key": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0",
+  "repository": "BI",
+  "author": "pengxiru@neware.com.cn",
+  "base_branch": "develop",
+  "status": "partial",
+  "issues": [
+    {
+      "issue_key": "23feccf9-71f5-4aa8-851f-768eeafa7b6c",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S1144",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+      "line": 1031,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T05:43:12.930294+00:00",
+          "finished_at": "2026-04-07T05:46:12.609618+00:00",
+          "duration_seconds": 179.679,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_23feccf9-71f5-4aa8-851f-768eeafa7b6c_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/23feccf9-71f5-4aa8-851f-768eeafa7b6c/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/23feccf9-71f5-4aa8-851f-768eeafa7b6c"
+    },
+    {
+      "issue_key": "4b65e0d0-6a6c-4f9e-a168-917c82abeab6",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S1144",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+      "line": 1076,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T05:46:12.991016+00:00",
+          "finished_at": "2026-04-07T05:48:27.025190+00:00",
+          "duration_seconds": 134.034,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_4b65e0d0-6a6c-4f9e-a168-917c82abeab6_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/4b65e0d0-6a6c-4f9e-a168-917c82abeab6/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T05:48:27.869875+00:00",
+          "finished_at": "2026-04-07T05:49:11.375320+00:00",
+          "duration_seconds": 43.505,
+          "failure_kind": "no_change",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "Agent completed without modifying any files",
+          "skip_reason": "",
+          "summary": "Fixed 0 file(s)",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_4b65e0d0-6a6c-4f9e-a168-917c82abeab6_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/4b65e0d0-6a6c-4f9e-a168-917c82abeab6/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T05:49:11.689756+00:00",
+          "finished_at": "2026-04-07T05:51:21.496330+00:00",
+          "duration_seconds": 129.807,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_4b65e0d0-6a6c-4f9e-a168-917c82abeab6_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/4b65e0d0-6a6c-4f9e-a168-917c82abeab6/attempt-03"
+        }
+      ],
+      "final_failure_kind": "scope",
+      "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/4b65e0d0-6a6c-4f9e-a168-917c82abeab6"
+    },
+    {
+      "issue_key": "941f6101-03f0-4509-9ff2-6281f2e2028f",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+      "line": 1613,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T05:51:22.402977+00:00",
+          "finished_at": "2026-04-07T05:53:27.897016+00:00",
+          "duration_seconds": 125.494,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_941f6101-03f0-4509-9ff2-6281f2e2028f_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/941f6101-03f0-4509-9ff2-6281f2e2028f/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "succeeded",
+          "started_at": "2026-04-07T05:53:28.329218+00:00",
+          "finished_at": "2026-04-07T05:58:22.271647+00:00",
+          "duration_seconds": 293.943,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_941f6101-03f0-4509-9ff2-6281f2e2028f_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/941f6101-03f0-4509-9ff2-6281f2e2028f/attempt-02"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/941f6101-03f0-4509-9ff2-6281f2e2028f"
+    },
+    {
+      "issue_key": "b682bf4f-8fc8-4745-90f1-40ebaea7e4e2",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 2108,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T05:58:22.693322+00:00",
+          "finished_at": "2026-04-07T05:58:22.702371+00:00",
+          "duration_seconds": 0.009,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_b682bf4f-8fc8-4745-90f1-40ebaea7e4e2_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/b682bf4f-8fc8-4745-90f1-40ebaea7e4e2/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/b682bf4f-8fc8-4745-90f1-40ebaea7e4e2"
+    },
+    {
+      "issue_key": "c95aba2e-5991-4701-857d-5ce8226591d6",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 2168,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T05:58:22.964345+00:00",
+          "finished_at": "2026-04-07T05:58:22.966505+00:00",
+          "duration_seconds": 0.002,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_c95aba2e-5991-4701-857d-5ce8226591d6_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/c95aba2e-5991-4701-857d-5ce8226591d6/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/c95aba2e-5991-4701-857d-5ce8226591d6"
+    },
+    {
+      "issue_key": "0cb5b78f-8720-4a76-8548-909db494dc90",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 2223,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T05:58:23.221896+00:00",
+          "finished_at": "2026-04-07T05:58:23.226654+00:00",
+          "duration_seconds": 0.005,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_0cb5b78f-8720-4a76-8548-909db494dc90_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/0cb5b78f-8720-4a76-8548-909db494dc90/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/0cb5b78f-8720-4a76-8548-909db494dc90"
+    },
+    {
+      "issue_key": "633e14e3-dfbd-44e7-b5b4-a31379198224",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 2261,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T05:58:23.541176+00:00",
+          "finished_at": "2026-04-07T05:58:23.543607+00:00",
+          "duration_seconds": 0.003,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_633e14e3-dfbd-44e7-b5b4-a31379198224_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/633e14e3-dfbd-44e7-b5b4-a31379198224/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/633e14e3-dfbd-44e7-b5b4-a31379198224"
+    },
+    {
+      "issue_key": "9a874d91-a7b6-4e39-a84e-da1c1722b7fe",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 2341,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T05:58:23.798270+00:00",
+          "finished_at": "2026-04-07T06:01:30.012675+00:00",
+          "duration_seconds": 186.214,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_9a874d91-a7b6-4e39-a84e-da1c1722b7fe_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/9a874d91-a7b6-4e39-a84e-da1c1722b7fe/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T06:01:31.065564+00:00",
+          "finished_at": "2026-04-07T06:06:50.574281+00:00",
+          "duration_seconds": 319.509,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_9a874d91-a7b6-4e39-a84e-da1c1722b7fe_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/9a874d91-a7b6-4e39-a84e-da1c1722b7fe/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T06:06:51.529586+00:00",
+          "finished_at": "2026-04-07T06:11:22.190092+00:00",
+          "duration_seconds": 270.661,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_9a874d91-a7b6-4e39-a84e-da1c1722b7fe_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/9a874d91-a7b6-4e39-a84e-da1c1722b7fe/attempt-03"
+        }
+      ],
+      "final_failure_kind": "scope",
+      "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/9a874d91-a7b6-4e39-a84e-da1c1722b7fe"
+    },
+    {
+      "issue_key": "c7a1d0fd-e02f-4d60-b5bc-d2e618df8ab2",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S2955",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 2595,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T06:11:24.108640+00:00",
+          "finished_at": "2026-04-07T06:15:40.403236+00:00",
+          "duration_seconds": 256.295,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_c7a1d0fd-e02f-4d60-b5bc-d2e618df8ab2_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/c7a1d0fd-e02f-4d60-b5bc-d2e618df8ab2/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:15:41.453581+00:00",
+          "finished_at": "2026-04-07T06:18:09.570654+00:00",
+          "duration_seconds": 148.117,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_c7a1d0fd-e02f-4d60-b5bc-d2e618df8ab2_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/c7a1d0fd-e02f-4d60-b5bc-d2e618df8ab2/attempt-02"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/c7a1d0fd-e02f-4d60-b5bc-d2e618df8ab2"
+    },
+    {
+      "issue_key": "c294734e-cfc1-461c-9e3c-1053f5d77bd0",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 3156,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T06:18:10.295681+00:00",
+          "finished_at": "2026-04-07T06:24:15.652320+00:00",
+          "duration_seconds": 365.357,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_c294734e-cfc1-461c-9e3c-1053f5d77bd0_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/c294734e-cfc1-461c-9e3c-1053f5d77bd0/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:24:16.512971+00:00",
+          "finished_at": "2026-04-07T06:27:29.961459+00:00",
+          "duration_seconds": 193.449,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_c294734e-cfc1-461c-9e3c-1053f5d77bd0_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/c294734e-cfc1-461c-9e3c-1053f5d77bd0/attempt-02"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/c294734e-cfc1-461c-9e3c-1053f5d77bd0"
+    },
+    {
+      "issue_key": "e5d9736f-bdbc-4df1-bcce-48cffb9263fc",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "external_roslyn:CS1573",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 2079,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:27:30.335283+00:00",
+          "finished_at": "2026-04-07T06:29:25.425713+00:00",
+          "duration_seconds": 115.09,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_e5d9736f-bdbc-4df1-bcce-48cffb9263fc_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/e5d9736f-bdbc-4df1-bcce-48cffb9263fc/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/e5d9736f-bdbc-4df1-bcce-48cffb9263fc"
+    },
+    {
+      "issue_key": "32f65f79-c6a4-42d0-a582-c0e2ac420152",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "external_roslyn:CS1573",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 2116,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:29:25.780131+00:00",
+          "finished_at": "2026-04-07T06:31:29.200411+00:00",
+          "duration_seconds": 123.42,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_32f65f79-c6a4-42d0-a582-c0e2ac420152_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/32f65f79-c6a4-42d0-a582-c0e2ac420152/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/32f65f79-c6a4-42d0-a582-c0e2ac420152"
+    },
+    {
+      "issue_key": "836cb30c-ed56-4057-b529-d327730ceb14",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "external_roslyn:CS1573",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 2176,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:31:29.588498+00:00",
+          "finished_at": "2026-04-07T06:33:18.123392+00:00",
+          "duration_seconds": 108.535,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_836cb30c-ed56-4057-b529-d327730ceb14_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/836cb30c-ed56-4057-b529-d327730ceb14/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/836cb30c-ed56-4057-b529-d327730ceb14"
+    },
+    {
+      "issue_key": "df38858d-ca69-4a86-9cd1-867e6afca5d7",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "external_roslyn:CS1573",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "line": 2911,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:33:18.445889+00:00",
+          "finished_at": "2026-04-07T06:35:02.115631+00:00",
+          "duration_seconds": 103.67,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_df38858d-ca69-4a86-9cd1-867e6afca5d7_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/df38858d-ca69-4a86-9cd1-867e6afca5d7/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/df38858d-ca69-4a86-9cd1-867e6afca5d7"
+    },
+    {
+      "issue_key": "7df7fe85-b963-4c91-b06c-850694223ea7",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "external_roslyn:CS1573",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs",
+      "line": 65,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:35:02.460702+00:00",
+          "finished_at": "2026-04-07T06:36:40.518810+00:00",
+          "duration_seconds": 98.058,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_7df7fe85-b963-4c91-b06c-850694223ea7_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/7df7fe85-b963-4c91-b06c-850694223ea7/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/7df7fe85-b963-4c91-b06c-850694223ea7"
+    },
+    {
+      "issue_key": "26161bb4-4fea-4df6-a40f-71f65e3ffca5",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S6608",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/MisconductReportApp.cs",
+      "line": 1269,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:36:40.807349+00:00",
+          "finished_at": "2026-04-07T06:38:33.454107+00:00",
+          "duration_seconds": 112.647,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/MisconductReportApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_26161bb4-4fea-4df6-a40f-71f65e3ffca5_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/26161bb4-4fea-4df6-a40f-71f65e3ffca5/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/26161bb4-4fea-4df6-a40f-71f65e3ffca5"
+    },
+    {
+      "issue_key": "7f02ec41-dd9f-4377-9230-5b2621da0128",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "external_roslyn:CS1570",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/UserRegister/UserRegisterDetail.cs",
+      "line": 565,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T06:38:33.749215+00:00",
+          "finished_at": "2026-04-07T06:38:53.009059+00:00",
+          "duration_seconds": 19.26,
+          "failure_kind": "no_change",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "Agent completed without modifying any files",
+          "skip_reason": "",
+          "summary": "Fixed 0 file(s)",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_7f02ec41-dd9f-4377-9230-5b2621da0128_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/7f02ec41-dd9f-4377-9230-5b2621da0128/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T06:38:53.581191+00:00",
+          "finished_at": "2026-04-07T06:39:16.799999+00:00",
+          "duration_seconds": 23.219,
+          "failure_kind": "no_change",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "Agent completed without modifying any files",
+          "skip_reason": "",
+          "summary": "Fixed 0 file(s)",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_7f02ec41-dd9f-4377-9230-5b2621da0128_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/7f02ec41-dd9f-4377-9230-5b2621da0128/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T06:39:17.246953+00:00",
+          "finished_at": "2026-04-07T06:40:00.111046+00:00",
+          "duration_seconds": 42.864,
+          "failure_kind": "no_change",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "Agent completed without modifying any files after 3 attempt(s)",
+          "skip_reason": "Agent completed without modifying any files after 3 attempt(s)",
+          "summary": "Fixed 0 file(s)",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_7f02ec41-dd9f-4377-9230-5b2621da0128_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/7f02ec41-dd9f-4377-9230-5b2621da0128/attempt-03"
+        }
+      ],
+      "final_failure_kind": "no_change",
+      "final_error": "Agent completed without modifying any files after 3 attempt(s)",
+      "final_skip_reason": "Agent completed without modifying any files after 3 attempt(s)",
+      "final_summary": "Fixed 0 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/7f02ec41-dd9f-4377-9230-5b2621da0128"
+    },
+    {
+      "issue_key": "08f43ced-74ad-4213-94f6-e77a360944ef",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S3267",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs",
+      "line": 907,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:40:00.984061+00:00",
+          "finished_at": "2026-04-07T06:43:07.150118+00:00",
+          "duration_seconds": 186.166,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_08f43ced-74ad-4213-94f6-e77a360944ef_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/08f43ced-74ad-4213-94f6-e77a360944ef/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/08f43ced-74ad-4213-94f6-e77a360944ef"
+    },
+    {
+      "issue_key": "5cbbccb2-2bac-42dc-8649-7a405d340471",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "external_roslyn:CS1573",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs",
+      "line": 402,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:43:07.645322+00:00",
+          "finished_at": "2026-04-07T06:48:20.095716+00:00",
+          "duration_seconds": 312.45,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_5cbbccb2-2bac-42dc-8649-7a405d340471_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/5cbbccb2-2bac-42dc-8649-7a405d340471/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/5cbbccb2-2bac-42dc-8649-7a405d340471"
+    },
+    {
+      "issue_key": "59de4b8e-08b5-4973-9cf1-a608ad1b926c",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "external_roslyn:CS1573",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs",
+      "line": 457,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:48:20.597130+00:00",
+          "finished_at": "2026-04-07T06:53:23.297470+00:00",
+          "duration_seconds": 302.691,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_59de4b8e-08b5-4973-9cf1-a608ad1b926c_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/59de4b8e-08b5-4973-9cf1-a608ad1b926c/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/59de4b8e-08b5-4973-9cf1-a608ad1b926c"
+    },
+    {
+      "issue_key": "18b0aa51-7688-4839-a1ea-0a9aa27704aa",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "external_roslyn:CS1573",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs",
+      "line": 705,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:53:23.770963+00:00",
+          "finished_at": "2026-04-07T06:57:17.606180+00:00",
+          "duration_seconds": 233.812,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_18b0aa51-7688-4839-a1ea-0a9aa27704aa_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/18b0aa51-7688-4839-a1ea-0a9aa27704aa/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/18b0aa51-7688-4839-a1ea-0a9aa27704aa"
+    },
+    {
+      "issue_key": "61e71511-ff10-4dfd-8aa9-9911c4c3291e",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "external_roslyn:CS1573",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs",
+      "line": 817,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T06:57:17.966595+00:00",
+          "finished_at": "2026-04-07T07:00:47.418196+00:00",
+          "duration_seconds": 209.431,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_61e71511-ff10-4dfd-8aa9-9911c4c3291e_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/61e71511-ff10-4dfd-8aa9-9911c4c3291e/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/61e71511-ff10-4dfd-8aa9-9911c4c3291e"
+    },
+    {
+      "issue_key": "f38e5fdc-9032-40d6-bf21-5520acdb172e",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S1066",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+      "line": 5017,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T07:00:47.787202+00:00",
+          "finished_at": "2026-04-07T07:04:31.417554+00:00",
+          "duration_seconds": 223.609,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_f38e5fdc-9032-40d6-bf21-5520acdb172e_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/f38e5fdc-9032-40d6-bf21-5520acdb172e/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T07:04:33.165205+00:00",
+          "finished_at": "2026-04-07T07:09:28.415809+00:00",
+          "duration_seconds": 295.222,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_f38e5fdc-9032-40d6-bf21-5520acdb172e_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/f38e5fdc-9032-40d6-bf21-5520acdb172e/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T07:09:29.194728+00:00",
+          "finished_at": "2026-04-07T07:12:10.550340+00:00",
+          "duration_seconds": 161.344,
+          "failure_kind": "no_change",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "Agent completed without modifying any files after 3 attempt(s)",
+          "skip_reason": "Agent completed without modifying any files after 3 attempt(s)",
+          "summary": "Fixed 0 file(s)",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_f38e5fdc-9032-40d6-bf21-5520acdb172e_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/f38e5fdc-9032-40d6-bf21-5520acdb172e/attempt-03"
+        }
+      ],
+      "final_failure_kind": "no_change",
+      "final_error": "Agent completed without modifying any files after 3 attempt(s)",
+      "final_skip_reason": "Agent completed without modifying any files after 3 attempt(s)",
+      "final_summary": "Fixed 0 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/f38e5fdc-9032-40d6-bf21-5520acdb172e"
+    },
+    {
+      "issue_key": "3eec07db-a123-44d0-805d-2a152dbf5d8f",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S1168",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs",
+      "line": 318,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T07:12:11.461347+00:00",
+          "finished_at": "2026-04-07T07:17:32.810993+00:00",
+          "duration_seconds": 321.327,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_3eec07db-a123-44d0-805d-2a152dbf5d8f_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/3eec07db-a123-44d0-805d-2a152dbf5d8f/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/3eec07db-a123-44d0-805d-2a152dbf5d8f"
+    },
+    {
+      "issue_key": "c85d1edc-3e94-4b95-95c1-d1ce5885882b",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S1168",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs",
+      "line": 361,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T07:17:33.454073+00:00",
+          "finished_at": "2026-04-07T07:24:07.637505+00:00",
+          "duration_seconds": 394.156,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_c85d1edc-3e94-4b95-95c1-d1ce5885882b_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/c85d1edc-3e94-4b95-95c1-d1ce5885882b/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "succeeded",
+          "started_at": "2026-04-07T07:24:08.993321+00:00",
+          "finished_at": "2026-04-07T07:27:16.561741+00:00",
+          "duration_seconds": 187.557,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_c85d1edc-3e94-4b95-95c1-d1ce5885882b_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/c85d1edc-3e94-4b95-95c1-d1ce5885882b/attempt-02"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/c85d1edc-3e94-4b95-95c1-d1ce5885882b"
+    },
+    {
+      "issue_key": "df26d73e-96b8-4313-88a9-2d1fd6db8543",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S3267",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs",
+      "line": 364,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T07:27:16.934122+00:00",
+          "finished_at": "2026-04-07T07:33:04.324912+00:00",
+          "duration_seconds": 347.374,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_df26d73e-96b8-4313-88a9-2d1fd6db8543_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/df26d73e-96b8-4313-88a9-2d1fd6db8543/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/df26d73e-96b8-4313-88a9-2d1fd6db8543"
+    },
+    {
+      "issue_key": "20da9e25-9ca9-4a1c-a3b6-87ba9d854db9",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S6580",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs",
+      "line": 449,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T07:33:05.118287+00:00",
+          "finished_at": "2026-04-07T07:36:27.442884+00:00",
+          "duration_seconds": 202.315,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_20da9e25-9ca9-4a1c-a3b6-87ba9d854db9_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/20da9e25-9ca9-4a1c-a3b6-87ba9d854db9/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T07:36:28.405978+00:00",
+          "finished_at": "2026-04-07T07:40:34.477657+00:00",
+          "duration_seconds": 246.059,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_20da9e25-9ca9-4a1c-a3b6-87ba9d854db9_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/20da9e25-9ca9-4a1c-a3b6-87ba9d854db9/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T07:40:35.422025+00:00",
+          "finished_at": "2026-04-07T07:44:32.156745+00:00",
+          "duration_seconds": 236.725,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_20da9e25-9ca9-4a1c-a3b6-87ba9d854db9_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/20da9e25-9ca9-4a1c-a3b6-87ba9d854db9/attempt-03"
+        }
+      ],
+      "final_failure_kind": "scope",
+      "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/20da9e25-9ca9-4a1c-a3b6-87ba9d854db9"
+    },
+    {
+      "issue_key": "2bfba801-1e9f-4995-88dd-b2a8e5e244ca",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S4136",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+      "line": 2115,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T07:44:33.622916+00:00",
+          "finished_at": "2026-04-07T07:44:33.626491+00:00",
+          "duration_seconds": 0.004,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S4136 默认跳过：重排重载成员会产生大范围 diff，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S4136 默认跳过：重排重载成员会产生大范围 diff，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_2bfba801-1e9f-4995-88dd-b2a8e5e244ca_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/2bfba801-1e9f-4995-88dd-b2a8e5e244ca/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S4136 默认跳过：重排重载成员会产生大范围 diff，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S4136 默认跳过：重排重载成员会产生大范围 diff，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/2bfba801-1e9f-4995-88dd-b2a8e5e244ca"
+    },
+    {
+      "issue_key": "f00c0210-75dd-4924-b17e-9dd05c948a08",
+      "repository": "BI",
+      "run_label": "20260407133700-01",
+      "rule_id": "csharpsquid:S6960",
+      "file_path": "/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/FinanceHomeController.cs",
+      "line": 19,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T07:44:33.908205+00:00",
+          "finished_at": "2026-04-07T07:44:33.910708+00:00",
+          "duration_seconds": 0.002,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S6960 默认跳过：Controller 职责拆分属于架构调整，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S6960 默认跳过：Controller 职责拆分属于架构调整，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_f00c0210-75dd-4924-b17e-9dd05c948a08_20260407133700-01.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/f00c0210-75dd-4924-b17e-9dd05c948a08/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S6960 默认跳过：Controller 职责拆分属于架构调整，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S6960 默认跳过：Controller 职责拆分属于架构调整，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/f00c0210-75dd-4924-b17e-9dd05c948a08"
+    }
+  ],
+  "started_at": "2026-04-07T05:37:00.848496+00:00",
+  "finished_at": "2026-04-07T07:46:24.537903+00:00"
+}

@@ -33,6 +33,8 @@ class VerificationOutcome:
 class FixVerifier:
     """Build and guardrail verification for issue patches."""
 
+    BUILD_TIMEOUT_SECONDS = 300
+
     @staticmethod
     def _combine_process_output(result: subprocess.CompletedProcess[str]) -> str:
         stdout = result.stdout if isinstance(result.stdout, str) else ""
@@ -90,7 +92,7 @@ class FixVerifier:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=300,
+                timeout=cls.BUILD_TIMEOUT_SECONDS,
             )
         except Exception as exc:
             return False, f"本地回退构建也失败：\n{cls.format_exception_details(exc)}"
@@ -112,16 +114,19 @@ class FixVerifier:
         """Run the normal post-edit build verification."""
 
         runner = build_runner or subprocess.run
-        result = runner(
-            build_command,
-            shell=True,
-            cwd=str(workspace_path),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=300,
-        )
+        try:
+            result = runner(
+                build_command,
+                shell=True,
+                cwd=str(workspace_path),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=cls.BUILD_TIMEOUT_SECONDS,
+            )
+        except Exception as exc:
+            return False, cls.format_exception_details(exc)
         return result.returncode == 0, cls._combine_process_output(result)
 
     @staticmethod

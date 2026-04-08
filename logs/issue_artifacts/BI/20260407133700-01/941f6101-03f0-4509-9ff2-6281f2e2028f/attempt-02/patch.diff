@@ -1,0 +1,90 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
+@@ -1620,6 +1620,19 @@
+                 .Select(x => new { x.OrderId, x.RelevanceOrderNos })
+
+                 .ToListAsync();
+
+ 
+
++            var mainToSubOrderMap = BuildMainToSubOrderMap(subOrderInfos, orderRelationDict);
+
++            ExpandRelatedOrders(allRelatedOrderIds, mainToSubOrderMap);
+
++
+
++            return (allRelatedOrderIds, orderRelationDict);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 构建主单到子单的映射关系
+
++        /// </summary>
+
++        private Dictionary<int, List<int>> BuildMainToSubOrderMap(
+
++            IEnumerable<dynamic> subOrderInfos,
+
++            Dictionary<int, string> orderRelationDict)
+
++        {
+
+             var mainToSubOrderMap = new Dictionary<int, List<int>>();
+
+             foreach (var subOrder in subOrderInfos)
+
+             {
+
+@@ -1644,6 +1657,16 @@
+                 }
+
+             }
+
+ 
+
++            return mainToSubOrderMap;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 扩展所有关联的子订单
+
++        /// </summary>
+
++        private void ExpandRelatedOrders(
+
++            HashSet<int> allRelatedOrderIds,
+
++            Dictionary<int, List<int>> mainToSubOrderMap)
+
++        {
+
+             var mainQueue = new Queue<int>(allRelatedOrderIds);
+
+             var expandedMainIds = new HashSet<int>();
+
+             while (mainQueue.Count > 0)
+
+@@ -1667,8 +1690,6 @@
+                     }
+
+                 }
+
+             }
+
+-
+
+-            return (allRelatedOrderIds, orderRelationDict);
+
+         }
+
+ 
+
+         /// <summary>

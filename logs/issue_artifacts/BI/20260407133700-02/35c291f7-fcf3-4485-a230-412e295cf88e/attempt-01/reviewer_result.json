@@ -1,0 +1,33 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+      "reason": "This hunk changes lines outside the edit contract window 2228-2230.",
+      "symbol": "statement@2228-2230",
+      "changed_lines": [
+        2226
+      ],
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs\n+++ OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs\n@@ -2227 +2226,0 @@\n-            //await AddReceiptsAsync(result, req, slpDict);"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "35c291f7-fcf3-4485-a230-412e295cf88e",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+      "symbol": "statement@2228-2230",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs\n+++ OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs\n@@ -2227 +2226,0 @@\n-            //await AddReceiptsAsync(result, req, slpDict);",
+      "discovered_at": "2026-04-07T08:03:02.331403+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 1,
+    "total_changed_lines": 1
+  }
+}

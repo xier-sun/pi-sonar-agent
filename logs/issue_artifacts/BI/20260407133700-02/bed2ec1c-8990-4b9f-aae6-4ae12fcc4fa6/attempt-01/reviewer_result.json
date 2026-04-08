@@ -1,0 +1,37 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "reason": "This hunk changes lines outside the edit contract window 942-942.",
+      "symbol": "statement@942-942",
+      "changed_lines": [
+        877,
+        878,
+        879,
+        951,
+        952
+      ],
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -876,0 +877,3 @@\n+            data.RemarkDic = remarkDic;\n+            data.BatchSaleOrderRemark = batchSaleOrderRemarkCanClear.Concat(batchSaleOrderRemarkCannotClear).ToList();\n+\n@@ -948,2 +951,2 @@\n-            public Dictionary<int, SaleOrdrRemark> RemarkDic { get; set; }\n-            public List<SaleOrdrRemark> BatchSaleOrderRemark { get; set; }\n+            public Dictionary<int, SaleOrdrRemark> RemarkDic { get; }\n+            public List<SaleOrdrRemark> BatchSaleOrderRemark { get; }"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "symbol": "statement@942-942",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -876,0 +877,3 @@\n+            data.RemarkDic = remarkDic;\n+            data.BatchSaleOrderRemark = batchSaleOrderRemarkCanClear.Concat(batchSaleOrderRemarkCannotClear).ToList();\n+\n@@ -948,2 +951,2 @@\n-            public Dictionary<int, SaleOrdrRemark> RemarkDic { get; set; }\n-            public List<SaleOrdrRemark> BatchSaleOrderRemark { get; set; }\n+            public Dictionary<int, SaleOrdrRemark> RemarkDic { get; }\n+            public List<SaleOrdrRemark> BatchSaleOrderRemark { get; }",
+      "discovered_at": "2026-04-07T10:43:56.482020+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 2,
+    "total_changed_lines": 5
+  }
+}

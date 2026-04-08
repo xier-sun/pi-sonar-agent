@@ -1,0 +1,48 @@
+{
+  "issue_key": "91ed2ea4-a21a-4f0b-8ff3-957435fb0a86",
+  "rule_id": "external_roslyn:CS1591",
+  "guardrail_mode": "scope",
+  "target_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/Request/SalesInvoiceReq.cs"
+  ],
+  "target_symbols": [
+    {
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/Request/SalesInvoiceReq.cs",
+      "symbol": "declaration@263-264",
+      "reason": "Sonar issue is located near line 263",
+      "start_line": 263,
+      "end_line": 264
+    }
+  ],
+  "allowed_change_kinds": [
+    "xml-doc-update",
+    "attribute-adjacent-comment"
+  ],
+  "forbidden_change_kinds": [
+    "drive-by-refactor",
+    "whole-file-format",
+    "touch-unrelated-files",
+    "touch-unrelated-tests"
+  ],
+  "validation_plan": [
+    "build",
+    "scope_review",
+    "diff_review"
+  ],
+  "follow_up_policy": "record_only",
+  "review_hints": [
+    "flag unrelated edits in the same file",
+    "record incidental findings instead of editing them",
+    "ignore adjacent XML comment formatting noise when it stays attached to the same declaration"
+  ],
+  "scope_mode": "declaration_comment",
+  "target_line_range": [
+    263,
+    264
+  ],
+  "validation_line_range": [
+    255,
+    272
+  ],
+  "patch_only": true
+}

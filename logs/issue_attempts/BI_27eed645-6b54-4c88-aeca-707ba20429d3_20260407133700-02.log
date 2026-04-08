@@ -1,0 +1,2 @@
+[2026-04-07 18:40:34] Attempt 1/3 started for 27eed645-6b54-4c88-aeca-707ba20429d3
+[2026-04-07 18:40:34] Issue skipped by policy: 规则 csharpsquid:S6960 默认跳过：Controller 职责拆分属于架构调整，建议人工处理。

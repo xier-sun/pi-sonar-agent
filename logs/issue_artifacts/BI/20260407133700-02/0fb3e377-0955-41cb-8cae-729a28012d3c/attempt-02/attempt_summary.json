@@ -1,0 +1,20 @@
+{
+  "attempt_number": 2,
+  "status": "succeeded",
+  "started_at": "2026-04-07T08:11:05.528918+00:00",
+  "finished_at": "2026-04-07T08:13:50.209814+00:00",
+  "duration_seconds": 164.677,
+  "failure_kind": "",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_0fb3e377-0955-41cb-8cae-729a28012d3c_20260407133700-02.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/0fb3e377-0955-41cb-8cae-729a28012d3c/attempt-02"
+}

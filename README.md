@@ -185,7 +185,7 @@ python3 -m pip install -e ".[dev]"
 - `logs/run_artifacts/`: `run_summary.json`、`target_summary.json`、`events.jsonl`
 - `logs/issue_artifacts/`: `issue.json`、`edit_contract.json`、`prompt_context.json`、`patch.diff`、`reviewer_result.json`
 - `logs/follow_ups/`: reviewer 识别到的后续技术债
-- `logs/pr_descriptions/`: PR 详细说明副本
+- `logs/pr_descriptions/`: PR 详细说明本地副本；正式审阅时会作为 PR 附件上传
 
 ## 配置优先级
 

@@ -1,0 +1,36 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
+@@ -4987,13 +4987,10 @@
+ 
+
+                 int SEMaxLimit = 10; // 默认值
+
+ 
+
+-                if (category != null && !string.IsNullOrEmpty(category.DtValue))
+
+-                {
+
+-                    // TryParse 会尝试转换，成功返回 true 并赋值给 result，失败返回 false
+
+-                    if (int.TryParse(category.DtValue, out int val))
+
+-                    {
+
+-                        SEMaxLimit = val;
+
+-                    }
+
++                // TryParse 会尝试转换，成功返回 true 并赋值给 result，失败返回 false
+
++                if (category != null && int.TryParse(category.DtValue, out int val))
+
++                {
+
++                    SEMaxLimit = val;
+
+                 }
+
+ 
+
+                 var grouped = rawList

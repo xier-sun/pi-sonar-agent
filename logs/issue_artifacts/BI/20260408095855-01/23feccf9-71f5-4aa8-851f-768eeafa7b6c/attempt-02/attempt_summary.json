@@ -1,0 +1,18 @@
+{
+  "attempt_number": 2,
+  "status": "retrying",
+  "started_at": "2026-04-08T02:04:30.970479+00:00",
+  "finished_at": "2026-04-08T02:04:50.205109+00:00",
+  "duration_seconds": 19.235,
+  "failure_kind": "no_change",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "error": "Agent completed without modifying any files",
+  "skip_reason": "",
+  "summary": "Fixed 0 file(s)",
+  "changed_files": [],
+  "issue_log_path": "logs\\issue_attempts\\BI_23feccf9-71f5-4aa8-851f-768eeafa7b6c_20260408095855-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260408095855-01/23feccf9-71f5-4aa8-851f-768eeafa7b6c/attempt-02"
+}

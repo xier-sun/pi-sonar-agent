@@ -1,0 +1,18 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
+@@ -2588,7 +2588,7 @@
+         /// <returns></returns>
+
+         private static T DeepClone<T>(T source)
+
+         {
+
+-            if (source == null)
+
++            if (object.Equals(source, null))
+
+             {
+
+                 return default;
+
+             }

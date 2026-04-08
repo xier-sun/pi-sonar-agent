@@ -1,0 +1,50 @@
+{
+  "issue_key": "c294734e-cfc1-461c-9e3c-1053f5d77bd0",
+  "rule_id": "csharpsquid:S3776",
+  "guardrail_mode": "scope",
+  "target_files": [
+    "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+  ],
+  "target_symbols": [
+    {
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "symbol": "method@3151-3237",
+      "reason": "Sonar issue is located near line 3156",
+      "start_line": 3151,
+      "end_line": 3237
+    }
+  ],
+  "allowed_change_kinds": [
+    "direct-fix",
+    "extract-local",
+    "guard-clause-adjustment",
+    "extract-private-helper"
+  ],
+  "forbidden_change_kinds": [
+    "drive-by-refactor",
+    "whole-file-format",
+    "touch-unrelated-files",
+    "touch-unrelated-tests"
+  ],
+  "validation_plan": [
+    "build",
+    "scope_review",
+    "diff_review"
+  ],
+  "follow_up_policy": "record_only",
+  "review_hints": [
+    "flag unrelated edits in the same file",
+    "record incidental findings instead of editing them",
+    "allow local scaffolding that is required for the main fix"
+  ],
+  "scope_mode": "method",
+  "target_line_range": [
+    3151,
+    3237
+  ],
+  "validation_line_range": [
+    3151,
+    3357
+  ],
+  "patch_only": true
+}

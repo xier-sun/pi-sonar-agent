@@ -1,0 +1,90 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -1481,32 +1481,21 @@
+                 }
+
+ 
+
+                 // 3. 获取发货记录
+
+-                if (!batchDeliveries.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.DeliveryForOverDue> deliveryForCalcList))
+
+-                {
+
+-                    deliveryForCalcList = new List<HistoricalOverdueCalculationService.DeliveryForOverDue>();
+
+-                }
+
+-
+
++                var deliveryForCalcList = GetOrEmptyDefault(batchDeliveries, order.DocEntry);
+
+                 // 4. 获取收款记录
+
+-                if (!batchReceipts.TryGetValue(order.DocEntry, out List<ReceiptForOrder> allReceipts))
+
+-                {
+
+-                    allReceipts = new List<ReceiptForOrder>();
+
+-                }
+
+-
+
++                var allReceipts = GetOrEmptyDefault(batchReceipts, order.DocEntry);
+
+                 // 5. 获取退货记录
+
+-                if (!batchReturns.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.ReturnForOverDue> allReturns))
+
+-                {
+
+-                    allReturns = new List<HistoricalOverdueCalculationService.ReturnForOverDue>();
+
+-                }
+
+-
+
+-                if (batchRefunds == null || !batchRefunds.TryGetValue(order.DocEntry, out List<SaleRefund> allRefunds))
+
+-                {
+
+-                    allRefunds = new List<SaleRefund>();
+
+-                }
+
+-
+
++                var allReturns = GetOrEmptyDefault(batchReturns, order.DocEntry);
+
++                var allRefunds = batchRefunds == null ? new List<SaleRefund>() : GetOrEmptyDefault(batchRefunds, order.DocEntry);
+
+                 // 6. 获取清账记录
+
+-                if (!batchClearRecons.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.ClearReconForOverDue> allClearRecons))
+
+-                {
+
+-                    allClearRecons = new List<HistoricalOverdueCalculationService.ClearReconForOverDue>();
+
++                var allClearRecons = GetOrEmptyDefault(batchClearRecons, order.DocEntry);
+
++
+
++                /// <summary>
+
++                /// 从字典中获取值，如果不存在则返回默认空列表
+
++                /// </summary>
+
++                static List<T> GetOrEmptyDefault<TKey, T>(Dictionary<TKey, List<T>> dict, TKey key) where T : class
+
++                {
+
++                    return dict.TryGetValue(key, out var value) ? value : new List<T>();
+
+                 }
+
+ 
+
+                 // 借用单，重新设置计算逾期的发货日期

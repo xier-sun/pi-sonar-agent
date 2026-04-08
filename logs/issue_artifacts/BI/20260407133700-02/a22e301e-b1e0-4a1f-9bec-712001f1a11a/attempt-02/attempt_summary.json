@@ -1,0 +1,20 @@
+{
+  "attempt_number": 2,
+  "status": "retrying",
+  "started_at": "2026-04-07T08:16:15.146576+00:00",
+  "finished_at": "2026-04-07T08:18:27.315599+00:00",
+  "duration_seconds": 132.166,
+  "failure_kind": "build",
+  "retry_reason": "build_verification_failed",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": true,
+  "error": "Issue changes failed local build verification",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_a22e301e-b1e0-4a1f-9bec-712001f1a11a_20260407133700-02.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/a22e301e-b1e0-4a1f-9bec-712001f1a11a/attempt-02"
+}

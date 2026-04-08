@@ -1,0 +1,72 @@
+{
+  "issue_key": "23feccf9-71f5-4aa8-851f-768eeafa7b6c",
+  "repository": "BI",
+  "run_label": "20260408095855-01",
+  "rule_id": "csharpsquid:S1144",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+  "line": 1037,
+  "status": "fixed",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "retrying",
+      "started_at": "2026-04-08T02:04:10.975469+00:00",
+      "finished_at": "2026-04-08T02:04:30.774531+00:00",
+      "duration_seconds": 19.799,
+      "failure_kind": "no_change",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": false,
+      "error": "Agent completed without modifying any files",
+      "skip_reason": "",
+      "summary": "Fixed 0 file(s)",
+      "changed_files": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_23feccf9-71f5-4aa8-851f-768eeafa7b6c_20260408095855-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260408095855-01/23feccf9-71f5-4aa8-851f-768eeafa7b6c/attempt-01"
+    },
+    {
+      "attempt_number": 2,
+      "status": "retrying",
+      "started_at": "2026-04-08T02:04:30.970479+00:00",
+      "finished_at": "2026-04-08T02:04:50.205109+00:00",
+      "duration_seconds": 19.235,
+      "failure_kind": "no_change",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": false,
+      "error": "Agent completed without modifying any files",
+      "skip_reason": "",
+      "summary": "Fixed 0 file(s)",
+      "changed_files": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_23feccf9-71f5-4aa8-851f-768eeafa7b6c_20260408095855-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260408095855-01/23feccf9-71f5-4aa8-851f-768eeafa7b6c/attempt-02"
+    },
+    {
+      "attempt_number": 3,
+      "status": "succeeded",
+      "started_at": "2026-04-08T02:04:50.386646+00:00",
+      "finished_at": "2026-04-08T02:07:52.094647+00:00",
+      "duration_seconds": 181.708,
+      "failure_kind": "",
+      "retry_reason": "none",
+      "retryable_failure": false,
+      "build_passed": true,
+      "build_verification_failed": false,
+      "error": "",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs"
+      ],
+      "issue_log_path": "logs\\issue_attempts\\BI_23feccf9-71f5-4aa8-851f-768eeafa7b6c_20260408095855-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260408095855-01/23feccf9-71f5-4aa8-851f-768eeafa7b6c/attempt-03"
+    }
+  ],
+  "final_failure_kind": "",
+  "final_error": "",
+  "final_skip_reason": "",
+  "final_summary": "Fixed 1 file(s)",
+  "artifact_root": "logs/issue_artifacts/BI/20260408095855-01/23feccf9-71f5-4aa8-851f-768eeafa7b6c"
+}

@@ -1,0 +1,76 @@
+{
+  "issue_key": "bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1",
+  "repository": "BI",
+  "run_label": "20260407133700-02",
+  "rule_id": "csharpsquid:S125",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+  "line": 118,
+  "status": "skipped",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "retrying",
+      "started_at": "2026-04-07T08:38:11.477639+00:00",
+      "finished_at": "2026-04-07T09:05:05.281147+00:00",
+      "duration_seconds": 1613.788,
+      "failure_kind": "build",
+      "retry_reason": "build_verification_failed",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": true,
+      "error": "Issue changes failed local build verification",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+      ],
+      "issue_log_path": "logs\\issue_attempts\\BI_bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1_20260407133700-02.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1/attempt-01"
+    },
+    {
+      "attempt_number": 2,
+      "status": "retrying",
+      "started_at": "2026-04-07T09:05:08.497587+00:00",
+      "finished_at": "2026-04-07T09:13:22.999818+00:00",
+      "duration_seconds": 494.498,
+      "failure_kind": "build",
+      "retry_reason": "build_verification_failed",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": true,
+      "error": "Issue changes failed local build verification",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+      ],
+      "issue_log_path": "logs\\issue_attempts\\BI_bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1_20260407133700-02.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1/attempt-02"
+    },
+    {
+      "attempt_number": 3,
+      "status": "skipped",
+      "started_at": "2026-04-07T09:13:24.183532+00:00",
+      "finished_at": "2026-04-07T09:18:11.572294+00:00",
+      "duration_seconds": 287.387,
+      "failure_kind": "scope",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": true,
+      "build_verification_failed": false,
+      "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+      ],
+      "issue_log_path": "logs\\issue_attempts\\BI_bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1_20260407133700-02.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1/attempt-03"
+    }
+  ],
+  "final_failure_kind": "scope",
+  "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+  "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+  "final_summary": "Fixed 1 file(s)",
+  "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1"
+}

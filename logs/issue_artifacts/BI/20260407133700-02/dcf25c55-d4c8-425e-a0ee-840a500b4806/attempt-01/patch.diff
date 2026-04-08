@@ -1,0 +1,665 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -1132,12 +1132,30 @@
+             var directReceipts = await unitWork.Find<ORCT>(r => orderIds.Contains(r.U_XSDD.Value) && r.Canceled != "Y").ToListAsync();
+
+ 
+
+             // 2. 获取间接收款记录（订单 → 发货单DLN1 → 发票INV1 → 收款核销RCT2 → 收款单ORCT）
+
+-            // 提升 map 到外层作用域，供间接收款路径内部各步骤复用
+
+-            Dictionary<int, int> dln1ToOrderMap ;   // dln1DocEntry → orderId
+
+-            Dictionary<int, int> inv1ToDln1Map ;     // inv1DocEntry → dln1DocEntry
+
+-            // 间接收款路径使用：存储 RCT2 核销记录（DocNum、发票DocEntry、金额）
+
+-            var rct2Raw = new List<(int DocNum, int? DocEntry, decimal? SumApplied, decimal? AppliedFC)>();
+
+-
+
++            var indirectReceipts = await GetIndirectReceiptsAsync(unitWork, orderIds);
+
++            if (indirectReceipts != null)
+
++            {
+
++                DistributeIndirectReceipts(result, indirectReceipts.Value.Receipts, indirectReceipts.Value.Mappings);
+
++            }
+
++
+
++            // 3. 处理直接收款（U_XSDD有值）：直接使用 ORCT.DocTotal 作为该订单的收款金额
+
++            // 原因：部分收款走日记帐科目而非发票核销，RCT2.SumApplied 无法反映完整金额
+
++            ProcessDirectReceipts(result, directReceipts);
+
++
+
++            // 4. 去重（同一收款单DocEntry若因多张发票被加入多次则合并金额）并排序
+
++            DeduplicateAndSortReceipts(result);
+
++
+
++            return result;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 获取间接收款记录及相关映射数据
+
++        /// </summary>
+
++        /// <param name="unitWork">工作单元</param>
+
++        /// <param name="orderIds">订单ID列表</param>
+
++        /// <returns>间接收款记录和映射数据，无数据时返回null</returns>
+
++        private static async Task<(List<ORCT> Receipts, IndirectReceiptMappings Mappings)?> GetIndirectReceiptsAsync(IUnitWork unitWork, List<int> orderIds)
+
++        {
+
+             // 2.1 获取所有关联订单的DLN1记录
+
+             var dln1Entries = await unitWork.Find<DLN1>(de =>
+
+                 de.BaseEntry.HasValue && orderIds.Contains(de.BaseEntry.Value) &&
+
+@@ -1145,104 +1163,146 @@
+                 .Select(de => new { BaseEntry = de.BaseEntry.Value, de.DocEntry })
+
+                 .ToListAsync();
+
+ 
+
+-            if (dln1Entries.Any())
+
+-            {
+
+-                // 2.2 获取所有关联的INV1记录（含BaseEntry用于构建map）
+
+-                var dln1DocEntries = dln1Entries.Select(de => de.DocEntry).Distinct().ToList();
+
+-                var inv1Full = await unitWork.Find<INV1>(ie =>
+
+-                    dln1DocEntries.Contains(ie.BaseEntry) &&
+
+-                    ie.BaseType == 15)
+
+-                    .Select(ie => new { ie.DocEntry, ie.BaseEntry })
+
+-                    .ToListAsync();
+
+-
+
+-                var inv1DocEntries = inv1Full.Select(ie => ie.DocEntry).Distinct().ToList();
+
+-
+
+-                if (inv1DocEntries.Any())
+
+-                {
+
+-                    // 2.3 获取所有关联的RCT2记录（含SumApplied/AppliedFC），合并到 rct2Raw 供间接收款路径分配
+
+-                    var indirectRct2 = await unitWork.Find<RCT2>(re =>
+
+-                        inv1DocEntries.Contains(re.DocEntry) &&
+
+-                        re.InvType == "13")
+
+-                        .Select(re => new { re.DocNum, re.DocEntry, re.SumApplied, re.AppliedFC })
+
+-                        .ToListAsync();
+
+-                    rct2Raw.AddRange(indirectRct2.Select(re => (re.DocNum, re.DocEntry, re.SumApplied, re.AppliedFC)));
+
+-
+
+-                    if (rct2Raw.Any())
+
+-                    {
+
+-                        // 2.4 获取所有关联的ORCT记录（间接收款）
+
+-                        var rctDocNums = rct2Raw.Select(re => re.DocNum).Distinct().ToList();
+
+-                        var indirectReceipts = await unitWork.Find<ORCT>(r =>
+
+-                            rctDocNums.Contains(r.DocNum) &&
+
+-                            r.Canceled != "Y" &&
+
+-                            !r.U_XSDD.HasValue) // U_XSDD有值的收款单已由直接收款路径处理，此处排除
+
+-                            .ToListAsync();
+
+-
+
+-                        // 2.5 构建映射
+
+-                        dln1ToOrderMap = dln1Entries
+
+-                            .GroupBy(x => x.DocEntry)
+
+-                            .ToDictionary(g => g.Key.Value, g => g.First().BaseEntry);
+
+-
+
+-                        inv1ToDln1Map = inv1Full
+
+-                            .GroupBy(x => x.DocEntry)
+
+-                            .ToDictionary(g => g.Key.Value, g => g.First().BaseEntry.Value);
+
+-
+
+-                        // rct2ToInv1Map: DocNum → [inv1DocEntries]
+
+-                        var rct2ToInv1Map = rct2Raw
+
+-                            .Where(re => re.DocEntry.HasValue)
+
+-                            .GroupBy(re => re.DocNum)
+
+-                            .ToDictionary(g => g.Key, g => g.Select(re => re.DocEntry.Value).ToList());
+
+-
+
+-                        // 2.6 将间接收款按订单分配（聚合SumApplied，一张收款单可核销多订单的发票）
+
+-                        foreach (var receipt in indirectReceipts)
+
+-                        {
+
+-                            if (!rct2ToInv1Map.TryGetValue(receipt.DocNum, out var inv1DocEntriesForReceipt))
+
+-                                continue;
+
+-
+
+-                            // 找出该收款单关联到哪些订单及其对应发票
+
+-                            var orderToInv1 = new Dictionary<int, List<int>>();
+
+-                            foreach (var inv1DocEntry in inv1DocEntriesForReceipt)
+
+-                            {
+
+-                                if (inv1ToDln1Map.TryGetValue(inv1DocEntry, out var dln1DocEntry) &&
+
+-                                    dln1ToOrderMap.TryGetValue(dln1DocEntry, out var orderId))
+
+-                                {
+
+-                                    if (!orderToInv1.ContainsKey(orderId))
+
+-                                        orderToInv1[orderId] = new List<int>();
+
+-                                    orderToInv1[orderId].Add(inv1DocEntry);
+
+-                                }
+
+-                            }
+
+-
+
+-                            foreach (var kv in orderToInv1)
+
+-                            {
+
+-                                var orderId = kv.Key;
+
+-                                var thisOrderInv1 = kv.Value;
+
+-
+
+-                                // 只累加核销到本订单发票的金额
+
+-                                var matchingRct2 = rct2Raw
+
+-                                    .Where(re => re.DocNum == receipt.DocNum && re.DocEntry.HasValue && thisOrderInv1.Contains(re.DocEntry.Value))
+
+-                                    .ToList();
+
+-                                var appliedAmount = matchingRct2.Sum(re => re.SumApplied ?? 0M);
+
+-                                var appliedAmountFC = matchingRct2.Sum(re => re.AppliedFC ?? 0M);
+
+-
+
+-                                if (!result.ContainsKey(orderId))
+
+-                                    result[orderId] = new List<ReceiptForOrder>();
+
+-
+
+-                                result[orderId].Add(new ReceiptForOrder
+
+-                                {
+
+-                                    DocEntry = receipt.DocEntry,
+
+-                                    DocNum = receipt.DocNum,
+
+-                                    DocDate = receipt.DocDate,
+
+-                                    Canceled = receipt.Canceled,
+
+-                                    AppliedAmount = appliedAmount,
+
+-                                    AppliedAmountFC = appliedAmountFC
+
+-                                });
+
+-                            }
+
+-                        }
+
+-                    }
+
+-                }
+
+-            }
+
+-
+
+-            // 3. 处理直接收款（U_XSDD有值）：直接使用 ORCT.DocTotal 作为该订单的收款金额
+
+-            // 原因：部分收款走日记帐科目而非发票核销，RCT2.SumApplied 无法反映完整金额
+
++            if (!dln1Entries.Any())
+
++                return null;
+
++
+
++            // 2.2 获取所有关联的INV1记录（含BaseEntry用于构建map）
+
++            var dln1DocEntries = dln1Entries.Select(de => de.DocEntry).Distinct().ToList();
+
++            var inv1Full = await unitWork.Find<INV1>(ie =>
+
++                dln1DocEntries.Contains(ie.BaseEntry) &&
+
++                ie.BaseType == 15)
+
++                .Select(ie => new { ie.DocEntry, ie.BaseEntry })
+
++                .ToListAsync();
+
++
+
++            var inv1DocEntries = inv1Full.Select(ie => ie.DocEntry).Distinct().ToList();
+
++
+
++            if (!inv1DocEntries.Any())
+
++                return null;
+
++
+
++            // 2.3 获取所有关联的RCT2记录（含SumApplied/AppliedFC）
+
++            var indirectRct2 = await unitWork.Find<RCT2>(re =>
+
++                inv1DocEntries.Contains(re.DocEntry) &&
+
++                re.InvType == "13")
+
++                .Select(re => new { re.DocNum, re.DocEntry, re.SumApplied, re.AppliedFC })
+
++                .ToListAsync();
+
++
+
++            var rct2Raw = indirectRct2.Select(re => (re.DocNum, re.DocEntry, re.SumApplied, re.AppliedFC)).ToList();
+
++
+
++            if (!rct2Raw.Any())
+
++                return null;
+
++
+
++            // 2.4 获取所有关联的ORCT记录（间接收款）
+
++            var rctDocNums = rct2Raw.Select(re => re.DocNum).Distinct().ToList();
+
++            var indirectReceipts = await unitWork.Find<ORCT>(r =>
+
++                rctDocNums.Contains(r.DocNum) &&
+
++                r.Canceled != "Y" &&
+
++                !r.U_XSDD.HasValue) // U_XSDD有值的收款单已由直接收款路径处理，此处排除
+
++                .ToListAsync();
+
++
+
++            // 2.5 构建映射
+
++            var dln1ToOrderMap = dln1Entries
+
++                .GroupBy(x => x.DocEntry)
+
++                .ToDictionary(g => g.Key.Value, g => g.First().BaseEntry);
+
++
+
++            var inv1ToDln1Map = inv1Full
+
++                .GroupBy(x => x.DocEntry)
+
++                .ToDictionary(g => g.Key.Value, g => g.First().BaseEntry.Value);
+
++
+
++            // rct2ToInv1Map: DocNum → [inv1DocEntries]
+
++            var rct2ToInv1Map = rct2Raw
+
++                .Where(re => re.DocEntry.HasValue)
+
++                .GroupBy(re => re.DocNum)
+
++                .ToDictionary(g => g.Key, g => g.Select(re => re.DocEntry.Value).ToList());
+
++
+
++            var mappings = new IndirectReceiptMappings
+
++            {
+
++                Dln1ToOrderMap = dln1ToOrderMap,
+
++                Inv1ToDln1Map = inv1ToDln1Map,
+
++                Rct2ToInv1Map = rct2ToInv1Map,
+
++                Rct2Raw = rct2Raw
+
++            };
+
++
+
++            return (indirectReceipts, mappings);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 将间接收款按订单分配（聚合SumApplied，一张收款单可核销多订单的发票）
+
++        /// </summary>
+
++        /// <param name="result">结果字典</param>
+
++        /// <param name="indirectReceipts">间接收款记录列表</param>
+
++        /// <param name="mappings">间接收款映射数据</param>
+
++        private static void DistributeIndirectReceipts(
+
++            Dictionary<int, List<ReceiptForOrder>> result,
+
++            List<ORCT> indirectReceipts,
+
++            IndirectReceiptMappings mappings)
+
++        {
+
++            foreach (var receipt in indirectReceipts)
+
++            {
+
++                if (!mappings.Rct2ToInv1Map.TryGetValue(receipt.DocNum, out var inv1DocEntriesForReceipt))
+
++                    continue;
+
++
+
++                // 找出该收款单关联到哪些订单及其对应发票
+
++                var orderToInv1 = BuildOrderToInv1Mapping(inv1DocEntriesForReceipt, mappings);
+
++
+
++                foreach (var kv in orderToInv1)
+
++                {
+
++                    var orderId = kv.Key;
+
++                    var thisOrderInv1 = kv.Value;
+
++
+
++                    // 只累加核销到本订单发票的金额
+
++                    var matchingRct2 = mappings.Rct2Raw
+
++                        .Where(re => re.DocNum == receipt.DocNum && re.DocEntry.HasValue && thisOrderInv1.Contains(re.DocEntry.Value))
+
++                        .ToList();
+
++                    var appliedAmount = matchingRct2.Sum(re => re.SumApplied ?? 0M);
+
++                    var appliedAmountFC = matchingRct2.Sum(re => re.AppliedFC ?? 0M);
+
++
+
++                    if (!result.ContainsKey(orderId))
+
++                        result[orderId] = new List<ReceiptForOrder>();
+
++
+
++                    result[orderId].Add(new ReceiptForOrder
+
++                    {
+
++                        DocEntry = receipt.DocEntry,
+
++                        DocNum = receipt.DocNum,
+
++                        DocDate = receipt.DocDate,
+
++                        Canceled = receipt.Canceled,
+
++                        AppliedAmount = appliedAmount,
+
++                        AppliedAmountFC = appliedAmountFC
+
++                    });
+
++                }
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 构建订单ID到发票DocEntry列表的映射
+
++        /// </summary>
+
++        /// <param name="inv1DocEntriesForReceipt">发票DocEntry列表</param>
+
++        /// <param name="mappings">间接收款映射数据</param>
+
++        /// <returns>订单ID到发票DocEntry列表的映射字典</returns>
+
++        private static Dictionary<int, List<int>> BuildOrderToInv1Mapping(
+
++            List<int> inv1DocEntriesForReceipt,
+
++            IndirectReceiptMappings mappings)
+
++        {
+
++            var orderToInv1 = new Dictionary<int, List<int>>();
+
++            foreach (var inv1DocEntry in inv1DocEntriesForReceipt)
+
++            {
+
++                if (mappings.Inv1ToDln1Map.TryGetValue(inv1DocEntry, out var dln1DocEntry) &&
+
++                    mappings.Dln1ToOrderMap.TryGetValue(dln1DocEntry, out var orderId))
+
++                {
+
++                    if (!orderToInv1.ContainsKey(orderId))
+
++                        orderToInv1[orderId] = new List<int>();
+
++                    orderToInv1[orderId].Add(inv1DocEntry);
+
++                }
+
++            }
+
++            return orderToInv1;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理直接收款记录
+
++        /// </summary>
+
++        /// <param name="result">结果字典</param>
+
++        /// <param name="directReceipts">直接收款记录列表</param>
+
++        private static void ProcessDirectReceipts(Dictionary<int, List<ReceiptForOrder>> result, List<ORCT> directReceipts)
+
++        {
+
+             foreach (var receipt in directReceipts)
+
+             {
+
+                 var orderId = receipt.U_XSDD.Value;
+
+@@ -1260,8 +1320,14 @@
+                     AppliedAmountFC = receipt.DocTotalFC ?? 0M
+
+                 });
+
+             }
+
+-
+
+-            // 4. 去重（同一收款单DocEntry若因多张发票被加入多次则合并金额）并排序
+
++        }
+
++
+
++        /// <summary>
+
++        /// 去重（同一收款单DocEntry若因多张发票被加入多次则合并金额）并排序
+
++        /// </summary>
+
++        /// <param name="result">结果字典</param>
+
++        private static void DeduplicateAndSortReceipts(Dictionary<int, List<ReceiptForOrder>> result)
+
++        {
+
+             var keys = result.Keys.ToList();
+
+             foreach (var key in keys)
+
+             {
+
+@@ -1279,8 +1345,32 @@
+                     .OrderBy(r => r.DocDate)
+
+                     .ToList();
+
+             }
+
+-
+
+-            return result;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 间接收款映射数据
+
++        /// </summary>
+
++        private class IndirectReceiptMappings
+
++        {
+
++            /// <summary>
+
++            /// dln1DocEntry → orderId 映射
+
++            /// </summary>
+
++            public Dictionary<int, int> Dln1ToOrderMap { get; set; }
+
++
+
++            /// <summary>
+
++            /// inv1DocEntry → dln1DocEntry 映射
+
++            /// </summary>
+
++            public Dictionary<int, int> Inv1ToDln1Map { get; set; }
+
++
+
++            /// <summary>
+
++            /// DocNum → [inv1DocEntries] 映射
+
++            /// </summary>
+
++            public Dictionary<int, List<int>> Rct2ToInv1Map { get; set; }
+
++
+
++            /// <summary>
+
++            /// RCT2核销记录原始数据
+
++            /// </summary>
+
++            public List<(int DocNum, int? DocEntry, decimal? SumApplied, decimal? AppliedFC)> Rct2Raw { get; set; }
+
+         }
+
+         
+
+         /// <summary>

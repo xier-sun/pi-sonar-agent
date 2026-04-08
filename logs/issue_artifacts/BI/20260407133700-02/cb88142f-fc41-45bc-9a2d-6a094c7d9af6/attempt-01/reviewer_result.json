@@ -1,0 +1,33 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "reason": "This hunk changes lines outside the edit contract window 942-942.",
+      "symbol": "statement@942-942",
+      "changed_lines": [
+        883
+      ],
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -882,0 +883 @@\n+            data.RemarkDic = remarkDic;"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "cb88142f-fc41-45bc-9a2d-6a094c7d9af6",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "symbol": "statement@942-942",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -882,0 +883 @@\n+            data.RemarkDic = remarkDic;",
+      "discovered_at": "2026-04-07T10:51:51.381965+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 1,
+    "total_changed_lines": 1
+  }
+}

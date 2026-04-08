@@ -1,0 +1,20 @@
+{
+  "attempt_number": 2,
+  "status": "retrying",
+  "started_at": "2026-04-08T02:08:19.438212+00:00",
+  "finished_at": "2026-04-08T02:10:23.793470+00:00",
+  "duration_seconds": 124.355,
+  "failure_kind": "scope",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "Issue changes exceeded allowed scope",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_4b65e0d0-6a6c-4f9e-a168-917c82abeab6_20260408095855-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260408095855-01/4b65e0d0-6a6c-4f9e-a168-917c82abeab6/attempt-02"
+}

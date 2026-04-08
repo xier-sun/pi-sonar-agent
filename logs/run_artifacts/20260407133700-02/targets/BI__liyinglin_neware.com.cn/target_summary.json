@@ -1,0 +1,1974 @@
+{
+  "run_label": "20260407133700-02",
+  "project_key": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0",
+  "repository": "BI",
+  "author": "liyinglin@neware.com.cn",
+  "base_branch": "develop",
+  "status": "partial",
+  "issues": [
+    {
+      "issue_key": "ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S1481",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+      "line": 2224,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T07:50:11.409065+00:00",
+          "finished_at": "2026-04-07T07:55:22.711244+00:00",
+          "duration_seconds": 311.291,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T07:55:23.303478+00:00",
+          "finished_at": "2026-04-07T07:57:34.842968+00:00",
+          "duration_seconds": 131.535,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "succeeded",
+          "started_at": "2026-04-07T07:57:35.315005+00:00",
+          "finished_at": "2026-04-07T07:59:55.094957+00:00",
+          "duration_seconds": 139.775,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4/attempt-03"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4"
+    },
+    {
+      "issue_key": "35c291f7-fcf3-4485-a230-412e295cf88e",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S125",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+      "line": 2228,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T07:59:55.428557+00:00",
+          "finished_at": "2026-04-07T08:03:02.340728+00:00",
+          "duration_seconds": 186.907,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_35c291f7-fcf3-4485-a230-412e295cf88e_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/35c291f7-fcf3-4485-a230-412e295cf88e/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T08:03:02.943254+00:00",
+          "finished_at": "2026-04-07T08:04:26.034116+00:00",
+          "duration_seconds": 83.089,
+          "failure_kind": "no_change",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "Agent completed without modifying any files",
+          "skip_reason": "",
+          "summary": "Fixed 0 file(s)",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_35c291f7-fcf3-4485-a230-412e295cf88e_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/35c291f7-fcf3-4485-a230-412e295cf88e/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T08:04:26.324273+00:00",
+          "finished_at": "2026-04-07T08:06:55.098028+00:00",
+          "duration_seconds": 148.77,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_35c291f7-fcf3-4485-a230-412e295cf88e_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/35c291f7-fcf3-4485-a230-412e295cf88e/attempt-03"
+        }
+      ],
+      "final_failure_kind": "scope",
+      "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/35c291f7-fcf3-4485-a230-412e295cf88e"
+    },
+    {
+      "issue_key": "1e604e34-4ff3-456f-a21b-cd9e5ebb556c",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S1144",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+      "line": 2394,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T08:06:56.006248+00:00",
+          "finished_at": "2026-04-07T08:09:22.086189+00:00",
+          "duration_seconds": 146.076,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_1e604e34-4ff3-456f-a21b-cd9e5ebb556c_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/1e604e34-4ff3-456f-a21b-cd9e5ebb556c/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/1e604e34-4ff3-456f-a21b-cd9e5ebb556c"
+    },
+    {
+      "issue_key": "0fb3e377-0955-41cb-8cae-729a28012d3c",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+      "line": 171,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T08:09:22.362374+00:00",
+          "finished_at": "2026-04-07T08:11:04.978072+00:00",
+          "duration_seconds": 102.613,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_0fb3e377-0955-41cb-8cae-729a28012d3c_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/0fb3e377-0955-41cb-8cae-729a28012d3c/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "succeeded",
+          "started_at": "2026-04-07T08:11:05.528918+00:00",
+          "finished_at": "2026-04-07T08:13:50.209814+00:00",
+          "duration_seconds": 164.677,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_0fb3e377-0955-41cb-8cae-729a28012d3c_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/0fb3e377-0955-41cb-8cae-729a28012d3c/attempt-02"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/0fb3e377-0955-41cb-8cae-729a28012d3c"
+    },
+    {
+      "issue_key": "a22e301e-b1e0-4a1f-9bec-712001f1a11a",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "line": 41,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T08:13:50.717793+00:00",
+          "finished_at": "2026-04-07T08:16:14.557777+00:00",
+          "duration_seconds": 143.836,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_a22e301e-b1e0-4a1f-9bec-712001f1a11a_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/a22e301e-b1e0-4a1f-9bec-712001f1a11a/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T08:16:15.146576+00:00",
+          "finished_at": "2026-04-07T08:18:27.315599+00:00",
+          "duration_seconds": 132.166,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_a22e301e-b1e0-4a1f-9bec-712001f1a11a_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/a22e301e-b1e0-4a1f-9bec-712001f1a11a/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T08:18:28.282100+00:00",
+          "finished_at": "2026-04-07T08:20:59.179483+00:00",
+          "duration_seconds": 150.895,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Build verification failed after 3 attempt(s)",
+          "skip_reason": "Build verification failed after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_a22e301e-b1e0-4a1f-9bec-712001f1a11a_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/a22e301e-b1e0-4a1f-9bec-712001f1a11a/attempt-03"
+        }
+      ],
+      "final_failure_kind": "build",
+      "final_error": "Build verification failed after 3 attempt(s)",
+      "final_skip_reason": "Build verification failed after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/a22e301e-b1e0-4a1f-9bec-712001f1a11a"
+    },
+    {
+      "issue_key": "b795a0d6-cb47-4cf1-9bad-ea490a739052",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S125",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "line": 62,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T08:21:00.034596+00:00",
+          "finished_at": "2026-04-07T08:23:12.494612+00:00",
+          "duration_seconds": 132.458,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_b795a0d6-cb47-4cf1-9bad-ea490a739052_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/b795a0d6-cb47-4cf1-9bad-ea490a739052/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/b795a0d6-cb47-4cf1-9bad-ea490a739052"
+    },
+    {
+      "issue_key": "996dd759-d30a-4041-9cb5-0ccfbe463173",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3358",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "line": 92,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T08:23:12.853825+00:00",
+          "finished_at": "2026-04-07T08:29:06.199410+00:00",
+          "duration_seconds": 353.34,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_996dd759-d30a-4041-9cb5-0ccfbe463173_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/996dd759-d30a-4041-9cb5-0ccfbe463173/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/996dd759-d30a-4041-9cb5-0ccfbe463173"
+    },
+    {
+      "issue_key": "eb636b43-4590-4664-8b69-40894b98b646",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3358",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "line": 93,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T08:29:06.687404+00:00",
+          "finished_at": "2026-04-07T08:35:40.649767+00:00",
+          "duration_seconds": 393.956,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_eb636b43-4590-4664-8b69-40894b98b646_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/eb636b43-4590-4664-8b69-40894b98b646/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "succeeded",
+          "started_at": "2026-04-07T08:35:41.987867+00:00",
+          "finished_at": "2026-04-07T08:38:11.118998+00:00",
+          "duration_seconds": 149.129,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_eb636b43-4590-4664-8b69-40894b98b646_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/eb636b43-4590-4664-8b69-40894b98b646/attempt-02"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/eb636b43-4590-4664-8b69-40894b98b646"
+    },
+    {
+      "issue_key": "bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S125",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "line": 118,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T08:38:11.477639+00:00",
+          "finished_at": "2026-04-07T09:05:05.281147+00:00",
+          "duration_seconds": 1613.788,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T09:05:08.497587+00:00",
+          "finished_at": "2026-04-07T09:13:22.999818+00:00",
+          "duration_seconds": 494.498,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T09:13:24.183532+00:00",
+          "finished_at": "2026-04-07T09:18:11.572294+00:00",
+          "duration_seconds": 287.387,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1/attempt-03"
+        }
+      ],
+      "final_failure_kind": "scope",
+      "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1"
+    },
+    {
+      "issue_key": "3b716a5c-3460-4183-8d7e-820d2e11387f",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S6562",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/UnTransportDailyNPercentProcessor.cs",
+      "line": 74,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T09:18:12.974600+00:00",
+          "finished_at": "2026-04-07T09:20:06.643928+00:00",
+          "duration_seconds": 113.669,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/UnTransportDailyNPercentProcessor.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_3b716a5c-3460-4183-8d7e-820d2e11387f_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/3b716a5c-3460-4183-8d7e-820d2e11387f/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/3b716a5c-3460-4183-8d7e-820d2e11387f"
+    },
+    {
+      "issue_key": "ea97b5e2-bca2-42b2-b678-a91347eca09d",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+      "line": 51,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T09:20:06.932599+00:00",
+          "finished_at": "2026-04-07T09:21:57.542055+00:00",
+          "duration_seconds": 110.609,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_ea97b5e2-bca2-42b2-b678-a91347eca09d_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/ea97b5e2-bca2-42b2-b678-a91347eca09d/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "succeeded",
+          "started_at": "2026-04-07T09:21:58.135656+00:00",
+          "finished_at": "2026-04-07T09:26:53.511800+00:00",
+          "duration_seconds": 295.374,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_ea97b5e2-bca2-42b2-b678-a91347eca09d_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/ea97b5e2-bca2-42b2-b678-a91347eca09d/attempt-02"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/ea97b5e2-bca2-42b2-b678-a91347eca09d"
+    },
+    {
+      "issue_key": "c8c4ea2e-fd35-40f6-a859-dc9ed80884e1",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+      "line": 195,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T09:26:54.117998+00:00",
+          "finished_at": "2026-04-07T09:31:07.409436+00:00",
+          "duration_seconds": 253.29,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_c8c4ea2e-fd35-40f6-a859-dc9ed80884e1_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/c8c4ea2e-fd35-40f6-a859-dc9ed80884e1/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/c8c4ea2e-fd35-40f6-a859-dc9ed80884e1"
+    },
+    {
+      "issue_key": "91ed2ea4-a21a-4f0b-8ff3-957435fb0a86",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "external_roslyn:CS1591",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/Request/SalesInvoiceReq.cs",
+      "line": 263,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T09:31:07.861717+00:00",
+          "finished_at": "2026-04-07T09:35:04.690309+00:00",
+          "duration_seconds": 236.827,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/Request/SalesInvoiceReq.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_91ed2ea4-a21a-4f0b-8ff3-957435fb0a86_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/91ed2ea4-a21a-4f0b-8ff3-957435fb0a86/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/91ed2ea4-a21a-4f0b-8ff3-957435fb0a86"
+    },
+    {
+      "issue_key": "dcf25c55-d4c8-425e-a0ee-840a500b4806",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 1127,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T09:35:05.068964+00:00",
+          "finished_at": "2026-04-07T09:39:36.078894+00:00",
+          "duration_seconds": 271.009,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_dcf25c55-d4c8-425e-a0ee-840a500b4806_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/dcf25c55-d4c8-425e-a0ee-840a500b4806/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/dcf25c55-d4c8-425e-a0ee-840a500b4806"
+    },
+    {
+      "issue_key": "e32e70ac-6c4d-484b-8eb2-78f115e2a23b",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 2622,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T09:39:36.505844+00:00",
+          "finished_at": "2026-04-07T09:39:36.513042+00:00",
+          "duration_seconds": 0.007,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_e32e70ac-6c4d-484b-8eb2-78f115e2a23b_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/e32e70ac-6c4d-484b-8eb2-78f115e2a23b/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/e32e70ac-6c4d-484b-8eb2-78f115e2a23b"
+    },
+    {
+      "issue_key": "e5f957f4-1ab3-45d8-a7d0-21b9a4ecefcd",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 2648,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T09:39:36.756687+00:00",
+          "finished_at": "2026-04-07T09:39:36.758102+00:00",
+          "duration_seconds": 0.001,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_e5f957f4-1ab3-45d8-a7d0-21b9a4ecefcd_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/e5f957f4-1ab3-45d8-a7d0-21b9a4ecefcd/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/e5f957f4-1ab3-45d8-a7d0-21b9a4ecefcd"
+    },
+    {
+      "issue_key": "f2f04149-8a3d-4915-a52a-f0098f141d5a",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs",
+      "line": 188,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T09:39:36.992603+00:00",
+          "finished_at": "2026-04-07T09:39:36.995495+00:00",
+          "duration_seconds": 0.003,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_f2f04149-8a3d-4915-a52a-f0098f141d5a_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/f2f04149-8a3d-4915-a52a-f0098f141d5a/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/f2f04149-8a3d-4915-a52a-f0098f141d5a"
+    },
+    {
+      "issue_key": "20621c0b-e1ba-4aa6-92f3-a8ad7c144f3c",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "external_roslyn:CS1591",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 467,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T09:39:37.230797+00:00",
+          "finished_at": "2026-04-07T09:43:46.736934+00:00",
+          "duration_seconds": 249.506,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_20621c0b-e1ba-4aa6-92f3-a8ad7c144f3c_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/20621c0b-e1ba-4aa6-92f3-a8ad7c144f3c/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/20621c0b-e1ba-4aa6-92f3-a8ad7c144f3c"
+    },
+    {
+      "issue_key": "e0df305b-afab-45c6-bd45-641d1ca20b66",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+      "line": 457,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T09:43:47.109194+00:00",
+          "finished_at": "2026-04-07T09:47:45.204583+00:00",
+          "duration_seconds": 238.095,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_e0df305b-afab-45c6-bd45-641d1ca20b66_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/e0df305b-afab-45c6-bd45-641d1ca20b66/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T09:47:47.703915+00:00",
+          "finished_at": "2026-04-07T09:56:02.412017+00:00",
+          "duration_seconds": 494.706,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_e0df305b-afab-45c6-bd45-641d1ca20b66_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/e0df305b-afab-45c6-bd45-641d1ca20b66/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "succeeded",
+          "started_at": "2026-04-07T09:56:03.769585+00:00",
+          "finished_at": "2026-04-07T10:03:55.804464+00:00",
+          "duration_seconds": 472.034,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_e0df305b-afab-45c6-bd45-641d1ca20b66_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/e0df305b-afab-45c6-bd45-641d1ca20b66/attempt-03"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/e0df305b-afab-45c6-bd45-641d1ca20b66"
+    },
+    {
+      "issue_key": "c2c11128-8890-4742-9c7b-cf2ffb04071a",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs",
+      "line": 856,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T10:03:56.330536+00:00",
+          "finished_at": "2026-04-07T10:08:46.313026+00:00",
+          "duration_seconds": 289.982,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_c2c11128-8890-4742-9c7b-cf2ffb04071a_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/c2c11128-8890-4742-9c7b-cf2ffb04071a/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/c2c11128-8890-4742-9c7b-cf2ffb04071a"
+    },
+    {
+      "issue_key": "c9376b94-63fd-4229-88e9-54dd45bddaae",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs",
+      "line": 43,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:08:46.778701+00:00",
+          "finished_at": "2026-04-07T10:08:46.788857+00:00",
+          "duration_seconds": 0.01,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_c9376b94-63fd-4229-88e9-54dd45bddaae_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/c9376b94-63fd-4229-88e9-54dd45bddaae/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/c9376b94-63fd-4229-88e9-54dd45bddaae"
+    },
+    {
+      "issue_key": "91335541-7084-45c2-a0ba-0ac021ce489d",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs",
+      "line": 137,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:08:47.066659+00:00",
+          "finished_at": "2026-04-07T10:08:47.068923+00:00",
+          "duration_seconds": 0.002,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_91335541-7084-45c2-a0ba-0ac021ce489d_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/91335541-7084-45c2-a0ba-0ac021ce489d/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/91335541-7084-45c2-a0ba-0ac021ce489d"
+    },
+    {
+      "issue_key": "a805790d-f60d-4121-b50e-9df270aa71db",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 507,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:08:47.334651+00:00",
+          "finished_at": "2026-04-07T10:08:47.339389+00:00",
+          "duration_seconds": 0.005,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_a805790d-f60d-4121-b50e-9df270aa71db_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/a805790d-f60d-4121-b50e-9df270aa71db/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/a805790d-f60d-4121-b50e-9df270aa71db"
+    },
+    {
+      "issue_key": "b7a40bd3-56f4-4edc-b0df-3ff389a5014f",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 554,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:08:47.670775+00:00",
+          "finished_at": "2026-04-07T10:08:47.672837+00:00",
+          "duration_seconds": 0.002,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_b7a40bd3-56f4-4edc-b0df-3ff389a5014f_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/b7a40bd3-56f4-4edc-b0df-3ff389a5014f/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/b7a40bd3-56f4-4edc-b0df-3ff389a5014f"
+    },
+    {
+      "issue_key": "fd483c64-1218-485f-9343-30ef2a2b530f",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 962,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T10:08:47.995880+00:00",
+          "finished_at": "2026-04-07T10:09:36.592506+00:00",
+          "duration_seconds": 48.597,
+          "failure_kind": "no_change",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "Agent completed without modifying any files",
+          "skip_reason": "",
+          "summary": "Fixed 0 file(s)",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_fd483c64-1218-485f-9343-30ef2a2b530f_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/fd483c64-1218-485f-9343-30ef2a2b530f/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "succeeded",
+          "started_at": "2026-04-07T10:09:37.313786+00:00",
+          "finished_at": "2026-04-07T10:14:52.434994+00:00",
+          "duration_seconds": 315.121,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_fd483c64-1218-485f-9343-30ef2a2b530f_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/fd483c64-1218-485f-9343-30ef2a2b530f/attempt-02"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/fd483c64-1218-485f-9343-30ef2a2b530f"
+    },
+    {
+      "issue_key": "56dee597-da49-46c5-9b12-62df7ba3ab97",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 1504,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T10:14:52.901149+00:00",
+          "finished_at": "2026-04-07T10:20:49.111590+00:00",
+          "duration_seconds": 356.21,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_56dee597-da49-46c5-9b12-62df7ba3ab97_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/56dee597-da49-46c5-9b12-62df7ba3ab97/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T10:20:50.502923+00:00",
+          "finished_at": "2026-04-07T10:22:23.726155+00:00",
+          "duration_seconds": 93.223,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_56dee597-da49-46c5-9b12-62df7ba3ab97_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/56dee597-da49-46c5-9b12-62df7ba3ab97/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:22:24.641384+00:00",
+          "finished_at": "2026-04-07T10:27:09.544157+00:00",
+          "duration_seconds": 284.902,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Build verification failed after 3 attempt(s)",
+          "skip_reason": "Build verification failed after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_56dee597-da49-46c5-9b12-62df7ba3ab97_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/56dee597-da49-46c5-9b12-62df7ba3ab97/attempt-03"
+        }
+      ],
+      "final_failure_kind": "build",
+      "final_error": "Build verification failed after 3 attempt(s)",
+      "final_skip_reason": "Build verification failed after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/56dee597-da49-46c5-9b12-62df7ba3ab97"
+    },
+    {
+      "issue_key": "d48b8eef-2eb6-4206-b6df-289bb4929256",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 1504,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:27:12.730676+00:00",
+          "finished_at": "2026-04-07T10:27:12.738597+00:00",
+          "duration_seconds": 0.008,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_d48b8eef-2eb6-4206-b6df-289bb4929256_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/d48b8eef-2eb6-4206-b6df-289bb4929256/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/d48b8eef-2eb6-4206-b6df-289bb4929256"
+    },
+    {
+      "issue_key": "609d2d1d-9dbc-4bc2-9900-87f9b9d45cc7",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 1778,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:27:13.023805+00:00",
+          "finished_at": "2026-04-07T10:27:13.027261+00:00",
+          "duration_seconds": 0.003,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_609d2d1d-9dbc-4bc2-9900-87f9b9d45cc7_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/609d2d1d-9dbc-4bc2-9900-87f9b9d45cc7/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/609d2d1d-9dbc-4bc2-9900-87f9b9d45cc7"
+    },
+    {
+      "issue_key": "e536a516-dac6-4cc1-b3df-301e21acdc94",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 1778,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T10:27:13.491815+00:00",
+          "finished_at": "2026-04-07T10:30:41.908810+00:00",
+          "duration_seconds": 208.417,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_e536a516-dac6-4cc1-b3df-301e21acdc94_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/e536a516-dac6-4cc1-b3df-301e21acdc94/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T10:30:43.486538+00:00",
+          "finished_at": "2026-04-07T10:34:42.411089+00:00",
+          "duration_seconds": 238.924,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_e536a516-dac6-4cc1-b3df-301e21acdc94_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/e536a516-dac6-4cc1-b3df-301e21acdc94/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:34:44.109634+00:00",
+          "finished_at": "2026-04-07T10:40:32.048851+00:00",
+          "duration_seconds": 347.939,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Build verification failed after 3 attempt(s)",
+          "skip_reason": "Build verification failed after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_e536a516-dac6-4cc1-b3df-301e21acdc94_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/e536a516-dac6-4cc1-b3df-301e21acdc94/attempt-03"
+        }
+      ],
+      "final_failure_kind": "build",
+      "final_error": "Build verification failed after 3 attempt(s)",
+      "final_skip_reason": "Build verification failed after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/e536a516-dac6-4cc1-b3df-301e21acdc94"
+    },
+    {
+      "issue_key": "ac012e8f-bd39-4bc9-8e92-f81c464aae5d",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 2270,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:40:34.496057+00:00",
+          "finished_at": "2026-04-07T10:40:34.504122+00:00",
+          "duration_seconds": 0.008,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_ac012e8f-bd39-4bc9-8e92-f81c464aae5d_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/ac012e8f-bd39-4bc9-8e92-f81c464aae5d/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/ac012e8f-bd39-4bc9-8e92-f81c464aae5d"
+    },
+    {
+      "issue_key": "27eed645-6b54-4c88-aeca-707ba20429d3",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S6960",
+      "file_path": "/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+      "line": 24,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:40:34.806767+00:00",
+          "finished_at": "2026-04-07T10:40:34.809557+00:00",
+          "duration_seconds": 0.003,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S6960 默认跳过：Controller 职责拆分属于架构调整，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S6960 默认跳过：Controller 职责拆分属于架构调整，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_27eed645-6b54-4c88-aeca-707ba20429d3_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/27eed645-6b54-4c88-aeca-707ba20429d3/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S6960 默认跳过：Controller 职责拆分属于架构调整，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S6960 默认跳过：Controller 职责拆分属于架构调整，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/27eed645-6b54-4c88-aeca-707ba20429d3"
+    },
+    {
+      "issue_key": "a6cc9ceb-a570-4768-8cca-8ff680911d13",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs",
+      "line": 804,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:40:35.086712+00:00",
+          "finished_at": "2026-04-07T10:40:35.089492+00:00",
+          "duration_seconds": 0.003,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_a6cc9ceb-a570-4768-8cca-8ff680911d13_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/a6cc9ceb-a570-4768-8cca-8ff680911d13/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/a6cc9ceb-a570-4768-8cca-8ff680911d13"
+    },
+    {
+      "issue_key": "bbd7c135-ef72-4de4-bc0f-b7f36e008062",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs",
+      "line": 869,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:40:35.351255+00:00",
+          "finished_at": "2026-04-07T10:40:35.353224+00:00",
+          "duration_seconds": 0.002,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_bbd7c135-ef72-4de4-bc0f-b7f36e008062_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bbd7c135-ef72-4de4-bc0f-b7f36e008062/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/bbd7c135-ef72-4de4-bc0f-b7f36e008062"
+    },
+    {
+      "issue_key": "bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S1144",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 942,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T10:40:35.624867+00:00",
+          "finished_at": "2026-04-07T10:43:56.558864+00:00",
+          "duration_seconds": 200.934,
+          "failure_kind": "build",
+          "retry_reason": "build_verification_failed",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": true,
+          "error": "Issue changes failed local build verification",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T10:43:57.788802+00:00",
+          "finished_at": "2026-04-07T10:46:53.489532+00:00",
+          "duration_seconds": 175.701,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:46:54.197601+00:00",
+          "finished_at": "2026-04-07T10:49:27.401334+00:00",
+          "duration_seconds": 153.204,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6/attempt-03"
+        }
+      ],
+      "final_failure_kind": "scope",
+      "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6"
+    },
+    {
+      "issue_key": "cb88142f-fc41-45bc-9a2d-6a094c7d9af6",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3459",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 942,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T10:49:28.877604+00:00",
+          "finished_at": "2026-04-07T10:51:51.432645+00:00",
+          "duration_seconds": 142.555,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_cb88142f-fc41-45bc-9a2d-6a094c7d9af6_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/cb88142f-fc41-45bc-9a2d-6a094c7d9af6/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T10:51:52.276147+00:00",
+          "finished_at": "2026-04-07T10:55:18.230660+00:00",
+          "duration_seconds": 205.954,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_cb88142f-fc41-45bc-9a2d-6a094c7d9af6_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/cb88142f-fc41-45bc-9a2d-6a094c7d9af6/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T10:55:19.144680+00:00",
+          "finished_at": "2026-04-07T10:57:43.690387+00:00",
+          "duration_seconds": 144.546,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_cb88142f-fc41-45bc-9a2d-6a094c7d9af6_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/cb88142f-fc41-45bc-9a2d-6a094c7d9af6/attempt-03"
+        }
+      ],
+      "final_failure_kind": "scope",
+      "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/cb88142f-fc41-45bc-9a2d-6a094c7d9af6"
+    },
+    {
+      "issue_key": "ec828433-949d-42c5-80e7-503b3c385ea5",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S1144",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 943,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T10:57:45.755494+00:00",
+          "finished_at": "2026-04-07T11:00:31.932891+00:00",
+          "duration_seconds": 166.177,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_ec828433-949d-42c5-80e7-503b3c385ea5_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/ec828433-949d-42c5-80e7-503b3c385ea5/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T11:00:32.961322+00:00",
+          "finished_at": "2026-04-07T11:02:32.418457+00:00",
+          "duration_seconds": 119.457,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_ec828433-949d-42c5-80e7-503b3c385ea5_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/ec828433-949d-42c5-80e7-503b3c385ea5/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T11:02:33.553549+00:00",
+          "finished_at": "2026-04-07T11:05:04.513126+00:00",
+          "duration_seconds": 150.959,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_ec828433-949d-42c5-80e7-503b3c385ea5_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/ec828433-949d-42c5-80e7-503b3c385ea5/attempt-03"
+        }
+      ],
+      "final_failure_kind": "scope",
+      "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/ec828433-949d-42c5-80e7-503b3c385ea5"
+    },
+    {
+      "issue_key": "052c0359-2d63-4dc6-993e-fefa2c4faa83",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3776",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "line": 2270,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "retrying",
+          "started_at": "2026-04-07T11:05:05.922407+00:00",
+          "finished_at": "2026-04-07T11:07:28.232982+00:00",
+          "duration_seconds": 142.31,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_052c0359-2d63-4dc6-993e-fefa2c4faa83_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/052c0359-2d63-4dc6-993e-fefa2c4faa83/attempt-01"
+        },
+        {
+          "attempt_number": 2,
+          "status": "retrying",
+          "started_at": "2026-04-07T11:07:29.245334+00:00",
+          "finished_at": "2026-04-07T11:08:19.642388+00:00",
+          "duration_seconds": 50.394,
+          "failure_kind": "no_change",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "Agent completed without modifying any files",
+          "skip_reason": "",
+          "summary": "Fixed 0 file(s)",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_052c0359-2d63-4dc6-993e-fefa2c4faa83_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/052c0359-2d63-4dc6-993e-fefa2c4faa83/attempt-02"
+        },
+        {
+          "attempt_number": 3,
+          "status": "skipped",
+          "started_at": "2026-04-07T11:08:20.118665+00:00",
+          "finished_at": "2026-04-07T11:11:01.597813+00:00",
+          "duration_seconds": 161.464,
+          "failure_kind": "scope",
+          "retry_reason": "retryable_failure",
+          "retryable_failure": true,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_052c0359-2d63-4dc6-993e-fefa2c4faa83_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/052c0359-2d63-4dc6-993e-fefa2c4faa83/attempt-03"
+        }
+      ],
+      "final_failure_kind": "scope",
+      "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/052c0359-2d63-4dc6-993e-fefa2c4faa83"
+    },
+    {
+      "issue_key": "1ae6ad1e-ceaf-4278-9248-10e33b961c7d",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3459",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+      "line": 436,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T11:11:03.047587+00:00",
+          "finished_at": "2026-04-07T11:13:04.544992+00:00",
+          "duration_seconds": 121.486,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_1ae6ad1e-ceaf-4278-9248-10e33b961c7d_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/1ae6ad1e-ceaf-4278-9248-10e33b961c7d/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/1ae6ad1e-ceaf-4278-9248-10e33b961c7d"
+    },
+    {
+      "issue_key": "1dafaa15-8579-4500-a094-9a7be8eeb098",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3459",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+      "line": 436,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T11:13:04.879767+00:00",
+          "finished_at": "2026-04-07T11:14:48.766132+00:00",
+          "duration_seconds": 103.876,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_1dafaa15-8579-4500-a094-9a7be8eeb098_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/1dafaa15-8579-4500-a094-9a7be8eeb098/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/1dafaa15-8579-4500-a094-9a7be8eeb098"
+    },
+    {
+      "issue_key": "f08f2b1b-a660-4681-8f8e-047fefc21c7b",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S3459",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+      "line": 436,
+      "status": "fixed",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "succeeded",
+          "started_at": "2026-04-07T11:14:49.286911+00:00",
+          "finished_at": "2026-04-07T11:17:10.150642+00:00",
+          "duration_seconds": 140.85,
+          "failure_kind": "",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": true,
+          "build_verification_failed": false,
+          "error": "",
+          "skip_reason": "",
+          "summary": "Fixed 1 file(s)",
+          "changed_files": [
+            "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs"
+          ],
+          "issue_log_path": "logs\\issue_attempts\\BI_f08f2b1b-a660-4681-8f8e-047fefc21c7b_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/f08f2b1b-a660-4681-8f8e-047fefc21c7b/attempt-01"
+        }
+      ],
+      "final_failure_kind": "",
+      "final_error": "",
+      "final_skip_reason": "",
+      "final_summary": "Fixed 1 file(s)",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/f08f2b1b-a660-4681-8f8e-047fefc21c7b"
+    },
+    {
+      "issue_key": "545b2297-c21d-4d89-800a-842b0066489a",
+      "repository": "BI",
+      "run_label": "20260407133700-02",
+      "rule_id": "csharpsquid:S107",
+      "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalUnTransportImportService.cs",
+      "line": 341,
+      "status": "skipped",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "status": "skipped",
+          "started_at": "2026-04-07T11:17:10.480634+00:00",
+          "finished_at": "2026-04-07T11:17:10.483778+00:00",
+          "duration_seconds": 0.003,
+          "failure_kind": "policy_skip",
+          "retry_reason": "none",
+          "retryable_failure": false,
+          "build_passed": false,
+          "build_verification_failed": false,
+          "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+          "summary": "Skipped by rule policy",
+          "changed_files": [],
+          "issue_log_path": "logs\\issue_attempts\\BI_545b2297-c21d-4d89-800a-842b0066489a_20260407133700-02.log",
+          "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/545b2297-c21d-4d89-800a-842b0066489a/attempt-01"
+        }
+      ],
+      "final_failure_kind": "policy_skip",
+      "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "final_summary": "Skipped by rule policy",
+      "artifact_root": "logs/issue_artifacts/BI/20260407133700-02/545b2297-c21d-4d89-800a-842b0066489a"
+    }
+  ],
+  "started_at": "2026-04-07T07:46:24.560707+00:00",
+  "finished_at": "2026-04-07T11:17:22.195126+00:00"
+}

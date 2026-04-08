@@ -226,6 +226,7 @@ class DingTalkCorpClient:
         author: str,
         total_issues: int,
         successful: int,
+        skipped: int,
         failed: int,
         pr_url: str | None = None,
         dingtalk_userid: str | None = None,
@@ -233,7 +234,7 @@ class DingTalkCorpClient:
         force_warn: bool = False,
     ) -> dict[str, Any]:
         """Send notification about fix run results."""
-        status_tag = "[SUCCESS]" if failed == 0 and not force_warn else "[WARN]"
+        status_tag = "[SUCCESS]" if failed == 0 and skipped == 0 and not force_warn else "[WARN]"
         title = f"{status_tag} SonarQube 修复完成 - {author}"
 
         text = f"""## 修复报告
@@ -241,6 +242,7 @@ class DingTalkCorpClient:
 - **作者**: {author}
 - **总问题数**: {total_issues}
 - **成功修复**: {successful} ✅
+- **跳过修复**: {skipped} ⏭️
 - **修复失败**: {failed} ❌
 
 """

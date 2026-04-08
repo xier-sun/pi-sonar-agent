@@ -3,7 +3,7 @@
     "project_key": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0",
     "repository": "BI",
     "author": "pengxiru@neware.com.cn",
-    "max_issues": 30,
+    "max_issues": 1,
     "solution_path": "OpenAuth.Core/OpenAuth.Core.WebApi.sln",
     "keep_workspace": false
   }

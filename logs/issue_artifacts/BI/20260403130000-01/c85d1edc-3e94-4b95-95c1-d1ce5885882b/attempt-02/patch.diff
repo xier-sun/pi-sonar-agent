@@ -1,0 +1,18 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs
+@@ -358,7 +358,7 @@
+         {
+
+             if (root == null || propertyNames == null || propertyNames.Length == 0)
+
+             {
+
+-                return null;
+
++                return JValue.CreateNull();
+
+             }
+
+ 
+
+             foreach (var property in root.Properties())

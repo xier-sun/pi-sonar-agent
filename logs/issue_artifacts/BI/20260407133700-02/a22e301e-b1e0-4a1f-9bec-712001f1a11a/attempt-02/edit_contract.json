@@ -1,0 +1,50 @@
+{
+  "issue_key": "a22e301e-b1e0-4a1f-9bec-712001f1a11a",
+  "rule_id": "csharpsquid:S3776",
+  "guardrail_mode": "scope",
+  "target_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+  ],
+  "target_symbols": [
+    {
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "symbol": "method@41-171",
+      "reason": "Sonar issue is located near line 41",
+      "start_line": 41,
+      "end_line": 171
+    }
+  ],
+  "allowed_change_kinds": [
+    "direct-fix",
+    "extract-local",
+    "guard-clause-adjustment",
+    "extract-private-helper"
+  ],
+  "forbidden_change_kinds": [
+    "drive-by-refactor",
+    "whole-file-format",
+    "touch-unrelated-files",
+    "touch-unrelated-tests"
+  ],
+  "validation_plan": [
+    "build",
+    "scope_review",
+    "diff_review"
+  ],
+  "follow_up_policy": "record_only",
+  "review_hints": [
+    "flag unrelated edits in the same file",
+    "record incidental findings instead of editing them",
+    "allow local scaffolding that is required for the main fix"
+  ],
+  "scope_mode": "method",
+  "target_line_range": [
+    41,
+    171
+  ],
+  "validation_line_range": [
+    41,
+    250
+  ],
+  "patch_only": true
+}

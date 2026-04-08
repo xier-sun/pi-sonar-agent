@@ -1,0 +1,225 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
+@@ -3158,21 +3158,16 @@
+             // 获取当前时间和登录用户ID
+
+             var now = DateTime.Now;
+
+             var updateUserId = p.LoginUser?.Id;
+
+-            
+
++
+
+             // 查找所有同类型的记录，不再按UpdateId匹配单条记录
+
+             var socialsecurityRecords = p.CurrentSecurities?.Where(x => x.Type == p.Type).ToList();
+
+-            
+
++
+
+             if (socialsecurityRecords == null || socialsecurityRecords.Count == 0)
+
+             {
+
+                 // 没有找到同类型记录，无论是否有字段更新，都创建新记录以保存处理人和处理时间
+
+-                // 记录原来没有标注是社保公积金的记录，然后删掉 
+
++                // 记录原来没有标注是社保公积金的记录，然后删掉
+
+                 var oldUnspecifiedTypeRecords = p.CurrentSecurities?.Where(x => x.Type != SocialsecurityTypeEnums.Socialsecurity && x.Type != SocialsecurityTypeEnums.Accumulationfunds).ToList();
+
+-                if (oldUnspecifiedTypeRecords != null && oldUnspecifiedTypeRecords.Any())
+
+-                {
+
+-                    p.DelSocialsecurityList.AddRange(oldUnspecifiedTypeRecords);
+
+-                    // 从 currentSecurities 中移除这些记录，以免后续逻辑再次处理或导致冲突
+
+-                    p.CurrentSecurities.RemoveAll(x => oldUnspecifiedTypeRecords.Contains(x));
+
+-                }
+
++                CleanupOldUnspecifiedRecords(oldUnspecifiedTypeRecords, p);
+
+ 
+
+                 // 从旧的未指定Type的记录中获取一些默认值，避免丢失
+
+                 var defaultRecord = oldUnspecifiedTypeRecords?.FirstOrDefault();
+
+@@ -3208,34 +3203,62 @@
+                 foreach (var record in socialsecurityRecords)
+
+                 {
+
+                     p.UpdateAction(record); // 执行特定于更新的操作
+
+-                    
+
++
+
+                     // 只有存在实质性变更时，才需要打回已确认状态并更新时间
+
+-                    if (p.HasSubstantiveChange && p.Type == SocialsecurityTypeEnums.Socialsecurity)
+
+-                    {
+
+-                        if (record.SIsPay == "Y")
+
+-                        {
+
+-                            record.SIsPay = "N";
+
+-                        }
+
+-                        if (record.SIsEnd == "Y")
+
+-                        {
+
+-                            record.SIsEnd = "N";
+
+-                        }
+
+-                    }
+
+-                    else if (p.HasSubstantiveChange && p.Type == SocialsecurityTypeEnums.Accumulationfunds)
+
+-                    {
+
+-                        if (record.PIsPay == "Y" )
+
+-                        {
+
+-                            record.PIsPay = "N";
+
+-                        }
+
+-                        if (record.PIsEnd == "Y")
+
+-                        {
+
+-                            record.PIsEnd = "N";
+
+-                        }
+
+-                    }
+
+-                    
+
++                    ResetRecordConfirmationStatus(record, p);
+
++
+
+                     // 设置更新时间和更新用户ID
+
+                     ApplyInfoUpdateAuditFields(record, p.OperationScene, now, updateUserId);
+
+                     p.UpdateSocialsecurityList.Add(record);
+
++                }
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 清理旧的未指定类型的社保记录
+
++        /// </summary>
+
++        private void CleanupOldUnspecifiedRecords(List<UserSocialsecurity> oldUnspecifiedTypeRecords, ProcessSocialsecurityRecordParams p)
+
++        {
+
++            if (oldUnspecifiedTypeRecords == null || !oldUnspecifiedTypeRecords.Any())
+
++            {
+
++                return;
+
++            }
+
++
+
++            p.DelSocialsecurityList.AddRange(oldUnspecifiedTypeRecords);
+
++            // 从 currentSecurities 中移除这些记录，以免后续逻辑再次处理或导致冲突
+
++            p.CurrentSecurities.RemoveAll(x => oldUnspecifiedTypeRecords.Contains(x));
+
++        }
+
++
+
++        /// <summary>
+
++        /// 重置记录的确认状态（当存在实质性变更时）
+
++        /// </summary>
+
++        private void ResetRecordConfirmationStatus(UserSocialsecurity record, ProcessSocialsecurityRecordParams p)
+
++        {
+
++            if (!p.HasSubstantiveChange)
+
++            {
+
++                return;
+
++            }
+
++
+
++            if (p.Type == SocialsecurityTypeEnums.Socialsecurity)
+
++            {
+
++                if (record.SIsPay == "Y")
+
++                {
+
++                    record.SIsPay = "N";
+
++                }
+
++                if (record.SIsEnd == "Y")
+
++                {
+
++                    record.SIsEnd = "N";
+
++                }
+
++            }
+
++            else if (p.Type == SocialsecurityTypeEnums.Accumulationfunds)
+
++            {
+
++                if (record.PIsPay == "Y")
+
++                {
+
++                    record.PIsPay = "N";
+
++                }
+
++                if (record.PIsEnd == "Y")
+
++                {
+
++                    record.PIsEnd = "N";
+
+                 }
+
+             }
+
+         }

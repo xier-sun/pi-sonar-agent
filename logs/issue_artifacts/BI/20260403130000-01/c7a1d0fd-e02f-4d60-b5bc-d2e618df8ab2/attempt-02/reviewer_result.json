@@ -1,0 +1,33 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "reason": "This hunk changes lines outside the edit contract window 2595-2596.",
+      "symbol": "statement@2595-2596",
+      "changed_lines": [
+        2591
+      ],
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n+++ OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n@@ -2591 +2591 @@\n-            if (source == null)\n+            if (object.Equals(source, null))"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "c7a1d0fd-e02f-4d60-b5bc-d2e618df8ab2",
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "symbol": "statement@2595-2596",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n+++ OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n@@ -2591 +2591 @@\n-            if (source == null)\n+            if (object.Equals(source, null))",
+      "discovered_at": "2026-04-07T04:12:00.247229+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 1,
+    "total_changed_lines": 1
+  }
+}

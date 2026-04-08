@@ -1,0 +1,36 @@
+{
+  "issue_key": "08f43ced-74ad-4213-94f6-e77a360944ef",
+  "repository": "BI",
+  "run_label": "20260407133700-01",
+  "rule_id": "csharpsquid:S3267",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs",
+  "line": 907,
+  "status": "fixed",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "succeeded",
+      "started_at": "2026-04-07T06:40:00.984061+00:00",
+      "finished_at": "2026-04-07T06:43:07.150118+00:00",
+      "duration_seconds": 186.166,
+      "failure_kind": "",
+      "retry_reason": "none",
+      "retryable_failure": false,
+      "build_passed": true,
+      "build_verification_failed": false,
+      "error": "",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs"
+      ],
+      "issue_log_path": "logs\\issue_attempts\\BI_08f43ced-74ad-4213-94f6-e77a360944ef_20260407133700-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/08f43ced-74ad-4213-94f6-e77a360944ef/attempt-01"
+    }
+  ],
+  "final_failure_kind": "",
+  "final_error": "",
+  "final_skip_reason": "",
+  "final_summary": "Fixed 1 file(s)",
+  "artifact_root": "logs/issue_artifacts/BI/20260407133700-01/08f43ced-74ad-4213-94f6-e77a360944ef"
+}

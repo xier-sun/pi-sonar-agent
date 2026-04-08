@@ -75,8 +75,8 @@ class RunCoordinator:
         from pi_sonar_agent.core.pr_description import (
             PullRequestIssueSummary,
             build_local_pr_report_path,
+            build_pr_attachment_name,
             build_pull_request_description,
-            build_repository_pr_report_path,
             build_summary_pull_request_description,
             write_markdown_report,
         )
@@ -454,19 +454,6 @@ class RunCoordinator:
         if should_create_pr:
             print("[INFO] 创建 Pull Request...")
             branch = f"fix/sonar-{target_config.author.split('@')[0]}-{options.run_label}"
-            repo_pr_report_path = build_repository_pr_report_path(
-                repository=target_config.repository,
-                author=target_config.author,
-                run_label=options.run_label,
-            )
-            repo_pr_report_file = write_markdown_report(
-                workspace,
-                repo_pr_report_path,
-                pr_report_markdown,
-            )
-            print(f"[INFO] PR 详细报告文件: {repo_pr_report_path}")
-            print(f"[INFO] PR 详细报告绝对路径: {repo_pr_report_file.as_posix()}")
-
             pr_description = build_summary_pull_request_description(
                 author=target_config.author,
                 base_branch=target_config.base_branch,
@@ -486,7 +473,6 @@ class RunCoordinator:
                 failed=failed,
                 build_passed=build_passed,
                 issue_summaries=issue_summaries,
-                report_path=repo_pr_report_path,
             )
 
             git_gateway.publish_branch(
@@ -506,20 +492,66 @@ class RunCoordinator:
                 )
                 pr_url = pr.url
                 print(f"  PR: {pr_url}")
+                attachment_name = build_pr_attachment_name(
+                    repository=target_config.repository,
+                    author=target_config.author,
+                    run_label=options.run_label,
+                )
+                try:
+                    attachment = ado_client.upload_pull_request_attachment(
+                        repository=target_config.repository,
+                        pull_request_id=pr.pr_id,
+                        file_name=attachment_name,
+                        content=pr_report_markdown,
+                    )
+                    print(
+                        "[INFO] PR 详细报告附件已上传: "
+                        f"{attachment.file_name} -> {attachment.url}"
+                    )
+                    updated_description = build_summary_pull_request_description(
+                        author=target_config.author,
+                        base_branch=target_config.base_branch,
+                        solution_path=solution_path,
+                        build_command=(
+                            str(final_build_result.get("build_command", build_command))
+                            if final_build_result
+                            else build_command
+                        ),
+                        test_command=(
+                            str(final_build_result.get("test_command", test_command or "")) or None
+                            if final_build_result
+                            else test_command
+                        ),
+                        successful=successful,
+                        skipped=skipped,
+                        failed=failed,
+                        build_passed=build_passed,
+                        issue_summaries=issue_summaries,
+                        report_attachment_name=attachment.file_name,
+                        report_attachment_url=attachment.url,
+                    )
+                    ado_client.update_pull_request_description(
+                        repository=target_config.repository,
+                        pull_request_id=pr.pr_id,
+                        description=updated_description,
+                    )
+                except Exception as exc:
+                    warning = f"PR 已创建，但详细报告附件上传失败: {exc}"
+                    print(f"[WARN] {warning}")
+                    pr_error = warning
             except Exception as exc:
                 pr_error = str(exc)
                 print(f"[WARN] PR 创建失败: {pr_error}")
 
-        should_notify = bool(
-            dingtalk_client and (pr_url or pr_error or successful or skipped or failed)
-        )
+        should_notify = bool(dingtalk_client and pr_url)
         if should_notify:
             try:
                 dingtalk_client.send_run_notification(
                     author=target_config.author,
                     total_issues=len(issues),
                     successful=successful,
-                    failed=failed + skipped,
+                    skipped=skipped,
+                    failed=failed,
                     pr_url=pr_url,
                     dingtalk_userid=recipients.dingtalk_userid,
                     warning_message=(f"PR 创建失败：{pr_error}" if pr_error else None),

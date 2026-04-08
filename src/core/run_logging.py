@@ -22,13 +22,19 @@ class TeeStream(io.TextIOBase):
 
     def write(self, text: str) -> int:
         for stream in self._streams:
-            stream.write(text)
-            stream.flush()
+            try:
+                stream.write(text)
+                stream.flush()
+            except ValueError:
+                continue
         return len(text)
 
     def flush(self) -> None:
         for stream in self._streams:
-            stream.flush()
+            try:
+                stream.flush()
+            except ValueError:
+                continue
 
     def isatty(self) -> bool:
         return bool(getattr(self._streams[0], "isatty", lambda: False)())

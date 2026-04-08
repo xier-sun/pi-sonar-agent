@@ -1,0 +1,20 @@
+{
+  "attempt_number": 1,
+  "status": "succeeded",
+  "started_at": "2026-04-07T11:14:49.286911+00:00",
+  "finished_at": "2026-04-07T11:17:10.150642+00:00",
+  "duration_seconds": 140.85,
+  "failure_kind": "",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_f08f2b1b-a660-4681-8f8e-047fefc21c7b_20260407133700-02.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/f08f2b1b-a660-4681-8f8e-047fefc21c7b/attempt-01"
+}

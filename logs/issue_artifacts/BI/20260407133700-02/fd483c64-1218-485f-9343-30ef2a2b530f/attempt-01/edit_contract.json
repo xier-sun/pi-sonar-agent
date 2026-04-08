@@ -1,0 +1,50 @@
+{
+  "issue_key": "fd483c64-1218-485f-9343-30ef2a2b530f",
+  "rule_id": "csharpsquid:S3776",
+  "guardrail_mode": "scope",
+  "target_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+  ],
+  "target_symbols": [
+    {
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "symbol": "method@954-960",
+      "reason": "Sonar issue is located near line 962",
+      "start_line": 954,
+      "end_line": 960
+    }
+  ],
+  "allowed_change_kinds": [
+    "direct-fix",
+    "extract-local",
+    "guard-clause-adjustment",
+    "extract-private-helper"
+  ],
+  "forbidden_change_kinds": [
+    "drive-by-refactor",
+    "whole-file-format",
+    "touch-unrelated-files",
+    "touch-unrelated-tests"
+  ],
+  "validation_plan": [
+    "build",
+    "scope_review",
+    "diff_review"
+  ],
+  "follow_up_policy": "record_only",
+  "review_hints": [
+    "flag unrelated edits in the same file",
+    "record incidental findings instead of editing them",
+    "allow local scaffolding that is required for the main fix"
+  ],
+  "scope_mode": "method",
+  "target_line_range": [
+    954,
+    960
+  ],
+  "validation_line_range": [
+    954,
+    1080
+  ],
+  "patch_only": true
+}

@@ -1,0 +1,20 @@
+{
+  "attempt_number": 2,
+  "status": "retrying",
+  "started_at": "2026-04-07T06:01:31.065564+00:00",
+  "finished_at": "2026-04-07T06:06:50.574281+00:00",
+  "duration_seconds": 319.509,
+  "failure_kind": "scope",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "Issue changes exceeded allowed scope",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_9a874d91-a7b6-4e39-a84e-da1c1722b7fe_20260407133700-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-01/9a874d91-a7b6-4e39-a84e-da1c1722b7fe/attempt-02"
+}

@@ -1,0 +1,20 @@
+{
+  "attempt_number": 2,
+  "status": "retrying",
+  "started_at": "2026-04-07T10:43:57.788802+00:00",
+  "finished_at": "2026-04-07T10:46:53.489532+00:00",
+  "duration_seconds": 175.701,
+  "failure_kind": "scope",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "Issue changes exceeded allowed scope",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6_20260407133700-02.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6/attempt-02"
+}

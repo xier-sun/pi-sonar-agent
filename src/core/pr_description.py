@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ADO_PR_DESCRIPTION_SOFT_LIMIT = 3800
-DEFAULT_PR_REPORT_ROOT = "docs/sonar-reports"
 DEFAULT_LOCAL_PR_REPORT_ROOT = "logs/pr_descriptions"
 
 
@@ -41,20 +40,20 @@ def _sanitize_path_segment(value: str) -> str:
     return normalized.strip("-._") or "run"
 
 
-def build_repository_pr_report_path(*, repository: str, author: str, run_label: str) -> str:
-    """Build the repository-relative markdown report path for a PR run."""
-
-    repository_name = _sanitize_path_segment(repository)
-    author_name = _sanitize_path_segment(author)
-    return f"{DEFAULT_PR_REPORT_ROOT}/{repository_name}_{author_name}_{run_label}.md"
-
-
 def build_local_pr_report_path(*, repository: str, author: str, run_label: str) -> Path:
     """Build the local persisted markdown report path for a PR run."""
 
     repository_name = _sanitize_path_segment(repository)
     author_name = _sanitize_path_segment(author)
     return Path(DEFAULT_LOCAL_PR_REPORT_ROOT) / f"{repository_name}_{author_name}_{run_label}.md"
+
+
+def build_pr_attachment_name(*, repository: str, author: str, run_label: str) -> str:
+    """Build the uploaded PR attachment file name for a run report."""
+
+    repository_name = _sanitize_path_segment(repository)
+    author_name = _sanitize_path_segment(author)
+    return f"{repository_name}_{author_name}_{run_label}.txt"
 
 
 def write_markdown_report(base_dir: Path, relative_path: str | Path, content: str) -> Path:
@@ -194,7 +193,8 @@ def build_summary_pull_request_description(
     failed: int,
     build_passed: bool,
     issue_summaries: list[PullRequestIssueSummary],
-    report_path: str | None = None,
+    report_attachment_name: str | None = None,
+    report_attachment_url: str | None = None,
 ) -> str:
     """Build a short Azure DevOps-friendly PR description."""
 
@@ -223,8 +223,13 @@ def build_summary_pull_request_description(
         lines.append(f"- 测试命令: {test_command}")
     if changed_files_summary:
         lines.append(f"- 主要改动文件: {changed_files_summary}")
-    if report_path:
-        lines.append(f"- 详细修复报告: {report_path}")
+    if report_attachment_name and report_attachment_url:
+        lines.append(
+            "- 详细修复报告附件: "
+            f"[{report_attachment_name}]({report_attachment_url})"
+        )
+    elif report_attachment_name:
+        lines.append(f"- 详细修复报告附件: {report_attachment_name}")
 
     lines.extend(
         [
@@ -232,7 +237,7 @@ def build_summary_pull_request_description(
             "## 审阅提示",
             "- 本 PR 仅包含最终构建验证通过的修复。",
             "- 跳过或失败的 issue 未纳入当前提交。",
-            "- 逐条 issue 处理结果、跳过原因和重试日志请查看仓库内 Markdown 报告。",
+            "- 逐条 issue 处理结果、跳过原因和重试日志请查看 PR 附件中的报告。",
         ]
     )
 

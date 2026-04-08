@@ -1,0 +1,20 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
+@@ -396,7 +396,8 @@
+         /// <summary>
+
+         /// 批量申请合同续签审批
+
+         /// </summary>
+
+-        /// <param name="req"></param>
+
++        /// <param name="req">合同申请请求信息</param>
+
++        /// <param name="formFiles">上传的附件文件列表</param>
+
+         /// <returns></returns>
+
+         /// <exception cref="InvalidOperationException"></exception>
+
+         public async Task BatchApply(UserContractApplyReq req, List<IFormFile> formFiles = null)

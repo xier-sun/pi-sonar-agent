@@ -1,0 +1,20 @@
+{
+  "attempt_number": 1,
+  "status": "succeeded",
+  "started_at": "2026-04-07T08:23:12.853825+00:00",
+  "finished_at": "2026-04-07T08:29:06.199410+00:00",
+  "duration_seconds": 353.34,
+  "failure_kind": "",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_996dd759-d30a-4041-9cb5-0ccfbe463173_20260407133700-02.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/996dd759-d30a-4041-9cb5-0ccfbe463173/attempt-01"
+}

@@ -70,3 +70,58 @@ def test_git_client_commit_and_push_ignores_nothing_to_commit(monkeypatch, tmp_p
     client.commit_and_push("fix: noop", cwd=tmp_path)
 
     assert calls == [f"init:{tmp_path}", "stage"]
+
+
+def test_upload_pull_request_attachment_posts_binary_payload() -> None:
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        status_code = 200
+        text = ""
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "fileName": "report.txt",
+                "url": "https://dev.azure.com/acme/project/_apis/git/repositories/repo/pullRequests/7/attachments/1",
+            }
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.headers: dict[str, str] = {}
+
+        def post(self, url: str, *, params=None, data=None, headers=None, timeout=None):
+            captured["url"] = url
+            captured["params"] = params
+            captured["data"] = data
+            captured["headers"] = headers
+            captured["timeout"] = timeout
+            return FakeResponse()
+
+    client = ado_module.AzureDevOpsClient(
+        "https://dev.azure.com/acme",
+        "project",
+        "ado-token",
+        organization="acme",
+        timeout=15,
+    )
+    client.session = FakeSession()
+
+    attachment = client.upload_pull_request_attachment(
+        repository="repo",
+        pull_request_id=7,
+        file_name="report.txt",
+        content="# Report\n",
+    )
+
+    assert attachment.file_name == "report.txt"
+    assert attachment.url.endswith("/attachments/1")
+    assert captured == {
+        "url": "https://dev.azure.com/acme/project/_apis/git/repositories/repo/pullRequests/7/attachments",
+        "params": {"fileName": "report.txt", "api-version": "7.1"},
+        "data": b"\xef\xbb\xbf# Report\n",
+        "headers": {"Content-Type": "application/octet-stream"},
+        "timeout": 15,
+    }

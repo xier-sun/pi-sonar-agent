@@ -1,0 +1,13 @@
+{
+  "success": false,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "retryable_failure": false,
+  "failure_kind": "",
+  "error": "'NoneType' object is not iterable",
+  "skip_reason": "'NoneType' object is not iterable",
+  "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+  "build_output": "",
+  "guardrail_mode": "scope",
+  "follow_up_log_path": ""
+}

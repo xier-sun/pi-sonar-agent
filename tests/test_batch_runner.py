@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import runpy
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
 
-import pi_sonar_agent.batch_runner as batch_runner
+import batch_runner as legacy_batch_runner
 from pi_sonar_agent.core.state import TargetState, TargetStatus
 
 
@@ -25,7 +27,7 @@ def test_run_for_target_delegates_to_shared_coordinator() -> None:
             calls.append((config, options))
             return _FakeResult(successful=2, skipped=1, failed=0, pr_url="https://ado/pr/1")
 
-    result = batch_runner.run_for_target(
+    result = legacy_batch_runner.run_for_target(
         {
             "project_key": "project-a",
             "repository": "repo-a",
@@ -57,7 +59,7 @@ def test_run_for_target_raises_for_missing_required_fields() -> None:
             raise AssertionError("should not be called")
 
     try:
-        batch_runner.run_for_target(
+        legacy_batch_runner.run_for_target(
             {
                 "repository": "repo-a",
                 "author": "alice@example.com",
@@ -119,23 +121,23 @@ def test_batch_main_reuses_shared_runtime_environment(monkeypatch, capsys) -> No
             )
         return _FakeResult(successful=0, skipped=1, failed=1, pr_url="", target_state=target_state)
 
-    monkeypatch.setattr(batch_runner, "RunLogSession", FakeRunLogSession)
-    monkeypatch.setattr(batch_runner, "load_runtime_environment", lambda: "runtime-env")
-    monkeypatch.setattr(batch_runner, "RunCoordinator", FakeCoordinator)
-    monkeypatch.setattr(batch_runner, "ArtifactWriter", FakeArtifactWriter)
+    monkeypatch.setattr(legacy_batch_runner, "RunLogSession", FakeRunLogSession)
+    monkeypatch.setattr(legacy_batch_runner, "load_runtime_environment", lambda: "runtime-env")
+    monkeypatch.setattr(legacy_batch_runner, "RunCoordinator", FakeCoordinator)
+    monkeypatch.setattr(legacy_batch_runner, "ArtifactWriter", FakeArtifactWriter)
     monkeypatch.setattr(
-        batch_runner,
+        legacy_batch_runner,
         "load_targets",
         lambda path: [
             {"project_key": "project-a", "repository": "repo-a", "author": "alice@example.com"},
             {"project_key": "project-b", "repository": "repo-b", "author": "bob@example.com"},
         ],
     )
-    monkeypatch.setattr(batch_runner, "run_for_target", fake_run_for_target)
-    monkeypatch.setattr(batch_runner.time, "strftime", lambda _: "20260403130000")
+    monkeypatch.setattr(legacy_batch_runner, "run_for_target", fake_run_for_target)
+    monkeypatch.setattr(legacy_batch_runner.time, "strftime", lambda _: "20260403130000")
     monkeypatch.setattr(sys, "argv", ["batch_runner.py"])
 
-    batch_runner.main()
+    legacy_batch_runner.main()
 
     assert calls == [
         ("repo-a", "20260403130000-01"),
@@ -150,3 +152,19 @@ def test_batch_main_reuses_shared_runtime_environment(monkeypatch, capsys) -> No
     assert "Total Failed    : 1" in output
     assert "Total PRs       : 1" in output
     assert "Run Summary     :" in output
+
+
+def test_pi_sonar_agent_batch_runner_bridge_invokes_legacy_main(monkeypatch) -> None:
+    calls: list[str] = []
+    fake_module = ModuleType("batch_runner")
+    fake_module.main = lambda: calls.append("legacy-batch-main")
+    fake_module.__all__ = ("main",)
+    monkeypatch.setitem(sys.modules, "batch_runner", fake_module)
+    sys.modules.pop("pi_sonar_agent.batch_runner", None)
+
+    try:
+        runpy.run_module("pi_sonar_agent.batch_runner", run_name="__main__")
+    except SystemExit as exc:
+        assert exc.code in {None, 0}
+
+    assert calls == ["legacy-batch-main"]

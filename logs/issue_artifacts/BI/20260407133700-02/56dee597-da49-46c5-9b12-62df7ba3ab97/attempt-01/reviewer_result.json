@@ -1,0 +1,44 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "reason": "This hunk changes lines outside the edit contract window 1504-1630.",
+      "symbol": "method@1504-1510",
+      "changed_lines": [
+        1484,
+        1486,
+        1488,
+        1489,
+        1491,
+        1492,
+        1493,
+        1494,
+        1495,
+        1496,
+        1497,
+        1498
+      ],
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -1484,5 +1484 @@\n-                if (!batchDeliveries.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.DeliveryForOverDue> deliveryForCalcList))\n-                {\n-                    deliveryForCalcList = new List<HistoricalOverdueCalculationService.DeliveryForOverDue>();\n-                }\n-\n+                var deliveryForCalcList = GetOrEmptyDefault(batchDeliveries, order.DocEntry);\n@@ -1490,5 +1486 @@\n-                if (!batchReceipts.TryGetValue(order.DocEntry, out List<ReceiptForOrder> allReceipts))\n-                {\n-                    allReceipts = new List<ReceiptForOrder>();\n-                }\n-\n+                var allReceipts = GetOrEmptyDefault(batchReceipts, order.DocEntry);\n@@ -1496,10 +1488,2 @@\n-                if (!batchReturns.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.ReturnForOverDue> allReturns))\n-                {\n-                    allReturns = new List<HistoricalOverdueCalculationService.ReturnForOverDue>();\n-                }\n-\n-                if (batchRefunds == null || !batchRefunds.TryGetValue(order.DocEntry, out List<SaleRefund> allRefunds))\n-                {\n-                    allRefunds = new List<SaleRefund>();\n-                }\n-\n+                var allReturns = GetOrEmptyDefault(batchReturns, order.DocEntry);\n+                var allRefunds = batchRefunds == null ? new List<SaleRefund>() : GetOrEmptyDefault(batchRefunds, order.DocEntry);\n@@ -1507,3 +1491,8 @@\n-                if (!batchClearRecons.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.ClearReconForOverDue> allClearRecons))\n-                {\n-                    allClearRecons = new List<HistoricalOverdueCalculationService.ClearReconForOverDue>();\n+                var allClearRecons = GetOrEmptyDefault(batchClearRecons, order.DocEntry);\n+\n+                /// <summary>\n+                /// 从字典中获取值，如果不存在则返回默认空列表\n+                /// </summary>\n+                static List<T> GetOrEmptyDefault<TKey, T>(Dictionary<TKey, List<T>> dict, TKey key) where T : class\n+                {\n+                    return dict.TryGetValue(key, out var value) ? value : new List<T>();"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "56dee597-da49-46c5-9b12-62df7ba3ab97",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "symbol": "method@1504-1510",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -1484,5 +1484 @@\n-                if (!batchDeliveries.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.DeliveryForOverDue> deliveryForCalcList))\n-                {\n-                    deliveryForCalcList = new List<HistoricalOverdueCalculationService.DeliveryForOverDue>();\n-                }\n-\n+                var deliveryForCalcList = GetOrEmptyDefault(batchDeliveries, order.DocEntry);\n@@ -1490,5 +1486 @@\n-                if (!batchReceipts.TryGetValue(order.DocEntry, out List<ReceiptForOrder> allReceipts))\n-                {\n-                    allReceipts = new List<ReceiptForOrder>();\n-                }\n-\n+                var allReceipts = GetOrEmptyDefault(batchReceipts, order.DocEntry);\n@@ -1496,10 +1488,2 @@\n-                if (!batchReturns.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.ReturnForOverDue> allReturns))\n-                {\n-                    allReturns = new List<HistoricalOverdueCalculationService.ReturnForOverDue>();\n-                }\n-\n-                if (batchRefunds == null || !batchRefunds.TryGetValue(order.DocEntry, out List<SaleRefund> allRefunds))\n-                {\n-                    allRefunds = new List<SaleRefund>();\n-                }\n-\n+                var allReturns = GetOrEmptyDefault(batchReturns, order.DocEntry);\n+                var allRefunds = batchRefunds == null ? new List<SaleRefund>() : GetOrEmptyDefault(batchRefunds, order.DocEntry);\n@@ -1507,3 +1491,8 @@\n-                if (!batchClearRecons.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.ClearReconForOverDue> allClearRecons))\n-                {\n-                    allClearRecons = new List<HistoricalOverdueCalculationService.ClearReconForOverDue>();\n+                var allClearRecons = GetOrEmptyDefault(batchClearRecons, order.DocEntry);\n+\n+                /// <summary>\n+                /// 从字典中获取值，如果不存在则返回默认空列表\n+                /// </summary>\n+                static List<T> GetOrEmptyDefault<TKey, T>(Dictionary<TKey, List<T>> dict, TKey key) where T : class\n+                {\n+                    return dict.TryGetValue(key, out var value) ? value : new List<T>();",
+      "discovered_at": "2026-04-07T10:20:49.040215+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 4,
+    "total_changed_lines": 12
+  }
+}

@@ -102,9 +102,12 @@ OPENAI_MODEL=glm-4.7
 
 ### 3.3 `data/targets.json`
 
-零参数运行会读取第一个 target；批量运行会遍历整个数组。
+`targets.json` 的根节点必须是一个数组。每个元素代表一个 target，也就是“一个 Sonar 项目 + 一个 ADO 仓库 + 一个作者过滤条件”的组合。
 
-推荐字段：
+- 零参数运行 `run.py` 时，只会读取数组中的第一个 target 作为默认值
+- 批量运行 `python -m pi_sonar_agent.batch_runner data\targets.json` 时，会遍历整个数组
+
+推荐示例：
 
 ```json
 [
@@ -125,11 +128,96 @@ OPENAI_MODEL=glm-4.7
 ]
 ```
 
-关键说明：
+#### 必填字段
 
-- `base_branch` 是仓库基线分支，当前会直接控制初始 clone
-- `keep_workspace`、`skip_build_gate` 只对批量入口按 target 生效
-- `reviewer_email`、`dingtalk_userid` 优先取 `targets.json`
+下面 3 个字段是 target 的最小闭环，缺任意一个都会在启动时直接失败：
+
+- `project_key`
+  含义：SonarQube 项目 Key，用来拉取该项目的 open issues。
+  用法：必须和 SonarQube 中项目的真实 key 一致。
+  示例：`"project_key": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0"`
+
+- `repository`
+  含义：Azure DevOps 仓库名，用来查询远端地址、clone 仓库、创建分支和 PR。
+  用法：填 ADO 仓库名，不是本地目录名，也不是完整 URL。
+  示例：`"repository": "BI"`
+
+- `author`
+  含义：Sonar issue 的作者过滤条件，只处理该作者关联的 issues。
+  用法：通常填邮箱；系统会把它作为本轮 issue 拉取条件。
+  示例：`"author": "pengxiru@neware.com.cn"`
+
+#### 可选字段
+
+- `reviewer_email`
+  含义：PR 审阅人邮箱。
+  用法：如果提供，创建 PR 后会尝试解析成 ADO 身份并加为 reviewer。
+  默认：空字符串，表示不强制指定 reviewer。
+  说明：单目标入口和批量入口都优先读取 `targets.json` 里的这个值。
+
+- `dingtalk_userid`
+  含义：钉钉接收人 userId。
+  用法：如果配置了钉钉通知能力，会优先尝试把通知发给这个 userId。
+  默认：空字符串，表示由数据库映射或 webhook 回退逻辑决定。
+  说明：单目标入口和批量入口都优先读取 `targets.json` 里的这个值。
+
+- `max_issues`
+  含义：本轮最多处理多少个 issue。
+  用法：用于限制单个 target 的处理规模，便于小批量试跑。
+  示例：`"max_issues": 30`
+  默认：
+  单目标入口中，未配置时默认 `0`，表示不限制。
+  批量入口中，未配置时默认 `3`，表示每个 target 最多处理 3 个 issue。
+
+- `base_branch`
+  含义：仓库基线分支。
+  用法：系统会直接按这个分支做初始 clone、创建修复分支，并把 PR 合并目标指向它。
+  示例：`"base_branch": "develop"` 或 `"base_branch": "main"`
+  默认：`develop`
+  说明：当前 `base_branch` 不从 `.env` 读取；单目标入口可以被 CLI `--base-branch` 覆盖。
+
+- `build_command`
+  含义：构建命令。
+  用法：用于单 issue 修复后的本地构建验证，以及最终 PR 前构建验证。
+  示例：`"build_command": "dotnet build"`
+  默认：未配置时会回退到 `dotnet build`
+
+- `test_command`
+  含义：测试命令。
+  用法：在最终构建验证阶段，如果提供了这个字段，系统会在 build 之后继续跑测试。
+  示例：`"test_command": "dotnet test"`
+  默认：空，表示不额外跑测试命令。
+
+- `solution_path`
+  含义：`.sln` 或 `.csproj` 的相对路径。
+  用法：用于帮助 build/test 在正确的解决方案或项目范围内运行，也会进入 PR 说明和运行报告。
+  示例：`"solution_path": "OpenAuth.Core/OpenAuth.Core.WebApi.sln"`
+  默认：空，表示直接在仓库工作区根目录运行构建命令。
+
+#### 仅批量入口生效的字段
+
+下面两个字段不会进入 `TargetConfig`，而是由批量入口 [src/batch_runner.py](../src/batch_runner.py) 直接读取：
+
+- `keep_workspace`
+  含义：是否保留该 target 的工作区。
+  用法：设为 `true` 时，本轮批量运行结束后保留工作区，便于人工排查和复现。
+  示例：`"keep_workspace": true`
+  默认：`false`
+  说明：单目标入口要保留工作区时，请用 CLI 参数 `--keep-workspace`，而不是依赖 `targets.json`。
+
+- `skip_build_gate`
+  含义：是否跳过最终 build/test gate。
+  用法：设为 `true` 时，该 target 在批量模式下会跳过最终构建校验。
+  示例：`"skip_build_gate": true`
+  默认：`false`
+  说明：单目标入口要跳过最终构建校验时，请用 CLI 参数 `--skip-build`。
+
+#### 配置建议
+
+- 布尔值优先用 JSON 原生 `true` / `false`
+- `keep_workspace`、`skip_build_gate` 即使用字符串 `"true"`、`"1"`、`"yes"`、`"on"` 目前也会被识别，但不建议依赖这个兼容行为
+- 同一个仓库如果在多个 target 中重复出现，建议保持 `base_branch`、`solution_path`、`build_command` 一致，避免运行语义漂移
+- 如果只是本地单次调试，优先用 `run.py` CLI 参数覆盖，不要频繁改 `targets.json`
 
 ### 3.4 可选数据库配置
 
@@ -281,7 +369,7 @@ OPENAI_MODEL=glm-4.7
 ### 7.3 其他输出
 
 - `logs/follow_ups/`: reviewer 识别到的后续技术债
-- `logs/pr_descriptions/`: 本地 PR 说明副本
+- `logs/pr_descriptions/`: 本地 PR 说明副本；PR 创建成功后会作为附件上传到 Azure DevOps
 - `.agent_workspaces/`: 临时工作区
 
 ## 8. 常见排障顺序

@@ -1,0 +1,20 @@
+{
+  "attempt_number": 1,
+  "status": "succeeded",
+  "started_at": "2026-04-07T08:06:56.006248+00:00",
+  "finished_at": "2026-04-07T08:09:22.086189+00:00",
+  "duration_seconds": 146.076,
+  "failure_kind": "",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_1e604e34-4ff3-456f-a21b-cd9e5ebb556c_20260407133700-02.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/1e604e34-4ff3-456f-a21b-cd9e5ebb556c/attempt-01"
+}

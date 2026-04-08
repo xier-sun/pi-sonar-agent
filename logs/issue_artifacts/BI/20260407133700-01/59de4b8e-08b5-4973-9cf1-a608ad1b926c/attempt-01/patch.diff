@@ -1,0 +1,16 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
+@@ -452,6 +452,7 @@
+         /// <param name="signType"></param>
+
+         /// <param name="req"></param>
+
+         /// <param name="contract"></param>
+
++        /// <param name="referenceFileLookup"></param>
+
+         /// <returns></returns>
+
+         /// <exception cref="CommonException"></exception>
+
+         /// <exception cref="InvalidOperationException"></exception>

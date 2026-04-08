@@ -1,0 +1,20 @@
+{
+  "attempt_number": 1,
+  "status": "succeeded",
+  "started_at": "2026-04-07T04:21:55.918896+00:00",
+  "finished_at": "2026-04-07T04:23:35.281275+00:00",
+  "duration_seconds": 99.362,
+  "failure_kind": "",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_7df7fe85-b963-4c91-b06c-850694223ea7_20260403130000-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260403130000-01/7df7fe85-b963-4c91-b06c-850694223ea7/attempt-01"
+}

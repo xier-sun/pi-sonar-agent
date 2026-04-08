@@ -1,0 +1,16 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -117,7 +117,6 @@
+                         ResolvedDevEntry = resolvedDevEntry
+
+                     };
+
+                 }).Where(x => x.ResolvedDevEntry > 0
+
+-                //&& !csOrders.Contains(x.ResolvedDevEntry)
+
+                 ).ToList();
+
+ 
+
+                 var returnProducts = returnItemsWithDevEntry.Where(m => m.Price > 0).ToList();

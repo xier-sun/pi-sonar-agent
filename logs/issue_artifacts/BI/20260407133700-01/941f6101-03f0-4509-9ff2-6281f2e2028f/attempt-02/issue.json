@@ -1,0 +1,11 @@
+{
+  "issue_key": "941f6101-03f0-4509-9ff2-6281f2e2028f",
+  "rule_id": "csharpsquid:S3776",
+  "message": "Refactor this method to reduce its Cognitive Complexity from 45 to the 30 allowed.",
+  "line": 1613,
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+  "severity": "CRITICAL",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

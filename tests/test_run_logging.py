@@ -27,6 +27,23 @@ def test_run_log_session_tees_stdout_and_stderr(tmp_path, monkeypatch) -> None:
     assert session.log_path.name == "test_20260330180000.log"
 
 
+def test_tee_stream_flush_ignores_closed_streams() -> None:
+    stdout_buffer = io.StringIO()
+    mirror_buffer = io.StringIO()
+    from pi_sonar_agent.core.run_logging import TeeStream
+
+    closed_buffer = io.StringIO()
+    closed_buffer.close()
+
+    stream = TeeStream(stdout_buffer, closed_buffer, mirror_buffer)
+    written = stream.write("hello")
+    stream.flush()
+
+    assert written == 5
+    assert stdout_buffer.getvalue() == "hello"
+    assert mirror_buffer.getvalue() == "hello"
+
+
 def test_prune_old_workspaces_keeps_latest_directory(tmp_path) -> None:
     workspace_a = tmp_path / "workspace_a"
     workspace_b = tmp_path / "workspace_b"

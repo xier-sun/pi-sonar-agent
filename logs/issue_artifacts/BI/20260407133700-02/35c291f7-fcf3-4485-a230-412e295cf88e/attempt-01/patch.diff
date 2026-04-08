@@ -1,0 +1,16 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs
+@@ -2224,7 +2224,6 @@
+             
+
+             await AddInvoicesAsync(result, req);
+
+             await AddCreditNotesAsync(result, req);
+
+-            //await AddReceiptsAsync(result, req, slpDict);
+
+             // 权限过滤：按销售员编码过滤
+
+             if (req.SlpCodes?.Any() == true)
+
+                 result = result.Where(x => x.SlpCode.HasValue && req.SlpCodes.Contains(x.SlpCode.Value.ToString())).ToList();

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import runpy
+import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
-import pi_sonar_agent.main as main_module
+import main as legacy_main
 from pi_sonar_agent.core.state import TargetState, TargetStatus
 
 
@@ -46,7 +48,7 @@ def test_main_writes_run_summary(monkeypatch, capsys) -> None:
             summary_path.write_text("{}", encoding="utf-8")
             return summary_path
 
-    monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(
+    monkeypatch.setattr(legacy_main, "parse_args", lambda: SimpleNamespace(
         project_key="project-a",
         repository="repo-a",
         author="alice@example.com",
@@ -59,23 +61,39 @@ def test_main_writes_run_summary(monkeypatch, capsys) -> None:
         keep_workspace=False,
         skip_build=False,
     ))
-    monkeypatch.setattr(main_module, "load_default_target", lambda: {})
-    monkeypatch.setattr(main_module.time, "strftime", lambda _: "20260403160000")
-    monkeypatch.setattr(main_module, "RunLogSession", FakeRunLogSession)
-    monkeypatch.setattr(main_module, "load_runtime_environment", lambda default_workspace_root: "runtime-env")
-    monkeypatch.setattr(main_module, "resolve_cli_target_config", lambda *args, **kwargs: SimpleNamespace(
+    monkeypatch.setattr(legacy_main, "load_default_target", lambda: {})
+    monkeypatch.setattr(legacy_main.time, "strftime", lambda _: "20260403160000")
+    monkeypatch.setattr(legacy_main, "RunLogSession", FakeRunLogSession)
+    monkeypatch.setattr(legacy_main, "load_runtime_environment", lambda default_workspace_root: "runtime-env")
+    monkeypatch.setattr(legacy_main, "resolve_cli_target_config", lambda *args, **kwargs: SimpleNamespace(
         project_key="project-a",
         repository="repo-a",
         author="alice@example.com",
         base_branch="main",
     ))
-    monkeypatch.setattr(main_module, "missing_required_target_fields", lambda config: [])
-    monkeypatch.setattr(main_module, "RunCoordinator", FakeCoordinator)
-    monkeypatch.setattr(main_module, "ArtifactWriter", FakeArtifactWriter)
+    monkeypatch.setattr(legacy_main, "missing_required_target_fields", lambda config: [])
+    monkeypatch.setattr(legacy_main, "RunCoordinator", FakeCoordinator)
+    monkeypatch.setattr(legacy_main, "ArtifactWriter", FakeArtifactWriter)
 
-    main_module.main()
+    legacy_main.main()
 
     assert len(run_states) == 1
     assert run_states[0].status.value == "succeeded"
     output = capsys.readouterr().out
     assert "运行摘要:" in output
+
+
+def test_pi_sonar_agent_main_bridge_invokes_legacy_main(monkeypatch) -> None:
+    calls: list[str] = []
+    fake_module = ModuleType("main")
+    fake_module.main = lambda: calls.append("legacy-main")
+    fake_module.__all__ = ("main",)
+    monkeypatch.setitem(sys.modules, "main", fake_module)
+    sys.modules.pop("pi_sonar_agent.main", None)
+
+    try:
+        runpy.run_module("pi_sonar_agent.main", run_name="__main__")
+    except SystemExit as exc:
+        assert exc.code in {None, 0}
+
+    assert calls == ["legacy-main"]

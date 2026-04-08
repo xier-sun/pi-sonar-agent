@@ -1,0 +1,146 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
+@@ -3204,37 +3204,48 @@
+                 foreach (var record in socialsecurityRecords)
+
+                 {
+
+                     p.UpdateAction(record); // 执行特定于更新的操作
+
+-                    
+
++
+
+                     // 只有存在实质性变更时，才需要打回已确认状态并更新时间
+
+-                    if (p.HasSubstantiveChange && p.Type == SocialsecurityTypeEnums.Socialsecurity)
+
+-                    {
+
+-                        if (record.SIsPay == "Y")
+
+-                        {
+
+-                            record.SIsPay = "N";
+
+-                        }
+
+-                        if (record.SIsEnd == "Y")
+
+-                        {
+
+-                            record.SIsEnd = "N";
+
+-                        }
+
+-                    }
+
+-                    else if (p.HasSubstantiveChange && p.Type == SocialsecurityTypeEnums.Accumulationfunds)
+
+-                    {
+
+-                        if (record.PIsPay == "Y" )
+
+-                        {
+
+-                            record.PIsPay = "N";
+
+-                        }
+
+-                        if (record.PIsEnd == "Y")
+
+-                        {
+
+-                            record.PIsEnd = "N";
+
+-                        }
+
+-                    }
+
+-                    
+
++                    ResetConfirmedStatusIfNeeded(record, p);
+
++
+
+                     // 设置更新时间和更新用户ID
+
+                     ApplyInfoUpdateAuditFields(record, p.OperationScene, now, updateUserId);
+
+                     p.UpdateSocialsecurityList.Add(record);
+
+                 }
+
+             }
+
+         }
+
++
+
++        private void ResetConfirmedStatusIfNeeded(UserSocialsecurity record, ProcessSocialsecurityRecordParams p)
+
++        {
+
++            if (!p.HasSubstantiveChange)
+
++            {
+
++                return;
+
++            }
+
++
+
++            if (p.Type == SocialsecurityTypeEnums.Socialsecurity)
+
++            {
+
++                if (record.SIsPay == "Y")
+
++                {
+
++                    record.SIsPay = "N";
+
++                }
+
++                if (record.SIsEnd == "Y")
+
++                {
+
++                    record.SIsEnd = "N";
+
++                }
+
++            }
+
++            else if (p.Type == SocialsecurityTypeEnums.Accumulationfunds)
+
++            {
+
++                if (record.PIsPay == "Y")
+
++                {
+
++                    record.PIsPay = "N";
+
++                }
+
++                if (record.PIsEnd == "Y")
+
++                {
+
++                    record.PIsEnd = "N";
+
++                }
+
++            }
+
++        }
+
++
+
+         /// <summary>
+
+         /// 批量确认社保缴纳
+
+         /// </summary>

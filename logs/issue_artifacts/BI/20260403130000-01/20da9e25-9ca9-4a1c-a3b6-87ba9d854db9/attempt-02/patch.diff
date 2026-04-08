@@ -1,0 +1,26 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityOperationLogHelper.cs
+@@ -442,9 +442,9 @@
+ 
+
+             if ((fieldName.EndsWith("Time", StringComparison.OrdinalIgnoreCase) ||
+
+                  fieldName.EndsWith("Date", StringComparison.OrdinalIgnoreCase)) &&
+
+-                DateTime.TryParse(rawValue, out var parsedDateTime))
+
+-            {
+
+-                return parsedDateTime.ToString("yyyy-MM-dd");
+
++                DateTime.TryParse(rawValue, System.Globalization.CultureInfo.InvariantCulture, out var parsedDateTime))
+
++            {
+
++                return parsedDateTime.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+             }
+
+ 
+
+             return rawValue;

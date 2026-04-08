@@ -27,6 +27,14 @@ class PullRequest:
     state: str
 
 
+@dataclass
+class PullRequestAttachment:
+    """Represents an Azure DevOps pull request attachment."""
+
+    file_name: str
+    url: str
+
+
 class AzureDevOpsRequestError(RuntimeError):
     """Rich Azure DevOps request failure with response details."""
 
@@ -167,6 +175,43 @@ class AzureDevOpsClient:
             target_branch=data.get("targetRefName", ""),
             url=web_url,
             state=data.get("status", ""),
+        )
+
+    def upload_pull_request_attachment(
+        self,
+        repository: str,
+        pull_request_id: int,
+        *,
+        file_name: str,
+        content: str | bytes,
+        content_type: str = "application/octet-stream",
+    ) -> PullRequestAttachment:
+        """Upload an attachment for a pull request and return its download URL."""
+
+        normalized_name = Path(str(file_name or "").strip() or "report.txt").name
+        payload = content.encode("utf-8-sig") if isinstance(content, str) else content
+        url = (
+            f"{self._api_url}/_apis/git/repositories/{repository}/pullRequests/"
+            f"{pull_request_id}/attachments"
+        )
+        response = self.session.post(
+            url,
+            params={
+                "fileName": normalized_name,
+                "api-version": "7.1",
+            },
+            data=payload,
+            headers={"Content-Type": content_type},
+            timeout=self.timeout,
+        )
+        self._raise_for_status_with_details(
+            response,
+            action=f"上传 PR 附件失败: PR {pull_request_id} ({normalized_name})",
+        )
+        data = response.json()
+        return PullRequestAttachment(
+            file_name=str(data.get("fileName", normalized_name)),
+            url=str(data.get("url", "")).strip(),
         )
 
     def _build_pr_web_url(self, repository: str, pr_id: int) -> str:

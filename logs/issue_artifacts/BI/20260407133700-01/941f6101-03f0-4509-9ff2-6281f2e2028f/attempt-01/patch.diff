@@ -1,0 +1,402 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
+@@ -1568,53 +1568,96 @@
+             CollectAllRelatedOrdersWithInfo(List<int> seedOrderIds)
+
+         {
+
+             var allRelatedOrderIds = new HashSet<int>(seedOrderIds);
+
+-            var orderRelationDict = new Dictionary<int, string>(); // OrderId -> RelevanceOrderNos
+
++            var orderRelationDict = new Dictionary<int, string>();
+
+ 
+
+             // 向上追溯主单（增量查询，避免全表扫描）
+
++            await CollectMainOrdersAsync(seedOrderIds, allRelatedOrderIds, orderRelationDict);
+
++
+
++            // 向下扩展所有层级子单
+
++            var mainToSubOrderMap = await BuildMainToSubOrderMapAsync(orderRelationDict);
+
++            ExpandSubOrders(allRelatedOrderIds, mainToSubOrderMap);
+
++
+
++            return (allRelatedOrderIds, orderRelationDict);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 向上追溯主单（增量查询）
+
++        /// </summary>
+
++        private async Task CollectMainOrdersAsync(
+
++            List<int> seedOrderIds,
+
++            HashSet<int> allRelatedOrderIds,
+
++            Dictionary<int, string> orderRelationDict)
+
++        {
+
+             var toQuery = new Queue<int>(seedOrderIds);
+
+             var queried = new HashSet<int>();
+
+ 
+
+             while (toQuery.Count > 0)
+
+             {
+
+-                var currentBatch = new List<int>();
+
+-                while (toQuery.Count > 0)
+
+-                {
+
+-                    var orderId = toQuery.Dequeue();
+
+-                    if (!queried.Contains(orderId))
+
+-                    {
+
+-                        currentBatch.Add(orderId);
+
+-                    }
+
+-                }
+
+-
+
++                var currentBatch = ExtractUniqueBatch(toQuery, queried);
+
+                 if (currentBatch.Count == 0) break;
+
+ 
+
+-                // 只查询当前批次的订单（而不是全表）
+
+                 var orderInfos = await UnitWork.Find<SaleOrderInfo>(
+
+                     x => currentBatch.Contains(x.OrderId) && !x.IsDeleted)
+
+                     .Select(x => new { x.OrderId, x.RelevanceOrderNos })
+
+                     .ToListAsync();
+
+ 
+
+-                foreach (var order in orderInfos)
+
+-                {
+
+-                    queried.Add(order.OrderId);
+
+-                    orderRelationDict[order.OrderId] = order.RelevanceOrderNos ?? string.Empty;
+
+-
+
+-                    if (!string.IsNullOrEmpty(order.RelevanceOrderNos))
+
++                ProcessOrderInfos(orderInfos, queried, orderRelationDict, allRelatedOrderIds, toQuery);
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 从队列中提取未查询的唯一批次
+
++        /// </summary>
+
++        private static List<int> ExtractUniqueBatch(Queue<int> queue, HashSet<int> queried)
+
++        {
+
++            var batch = new List<int>();
+
++            while (queue.Count > 0)
+
++            {
+
++                var orderId = queue.Dequeue();
+
++                if (!queried.Contains(orderId))
+
++                {
+
++                    batch.Add(orderId);
+
++                }
+
++            }
+
++            return batch;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理订单信息，更新已查集合和关系字典
+
++        /// </summary>
+
++        private static void ProcessOrderInfos(
+
++            IEnumerable<dynamic> orderInfos,
+
++            HashSet<int> queried,
+
++            Dictionary<int, string> orderRelationDict,
+
++            HashSet<int> allRelatedOrderIds,
+
++            Queue<int> toQuery)
+
++        {
+
++            foreach (var order in orderInfos)
+
++            {
+
++                queried.Add(order.OrderId);
+
++                orderRelationDict[order.OrderId] = order.RelevanceOrderNos ?? string.Empty;
+
++
+
++                if (string.IsNullOrEmpty(order.RelevanceOrderNos))
+
++                    continue;
+
++
+
++                var mainIds = ParseOrderIds(order.RelevanceOrderNos);
+
++                foreach (var mainId in mainIds)
+
++                {
+
++                    allRelatedOrderIds.Add(mainId);
+
++                    if (!queried.Contains(mainId))
+
+                     {
+
+-                        var mainIds = ParseOrderIds(order.RelevanceOrderNos);
+
+-                        foreach (var mainId in mainIds)
+
+-                        {
+
+-                            allRelatedOrderIds.Add(mainId);
+
+-                            if (!queried.Contains(mainId))
+
+-                            {
+
+-                                toQuery.Enqueue(mainId);
+
+-                            }
+
+-                        }
+
++                        toQuery.Enqueue(mainId);
+
+                     }
+
+                 }
+
+             }
+
+-
+
+-            // 向下扩展所有层级子单（查询所有有主单的订单）
+
++        }
+
++
+
++        /// <summary>
+
++        /// 构建主单到子单的映射关系
+
++        /// </summary>
+
++        private async Task<Dictionary<int, List<int>>> BuildMainToSubOrderMapAsync(
+
++            Dictionary<int, string> orderRelationDict)
+
++        {
+
+             var subOrderInfos = await UnitWork.Find<SaleOrderInfo>(
+
+                 x => !string.IsNullOrEmpty(x.RelevanceOrderNos) && !x.IsDeleted)
+
+                 .Select(x => new { x.OrderId, x.RelevanceOrderNos })
+
+@@ -1625,9 +1668,7 @@
+             {
+
+                 var mainIds = ParseOrderIds(subOrder.RelevanceOrderNos);
+
+                 if (mainIds.Count == 0)
+
+-                {
+
+                     continue;
+
+-                }
+
+ 
+
+                 if (!orderRelationDict.ContainsKey(subOrder.OrderId))
+
+                 {
+
+@@ -1644,20 +1685,27 @@
+                 }
+
+             }
+
+ 
+
++            return mainToSubOrderMap;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 向下扩展所有层级子单
+
++        /// </summary>
+
++        private static void ExpandSubOrders(
+
++            HashSet<int> allRelatedOrderIds,
+
++            Dictionary<int, List<int>> mainToSubOrderMap)
+
++        {
+
+             var mainQueue = new Queue<int>(allRelatedOrderIds);
+
+             var expandedMainIds = new HashSet<int>();
+
++
+
+             while (mainQueue.Count > 0)
+
+             {
+
+                 var currentMainId = mainQueue.Dequeue();
+
+                 if (!expandedMainIds.Add(currentMainId))
+
+-                {
+
+                     continue;
+
+-                }
+
+ 
+
+                 if (!mainToSubOrderMap.TryGetValue(currentMainId, out var subOrderIds))
+
+-                {
+
+                     continue;
+
+-                }
+
+ 
+
+                 foreach (var subOrderId in subOrderIds)
+
+                 {
+
+@@ -1667,16 +1715,14 @@
+                     }
+
+                 }
+
+             }
+
+-
+
+-            return (allRelatedOrderIds, orderRelationDict);
+
+         }
+
+ 
+
+         /// <summary>
+
+         /// 为构树补齐订单关系信息，确保补充出来的无收款订单也能参与主子单组装
+
+         /// </summary>
+
+-        /// <param name="allReceipts"></param>
+
+-        /// <param name="orderRelations"></param>
+
+-        /// <returns></returns>
+
++        /// <param name="allReceipts">所有收款数据</param>
+
++        /// <param name="orderRelations">订单关系映射</param>
+
++        /// <returns>销售订单信息列表</returns>
+
+         private static IEnumerable<dynamic> BuildSaleOrderInfosForProcess(
+
+             List<ReceiptDtoResp> allReceipts,
+
+             Dictionary<int, string> orderRelations)
+
+@@ -1697,12 +1743,10 @@
+         }
+
+ 
+
+         /// <summary>
+
+-        /// 构建订单关系映射
+
+-        /// </summary>
+
+-        /// <param name="orderNosStr"></param>
+
+-        /// <summary>
+
+         /// 解析订单号字符串
+
+         /// </summary>
+
++        /// <param name="orderNosStr">订单号字符串，逗号分隔</param>
+
++        /// <returns>订单ID列表</returns>
+
+         private static List<int> ParseOrderIds(string orderNosStr)
+
+         {
+
+             return orderNosStr

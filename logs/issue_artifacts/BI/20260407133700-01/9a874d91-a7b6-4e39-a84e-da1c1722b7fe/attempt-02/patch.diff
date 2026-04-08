@@ -1,0 +1,424 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
+@@ -2354,83 +2354,147 @@
+ 
+
+             if (requestType == SocialsecurityTypeEnums.Socialsecurity)
+
+             {
+
+-                ProcessSocialsecurityRecord(new ProcessSocialsecurityRecordParams
+
+-                {
+
+-                    CurrentSecurities = previewSecurities,
+
+-                    Type = SocialsecurityTypeEnums.Socialsecurity,
+
+-                    UpdateId = updateRequest.UpdateId,
+
+-                    UserId = systemUserId,
+
++                ProcessSocialsecurityPreview(new ProcessSocialsecurityPreviewParams
+
++                {
+
++                    PreviewSecurities = previewSecurities,
+
++                    PreviewAdds = previewAdds,
+
++                    PreviewUpdates = previewUpdates,
+
++                    PreviewDeletes = previewDeletes,
+
++                    UpdateRequest = updateRequest,
+
++                    SystemUserId = systemUserId,
+
+                     Account = account,
+
+-                    Name = userName,
+
+-                    UpdateAction = (ss) => {
+
+-                        if (!string.IsNullOrEmpty(updateRequest.SocialSecurityAccount))
+
+-                            ss.SocialsecurityAccount = updateRequest.SocialSecurityAccount;
+
+-                        if (updateRequest.IsInternship && updateRequest.BeginPaymentTime.HasValue)
+
+-                            ss.SBeginPaymentTime = updateRequest.BeginPaymentTime;
+
+-                        if (updateRequest?.Remark != null)
+
+-                            ss.Remark = updateRequest.Remark;
+
+-                    },
+
+-                    CreateCondition = () =>
+
+-                        !string.IsNullOrEmpty(updateRequest.SocialSecurityAccount) ||
+
+-                        (updateRequest.IsInternship && updateRequest.BeginPaymentTime.HasValue),
+
+-                    CreateAction = (ss) => {
+
+-                        ss.SocialsecurityAccount = updateRequest.SocialSecurityAccount ?? "";
+
+-                        ss.SBeginPaymentTime = updateRequest.IsInternship ? updateRequest.BeginPaymentTime : null;
+
+-                        ss.Remark = updateRequest.Remark ?? "";
+
+-                    },
+
+-                    AddSocialsecurityList = previewAdds,
+
+-                    UpdateSocialsecurityList = previewUpdates,
+
+-                    DelSocialsecurityList = previewDeletes,
+
++                    UserName = userName,
+
+                     LoginUser = loginUser,
+
+-                    OperationScene = PaymentOrRefundEnums.Payment,
+
+-                    HasSubstantiveChange = false
+
++                    IsSocialsecurity = true
+
+                 });
+
+             }
+
+             else if (requestType == SocialsecurityTypeEnums.Accumulationfunds)
+
+             {
+
+-                ProcessSocialsecurityRecord(new ProcessSocialsecurityRecordParams
+
+-                {
+
+-                    CurrentSecurities = previewSecurities,
+
+-                    Type = SocialsecurityTypeEnums.Accumulationfunds,
+
+-                    UpdateId = updateRequest.UpdateId,
+
+-                    UserId = systemUserId,
+
++                ProcessSocialsecurityPreview(new ProcessSocialsecurityPreviewParams
+
++                {
+
++                    PreviewSecurities = previewSecurities,
+
++                    PreviewAdds = previewAdds,
+
++                    PreviewUpdates = previewUpdates,
+
++                    PreviewDeletes = previewDeletes,
+
++                    UpdateRequest = updateRequest,
+
++                    SystemUserId = systemUserId,
+
+                     Account = account,
+
+-                    Name = userName,
+
+-                    UpdateAction = (af) => {
+
+-                        if (!string.IsNullOrEmpty(updateRequest.SocialSecurityAccount))
+
+-                            af.SocialsecurityAccount = updateRequest.SocialSecurityAccount;
+
+-                        if (!string.IsNullOrEmpty(updateRequest.ProvidentFundBank))
+
+-                            af.ProvidentFundBank = updateRequest.ProvidentFundBank;
+
+-                        if (!string.IsNullOrEmpty(updateRequest.ProvidentFundBankAccount))
+
+-                            af.ProvidentFundBankAccount = updateRequest.ProvidentFundBankAccount;
+
+-                        if (updateRequest.IsInternship && updateRequest.BeginPaymentTime.HasValue)
+
+-                            af.PBeginPaymentTime = updateRequest.BeginPaymentTime;
+
+-                        if (updateRequest?.Remark != null)
+
+-                            af.Remark = updateRequest.Remark;
+
+-                    },
+
+-                    CreateCondition = () =>
+
+-                        !string.IsNullOrEmpty(updateRequest.SocialSecurityAccount) ||
+
+-                        !string.IsNullOrEmpty(updateRequest.ProvidentFundBank) ||
+
+-                        !string.IsNullOrEmpty(updateRequest.ProvidentFundBankAccount) ||
+
+-                        (updateRequest.IsInternship && updateRequest.BeginPaymentTime.HasValue),
+
+-                    CreateAction = (af) => {
+
+-                        af.SocialsecurityAccount = updateRequest.SocialSecurityAccount ?? "";
+
+-                        af.ProvidentFundBank = updateRequest.ProvidentFundBank ?? "";
+
+-                        af.ProvidentFundBankAccount = updateRequest.ProvidentFundBankAccount ?? "";
+
+-                        af.PBeginPaymentTime = updateRequest.IsInternship ? updateRequest.BeginPaymentTime : null;
+
+-                        af.Remark = updateRequest.Remark ?? "";
+
+-                    },
+
+-                    AddSocialsecurityList = previewAdds,
+
+-                    UpdateSocialsecurityList = previewUpdates,
+
+-                    DelSocialsecurityList = previewDeletes,
+
++                    UserName = userName,
+
+                     LoginUser = loginUser,
+
+-                    OperationScene = PaymentOrRefundEnums.Payment,
+
+-                    HasSubstantiveChange = false
+
++                    IsSocialsecurity = false
+
+                 });
+
+             }
+
+ 
+
+             previewSecurities.AddRange(previewAdds);
+
+             return previewSecurities;
+
++        }
+
++
+
++        private void ProcessSocialsecurityPreview(ProcessSocialsecurityPreviewParams parameters)
+
++        {
+
++            var type = parameters.IsSocialsecurity ? SocialsecurityTypeEnums.Socialsecurity : SocialsecurityTypeEnums.Accumulationfunds;
+
++
+
++            ProcessSocialsecurityRecord(new ProcessSocialsecurityRecordParams
+
++            {
+
++                CurrentSecurities = parameters.PreviewSecurities,
+
++                Type = type,
+
++                UpdateId = parameters.UpdateRequest.UpdateId,
+
++                UserId = parameters.SystemUserId,
+
++                Account = parameters.Account,
+
++                Name = parameters.UserName,
+
++                UpdateAction = parameters.IsSocialsecurity
+
++                    ? CreateSocialsecurityUpdateAction(parameters.UpdateRequest)
+
++                    : CreateAccumulationfundsUpdateAction(parameters.UpdateRequest),
+
++                CreateCondition = parameters.IsSocialsecurity
+
++                    ? CreateSocialsecurityCreateCondition(parameters.UpdateRequest)
+
++                    : CreateAccumulationfundsCreateCondition(parameters.UpdateRequest),
+
++                CreateAction = parameters.IsSocialsecurity
+
++                    ? CreateSocialsecurityCreateAction(parameters.UpdateRequest)
+
++                    : CreateAccumulationfundsCreateAction(parameters.UpdateRequest),
+
++                AddSocialsecurityList = parameters.PreviewAdds,
+
++                UpdateSocialsecurityList = parameters.PreviewUpdates,
+
++                DelSocialsecurityList = parameters.PreviewDeletes,
+
++                LoginUser = parameters.LoginUser,
+
++                OperationScene = PaymentOrRefundEnums.Payment,
+
++                HasSubstantiveChange = false
+
++            });
+
++        }
+
++
+
++        private Action<UserSocialsecurity> CreateSocialsecurityUpdateAction(UpdateSocialFundRequest request)
+
++        {
+
++            return ss => {
+
++                if (!string.IsNullOrEmpty(request.SocialSecurityAccount))
+
++                    ss.SocialsecurityAccount = request.SocialSecurityAccount;
+
++                if (request.IsInternship && request.BeginPaymentTime.HasValue)
+
++                    ss.SBeginPaymentTime = request.BeginPaymentTime;
+
++                if (request?.Remark != null)
+
++                    ss.Remark = request.Remark;
+
++            };
+
++        }
+
++
+
++        private Action<UserSocialsecurity> CreateAccumulationfundsUpdateAction(UpdateSocialFundRequest request)
+
++        {
+
++            return af => {
+
++                if (!string.IsNullOrEmpty(request.SocialSecurityAccount))
+
++                    af.SocialsecurityAccount = request.SocialSecurityAccount;
+
++                if (!string.IsNullOrEmpty(request.ProvidentFundBank))
+
++                    af.ProvidentFundBank = request.ProvidentFundBank;
+
++                if (!string.IsNullOrEmpty(request.ProvidentFundBankAccount))
+
++                    af.ProvidentFundBankAccount = request.ProvidentFundBankAccount;
+
++                if (request.IsInternship && request.BeginPaymentTime.HasValue)
+
++                    af.PBeginPaymentTime = request.BeginPaymentTime;
+
++                if (request?.Remark != null)
+
++                    af.Remark = request.Remark;
+
++            };
+
++        }
+
++
+
++        private Func<bool> CreateSocialsecurityCreateCondition(UpdateSocialFundRequest request)
+
++        {
+
++            return () =>
+
++                !string.IsNullOrEmpty(request.SocialSecurityAccount) ||
+
++                (request.IsInternship && request.BeginPaymentTime.HasValue);
+
++        }
+
++
+
++        private Func<bool> CreateAccumulationfundsCreateCondition(UpdateSocialFundRequest request)
+
++        {
+
++            return () =>
+
++                !string.IsNullOrEmpty(request.SocialSecurityAccount) ||
+
++                !string.IsNullOrEmpty(request.ProvidentFundBank) ||
+
++                !string.IsNullOrEmpty(request.ProvidentFundBankAccount) ||
+
++                (request.IsInternship && request.BeginPaymentTime.HasValue);
+
++        }
+
++
+
++        private Action<UserSocialsecurity> CreateSocialsecurityCreateAction(UpdateSocialFundRequest request)
+
++        {
+
++            return ss => {
+
++                ss.SocialsecurityAccount = request.SocialSecurityAccount ?? "";
+
++                ss.SBeginPaymentTime = request.IsInternship ? request.BeginPaymentTime : null;
+
++                ss.Remark = request.Remark ?? "";
+
++            };
+
++        }
+
++
+
++        private Action<UserSocialsecurity> CreateAccumulationfundsCreateAction(UpdateSocialFundRequest request)
+
++        {
+
++            return af => {
+
++                af.SocialsecurityAccount = request.SocialSecurityAccount ?? "";
+
++                af.ProvidentFundBank = request.ProvidentFundBank ?? "";
+
++                af.ProvidentFundBankAccount = request.ProvidentFundBankAccount ?? "";
+
++                af.PBeginPaymentTime = request.IsInternship ? request.BeginPaymentTime : null;
+
++                af.Remark = request.Remark ?? "";
+
++            };
+
++        }
+
++
+
++        private class ProcessSocialsecurityPreviewParams
+
++        {
+
++            public List<UserSocialsecurity> PreviewSecurities { get; set; }
+
++            public List<UserSocialsecurity> PreviewAdds { get; set; }
+
++            public List<UserSocialsecurity> PreviewUpdates { get; set; }
+
++            public List<UserSocialsecurity> PreviewDeletes { get; set; }
+
++            public UpdateSocialFundRequest UpdateRequest { get; set; }
+
++            public string SystemUserId { get; set; }
+
++            public string Account { get; set; }
+
++            public string UserName { get; set; }
+
++            public User LoginUser { get; set; }
+
++            public bool IsSocialsecurity { get; set; }
+
+         }
+
+ 
+
+         /// <summary>

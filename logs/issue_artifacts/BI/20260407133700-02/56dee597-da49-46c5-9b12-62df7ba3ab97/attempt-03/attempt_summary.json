@@ -1,0 +1,20 @@
+{
+  "attempt_number": 3,
+  "status": "skipped",
+  "started_at": "2026-04-07T10:22:24.641384+00:00",
+  "finished_at": "2026-04-07T10:27:09.544157+00:00",
+  "duration_seconds": 284.902,
+  "failure_kind": "build",
+  "retry_reason": "build_verification_failed",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": true,
+  "error": "Build verification failed after 3 attempt(s)",
+  "skip_reason": "Build verification failed after 3 attempt(s)",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_56dee597-da49-46c5-9b12-62df7ba3ab97_20260407133700-02.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260407133700-02/56dee597-da49-46c5-9b12-62df7ba3ab97/attempt-03"
+}

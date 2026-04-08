@@ -1,0 +1,13 @@
+{
+  "success": false,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "retryable_failure": true,
+  "failure_kind": "no_change",
+  "error": "Agent completed without modifying any files after 3 attempt(s)",
+  "skip_reason": "Agent completed without modifying any files after 3 attempt(s)",
+  "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+  "build_output": "",
+  "guardrail_mode": "scope",
+  "follow_up_log_path": ""
+}

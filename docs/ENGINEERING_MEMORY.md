@@ -279,7 +279,7 @@
 
 - [src/core/pr_description.py](../src/core/pr_description.py) 负责生成结构化 PR 描述
 - 本地会在 `logs/pr_descriptions/` 保留副本
-- 仓库工作区里也会写一份 PR 详细报告，供 PR 描述引用
+- PR 创建后会把这份 Markdown 作为 Azure DevOps PR 附件上传，并把链接回填到短描述里
 
 ## 14. Azure DevOps abandoned PR 不能直接更新
 

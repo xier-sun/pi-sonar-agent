@@ -1,0 +1,30 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
+@@ -904,12 +904,9 @@
+                 throw new InvalidOperationException($"参考附件文件名重复：{string.Join('，', duplicateFileNames)}");
+
+             }
+
+ 
+
+-            foreach (var attachment in attachments)
+
+-            {
+
+-                if (attachment.FileName.IsNullOrWhiteSpace())
+
+-                {
+
+-                    throw new InvalidOperationException("参考附件文件名不能为空");
+
+-                }
+
++            if (attachments.Any(x => x.FileName.IsNullOrWhiteSpace()))
+
++            {
+
++                throw new InvalidOperationException("参考附件文件名不能为空");
+
+             }
+
+         }
