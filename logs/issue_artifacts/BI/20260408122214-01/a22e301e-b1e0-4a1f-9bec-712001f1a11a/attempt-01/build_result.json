@@ -1,0 +1,444 @@
+{
+  "success": false,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "retryable_failure": true,
+  "failure_kind": "quality_gate",
+  "error": "Quality gate verification failed",
+  "skip_reason": "",
+  "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+  "build_output": "Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:\n1. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ReturnUnRelNewOrderProcessor 缺少参数 unitWork 的 <param> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:24\n   Evidence: /// <summary>\n/// 退货未关联新单据处理器\n/// </summary>\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n2. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ReturnUnRelNewOrderProcessor 有返回值但缺少 <returns> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:24\n   Evidence: /// <summary>\n/// 退货未关联新单据处理器\n/// </summary>\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n3. [public_xml_docs] 公开成员 XML 文档完整: method ReturnUnRelNewOrderProcessor 缺少 XML 文档注释。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:25\n   Evidence: { /// <summary> /// 构造函数 /// </summary> public ReturnUnRelNewOrderProcessor(IUnitWork unitWork, IAuth auth) : base(unitWork, auth) {\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n4. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ReturnUnRelNewOrderProcessor 缺少参数 unitWork 的 <param> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:29\n   Evidence: /// <summary>\n/// 构造函数\n/// </summary>\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n5. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ReturnUnRelNewOrderProcessor 有返回值但缺少 <returns> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:29\n   Evidence: /// <summary>\n/// 构造函数\n/// </summary>\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n6. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 Task< 缺少参数 NewEvents 的 <param> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41\n   Evidence: ///<summary>\n/// 处理器方法\n/// </summary>\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n7. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 Task< 有返回值但缺少 <returns> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41\n   Evidence: ///<summary>\n/// 处理器方法\n/// </summary>\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n8. [async_signature] 异步签名规范: 异步方法 Task< 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41\n   Evidence: public async Task<(List<PenaltyEventData> NewEvents, List<ResolvedEventData> ResolvedEvents, List<CanceledEventData> CanceledEvents)> ProcessAsync(IEnumerable<PenaltyRuleDefinition> matchedRules) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n9. [async_signature] 异步签名规范: 异步方法 Task< 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41\n   Evidence: public async Task<(List<PenaltyEventData> NewEvents, List<ResolvedEventData> ResolvedEvents, List<CanceledEventData> CanceledEvents)> ProcessAsync(IEnumerable<PenaltyRuleDefinition> matchedRules) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n10. [async_signature] 异步签名规范: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:180\n   Evidence: return 0; } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n11. [async_signature] 异步签名规范: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:181\n   Evidence: } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n12. [async_signature] 异步签名规范: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:186\n   Evidence: private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n13. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:180\n   Evidence: return 0; } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n14. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:181\n   Evidence: } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n15. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:186\n   Evidence: private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n16. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:68\n   Evidence: var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n17. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:69\n   Evidence: join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n18. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:70\n   Evidence: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n19. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:97\n   Evidence: var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n20. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:98\n   Evidence: join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n21. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:108\n   Evidence: var delivrdItems = await (from r1 in UnitWork.Find<RDR1>(null)\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n22. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:109\n   Evidence: join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n23. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:110\n   Evidence: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。",
+  "guardrail_mode": "scope",
+  "quality_gate_result": {
+    "status": "retry",
+    "summary": "Quality gate rejected the patch with 23 hard violation(s).",
+    "applied_rule_ids": [
+      "public_xml_docs",
+      "async_signature",
+      "async_requires_await",
+      "linq_method_syntax",
+      "cognitive_complexity",
+      "zero_redundant_code",
+      "static_preferred",
+      "sealed_preferred",
+      "constructor_dependency_injection",
+      "business_comments_chinese",
+      "finance_terms_chinese"
+    ],
+    "violations": [
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "message": "公开方法 ReturnUnRelNewOrderProcessor 缺少参数 unitWork 的 <param> 文档。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 24,
+        "symbol": "ReturnUnRelNewOrderProcessor@24-36",
+        "evidence": "/// <summary>\n/// 退货未关联新单据处理器\n/// </summary>",
+        "retry_hint": "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+      },
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "message": "公开方法 ReturnUnRelNewOrderProcessor 有返回值但缺少 <returns> 文档。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 24,
+        "symbol": "ReturnUnRelNewOrderProcessor@24-36",
+        "evidence": "/// <summary>\n/// 退货未关联新单据处理器\n/// </summary>",
+        "retry_hint": "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+      },
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "message": "method ReturnUnRelNewOrderProcessor 缺少 XML 文档注释。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 25,
+        "symbol": "ReturnUnRelNewOrderProcessor@25-36",
+        "evidence": "{ /// <summary> /// 构造函数 /// </summary> public ReturnUnRelNewOrderProcessor(IUnitWork unitWork, IAuth auth) : base(unitWork, auth) {",
+        "retry_hint": "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+      },
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "message": "公开方法 ReturnUnRelNewOrderProcessor 缺少参数 unitWork 的 <param> 文档。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 29,
+        "symbol": "ReturnUnRelNewOrderProcessor@29-31",
+        "evidence": "/// <summary>\n/// 构造函数\n/// </summary>",
+        "retry_hint": "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+      },
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "message": "公开方法 ReturnUnRelNewOrderProcessor 有返回值但缺少 <returns> 文档。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 29,
+        "symbol": "ReturnUnRelNewOrderProcessor@29-31",
+        "evidence": "/// <summary>\n/// 构造函数\n/// </summary>",
+        "retry_hint": "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+      },
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "message": "公开方法 Task< 缺少参数 NewEvents 的 <param> 文档。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 41,
+        "symbol": "Task<@41-58",
+        "evidence": "///<summary>\n/// 处理器方法\n/// </summary>",
+        "retry_hint": "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+      },
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "message": "公开方法 Task< 有返回值但缺少 <returns> 文档。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 41,
+        "symbol": "Task<@41-58",
+        "evidence": "///<summary>\n/// 处理器方法\n/// </summary>",
+        "retry_hint": "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 Task< 没有以 Async 结尾。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 41,
+        "symbol": "Task<@41-58",
+        "evidence": "public async Task<(List<PenaltyEventData> NewEvents, List<ResolvedEventData> ResolvedEvents, List<CanceledEventData> CanceledEvents)> ProcessAsync(IEnumerable<PenaltyRuleDefinition> matchedRules) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 Task< 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 41,
+        "symbol": "Task<@41-58",
+        "evidence": "public async Task<(List<PenaltyEventData> NewEvents, List<ResolvedEventData> ResolvedEvents, List<CanceledEventData> CanceledEvents)> ProcessAsync(IEnumerable<PenaltyRuleDefinition> matchedRules) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 ResolveOrderDocEntryFromReturnChainAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 180,
+        "symbol": "ResolveOrderDocEntryFromReturnChainAsync@180-193",
+        "evidence": "return 0; } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 ResolveOrderDocEntryFromReturnChainAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 181,
+        "symbol": "ResolveOrderDocEntryFromReturnChainAsync@181-193",
+        "evidence": "} /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 ResolveOrderDocEntryFromReturnChainAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 186,
+        "symbol": "ResolveOrderDocEntryFromReturnChainAsync@186-193",
+        "evidence": "private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 180,
+        "symbol": "ResolveOrderDocEntryFromReturnChainAsync@180-193",
+        "evidence": "return 0; } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 181,
+        "symbol": "ResolveOrderDocEntryFromReturnChainAsync@181-193",
+        "evidence": "} /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 186,
+        "symbol": "ResolveOrderDocEntryFromReturnChainAsync@186-193",
+        "evidence": "private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 68,
+        "symbol": "",
+        "evidence": "var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)",
+        "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 69,
+        "symbol": "",
+        "evidence": "join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry",
+        "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 70,
+        "symbol": "",
+        "evidence": "join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode",
+        "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 97,
+        "symbol": "",
+        "evidence": "var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)",
+        "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 98,
+        "symbol": "",
+        "evidence": "join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId",
+        "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 108,
+        "symbol": "",
+        "evidence": "var delivrdItems = await (from r1 in UnitWork.Find<RDR1>(null)",
+        "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 109,
+        "symbol": "",
+        "evidence": "join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry",
+        "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 110,
+        "symbol": "",
+        "evidence": "join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode",
+        "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+      }
+    ],
+    "soft_findings": [
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ResolveOrderDocEntryFromReturnChainAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 180,
+        "symbol": "ResolveOrderDocEntryFromReturnChainAsync@180-193",
+        "evidence": "return 0; } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ResolveOrderDocEntryFromReturnChainAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 181,
+        "symbol": "ResolveOrderDocEntryFromReturnChainAsync@181-193",
+        "evidence": "} /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ResolveOrderDocEntryFromReturnChainAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 186,
+        "symbol": "ResolveOrderDocEntryFromReturnChainAsync@186-193",
+        "evidence": "private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 21,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 23,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 26,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 28,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 33,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 35,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 38,
+        "symbol": "",
+        "evidence": "///<summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 40,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 62,
+        "symbol": "",
+        "evidence": "//var csOrders = UnitWork.Find<sale_ordr>(x => x.U_ERPFrom == \"4\" && x.sbo_id == Define.SBO_ID).Select(x => x.DocEntry.Value).ToHashSet();"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 93,
+        "symbol": "",
+        "evidence": "//&& !csOrders.Contains(x.ResolvedDevEntry)"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 116,
+        "symbol": "",
+        "evidence": "//delivrdItems = delivrdItems.Where( r=> !csOrders.Contains(r.DocEntry)).ToList();"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 171,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 173,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 183,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 185,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 209,
+        "symbol": "",
+        "evidence": "// INV1 → DLN1"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        "line": 217,
+        "symbol": "",
+        "evidence": "// DLN1 → ORDR"
+      }
+    ]
+  },
+  "follow_up_log_path": "logs/follow_ups/BI/20260408122214-01/a22e301e-b1e0-4a1f-9bec-712001f1a11a.jsonl"
+}

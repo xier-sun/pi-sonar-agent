@@ -41,6 +41,31 @@ def test_resource_loader_compose_system_prompt_prefers_workspace_rules(tmp_path)
     assert "Keep patches small." in prompt
 
 
+def test_resource_loader_loads_json_front_matter_and_markdown_body(tmp_path) -> None:
+    gate_file = tmp_path / "csharp-quality-gate.md"
+    gate_file.write_text(
+        "\n".join(
+            [
+                "---",
+                '{"version":1,"rules":[{"rule_id":"demo","title":"Demo","summary":"Demo","enforcement":"hard"}]}',
+                "---",
+                "",
+                "# Demo Gate",
+                "",
+                "- Keep it small.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    path, metadata, body = ResourceLoader.load_json_front_matter((gate_file,))
+
+    assert path == gate_file
+    assert metadata["version"] == 1
+    assert metadata["rules"][0]["rule_id"] == "demo"
+    assert body.startswith("# Demo Gate")
+
+
 def test_tool_policy_classifies_allowed_build_and_forbidden_tools() -> None:
     registry = build_fix_tool_registry(
         builtin_tools=["Read", "Edit", "Write"],

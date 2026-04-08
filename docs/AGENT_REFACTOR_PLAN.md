@@ -446,7 +446,9 @@ Git 认证必须由单一 `GitRepositoryGateway` 承担。
 - `3.5 引入 FollowUpQueue`：已完成。已新增 `follow_up_store.py`，`DiffReviewer` 发现的 incidental fix / 邻近技术债会写入 `logs/follow_ups/...jsonl`
 - `3.6 引入长期规则文件`：已完成。仓库根目录已新增 `CLAUDE.md`，`ResourceLoader` 现会把 agent-level 规则与目标仓库规则一并并入 system prompt
 - `3.7 用 feature flag 渐进替换旧 scope`：已完成。已新增 `ISSUE_GUARDRAIL_MODE=scope|contract_review`；默认仍保留 legacy `scope`，`contract_review` 已可独立启用并落盘 reviewer/follow-up 工件
+- `3.8 收口 touched-region 与 boundary policy`：已完成。已新增 `attempt_changes.py / boundary_policy.py / boundary_runtime.py`，将 patch touched-region、scope 越界判定和 contract line-range 判定收口为共享 runtime/policy；修复了“attempt 起始时干净文件被误判为整文件变更”的 baseline 对比缺陷，并进一步把删除前/删除后坐标分开建模，消除了纯删除 hunk 在 `scope` 模式下的行号错位
 - `补充说明`：`ClaudeFixAgent` 已继续下沉一层，issue contract、editor policy、diff reviewer 和 follow-up queue 均已从单体逻辑中抽离；issue 级 prompt 装配、build 验证和规则本地校验仍保留在兼容层，后续在 Phase 4 / 包结构收口中继续下沉
+- `日志驱动补充整改（2026-04-08）`：针对 `batch_20260408122214.log` 中 `S1481 / S125` 的连续失败，已补上“真实 patch touched lines 单一真源”和 `S125` 的相邻清理策略，避免单行补丁被误判成整文件修改，也避免删注释代码时被过窄 statement scope 误伤；针对 `batch_20260408133124.log` 暴露出的纯删除 hunk 错位问题，已把 before/after touched lines 分离，改为 `scope/reviewer` 使用删除前坐标、`quality gate` 使用删除后坐标
 
 ### 主要任务
 
@@ -587,6 +589,22 @@ Git 认证必须由单一 `GitRepositoryGateway` 承担。
 - 推荐增加 `ISSUE_GUARDRAIL_MODE=scope|contract_review`
 - 当 `contract_review` 在成功率不下降的前提下显著降低 incidental fix，再逐步替代旧逻辑
 
+#### 3.8 收口 touched-region 与 boundary policy
+
+针对日志中暴露出的 `S1481 / S125` 失败，补齐剩余 guardrail 收口工作：
+
+- touched-region 必须从真实 patch hunk 提取，不能再用“起始时已脏文件快照”推测整文件范围
+- `DiffReviewer`、legacy `scope` 校验、`QualityGateVerifier` 必须共用同一份 touched-region 事实
+- touched-region 不能只保留一套 `changed_lines`；必须显式区分删除前/删除后坐标，避免纯删除 patch 被映射成相邻存活行
+- 边界判定要从 `ClaudeFixAgent` 的局部猜测下沉到 runtime/policy，形成显式的 boundary review pipeline
+- 对 `S125` 这类“移除注释代码后需要顺带清理紧邻死变量”的规则，允许受控的 adjacent cleanup，而不是继续强卡单 statement 行窗
+
+参考 `pi-mono` 与 Claude Code 的工程思想：
+
+- 任务是一等对象
+- 边界是运行时决策，不是散落的 if 判断
+- 恢复性来自显式状态、工件与可解释的失败原因
+
 ### 交付物
 
 - `issue_planner.py`
@@ -624,6 +642,7 @@ Git 认证必须由单一 `GitRepositoryGateway` 承担。
 - `4.2 清理入口 hack`：已完成。`run.py` 已移除开发机私有 SDK fallback，仅保留本仓库 `src/` bootstrap 和标准 `python -m pip install -e .` 提示
 - `4.3 删除旧实现`：已完成第一批。legacy 包 `__init__.py` 已改为相对导出，消除了移除 `__path__` 后的循环导入；`ClaudeFixAgent` 中的 issue prompt、legacy scope guard、build/rule verification 已继续下沉到 `issue_prompt.py / scope_guard.py / fix_verifier.py`
 - `4.4 补齐质量门槛`：已完成。全仓 `ruff check .` 已通过，仓库已新增 GitHub Actions CI，关键验收场景已由现有回归测试和新增质量门槛测试共同覆盖
+- `4.5 继续收口边界检查职责`：已完成。边界检查已下沉为 `BoundaryRuntime + BoundaryPolicy`，不再由 `ClaudeFixAgent` 或 verifier 各自猜测 touched-region；质量门禁现与 reviewer/scope 共用统一 patch 事实，并已明确切换为 `scope/reviewer -> before-lines`、`quality gate -> after-lines`
 - `补充说明`：`GitClient`、`workspace` 等公共兼容 facade 仍保留，但主运行链路已不再依赖这层兼容接口；它们现作为公共兼容 API 保留，不再阻塞本轮重构收口
 
 ### 主要任务
@@ -659,6 +678,14 @@ Git 认证必须由单一 `GitRepositoryGateway` 承担。
 - 单目标与批量入口行为一致
 - `scope` 与 `contract_review` 对照
 - DB 降级运行
+
+#### 4.5 继续收口边界检查职责
+
+- 用 `BoundaryRuntime` 编排 scope review 与 diff review
+- 用 `BoundaryPolicy` 统一行窗允许策略
+- 用 `AttemptFileChangeBuilder` 统一 per-attempt diff、touched lines 和 baseline 对比
+- 让 `AttemptFileChangeBuilder` 同时输出 before/after touched lines 与 edit operations，供不同 verifier 使用各自正确的坐标面
+- 保证 `QualityGateVerifier` 只审真实 touched region，不再把历史整文件问题误判为当前 patch 失败
 
 ### 交付物
 
@@ -793,6 +820,9 @@ Git 认证必须由单一 `GitRepositoryGateway` 承担。
 - 已完成：`RetryContext / issue_retry` 已接入 reviewer rejection 与 follow-up queue，支持 reviewer 失败后的结构化重试反馈
 - 已完成：新增仓库级 `CLAUDE.md` 并通过 `ResourceLoader` 接入 system prompt
 - 已完成：补充回归测试，覆盖 `IssuePlanner`、`DiffReviewer`、`FollowUpStore`、artifact 落盘和 `contract_review` 主流程
+- 已完成：新增 `attempt_changes.py`，将 per-attempt diff、touched lines 提取和 baseline 读取收口为共享事实来源
+- 已完成：新增 `boundary_policy.py`，统一 contract/scope 的行窗判定逻辑，避免 reviewer 和 legacy scope 各自猜 touched lines
+- 已完成：针对 `csharpsquid:S125` 补充 rule-specific adjacent cleanup 策略，允许删除注释代码时一并清理紧邻死变量
 - 后续 Phase 4：继续将 issue 级 prompt 构造、build/rule validation 从 `ClaudeFixAgent` 兼容层下沉，完成 `2.6` 的最终瘦身
 
 - 建 `IssuePlanner`
@@ -810,6 +840,7 @@ Git 认证必须由单一 `GitRepositoryGateway` 承担。
 - 已完成：legacy `agent/__init__.py`、`fixers/__init__.py`、`integrations/__init__.py`、`sonar_mcp/__init__.py` 已改为包内相对导出，移除对 `pi_sonar_agent.*` 的反向依赖，解决去掉路径 hack 后的循环导入
 - 已完成：`run.py` 已删除开发机私有路径和安装提示，统一为标准可移植入口
 - 已完成：新增 `issue_prompt.py`、`scope_guard.py`、`fix_verifier.py`，将 issue prompt 构造、legacy scope 计算/校验、build/rule verification 从 `ClaudeFixAgent` 兼容层继续下沉，完成 `2.6` 的第二轮瘦身
+- 已完成：新增 `boundary_runtime.py`，将 boundary review 编排从 `ClaudeFixAgent` 继续下沉；`FixVerifier` 现通过该 runtime 统一执行 scope + reviewer 判定
 - 保留说明：`GitClient` 与少量 facade 继续作为公共兼容接口存在，但主链路已经统一走正式 gateway / runtime / verifier 组件
 
 - 收敛到 `src/pi_sonar_agent/`

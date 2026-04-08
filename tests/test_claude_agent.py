@@ -17,6 +17,7 @@ from pi_sonar_agent.agent.rule_policies import (
 )
 from pi_sonar_agent.agent.rule_validators import validate_rule_fix
 from pi_sonar_agent.core.retry_context import RetryContext
+from pi_sonar_agent.core.scope_guard import IssueEditScope
 
 
 def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
@@ -176,7 +177,7 @@ def test_resolve_sdk_model_uses_env_for_third_party_provider() -> None:
     assert child_env["CLAUDE_MODEL"] == "glm-4.7"
 
 
-def test_load_csharp_quality_gate_prefers_skill_file_and_appends_xml_doc_constraints(
+def test_load_csharp_quality_gate_uses_repo_markdown_as_single_source(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -189,13 +190,12 @@ def test_load_csharp_quality_gate_prefers_skill_file_and_appends_xml_doc_constra
         severity="MAJOR",
         issue_type="CODE_SMELL",
     )
-    skill_file = tmp_path / "SKILL.md"
-    skill_file.write_text(
+    gate_file = tmp_path / "csharp-quality-gate.md"
+    gate_file.write_text(
         "\n".join(
             [
                 "---",
-                "name: csharp-quality-gate",
-                "description: demo",
+                '{"version":1,"rules":[{"rule_id":"demo","title":"Demo","summary":"Demo","enforcement":"hard"}]}',
                 "---",
                 "",
                 "# C# 代码质量与架构规范门禁",
@@ -206,14 +206,20 @@ def test_load_csharp_quality_gate_prefers_skill_file_and_appends_xml_doc_constra
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(ClaudeFixAgent, "QUALITY_GATE_PATHS", (skill_file,))
+    monkeypatch.setattr(ClaudeFixAgent, "QUALITY_GATE_PATHS", (gate_file,))
 
     gate = ClaudeFixAgent._load_csharp_quality_gate(issue)
 
-    assert "name: csharp-quality-gate" not in gate
+    assert '"version":1' not in gate
     assert "# C# 代码质量与架构规范门禁" in gate
     assert "所有公开的类、方法、属性、实体都必须有完整的 XML 文档注释" in gate
-    assert "不要给 `private` 或 `internal` 的辅助方法添加残缺的 XML 文档注释" in gate
+
+
+def test_default_quality_gate_source_points_to_repo_file() -> None:
+    assert len(ClaudeFixAgent.QUALITY_GATE_PATHS) == 1
+    assert str(ClaudeFixAgent.QUALITY_GATE_PATHS[0]).replace("\\", "/").endswith(
+        "data/csharp-quality-gate.md"
+    )
 
 
 def test_build_user_prompt_includes_rule_specific_guards() -> None:
@@ -927,7 +933,7 @@ def test_fix_issue_scope_validation_ignores_previous_successful_changes_in_same_
         key="issue-3c",
         rule="csharpsquid:S6562",
         message="DateTime 应显式指定 Kind",
-        line=7,
+        line=10,
         component="BI:src/Foo.cs",
         severity="MAJOR",
         issue_type="CODE_SMELL",
@@ -937,15 +943,18 @@ def test_fix_issue_scope_validation_ignores_previous_successful_changes_in_same_
     source_file.parent.mkdir(parents=True, exist_ok=True)
     source_file.write_text(
         "\n".join(
-            [
-                "class Foo",
-                "{",
-                "    private int _value = 1;",
-                "",
-                "    public void Demo()",
-                "    {",
-                "        var now = DateTime.Now;",
-                "    }",
+                [
+                    "class Foo",
+                    "{",
+                    "    private int _value = 1;",
+                    "",
+                    "    /// <summary>",
+                    "    /// Demo.",
+                    "    /// </summary>",
+                    "    public void Demo()",
+                    "    {",
+                    "        var now = DateTime.Now;",
+                    "    }",
                 "}",
                 "",
             ]
@@ -956,15 +965,18 @@ def test_fix_issue_scope_validation_ignores_previous_successful_changes_in_same_
     # Simulate a previous issue that already modified the same file before the current issue starts.
     source_file.write_text(
         "\n".join(
-            [
-                "class Foo",
-                "{",
-                "    private int _value = 2;",
-                "",
-                "    public void Demo()",
-                "    {",
-                "        var now = DateTime.Now;",
-                "    }",
+                [
+                    "class Foo",
+                    "{",
+                    "    private int _value = 2;",
+                    "",
+                    "    /// <summary>",
+                    "    /// Demo.",
+                    "    /// </summary>",
+                    "    public void Demo()",
+                    "    {",
+                    "        var now = DateTime.Now;",
+                    "    }",
                 "}",
                 "",
             ]
@@ -988,15 +1000,18 @@ def test_fix_issue_scope_validation_ignores_previous_successful_changes_in_same_
     def fake_run(func) -> None:
         source_file.write_text(
             "\n".join(
-                [
-                    "class Foo",
-                    "{",
-                    "    private int _value = 2;",
-                    "",
-                    "    public void Demo()",
-                    "    {",
-                    "        var now = DateTime.UtcNow;",
-                    "    }",
+                    [
+                        "class Foo",
+                        "{",
+                        "    private int _value = 2;",
+                        "",
+                        "    /// <summary>",
+                        "    /// Demo.",
+                        "    /// </summary>",
+                        "    public void Demo()",
+                        "    {",
+                        "        var now = DateTime.UtcNow;",
+                        "    }",
                     "}",
                     "",
                 ]
@@ -1049,7 +1064,16 @@ def test_scope_validation_rejects_out_of_scope_lines() -> None:
     )
 
     changed_lines = ClaudeFixAgent._extract_changed_line_numbers(
-        "@@ -4,1 +4,1 @@\n@@ -8,1 +8,1 @@\n"
+        "\n".join(
+            [
+                "@@ -4,1 +4,1 @@",
+                "-    var cuffOffDate = new DateTime(",
+                "+    var cuffOffDate = DateTime.SpecifyKind(",
+                "@@ -8,1 +8,1 @@",
+                "-    var another = DateTime.Now;",
+                "+    var another = DateTime.UtcNow;",
+            ]
+        )
     )
     offending_lines = ClaudeFixAgent._find_out_of_scope_lines(scope, changed_lines)
 
@@ -1057,6 +1081,59 @@ def test_scope_validation_rejects_out_of_scope_lines() -> None:
     assert scope.validation_start_line == 4
     assert scope.validation_end_line == 7
     assert offending_lines == [8]
+
+
+def test_scope_validation_uses_before_coordinates_for_pure_delete() -> None:
+    scope = IssueEditScope(
+        start_line=2224,
+        end_line=2224,
+        validation_start_line=2224,
+        validation_end_line=2224,
+        mode="statement",
+    )
+
+    changed_lines = ClaudeFixAgent._extract_changed_line_numbers(
+        "\n".join(
+            [
+                "@@ -2224 +2223,0 @@",
+                "-        var orderNum = result.OrderNum();",
+            ]
+        )
+    )
+
+    offending_lines = ClaudeFixAgent._find_out_of_scope_lines(scope, changed_lines)
+
+    assert changed_lines == {2224}
+    assert offending_lines == []
+
+
+def test_build_issue_edit_scope_expands_window_for_s125_adjacent_cleanup() -> None:
+    scope = ClaudeFixAgent._build_issue_edit_scope(
+        SonarIssue(
+            key="issue-s125",
+            rule="csharpsquid:S125",
+            message="移除被注释掉的代码段",
+            line=6,
+            component="BI:src/Foo.cs",
+            severity="MAJOR",
+            issue_type="CODE_SMELL",
+        ),
+        [
+            "class Foo",
+            "{",
+            "    void Demo()",
+            "    {",
+            "        var temp = 1;",
+            "        // old code",
+            "        Run();",
+            "    }",
+            "}",
+        ],
+    )
+
+    assert scope.mode == "statement"
+    assert scope.validation_start_line < 6
+    assert scope.validation_end_line >= 6
 
 
 def test_build_issue_edit_scope_supports_control_block_scope() -> None:

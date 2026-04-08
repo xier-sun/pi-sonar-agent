@@ -428,3 +428,41 @@ def test_build_retry_feedback_distinguishes_follow_up_response_timeout(tmp_path)
     feedback = build_retry_feedback(repo, result)
 
     assert "等待模型后续响应时超时" in feedback
+
+
+def test_build_retry_feedback_includes_quality_gate_failures(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-quality-gate",
+        file_path="tracked.cs",
+        build_passed=True,
+        build_verification_failed=False,
+        error="Quality gate verification failed",
+        build_command='dotnet build "tracked.sln"',
+        build_output="Quality gate verification failed.",
+        retryable_failure=True,
+        failure_kind="quality_gate",
+        quality_gate_result={
+            "status": "retry",
+            "summary": "Quality gate rejected the patch with 1 hard violation(s).",
+            "violations": [
+                {
+                    "rule_id": "public_xml_docs",
+                    "title": "公开成员 XML 文档完整",
+                    "message": "公开方法 SaveAsync 缺少参数 id 的 <param> 文档。",
+                    "file": "tracked.cs",
+                    "line": 12,
+                    "retry_hint": "只补当前 patch 触达的公开成员 XML 文档。",
+                }
+            ],
+        },
+    )
+
+    feedback = build_retry_feedback(repo, result)
+
+    assert "没有通过 C# 质量门禁" in feedback
+    assert "public_xml_docs" in feedback
+    assert "只补当前 patch 触达的公开成员 XML 文档" in feedback

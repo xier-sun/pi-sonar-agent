@@ -5,8 +5,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from pi_sonar_agent.core.boundary_policy import BoundaryPolicy
 from pi_sonar_agent.core.issue_contract import EditContract
 from pi_sonar_agent.core.state import serialize_state, utc_now_iso
+
+
+@dataclass(frozen=True)
+class ReviewedLineOperation:
+    """Single diff edit expressed in before/after coordinate spaces."""
+
+    kind: str
+    before_line: int = 0
+    after_line: int = 0
+    text: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
 
 
 @dataclass(frozen=True)
@@ -14,11 +28,52 @@ class ReviewedFileChange:
     """Single file diff facts consumed by DiffReviewer."""
 
     file: str
-    changed_lines: tuple[int, ...]
-    diff_text: str
+    changed_lines: tuple[int, ...] = ()
+    diff_text: str = ""
     hunk_count: int = 0
     before_exists: bool = True
     after_exists: bool = True
+    before_changed_lines: tuple[int, ...] = ()
+    after_changed_lines: tuple[int, ...] = ()
+    line_operations: tuple[ReviewedLineOperation, ...] = ()
+
+    def __post_init__(self) -> None:
+        normalized_changed = self._normalize_lines(self.changed_lines)
+        normalized_before = self._normalize_lines(self.before_changed_lines)
+        normalized_after = self._normalize_lines(self.after_changed_lines)
+        if not normalized_before and normalized_changed:
+            normalized_before = normalized_changed
+        if not normalized_after and normalized_changed:
+            normalized_after = normalized_changed
+        if not normalized_changed:
+            normalized_changed = normalized_before or normalized_after
+        object.__setattr__(self, "changed_lines", normalized_changed)
+        object.__setattr__(self, "before_changed_lines", normalized_before)
+        object.__setattr__(self, "after_changed_lines", normalized_after)
+
+    @staticmethod
+    def _normalize_lines(raw_lines: tuple[int, ...] | list[int]) -> tuple[int, ...]:
+        return tuple(
+            sorted(
+                {
+                    int(line)
+                    for line in raw_lines
+                    if str(line).strip() and int(line) > 0
+                }
+            )
+        )
+
+    @property
+    def boundary_changed_lines(self) -> tuple[int, ...]:
+        """Lines compared against the original issue window."""
+
+        return self.before_changed_lines or self.changed_lines
+
+    @property
+    def quality_gate_changed_lines(self) -> tuple[int, ...]:
+        """Lines that still exist in the post-edit file."""
+
+        return self.after_changed_lines
 
     def to_dict(self) -> dict[str, Any]:
         return serialize_state(self)
@@ -106,6 +161,10 @@ class DiffReviewer:
             return contract.validation_line_range[0], contract.validation_line_range[1]
         return None
 
+    @staticmethod
+    def _allowed_line_ranges(contract: EditContract) -> tuple[tuple[int, int], ...]:
+        return BoundaryPolicy.contract_line_ranges(contract)
+
     @classmethod
     def review(
         cls,
@@ -117,6 +176,7 @@ class DiffReviewer:
 
         target_files = set(edit_contract.target_files)
         line_range = cls._line_range(edit_contract)
+        allowed_line_ranges = cls._allowed_line_ranges(edit_contract)
         violations: list[ReviewerViolation] = []
         follow_ups: list[FollowUpItem] = []
 
@@ -128,7 +188,7 @@ class DiffReviewer:
                         type="undeclared_file",
                         file=change.file,
                         reason=reason,
-                        changed_lines=change.changed_lines,
+                        changed_lines=change.boundary_changed_lines,
                         evidence_hunk=change.diff_text,
                     )
                 )
@@ -144,19 +204,23 @@ class DiffReviewer:
                 )
                 continue
 
-            if line_range is None or not change.changed_lines:
+            if not allowed_line_ranges or not change.boundary_changed_lines:
                 continue
 
-            start_line, end_line = line_range
-            outside_lines = tuple(
-                line for line in change.changed_lines if line < start_line or line > end_line
+            outside_lines = BoundaryPolicy.find_outside_lines(
+                change.boundary_changed_lines,
+                allowed_line_ranges,
             )
             if not outside_lines:
                 continue
 
-            reason = (
-                f"This hunk changes lines outside the edit contract window {start_line}-{end_line}."
-            )
+            if line_range is not None:
+                start_line, end_line = line_range
+                reason = (
+                    f"This hunk changes lines outside the edit contract window {start_line}-{end_line}."
+                )
+            else:
+                reason = "This hunk changes lines outside the declared edit contract ranges."
             violations.append(
                 ReviewerViolation(
                     type="incidental_fix",
@@ -181,7 +245,7 @@ class DiffReviewer:
         metrics = {
             "changed_file_count": len(file_changes),
             "hunk_count": sum(change.hunk_count for change in file_changes),
-            "total_changed_lines": sum(len(change.changed_lines) for change in file_changes),
+            "total_changed_lines": sum(len(change.boundary_changed_lines) for change in file_changes),
         }
         if violations:
             summary = "Patch touches undeclared files or lines outside the declared edit contract."

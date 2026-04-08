@@ -23,6 +23,8 @@ from pi_sonar_agent.core.artifact_writer import ArtifactWriter
 from pi_sonar_agent.core.follow_up_store import FollowUpStore
 from pi_sonar_agent.core.retry_context import (
     CompilerErrorContext,
+    QualityGateFailureContext,
+    QualityGateViolationContext,
     RetryContext,
     ReviewFailureContext,
     ReviewViolationContext,
@@ -234,6 +236,37 @@ def _extract_review_failure_context(result: FixResult) -> ReviewFailureContext |
     )
 
 
+def _extract_quality_gate_failure_context(result: FixResult) -> QualityGateFailureContext | None:
+    """Extract structured quality-gate failures from a FixResult."""
+
+    payload = getattr(result, "quality_gate_result", None)
+    if not isinstance(payload, dict):
+        return None
+    if str(payload.get("status", "")).strip().lower() != "retry":
+        return None
+
+    violations = tuple(
+        QualityGateViolationContext(
+            rule_id=str(item.get("rule_id", "")).strip(),
+            title=str(item.get("title", "")).strip(),
+            message=str(item.get("message", "")).strip(),
+            file=str(item.get("file", "")).strip(),
+            line=int(item.get("line", 0) or 0),
+            symbol=str(item.get("symbol", "")).strip(),
+            evidence=str(item.get("evidence", "")).strip(),
+            retry_hint=str(item.get("retry_hint", "")).strip(),
+        )
+        for item in payload.get("violations", [])
+        if isinstance(item, dict)
+    )
+    if not violations:
+        return None
+    return QualityGateFailureContext(
+        summary=str(payload.get("summary", "")).strip() or "C# quality gate rejected the patch.",
+        violations=violations,
+    )
+
+
 def build_retry_context(
     workspace_path: Path,
     result: FixResult,
@@ -259,6 +292,7 @@ def build_retry_context(
         guidance=tuple(_build_retry_guidance(list(compiler_errors))) if compiler_errors else (),
         scope_violation=_extract_scope_violation_context(raw_output, issue),
         review_failure=_extract_review_failure_context(result),
+        quality_gate_failure=_extract_quality_gate_failure_context(result),
         model_timeout_summary=_summarize_model_timeout(raw_output) if result.failure_kind == "model_timeout" else "",
         build_tool_failed=result.failure_kind == "build_tool",
         forbidden_tool_failed=result.failure_kind == "forbidden_tool",
@@ -295,6 +329,8 @@ def _build_final_skip_reason(result: FixResult, attempts: int) -> str:
         return f"Issue changes exceeded allowed scope after {attempts} attempt(s)"
     if result.failure_kind == "reviewer":
         return f"Diff reviewer rejected the patch after {attempts} attempt(s)"
+    if result.failure_kind == "quality_gate":
+        return f"C# quality gate verification failed after {attempts} attempt(s)"
     if result.failure_kind == "no_change":
         return f"Agent completed without modifying any files after {attempts} attempt(s)"
     if result.failure_kind == "rule_validation":

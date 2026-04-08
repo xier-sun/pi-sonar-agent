@@ -1,0 +1,28 @@
+{
+  "attempt_number": 3,
+  "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+  "retry_feedback": "上次尝试在等待模型后续响应时超时，请先确认当前模型网关或 provider 可正常返回工具调用响应：\n模型在 180 秒内没有返回后续响应\n取消原因: follow_up_response_timeout\n清理动作: interrupt, close_response_stream, disconnect\n重试约束:\n- 不要更换构建命令，先确认模型能稳定返回工具调用响应。\n- 如果连续超时，优先检查 .env 中的模型 endpoint、token 和 provider 兼容性。",
+  "retry_context": {
+    "source_attempt_number": 2,
+    "failure_kind": "model_timeout",
+    "error": "Model response timed out",
+    "summary": "Fixed 0 file(s)",
+    "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+    "raw_output": "模型在 180 秒内没有返回后续响应\n取消原因: follow_up_response_timeout\n清理动作: interrupt, close_response_stream, disconnect",
+    "retryable_failure": true,
+    "build_verification_failed": false,
+    "changed_files": [],
+    "compiler_errors": [],
+    "guidance": [],
+    "scope_violation": null,
+    "review_failure": null,
+    "quality_gate_failure": null,
+    "model_timeout_summary": "在等待模型后续响应时超时",
+    "build_tool_failed": false,
+    "forbidden_tool_failed": false,
+    "model_timeout_failed": true
+  },
+  "workspace_path": ".agent_workspaces/fix_BI_20260408122214-01",
+  "baseline_head_commit": "001fd679211969930a48256849406475668714c3",
+  "guardrail_mode": "scope"
+}

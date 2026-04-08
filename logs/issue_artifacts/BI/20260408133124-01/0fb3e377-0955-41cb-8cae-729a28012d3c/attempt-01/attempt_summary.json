@@ -1,0 +1,18 @@
+{
+  "attempt_number": 1,
+  "status": "retrying",
+  "started_at": "2026-04-08T05:57:55.905976+00:00",
+  "finished_at": "2026-04-08T06:01:09.359525+00:00",
+  "duration_seconds": 193.438,
+  "failure_kind": "model_timeout",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "error": "Model response timed out",
+  "skip_reason": "",
+  "summary": "Fixed 0 file(s)",
+  "changed_files": [],
+  "issue_log_path": "logs\\issue_attempts\\BI_0fb3e377-0955-41cb-8cae-729a28012d3c_20260408133124-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260408133124-01/0fb3e377-0955-41cb-8cae-729a28012d3c/attempt-01"
+}

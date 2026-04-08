@@ -31,7 +31,11 @@ def test_issue_planner_builds_edit_contract_for_contract_review() -> None:
     assert plan.edit_contract.target_files == ("src/Foo.cs",)
     assert plan.edit_contract.patch_only is True
     assert "lambda-rewrite" in plan.edit_contract.allowed_change_kinds
+    assert plan.edit_contract.quality_gate_rules
+    assert any(rule.rule_id == "public_xml_docs" for rule in plan.edit_contract.quality_gate_rules)
     assert "Edit Contract" in plan.prompt_guidance
+    assert "Hard Quality Gates" in plan.prompt_guidance
+    assert "Quality Gate Notes" in plan.prompt_guidance
 
 
 def test_diff_reviewer_rejects_undeclared_file_and_records_follow_up() -> None:

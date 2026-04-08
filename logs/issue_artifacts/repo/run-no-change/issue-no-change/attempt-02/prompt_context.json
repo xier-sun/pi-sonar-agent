@@ -16,12 +16,13 @@
     "guidance": [],
     "scope_violation": null,
     "review_failure": null,
+    "quality_gate_failure": null,
     "model_timeout_summary": "",
     "build_tool_failed": false,
     "forbidden_tool_failed": false,
     "model_timeout_failed": false
   },
-  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-147/test_process_issue_with_retrie1/repo",
-  "baseline_head_commit": "ca53cfacc07842ebf4db35e11bd8d4bf3ee4068c",
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-174/test_process_issue_with_retrie1/repo",
+  "baseline_head_commit": "c38d0da95f1e5ae37469c8d98f833af3ba6be561",
   "guardrail_mode": ""
 }

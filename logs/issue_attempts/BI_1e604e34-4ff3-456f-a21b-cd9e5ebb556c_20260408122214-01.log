@@ -1,0 +1,153 @@
+[2026-04-08 12:42:39] Attempt 1/3 started for 1e604e34-4ff3-456f-a21b-cd9e5ebb556c
+[2026-04-08 12:45:04] Attempt 1 failed: Quality gate verification failed
+[2026-04-08 12:45:04] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+... (省略前 450 行)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+136. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2335
+   Evidence: join slp in UnitWork.Find<OSLP>(null) on rin.SlpCode equals slp.SlpCode into slpJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+137. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2336
+   Evidence: from slp in slpJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+138. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2360
+   Evidence: from rin in query
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+139. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2361
+   Evidence: join slp in UnitWork.Find<OSLP>(null) on rin.SlpCode equals slp.SlpCode into slpJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+140. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2362
+   Evidence: from slp in slpJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+141. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2398
+   Evidence: from orct in baseQuery.Where(o => o.U_XSDD != null && o.PayNoDoc == "Y" && o.DocTotalSy == o.NoDocSum)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+142. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2399
+   Evidence: join ordr in UnitWork.Find<ORDR>(null) on orct.U_XSDD equals ordr.DocEntry into ordrJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+143. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2400
+   Evidence: from ordr in ordrJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+144. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2424
+   Evidence: from orct in baseQuery.Where(o => o.U_U_XSDBCode != null && o.U_XSDD == null)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+145. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2425
+   Evidence: join rct2 in UnitWork.Find<RCT2>(null) on orct.DocNum equals rct2.DocNum into rct2Join
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+146. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2426
+   Evidence: from rct2 in rct2Join.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+147. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2427
+   Evidence: join slp in UnitWork.Find<OSLP>(null) on orct.U_U_XSDBCode equals slp.SlpCode.ToString() into slpJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+148. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2428
+   Evidence: from slp in slpJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+[2026-04-08 12:45:05] Workspace restored to issue baseline
+[2026-04-08 12:45:05] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 12:45:05] Attempt 2/3 started for 1e604e34-4ff3-456f-a21b-cd9e5ebb556c
+[2026-04-08 12:49:27] Attempt 2 failed: Quality gate verification failed
+[2026-04-08 12:49:27] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+... (省略前 426 行)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+128. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2256
+   Evidence: from inv in query
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+129. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2257
+   Evidence: join slp in UnitWork.Find<OSLP>(null) on inv.SlpCode equals slp.SlpCode into slpJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+130. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2259
+   Evidence: from slp in slpJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+131. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2281
+   Evidence: from inv in query
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+132. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2282
+   Evidence: join crd in UnitWork.Find<OCRD>(null) on inv.CardCode equals crd.CardCode
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+133. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2283
+   Evidence: join slp in UnitWork.Find<OSLP>(null) on inv.SlpCode equals slp.SlpCode into slpJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+134. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2284
+   Evidence: from slp in slpJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+135. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2334
+   Evidence: from rin in query
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+136. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2335
+   Evidence: join slp in UnitWork.Find<OSLP>(null) on rin.SlpCode equals slp.SlpCode into slpJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+137. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2336
+   Evidence: from slp in slpJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+138. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2360
+   Evidence: from rin in query
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+139. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2361
+   Evidence: join slp in UnitWork.Find<OSLP>(null) on rin.SlpCode equals slp.SlpCode into slpJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+140. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2362
+   Evidence: from slp in slpJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+[2026-04-08 12:49:27] Workspace restored to issue baseline
+[2026-04-08 12:49:27] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 12:49:27] Attempt 3/3 started for 1e604e34-4ff3-456f-a21b-cd9e5ebb556c
+[2026-04-08 12:53:40] Attempt 3 failed: Quality gate verification failed
+[2026-04-08 12:53:40] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+... (省略前 450 行)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+136. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2335
+   Evidence: join slp in UnitWork.Find<OSLP>(null) on rin.SlpCode equals slp.SlpCode into slpJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+137. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2336
+   Evidence: from slp in slpJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+138. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2360
+   Evidence: from rin in query
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+139. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2361
+   Evidence: join slp in UnitWork.Find<OSLP>(null) on rin.SlpCode equals slp.SlpCode into slpJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+140. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2362
+   Evidence: from slp in slpJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+141. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2398
+   Evidence: from orct in baseQuery.Where(o => o.U_XSDD != null && o.PayNoDoc == "Y" && o.DocTotalSy == o.NoDocSum)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+142. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2399
+   Evidence: join ordr in UnitWork.Find<ORDR>(null) on orct.U_XSDD equals ordr.DocEntry into ordrJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+143. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2400
+   Evidence: from ordr in ordrJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+144. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2424
+   Evidence: from orct in baseQuery.Where(o => o.U_U_XSDBCode != null && o.U_XSDD == null)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+145. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2425
+   Evidence: join rct2 in UnitWork.Find<RCT2>(null) on orct.DocNum equals rct2.DocNum into rct2Join
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+146. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2426
+   Evidence: from rct2 in rct2Join.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+147. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2427
+   Evidence: join slp in UnitWork.Find<OSLP>(null) on orct.U_U_XSDBCode equals slp.SlpCode.ToString() into slpJoin
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+148. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs:2428
+   Evidence: from slp in slpJoin.DefaultIfEmpty()
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+[2026-04-08 12:53:41] Workspace restored to issue baseline
+[2026-04-08 12:53:41] Issue skipped: C# quality gate verification failed after 3 attempt(s)

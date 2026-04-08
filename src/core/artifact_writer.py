@@ -130,6 +130,13 @@ class ArtifactWriter:
                 "build_command": result.build_command or build_command,
                 "build_output": result.build_output,
                 "guardrail_mode": getattr(result, "guardrail_mode", ""),
+                "quality_gate_result": _serialize_optional_payload(
+                    getattr(result, "quality_gate_result", None),
+                    {
+                        "status": "not_available",
+                        "reason": "Quality gate result was not attached to this attempt.",
+                    },
+                ),
                 "follow_up_log_path": getattr(result, "follow_up_log_path", ""),
             },
         )

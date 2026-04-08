@@ -9,5 +9,9 @@
   "build_command": "dotnet build \"tracked.sln\"",
   "build_output": "",
   "guardrail_mode": "",
+  "quality_gate_result": {
+    "status": "not_available",
+    "reason": "Quality gate result was not attached to this attempt."
+  },
   "follow_up_log_path": ""
 }

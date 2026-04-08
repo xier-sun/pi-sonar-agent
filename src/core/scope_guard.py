@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import difflib
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +17,8 @@ from pi_sonar_agent.agent.rule_policies import (
     STATEMENT_SCOPE_MODE,
     get_rule_policy,
 )
+from pi_sonar_agent.core.attempt_changes import AttemptFileChangeBuilder
+from pi_sonar_agent.core.boundary_policy import BoundaryPolicy
 
 if TYPE_CHECKING:
     from pi_sonar_agent.agent.claude_agent import SonarIssue
@@ -425,8 +425,8 @@ class LegacyScopeGuard:
         if logical_range is None:
             logical_range = cls._find_enclosing_statement_range(lines, issue.line)
             scope_mode = STATEMENT_SCOPE_MODE
-            validation_start_line = logical_range[0]
-            validation_end_line = logical_range[1]
+            validation_start_line = max(1, logical_range[0] - policy.validation_leading_lines)
+            validation_end_line = min(total_lines, logical_range[1] + policy.validation_trailing_lines)
         else:
             validation_start_line = max(1, logical_range[0] - policy.validation_leading_lines)
             validation_end_line = min(total_lines, logical_range[1] + policy.validation_trailing_lines)
@@ -494,26 +494,15 @@ class LegacyScopeGuard:
 
     @staticmethod
     def extract_changed_line_numbers(diff_text: str) -> set[int]:
-        pattern = re.compile(r"^@@ -\d+(?:,\d+)? \+(?P<start>\d+)(?:,(?P<count>\d+))? @@")
-        changed_lines: set[int] = set()
-        for raw_line in (diff_text or "").splitlines():
-            match = pattern.match(raw_line.strip())
-            if not match:
-                continue
-            start = int(match.group("start"))
-            count = int(match.group("count") or "1")
-            if count <= 0:
-                changed_lines.add(start)
-                continue
-            changed_lines.update(range(start, start + count))
-        return changed_lines
+        return AttemptFileChangeBuilder.extract_touched_line_numbers(diff_text)
 
     @staticmethod
     def find_out_of_scope_lines(scope: IssueEditScope, changed_lines: set[int]) -> list[int]:
-        return sorted(
-            line
-            for line in changed_lines
-            if line < scope.validation_start_line or line > scope.validation_end_line
+        return list(
+            BoundaryPolicy.find_outside_lines(
+                changed_lines,
+                ((scope.validation_start_line, scope.validation_end_line),),
+            )
         )
 
     @staticmethod
@@ -522,15 +511,10 @@ class LegacyScopeGuard:
         current_content: str,
         relative_path: str,
     ) -> str:
-        return "\n".join(
-            difflib.unified_diff(
-                original_content.splitlines(),
-                current_content.splitlines(),
-                fromfile=relative_path,
-                tofile=relative_path,
-                n=0,
-                lineterm="",
-            )
+        return AttemptFileChangeBuilder.build_content_diff(
+            original_content,
+            current_content,
+            relative_path,
         )
 
     @classmethod

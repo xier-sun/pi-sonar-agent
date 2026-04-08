@@ -1,0 +1,190 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs
+@@ -2388,94 +2388,6 @@
+             }
+
+         }
+
+ 
+
+-        /// <summary>
+
+-        /// 添加收款数据 (RC)
+
+-        /// </summary>
+
+-        private async Task AddReceiptsAsync(List<AgingRawItem> result, OverdueAgingChartReq req, Dictionary<int, string> slpDict)
+
+-        {
+
+-            var query = UnitWork.Find<ORCT>(null);
+
+-
+
+-            if (req.PostingDateFrom.HasValue) query = query.Where(o => o.DocDate >= req.PostingDateFrom.Value);
+
+-            if (req.PostingDateTo.HasValue) query = query.Where(o => o.DocDate <= req.PostingDateTo.Value);
+
+-            if (req.DueDateFrom.HasValue) query = query.Where(o => o.DocDueDate >= req.DueDateFrom.Value);
+
+-            if (req.DueDateTo.HasValue) query = query.Where(o => o.DocDueDate <= req.DueDateTo.Value);
+
+-            if (req.DocumentDateFrom.HasValue) query = query.Where(o => o.TaxDate >= req.DocumentDateFrom.Value);
+
+-            if (req.DocumentDateTo.HasValue) query = query.Where(o => o.TaxDate <= req.DocumentDateTo.Value);
+
+-
+
+-            // 不显示已对账交易时，只查询未清金额大于0的收款
+
+-            if (!req.ShowReconciledTransactions)
+
+-            {
+
+-                query = query.Where(o => o.OpenBal > 0);
+
+-            }
+
+-
+
+-            await AddReceiptsCaseAAsync(result, query, slpDict, req);
+
+-            await AddReceiptsCaseBAsync(result, query, slpDict, req);
+
+-        }
+
+-
+
+-        /// <summary>
+
+-        /// 添加收款数据 - 情况A: U_XSDD 有值
+
+-        /// </summary>
+
+-        private async Task AddReceiptsCaseAAsync(List<AgingRawItem> result, IQueryable<ORCT> baseQuery, Dictionary<int, string> slpDict, OverdueAgingChartReq req)
+
+-        {
+
+-            var data = await (
+
+-                from orct in baseQuery.Where(o => o.U_XSDD != null && o.PayNoDoc == "Y" && o.DocTotalSy == o.NoDocSum)
+
+-                join ordr in UnitWork.Find<ORDR>(null) on orct.U_XSDD equals ordr.DocEntry into ordrJoin
+
+-                from ordr in ordrJoin.DefaultIfEmpty()
+
+-                select new { SlpCode = ordr != null ? ordr.SlpCode : (int?)null, orct.CardCode, orct.CardName, orct.DocEntry, orct.DocDueDate, PostingDate = orct.DocDate, orct.DocTotalSy, orct.OpenBal }
+
+-            ).ToListAsync();
+
+-
+
+-            result.AddRange(data.Select(x => new AgingRawItem
+
+-            {
+
+-                SlpName = x.SlpCode.HasValue && slpDict.ContainsKey(x.SlpCode.Value) ? slpDict[x.SlpCode.Value] : "",
+
+-                SlpCode = x.SlpCode,
+
+-                CustomerCode = x.CardCode,
+
+-                CustomerName = x.CardName,
+
+-                DocumentNumber = x.DocEntry.ToString(),
+
+-                Type = "RC",
+
+-                DueDate = x.DocDueDate,
+
+-                PostingDate = x.PostingDate,
+
+-                Amount = -(req.ShowReconciledTransactions ? (x.DocTotalSy ?? 0m) : (x.OpenBal ?? 0m))
+
+-            }));
+
+-        }
+
+-
+
+-        /// <summary>
+
+-        /// 添加收款数据 - 情况B: U_XSDD没值但 U_U_XSDBCode 有值且没明细关联发票
+
+-        /// </summary>
+
+-        private async Task AddReceiptsCaseBAsync(List<AgingRawItem> result, IQueryable<ORCT> baseQuery, Dictionary<int, string> slpDict, OverdueAgingChartReq req)
+
+-        {
+
+-            var data = await (
+
+-                from orct in baseQuery.Where(o => o.U_U_XSDBCode != null && o.U_XSDD == null)
+
+-                join rct2 in UnitWork.Find<RCT2>(null) on orct.DocNum equals rct2.DocNum into rct2Join
+
+-                from rct2 in rct2Join.DefaultIfEmpty()
+
+-                join slp in UnitWork.Find<OSLP>(null) on orct.U_U_XSDBCode equals slp.SlpCode.ToString() into slpJoin
+
+-                from slp in slpJoin.DefaultIfEmpty()
+
+-                where rct2.DocEntry == null
+
+-                select new
+
+-                {
+
+-                    SlpCode = slp != null ? slp.SlpCode : (int?)null,
+
+-                    orct.CardCode,
+
+-                    orct.CardName,
+
+-                    orct.DocEntry,
+
+-                    orct.DocDueDate,
+
+-                    PostingDate = orct.DocDate,
+
+-                    orct.DocTotalSy,
+
+-                    orct.OpenBal,
+
+-                }).ToListAsync();
+
+-
+
+-            result.AddRange(data.Select(x => new AgingRawItem
+
+-            {
+
+-                SlpName = x.SlpCode.HasValue && slpDict.ContainsKey(x.SlpCode.Value) ? slpDict[x.SlpCode.Value] : "",
+
+-                SlpCode = x.SlpCode,
+
+-                CustomerCode = x.CardCode,
+
+-                CustomerName = x.CardName,
+
+-                DocumentNumber = x.DocEntry.ToString(),
+
+-                Type = "RC",
+
+-                DueDate = x.DocDueDate,
+
+-                PostingDate = x.PostingDate,
+
+-                Amount = -(req.ShowReconciledTransactions ? (x.DocTotalSy ?? 0m) : (x.OpenBal ?? 0m))
+
+-            }));
+
+-        }
+
+-
+
+         private sealed class AgingRawItem
+
+         {
+
+             public string SlpName { get; set; }

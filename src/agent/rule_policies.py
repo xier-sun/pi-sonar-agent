@@ -96,6 +96,19 @@ RULE_HANDLING_POLICIES: dict[str, RuleHandlingPolicy] = {
             "不要因为这个规则改动 public 或 protected API 形态，也不要破坏多态行为。",
         ),
     ),
+    "csharpsquid:S125": RuleHandlingPolicy(
+        validation_leading_lines=4,
+        validation_trailing_lines=1,
+        prompt_guards=(
+            "如果移除被注释掉的代码后，紧邻的局部变量立即变成未使用，可以一并删除。",
+            "只允许清理与该注释代码直接耦合的相邻冗余，不要继续扩展到更远的同类清理。",
+        ),
+    ),
+    "csharpsquid:S1481": RuleHandlingPolicy(
+        prompt_guards=(
+            "只删除当前 issue 对应的未使用局部变量，不要顺手改同一方法里的其他清理项。",
+        ),
+    ),
     "csharpsquid:S107": RuleHandlingPolicy(
         skip_reason="规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
     ),

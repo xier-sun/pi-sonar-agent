@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from pi_sonar_agent.core.quality_gate import QualityGateRule
 from pi_sonar_agent.core.state import serialize_state
 
 
@@ -38,9 +39,11 @@ class EditContract:
     validation_plan: tuple[str, ...] = ()
     follow_up_policy: str = "record_only"
     review_hints: tuple[str, ...] = ()
+    quality_gate_rules: tuple[QualityGateRule, ...] = ()
     scope_mode: str = ""
     target_line_range: tuple[int, int] = ()
     validation_line_range: tuple[int, int] = ()
+    allowed_line_ranges: tuple[tuple[int, int], ...] = ()
     patch_only: bool = True
 
     def to_dict(self) -> dict[str, Any]:

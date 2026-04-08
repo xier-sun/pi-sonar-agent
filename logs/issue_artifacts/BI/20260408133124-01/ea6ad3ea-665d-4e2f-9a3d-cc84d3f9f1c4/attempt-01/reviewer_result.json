@@ -1,0 +1,33 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+      "reason": "This hunk changes lines outside the edit contract window 2224-2224.",
+      "symbol": "statement@2224-2224",
+      "changed_lines": [
+        2223
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs\n@@ -2224 +2223,0 @@\n-            var slpDict = await UnitWork.Find<OSLP>(null).ToDictionaryAsync(x => x.SlpCode, x => x.SlpName);"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+      "symbol": "statement@2224-2224",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs\n@@ -2224 +2223,0 @@\n-            var slpDict = await UnitWork.Find<OSLP>(null).ToDictionaryAsync(x => x.SlpCode, x => x.SlpName);",
+      "discovered_at": "2026-04-08T05:40:05.581398+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 1,
+    "total_changed_lines": 1
+  }
+}

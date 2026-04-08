@@ -31,6 +31,7 @@ from pi_sonar_agent.agent.rule_policies import (
     get_rule_policy,
 )
 from pi_sonar_agent.core.agent_runtime import AgentRuntime, AgentRuntimeError, RuntimeTimeouts
+from pi_sonar_agent.core.attempt_changes import AttemptFileChangeBuilder
 from pi_sonar_agent.core.claude_adapter import ClaudeAdapter, ClaudeSDKDependencies
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange
 from pi_sonar_agent.core.editor_policy import EditorPolicy
@@ -40,7 +41,7 @@ from pi_sonar_agent.core.issue_planner import IssuePlanner
 from pi_sonar_agent.core.issue_prompt import IssuePromptBuilder
 from pi_sonar_agent.core.policy import ToolPolicy
 from pi_sonar_agent.core.registry import build_fix_tool_registry
-from pi_sonar_agent.core.resource_loader import ResourceLoader
+from pi_sonar_agent.core.resource_loader import DEFAULT_CSHARP_QUALITY_GATE_FILE, ResourceLoader
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.scope_guard import IssueEditScope, LegacyScopeGuard
 
@@ -93,6 +94,7 @@ class FixResult:
     failure_kind: str = ""
     edit_contract: Any | None = None
     reviewer_result: Any | None = None
+    quality_gate_result: Any | None = None
     follow_ups: tuple[Any, ...] = ()
     guardrail_mode: str = ""
     follow_up_log_path: str = ""
@@ -129,17 +131,7 @@ ISSUE_HARD_TIMEOUT_SECONDS = 900
 class ClaudeFixAgent:
     """Main agent for fixing SonarQube issues using Claude Code SDK."""
 
-    QUALITY_GATE_PATHS = (
-        Path.home() / ".claude" / "skills" / "csharp-quality-gate" / "SKILL.md",
-        Path(__file__).resolve().parents[2] / "data" / "csharp-quality-gate.md",
-    )
-    QUALITY_GATE_SUPPLEMENT = """
-## 当前执行补充约束
-
-- 新增公开类、公开方法、公开属性、公开实体时，必须补齐完整 XML 文档注释；至少包含 `<summary>`，有参数时补 `<param>`，有返回值时补 `<returns>`，可能抛出的业务异常按需补 `<exception>`。
-- 不要给 `private` 或 `internal` 的辅助方法添加残缺的 XML 文档注释；默认不写 XML 文档注释，确有必要时用简短中文注释说明业务意图。
-- 严禁只写 `<summary>` 却省略与签名对应的 `<param>`、`<returns>` 等内容。
-""".strip()
+    QUALITY_GATE_PATHS = (DEFAULT_CSHARP_QUALITY_GATE_FILE,)
 
     def __init__(
         self,
@@ -596,7 +588,6 @@ class ClaudeFixAgent:
         return ResourceLoader.load_csharp_quality_gate(
             issue.file_path,
             cls.QUALITY_GATE_PATHS,
-            cls.QUALITY_GATE_SUPPLEMENT,
         )
 
     @classmethod
@@ -631,7 +622,7 @@ class ClaudeFixAgent:
     def _extract_changed_line_numbers(diff_text: str) -> set[int]:
         """Extract changed target line numbers from unified diff text."""
 
-        return LegacyScopeGuard.extract_changed_line_numbers(diff_text)
+        return AttemptFileChangeBuilder.extract_touched_line_numbers(diff_text)
 
     @staticmethod
     def _find_out_of_scope_lines(scope: IssueEditScope, changed_lines: set[int]) -> list[int]:
@@ -647,7 +638,7 @@ class ClaudeFixAgent:
     ) -> str:
         """Build a unified diff for the current attempt only."""
 
-        return LegacyScopeGuard.build_content_diff(original_content, current_content, relative_path)
+        return AttemptFileChangeBuilder.build_content_diff(original_content, current_content, relative_path)
 
     @classmethod
     def _validate_issue_edit_scope(
@@ -824,52 +815,11 @@ class ClaudeFixAgent:
     ) -> tuple[ReviewedFileChange, ...]:
         """Build file-level diff facts for diff review."""
 
-        manifest = cls._load_attempt_state_manifest(workspace_path) or {}
-        files_root = cls._attempt_state_root(workspace_path) / "files"
-        existing_before = {
-            str(path).replace("\\", "/")
-            for path in manifest.get("existing_paths", [])
-            if str(path).strip()
-        }
-        file_changes: list[ReviewedFileChange] = []
-
-        for rel_path in sorted(
-            {
-                str(path).replace("\\", "/").lstrip("/")
-                for path in changed_files
-                if str(path).strip()
-            }
-        ):
-            current_file = workspace_path / rel_path
-            after_exists = current_file.is_file()
-            before_exists = rel_path in existing_before and (files_root / rel_path).is_file()
-            before_text = (
-                (files_root / rel_path).read_text(encoding="utf-8", errors="replace")
-                if before_exists
-                else ""
-            )
-            after_text = (
-                current_file.read_text(encoding="utf-8", errors="replace")
-                if after_exists
-                else ""
-            )
-            diff_text = cls._build_content_diff(before_text, after_text, rel_path)
-            if not diff_text and not before_exists and not after_exists:
-                continue
-            changed_lines = tuple(sorted(cls._extract_changed_line_numbers(diff_text)))
-            hunk_count = sum(1 for line in diff_text.splitlines() if line.startswith("@@ "))
-            file_changes.append(
-                ReviewedFileChange(
-                    file=rel_path,
-                    changed_lines=changed_lines,
-                    diff_text=diff_text,
-                    hunk_count=hunk_count,
-                    before_exists=before_exists,
-                    after_exists=after_exists,
-                )
-            )
-
-        return tuple(file_changes)
+        return AttemptFileChangeBuilder.build(
+            workspace_path=workspace_path,
+            changed_files=changed_files,
+            manifest=cls._load_attempt_state_manifest(workspace_path),
+        )
 
     def fix_issue(
         self,
@@ -1214,6 +1164,7 @@ class ClaudeFixAgent:
             build_passed = verification.build_passed
             build_output = verification.build_output
             scope_violation = verification.scope_violation
+            quality_gate_result = verification.quality_gate_result
 
             if not build_passed:
                 return FixResult(
@@ -1230,6 +1181,7 @@ class ClaudeFixAgent:
                     retryable_failure=True,
                     failure_kind="build",
                     reviewer_result=reviewer_result.to_dict(),
+                    quality_gate_result=quality_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
                     **result_metadata,
                 )
@@ -1249,6 +1201,7 @@ class ClaudeFixAgent:
                     retryable_failure=True,
                     failure_kind="scope",
                     reviewer_result=reviewer_result.to_dict(),
+                    quality_gate_result=quality_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
                     **result_metadata,
                 )
@@ -1268,6 +1221,27 @@ class ClaudeFixAgent:
                     retryable_failure=True,
                     failure_kind="reviewer",
                     reviewer_result=reviewer_result.to_dict(),
+                    quality_gate_result=quality_gate_result.to_dict(),
+                    follow_ups=reviewer_result.follow_ups,
+                    **result_metadata,
+                )
+
+            if quality_gate_result.status == "retry":
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=str(file_path),
+                    changes=changes,
+                    build_passed=build_passed,
+                    build_verification_failed=False,
+                    error="Quality gate verification failed",
+                    summary=f"Fixed {len(changes)} file(s)",
+                    build_command=resolved_build_command,
+                    build_output=quality_gate_result.to_retry_message(),
+                    retryable_failure=True,
+                    failure_kind="quality_gate",
+                    reviewer_result=reviewer_result.to_dict(),
+                    quality_gate_result=quality_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
                     **result_metadata,
                 )
@@ -1288,6 +1262,7 @@ class ClaudeFixAgent:
                     retryable_failure=True,
                     failure_kind="rule_validation",
                     reviewer_result=reviewer_result.to_dict(),
+                    quality_gate_result=quality_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
                     **result_metadata,
                 )
@@ -1302,6 +1277,7 @@ class ClaudeFixAgent:
                 build_command=resolved_build_command,
                 build_output=build_output,
                 reviewer_result=reviewer_result.to_dict(),
+                quality_gate_result=quality_gate_result.to_dict(),
                 follow_ups=reviewer_result.follow_ups,
                 **result_metadata,
             )

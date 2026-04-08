@@ -1,0 +1,20 @@
+{
+  "attempt_number": 1,
+  "status": "retrying",
+  "started_at": "2026-04-08T04:42:39.298883+00:00",
+  "finished_at": "2026-04-08T04:45:04.523752+00:00",
+  "duration_seconds": 145.225,
+  "failure_kind": "quality_gate",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "Quality gate verification failed",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+  ],
+  "issue_log_path": "logs\\issue_attempts\\BI_1e604e34-4ff3-456f-a21b-cd9e5ebb556c_20260408122214-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260408122214-01/1e604e34-4ff3-456f-a21b-cd9e5ebb556c/attempt-01"
+}

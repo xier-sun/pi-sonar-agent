@@ -2,8 +2,10 @@
   {
     "project_key": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0",
     "repository": "BI",
-    "author": "pengxiru@neware.com.cn",
-    "max_issues": 1,
+    "author": "liyinglin@neware.com.cn",
+    "reviewer_email": "pengxiru@neware.com.cn",
+    "dingtalk_userid": "17556530801301497",
+    "max_issues": 50,
     "solution_path": "OpenAuth.Core/OpenAuth.Core.WebApi.sln",
     "keep_workspace": false
   }

@@ -10,8 +10,11 @@ from typing import TYPE_CHECKING, Any
 
 from pi_sonar_agent.agent.rule_policies import get_rule_policy
 from pi_sonar_agent.agent.rule_validators import validate_rule_fix
-from pi_sonar_agent.core.diff_reviewer import DiffReviewer, ReviewedFileChange, ReviewerResult
-from pi_sonar_agent.core.scope_guard import IssueEditScope, LegacyScopeGuard
+from pi_sonar_agent.core.boundary_runtime import BoundaryRuntime
+from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange, ReviewerResult
+from pi_sonar_agent.core.quality_gate import QualityGateResult
+from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
+from pi_sonar_agent.core.scope_guard import IssueEditScope
 
 if TYPE_CHECKING:
     from pi_sonar_agent.agent.claude_agent import SonarIssue
@@ -26,6 +29,7 @@ class VerificationOutcome:
     reviewer_result: ReviewerResult
     reviewer_retry_message: str
     scope_violation: str | None
+    quality_gate_result: QualityGateResult
     combined_output: str
     rule_validation_message: str
 
@@ -168,22 +172,40 @@ class FixVerifier:
                 build_runner=build_runner,
             )
 
-        reviewer_result = DiffReviewer.review(
+        boundary_outcome = BoundaryRuntime.review(
+            issue_key=issue.key,
+            rule_id=issue.rule,
+            guardrail_mode=guardrail_mode,
             edit_contract=edit_contract,
-            file_changes=reviewed_changes,
+            reviewed_changes=reviewed_changes,
+            workspace_path=workspace_path,
+            issue=issue,
+            scope=scope,
+            original_issue_file_content=original_issue_file_content,
+            current_issue_file_content=current_issue_file_content,
+            scope_validator=scope_validator,
         )
-        reviewer_retry_message = reviewer_result.to_retry_message()
-        effective_scope_validator = scope_validator or LegacyScopeGuard.validate_issue_edit_scope
-        scope_violation = effective_scope_validator(
-            workspace_path,
-            issue,
-            scope,
-            original_content=original_issue_file_content,
-            current_content=current_issue_file_content,
-        )
+        reviewer_result = boundary_outcome.reviewer_result
+        reviewer_retry_message = boundary_outcome.reviewer_retry_message
+        scope_violation = boundary_outcome.scope_violation
         guardrail_message = scope_violation if guardrail_mode == "scope" else reviewer_retry_message
         combined_output_parts = [part for part in [build_output.strip(), guardrail_message] if part]
         combined_output = "\n\n".join(combined_output_parts)
+
+        quality_gate_result = QualityGateVerifier.review(
+            issue_file_path=issue.file_path,
+            edit_contract=edit_contract,
+            reviewed_changes=reviewed_changes,
+            original_issue_file_content=original_issue_file_content,
+            current_issue_file_content=current_issue_file_content,
+        )
+        if quality_gate_result.status == "retry":
+            quality_retry_message = quality_gate_result.to_retry_message()
+            combined_output = "\n\n".join(
+                part
+                for part in [combined_output.strip(), quality_retry_message]
+                if str(part).strip()
+            )
 
         rule_validation_message = ""
         if current_issue_file_content is not None:
@@ -196,6 +218,7 @@ class FixVerifier:
             reviewer_result=reviewer_result,
             reviewer_retry_message=reviewer_retry_message,
             scope_violation=scope_violation,
+            quality_gate_result=quality_gate_result,
             combined_output=combined_output,
             rule_validation_message=rule_validation_message,
         )

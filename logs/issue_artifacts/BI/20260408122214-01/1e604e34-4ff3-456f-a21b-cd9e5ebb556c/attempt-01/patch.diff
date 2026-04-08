@@ -1,0 +1,60 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs
+@@ -2388,29 +2388,6 @@
+             }
+
+         }
+
+ 
+
+-        /// <summary>
+
+-        /// 添加收款数据 (RC)
+
+-        /// </summary>
+
+-        private async Task AddReceiptsAsync(List<AgingRawItem> result, OverdueAgingChartReq req, Dictionary<int, string> slpDict)
+
+-        {
+
+-            var query = UnitWork.Find<ORCT>(null);
+
+-
+
+-            if (req.PostingDateFrom.HasValue) query = query.Where(o => o.DocDate >= req.PostingDateFrom.Value);
+
+-            if (req.PostingDateTo.HasValue) query = query.Where(o => o.DocDate <= req.PostingDateTo.Value);
+
+-            if (req.DueDateFrom.HasValue) query = query.Where(o => o.DocDueDate >= req.DueDateFrom.Value);
+
+-            if (req.DueDateTo.HasValue) query = query.Where(o => o.DocDueDate <= req.DueDateTo.Value);
+
+-            if (req.DocumentDateFrom.HasValue) query = query.Where(o => o.TaxDate >= req.DocumentDateFrom.Value);
+
+-            if (req.DocumentDateTo.HasValue) query = query.Where(o => o.TaxDate <= req.DocumentDateTo.Value);
+
+-
+
+-            // 不显示已对账交易时，只查询未清金额大于0的收款
+
+-            if (!req.ShowReconciledTransactions)
+
+-            {
+
+-                query = query.Where(o => o.OpenBal > 0);
+
+-            }
+
+-
+
+-            await AddReceiptsCaseAAsync(result, query, slpDict, req);
+
+-            await AddReceiptsCaseBAsync(result, query, slpDict, req);
+
+-        }
+
+ 
+
+         /// <summary>
+
+         /// 添加收款数据 - 情况A: U_XSDD 有值

@@ -72,6 +72,34 @@ class ReviewFailureContext:
 
 
 @dataclass(frozen=True)
+class QualityGateViolationContext:
+    """Structured hard quality-gate violation for retry analysis."""
+
+    rule_id: str
+    title: str
+    message: str
+    file: str = ""
+    line: int = 0
+    symbol: str = ""
+    evidence: str = ""
+    retry_hint: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
+
+
+@dataclass(frozen=True)
+class QualityGateFailureContext:
+    """Structured quality-gate rejection details for retry analysis."""
+
+    summary: str = ""
+    violations: tuple[QualityGateViolationContext, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
+
+
+@dataclass(frozen=True)
 class RetryContext:
     """Structured retry memory for the next issue attempt."""
 
@@ -88,6 +116,7 @@ class RetryContext:
     guidance: tuple[str, ...] = ()
     scope_violation: ScopeViolationContext | None = None
     review_failure: ReviewFailureContext | None = None
+    quality_gate_failure: QualityGateFailureContext | None = None
     model_timeout_summary: str = ""
     build_tool_failed: bool = False
     forbidden_tool_failed: bool = False
@@ -108,8 +137,10 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
     raw_output = str(retry_context.raw_output or "").strip()
     scope_violation = retry_context.scope_violation
     review_failure = retry_context.review_failure
+    quality_gate_failure = retry_context.quality_gate_failure
     has_scope_violation = scope_violation is not None
     has_review_failure = review_failure is not None
+    has_quality_gate_failure = quality_gate_failure is not None
     compiler_errors = list(retry_context.compiler_errors)
 
     if not compiler_errors:
@@ -175,6 +206,16 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                         *(review_failure.constraints if review_failure else ()),
                     ]
                 )
+            if has_quality_gate_failure:
+                sections = [
+                    "上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：",
+                    quality_gate_failure.summary if quality_gate_failure else raw_output,
+                ]
+                for index, item in enumerate(quality_gate_failure.violations if quality_gate_failure else (), start=1):
+                    sections.append(f"{index}. [{item.rule_id}] {item.title}: {item.message}")
+                    if item.retry_hint:
+                        sections.append(f"   重试提示: {item.retry_hint}")
+                return "\n".join(sections)
             return raw_output
         if retry_context.failure_kind == "no_change" or retry_context.error == "Agent completed without modifying any files":
             return "\n".join(
@@ -229,5 +270,12 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                 *(review_failure.constraints if review_failure else ()),
             ]
         )
+    if has_quality_gate_failure:
+        sections.append("另外，上次 patch 还没有通过 C# 质量门禁：")
+        sections.append(quality_gate_failure.summary if quality_gate_failure else "")
+        for index, item in enumerate(quality_gate_failure.violations if quality_gate_failure else (), start=1):
+            sections.append(f"{index}. [{item.rule_id}] {item.title}: {item.message}")
+            if item.retry_hint:
+                sections.append(f"   重试提示: {item.retry_hint}")
 
     return "\n".join(sections)

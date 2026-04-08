@@ -8,6 +8,7 @@ from pi_sonar_agent.core.artifact_writer import ArtifactWriter
 from pi_sonar_agent.core.diff_reviewer import ReviewerResult
 from pi_sonar_agent.core.issue_contract import ContractTargetSymbol, EditContract
 from pi_sonar_agent.core.issue_retry import capture_workspace_baseline, cleanup_workspace_baseline
+from pi_sonar_agent.core.quality_gate import QualityGateRule
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.state import (
     AttemptState,
@@ -98,6 +99,14 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
                 forbidden_change_kinds=("drive-by-refactor",),
                 validation_plan=("build", "diff_review"),
                 review_hints=("flag unrelated edits in the same file",),
+                quality_gate_rules=(
+                    QualityGateRule(
+                        rule_id="public_xml_docs",
+                        title="公开成员 XML 文档完整",
+                        summary="公开成员需要完整 XML 文档。",
+                        enforcement="hard",
+                    ),
+                ),
                 scope_mode="statement",
                 target_line_range=(1, 1),
                 validation_line_range=(1, 1),
@@ -108,6 +117,12 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
                 summary="Patch stays inside the declared issue contract.",
                 metrics={"changed_file_count": 1},
             ).to_dict(),
+            quality_gate_result={
+                "status": "pass",
+                "summary": "Hard quality gates passed.",
+                "applied_rule_ids": ["public_xml_docs"],
+                "soft_findings": [],
+            },
             guardrail_mode="contract_review",
         )
         attempt_state = AttemptState(
@@ -182,6 +197,9 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
         assert '"target_files": [' in edit_contract
         reviewer_result = bundle.reviewer_result_json.read_text(encoding="utf-8")
         assert '"status": "pass"' in reviewer_result
+        build_result = bundle.build_result_json.read_text(encoding="utf-8")
+        assert '"quality_gate_result": {' in build_result
+        assert '"applied_rule_ids": [' in build_result
         patch_text = bundle.patch_diff.read_text(encoding="utf-8")
         assert "--- a/tracked.cs" in patch_text
         assert "+++ b/tracked.cs" in patch_text

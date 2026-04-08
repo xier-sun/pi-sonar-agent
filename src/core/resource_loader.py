@@ -2,29 +2,39 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 DEFAULT_WORKSPACE_RULE_FILES = ("CLAUDE.md", "AGENTS.md")
 PROJECT_RULE_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CSHARP_QUALITY_GATE_FILE = PROJECT_RULE_ROOT / "data" / "csharp-quality-gate.md"
 
 
 class ResourceLoader:
     """Load optional markdown resources used during issue fixing."""
 
     @staticmethod
-    def strip_markdown_front_matter(text: str) -> str:
-        """Strip optional YAML front matter from a markdown file."""
+    def split_markdown_front_matter(text: str) -> tuple[str, str]:
+        """Split optional markdown front matter from the body text."""
 
         normalized = str(text or "").strip()
         if not normalized.startswith("---"):
-            return normalized
+            return "", normalized
 
         lines = normalized.splitlines()
         for index in range(1, len(lines)):
             if lines[index].strip() == "---":
-                return "\n".join(lines[index + 1:]).strip()
-        return normalized
+                return "\n".join(lines[1:index]).strip(), "\n".join(lines[index + 1:]).strip()
+        return "", normalized
+
+    @classmethod
+    def strip_markdown_front_matter(cls, text: str) -> str:
+        """Strip optional front matter from a markdown file."""
+
+        _, body = cls.split_markdown_front_matter(text)
+        return body
 
     @classmethod
     def load_markdown(cls, paths: Iterable[Path]) -> str:
@@ -42,6 +52,38 @@ class ResourceLoader:
             except Exception:
                 continue
         return ""
+
+    @classmethod
+    def load_markdown_document(cls, paths: Iterable[Path]) -> tuple[Path | None, str, str]:
+        """Return the first non-empty markdown resource with metadata and body."""
+
+        for path in paths:
+            try:
+                if not path.exists():
+                    continue
+                raw_text = path.read_text(encoding="utf-8", errors="replace")
+                metadata, body = cls.split_markdown_front_matter(raw_text)
+                content = body.strip()
+                if content:
+                    return path, metadata.strip(), content
+            except Exception:
+                continue
+        return None, "", ""
+
+    @classmethod
+    def load_json_front_matter(cls, paths: Iterable[Path]) -> tuple[Path | None, dict[str, Any], str]:
+        """Load JSON front matter and the markdown body from the first available file."""
+
+        path, metadata, body = cls.load_markdown_document(paths)
+        if not metadata:
+            return path, {}, body
+        try:
+            payload = json.loads(metadata)
+        except json.JSONDecodeError:
+            return path, {}, body
+        if isinstance(payload, dict):
+            return path, payload, body
+        return path, {}, body
 
     @classmethod
     def load_csharp_quality_gate(
