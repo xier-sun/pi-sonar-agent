@@ -5,7 +5,7 @@
     "author": "liyinglin@neware.com.cn",
     "reviewer_email": "pengxiru@neware.com.cn",
     "dingtalk_userid": "17556530801301497",
-    "max_issues": 50,
+    "max_issues": 40,
     "solution_path": "OpenAuth.Core/OpenAuth.Core.WebApi.sln",
     "keep_workspace": false
   }

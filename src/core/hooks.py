@@ -13,6 +13,8 @@ class ToolCallContext:
 
     tool_name: str
     decision: Any
+    payload: dict[str, Any]
+    preview: str = ""
 
 
 @dataclass(frozen=True)

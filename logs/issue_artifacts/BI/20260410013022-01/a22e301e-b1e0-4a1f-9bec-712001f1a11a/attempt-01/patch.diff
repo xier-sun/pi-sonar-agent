@@ -1,0 +1,142 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -126,24 +126,10 @@
+                     //遍历订单中所有有价物料，检查每个物料是否都已退完
+
+                     if( delivrdItemsInThisOrdr.All(x=> x.Value == (thisOrdrReturnItems.TryGetValue(x.Key,out var returnedQty) ? returnedQty : 0 )))
+
+                     {
+
+-                        // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+
+-                        var returnedZeroPriceQtyByItem = returnItemsWithDevEntry
+
+-                            .Where(x => x.Price == 0 && x.ResolvedDevEntry == group.Key)
+
+-                            .GroupBy(x => x.ItemCode)
+
+-                            .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+
+-                        // 未退的 Price=0 物料成本 = sum(未退数量 * LastPurPrc)
+
+-                        var fixedPenaltyAmount = delivrdItems
+
+-                            .Where(x => x.Price == 0 && x.DocEntry == group.Key)
+
+-                            .GroupBy(x => x.ItemCode)
+
+-                            .Sum(g =>
+
+-                            {
+
+-                                var totalDelivrdQty = g.Sum(s => s.DelivrdQty);
+
+-                                returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+
+-                                var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+
+-                                return unreturnedQty > 0 ? unreturnedQty * g.First().LastPurPrc : (decimal?)0;
+
+-                            });
+
++                        var returnedZeroPriceQtyByItem = GetReturnedQuantityByItem(returnItemsWithDevEntry, group.Key);
+
++                        var fixedPenaltyAmount = CalculateFixedPenaltyAmount(delivrdItems, group.Key, returnedZeroPriceQtyByItem);
+
+                         var slpCode = delivrdItems.FirstOrDefault(x => x.Price == 0 && x.DocEntry == group.Key)?.SlpCode;
+
+-                        
+
++
+
+                         if(fixedPenaltyAmount.HasValue && fixedPenaltyAmount != 0)
+
+                         {
+
+                             var PenaltyEvent = new PenaltyEventData
+
+@@ -153,7 +139,7 @@
+                                 SlpName = slpCodeToNameMap[slpCode.Value],
+
+                                 TriggerDocType = "ORDR",
+
+                                 TriggerDocEntry = group.Key.ToString(),
+
+-                                SEDocEntry = group.Key, 
+
++                                SEDocEntry = group.Key,
+
+                                 PenaltyBaseAmount = fixedPenaltyAmount.Value,
+
+                                 TriggerEventDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
+                                 PenaltyStartDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
+@@ -171,6 +157,34 @@
+         }
+
+ 
+
+         /// <summary>
+
++        /// 获取退货单中指定订单的 Price=0 物料已退数量汇总
+
++        /// </summary>
+
++        private Dictionary<string, decimal> GetReturnedQuantityByItem(IEnumerable<dynamic> returnItemsWithDevEntry, int ordDocEntry)
+
++        {
+
++            return returnItemsWithDevEntry
+
++                .Where(x => x.Price == 0 && x.ResolvedDevEntry == ordDocEntry)
+
++                .GroupBy(x => x.ItemCode)
+
++                .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+
++        }
+
++
+
++        /// <summary>
+
++        /// 计算未退的 Price=0 物料成本罚息金额
+
++        /// </summary>
+
++        private decimal? CalculateFixedPenaltyAmount(IEnumerable<dynamic> delivrdItems, int ordDocEntry, Dictionary<string, decimal> returnedZeroPriceQtyByItem)
+
++        {
+
++            return delivrdItems
+
++                .Where(x => x.Price == 0 && x.DocEntry == ordDocEntry)
+
++                .GroupBy(x => x.ItemCode)
+
++                .Sum(g =>
+
++                {
+
++                    var totalDelivrdQty = g.Sum(s => s.DelivrdQty);
+
++                    returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+
++                    var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+
++                    return unreturnedQty > 0 ? unreturnedQty * g.First().LastPurPrc : (decimal?)0;
+
++                });
+
++        }
+
++
+
++        /// <summary>
+
+         /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号
+
+         /// </summary>
+
+         private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync(

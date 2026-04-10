@@ -1,0 +1,18 @@
+{
+  "attempt_number": 3,
+  "status": "skipped",
+  "started_at": "2026-04-08T07:26:29.499320+00:00",
+  "finished_at": "2026-04-08T07:31:03.232901+00:00",
+  "duration_seconds": 273.73,
+  "failure_kind": "",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "error": "'NoneType' object is not iterable",
+  "skip_reason": "'NoneType' object is not iterable",
+  "summary": "",
+  "changed_files": [],
+  "issue_log_path": "logs\\issue_attempts\\BI_ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4_20260408151608-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260408151608-01/ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4/attempt-03"
+}

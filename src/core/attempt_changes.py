@@ -157,6 +157,7 @@ class AttemptFileChangeBuilder:
         files_root: Path,
         rel_path: str,
         manifest: dict[str, object],
+        fallback_before_texts: dict[str, str] | None = None,
     ) -> tuple[bool, str]:
         existing_before = {
             str(path).replace("\\", "/")
@@ -164,6 +165,11 @@ class AttemptFileChangeBuilder:
             if str(path).strip()
         }
         normalized_path = str(rel_path or "").replace("\\", "/").lstrip("/")
+        fallback_lookup = {
+            str(path).replace("\\", "/").lstrip("/"): str(text)
+            for path, text in (fallback_before_texts or {}).items()
+            if str(path).strip()
+        }
 
         if normalized_path in existing_before:
             snapshot_file = files_root / normalized_path
@@ -175,6 +181,10 @@ class AttemptFileChangeBuilder:
         if git_text is not None:
             return True, git_text
 
+        fallback_text = fallback_lookup.get(normalized_path)
+        if fallback_text is not None:
+            return True, fallback_text
+
         return False, ""
 
     @classmethod
@@ -184,6 +194,7 @@ class AttemptFileChangeBuilder:
         workspace_path: Path,
         changed_files: tuple[str, ...] | list[str],
         manifest: dict[str, object] | None = None,
+        fallback_before_texts: dict[str, str] | None = None,
     ) -> tuple[ReviewedFileChange, ...]:
         """Build reviewed file changes from the attempt baseline and workspace."""
 
@@ -205,6 +216,7 @@ class AttemptFileChangeBuilder:
                 files_root=files_root,
                 rel_path=rel_path,
                 manifest=normalized_manifest,
+                fallback_before_texts=fallback_before_texts,
             )
             after_text = cls._read_text_file(current_file) if after_exists else ""
 

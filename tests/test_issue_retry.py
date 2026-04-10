@@ -6,12 +6,14 @@ from pathlib import Path
 
 from pi_sonar_agent.agent.claude_agent import FixResult, SonarIssue
 from pi_sonar_agent.core.issue_retry import (
+    _summarize_model_timeout,
     build_retry_feedback,
     capture_workspace_baseline,
     cleanup_workspace_baseline,
     process_issue_with_retries,
     restore_workspace_baseline,
 )
+from pi_sonar_agent.core.lessons_store import LessonsStore
 
 
 def _run_git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -140,6 +142,7 @@ def test_process_issue_with_retries_skips_after_three_build_failures(tmp_path) -
         build_command='dotnet build "tracked.sln"',
         repository="repo",
         run_label="run2",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
         max_build_retries=3,
     )
 
@@ -174,6 +177,7 @@ def test_process_issue_with_retries_skips_after_three_build_failures(tmp_path) -
     assert (Path(result.artifact_root) / "attempt-01" / "attempt_summary.json").exists()
     assert (Path(result.artifact_root) / "attempt-01" / "build_result.json").exists()
     assert (Path(result.artifact_root) / "attempt-01" / "patch.diff").exists()
+    assert (Path(result.artifact_root) / "compliance_summary.json").exists()
 
 
 def test_process_issue_with_retries_retries_when_agent_makes_no_changes(tmp_path) -> None:
@@ -216,6 +220,7 @@ def test_process_issue_with_retries_retries_when_agent_makes_no_changes(tmp_path
         build_command='dotnet build "tracked.sln"',
         repository="repo",
         run_label="run-no-change",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
         max_build_retries=3,
     )
 
@@ -253,6 +258,30 @@ def test_build_retry_feedback_preserves_scope_violation_details(tmp_path) -> Non
     assert "Allowed lines: 72-72" in feedback
     assert "Changed lines outside scope: 141, 186" in feedback
     assert "如果这是行级问题，只修改包含 issue 行的那条语句。" in feedback
+
+
+def test_summarize_model_timeout_uses_specific_stage_labels() -> None:
+    assert _summarize_model_timeout("", "post_edit_stall") == "在 Edit 工具返回后等待模型继续响应时超时"
+    assert _summarize_model_timeout("", "post_summary_stall") == "在修复已完成后的总结阶段超时"
+
+
+def test_retry_feedback_mentions_patch_salvage_for_model_timeout() -> None:
+    result = FixResult(
+        success=False,
+        issue_key="issue-timeout-salvage",
+        file_path="tracked.cs",
+        error="Model response timed out",
+        build_output="模型在 180 秒内没有返回后续响应",
+        retryable_failure=True,
+        failure_kind="model_timeout",
+        model_timeout_stage="post_edit_stall",
+        patch_salvaged=True,
+    )
+
+    feedback = build_retry_feedback(Path("."), result)
+
+    assert "在 Edit 工具返回后等待模型继续响应时超时" in feedback
+    assert "已检测到有效 patch 并尝试回收验证" in feedback
 
 
 def test_build_retry_feedback_guides_s3358_toward_local_expression_rewrite(tmp_path) -> None:
@@ -381,7 +410,10 @@ def test_build_retry_feedback_includes_forbidden_tool_constraints(tmp_path) -> N
     feedback = build_retry_feedback(repo, result)
 
     assert "被禁止的工具" in feedback
-    assert "严禁使用 Bash、git_add、git_commit、git_push" in feedback
+    assert "严禁使用 git_add、git_commit、git_push" in feedback
+    assert "如果使用 shell 工具（工具名 Bash）" in feedback
+    assert "bash 兼容命令" in feedback
+    assert "严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码" in feedback
     assert "提交由外层流程统一处理" in feedback
 
 
@@ -447,7 +479,7 @@ def test_build_retry_feedback_includes_quality_gate_failures(tmp_path) -> None:
         failure_kind="quality_gate",
         quality_gate_result={
             "status": "retry",
-            "summary": "Quality gate rejected the patch with 1 hard violation(s).",
+            "summary": "Quality gate rejected the patch with 3 hard violation(s).",
             "violations": [
                 {
                     "rule_id": "public_xml_docs",
@@ -456,6 +488,22 @@ def test_build_retry_feedback_includes_quality_gate_failures(tmp_path) -> None:
                     "file": "tracked.cs",
                     "line": 12,
                     "retry_hint": "只补当前 patch 触达的公开成员 XML 文档。",
+                },
+                {
+                    "rule_id": "async_signature",
+                    "title": "异步签名规范",
+                    "message": "异步方法 Save 没有以 Async 结尾。",
+                    "file": "tracked.cs",
+                    "line": 12,
+                    "retry_hint": "如果当前修改触达异步方法，优先保持 Async 命名、Task 返回值和 async/await 配套。",
+                },
+                {
+                    "rule_id": "async_requires_await",
+                    "title": "异步方法必须真正 await",
+                    "message": "异步方法 SaveAsync 没有实际 await。",
+                    "file": "tracked.cs",
+                    "line": 14,
+                    "retry_hint": "不要保留没有 await 的 async 方法。",
                 }
             ],
         },
@@ -466,3 +514,38 @@ def test_build_retry_feedback_includes_quality_gate_failures(tmp_path) -> None:
     assert "没有通过 C# 质量门禁" in feedback
     assert "public_xml_docs" in feedback
     assert "只补当前 patch 触达的公开成员 XML 文档" in feedback
+    assert "同步接口声明、调用点和 nameof(...)" in feedback
+    assert "移除 async 并改成同步方法" in feedback
+    assert "只修这些门禁问题，保留已经通过的其它改动" in feedback
+
+
+def test_build_retry_feedback_includes_plan_precheck_conflict(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-plan-conflict",
+        file_path="tracked.cs",
+        error="Plan precheck rejected the edit.",
+        build_output="Plan 预检发现本次修复需要 signature_change，但当前 contract 不允许该能力。",
+        failure_kind="plan_conflict",
+        plan_precheck={
+            "status": "conflict",
+            "blocking": True,
+            "code": "signature_change_not_allowed",
+            "summary": "Plan 预检发现本次修复需要 signature_change，但当前 contract 不允许该能力。",
+            "details": [
+                "当前结构化 plan 预计需要修改方法签名/名称，但 EditContract 未声明 signature_change capability。"
+            ],
+            "guidance": [
+                "如果该规则必须修改方法名或方法签名，请先让 planner/contract 显式放开 signature_change。"
+            ],
+        },
+    )
+
+    feedback = build_retry_feedback(repo, result)
+
+    assert "Plan 预检阶段" in feedback
+    assert "signature_change_not_allowed" in feedback or "signature_change" in feedback
+    assert "显式放开 signature_change" in feedback

@@ -1,0 +1,15 @@
+[2026-04-08 20:44:03] Attempt 1/3 started for 3b716a5c-3460-4183-8d7e-820d2e11387f
+[2026-04-08 20:47:06] Attempt 1 failed: Model response timed out
+[2026-04-08 20:47:06] Build failure report:
+错误: Model response timed out
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+模型在 180 秒内没有返回后续响应
+取消原因: follow_up_response_timeout
+清理动作: interrupt, close_response_stream, disconnect
+[2026-04-08 20:47:06] Workspace restored to issue baseline
+[2026-04-08 20:47:06] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 20:47:06] Attempt 2/3 started for 3b716a5c-3460-4183-8d7e-820d2e11387f
+[2026-04-08 20:52:20] Attempt 2 succeeded: Fixed 1 file(s)

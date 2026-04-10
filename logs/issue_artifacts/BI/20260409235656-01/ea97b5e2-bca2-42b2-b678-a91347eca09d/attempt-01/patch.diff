@@ -1,0 +1,111 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IPenaltyCalculationService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IPenaltyCalculationService.cs
+@@ -5,16 +5,16 @@
+ namespace OpenAuth.App.Finance.Interfaces
+
+ {
+
+     /// <summary>
+
+-    /// 
+
++    /// 罚款计算服务接口
+
+     /// </summary>
+
+     public interface IPenaltyCalculationService : IDependency
+
+     {
+
+         /// <summary>
+
+-        /// 
+
++        /// 执行后台罚款计算任务
+
+         /// </summary>
+
+-        /// <param name="jobRunId"></param>
+
++        /// <param name="jobRunId">任务运行ID</param>
+
+         /// <returns></returns>
+
+-        Task BackgroundService(string jobRunId);
+
++        Task BackgroundServiceAsync(string jobRunId);
+
+         /// <summary>
+
+         ///
+
+         /// </summary>
+
+--- a/OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs
+@@ -44,11 +44,11 @@
+             _ledgerService = ledgerService;
+
+         }
+
+         /// <summary>
+
+-        /// 
+
++        /// 执行后台罚款计算任务
+
+         /// </summary>
+
+-        /// <param name="jobRunId"></param>
+
++        /// <param name="jobRunId">任务运行ID</param>
+
+         /// <returns></returns>
+
+-        public async Task BackgroundService(string jobRunId)
+
++        public async Task BackgroundServiceAsync(string jobRunId)
+
+         {
+
+             // 获取所有活跃的罚款事件
+
+             var allActive = await UnitWork.Find<PenaltyRuleDefinition>(r => r.IsActive).ToListAsync();
+
+--- a/OpenAuth.Core/OpenAuth.App/Jobs/SlpPenalty/PenaltyCalculationJob.cs
++++ b/OpenAuth.Core/OpenAuth.App/Jobs/SlpPenalty/PenaltyCalculationJob.cs
+@@ -31,7 +31,7 @@
+         public async Task Execute(IJobExecutionContext context)
+
+         {
+
+                 var jobId = context.MergedJobDataMap.GetString(Define.JOBMAPKEY);
+
+-                await _calculationService.BackgroundService(jobId);
+
++                await _calculationService.BackgroundServiceAsync(jobId);
+
+                 _openJobApp.RecordRun(jobId);
+
+             
+
+         }
+
+--- a/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/PenaltyController.cs
++++ b/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/PenaltyController.cs
+@@ -49,7 +49,7 @@
+         public async Task<Response<string>> ExecutePenaltyCalculationJob()
+
+         {
+
+             var jobRunId = "TEST_" + DateTime.Now.ToString("yyyyMMddHHmmss");
+
+-            await _penaltyCalculationService.BackgroundService(jobRunId);
+
++            await _penaltyCalculationService.BackgroundServiceAsync(jobRunId);
+
+             return new Response<string> { Message = "罚款计算任务执行成功", Result = jobRunId };
+
+         }
+
+         /// <summary>

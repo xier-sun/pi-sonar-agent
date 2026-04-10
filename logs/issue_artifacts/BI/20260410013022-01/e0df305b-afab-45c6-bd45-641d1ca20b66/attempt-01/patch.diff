@@ -1,0 +1,34 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
+@@ -454,16 +454,12 @@
+         /// <summary>
+
+         /// 批量预加载所有需要的共享数据
+
+         /// </summary>
+
+-        private async Task<SharedDataCache> PreloadSharedData(List<ORDR> orders)
+
++        private async Task<SharedDataCache> PreloadSharedDataAsync(List<ORDR> orders)
+
+         {
+
+             var orderIds = orders.Select(o => o.DocEntry).ToList();
+
+-
+
+             var cache = new SharedDataCache();
+
+ 
+
+-            // 1. 加载所有业务员信息
+
+             cache.SlpNames = await UnitWork.Find<OSLP>(null).ToDictionaryAsync(x => x.SlpCode, x => x.SlpName);
+
+-
+
+-            // 2. 加载所有客户类型信息
+
+             var customerTypesList = await _customerCommonApp.GetMainlandCustomerType();
+
+             cache.CustomerTypes = customerTypesList.ToDictionary(ct => ct.CardCode, ct => ct);

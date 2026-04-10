@@ -1,0 +1,453 @@
+{
+  "success": false,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "retryable_failure": true,
+  "failure_kind": "quality_gate",
+  "error": "Quality gate verification failed",
+  "skip_reason": "",
+  "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+  "build_output": "Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:\n1. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessResolvedEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:125\n   Evidence: } } /// <summary> /// 处理已解决事件（结案） /// </summary> private async Task<List<PenaltyEvent>> ProcessResolvedEventsAsync(List<ResolvedEventInfo> resolvedEvents) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n2. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessResolvedEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:126\n   Evidence: } /// <summary> /// 处理已解决事件（结案） /// </summary> private async Task<List<PenaltyEvent>> ProcessResolvedEventsAsync(List<ResolvedEventInfo> resolvedEvents) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n3. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessResolvedEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:131\n   Evidence: private async Task<List<PenaltyEvent>> ProcessResolvedEventsAsync(List<ResolvedEventInfo> resolvedEvents) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n4. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessCanceledEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:150\n   Evidence: return updatePenaltyEventList; } /// <summary> /// 处理已取消事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessCanceledEventsAsync(List<CanceledEventInfo> canceledEvents) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n5. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessCanceledEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:151\n   Evidence: } /// <summary> /// 处理已取消事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessCanceledEventsAsync(List<CanceledEventInfo> canceledEvents) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n6. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessCanceledEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:156\n   Evidence: private async Task<List<PenaltyEvent>> ProcessCanceledEventsAsync(List<CanceledEventInfo> canceledEvents) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。",
+  "guardrail_mode": "scope",
+  "quality_gate_result": {
+    "status": "retry",
+    "summary": "Quality gate rejected the patch with 6 hard violation(s).",
+    "applied_rule_ids": [
+      "public_xml_docs",
+      "async_signature",
+      "async_requires_await",
+      "linq_method_syntax",
+      "cognitive_complexity",
+      "zero_redundant_code",
+      "static_preferred",
+      "sealed_preferred",
+      "constructor_dependency_injection",
+      "business_comments_chinese",
+      "finance_terms_chinese"
+    ],
+    "violations": [
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ProcessResolvedEventsAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 125,
+        "symbol": "ProcessResolvedEventsAsync@125-137",
+        "evidence": "} } /// <summary> /// 处理已解决事件（结案） /// </summary> private async Task<List<PenaltyEvent>> ProcessResolvedEventsAsync(List<ResolvedEventInfo> resolvedEvents) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ProcessResolvedEventsAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 126,
+        "symbol": "ProcessResolvedEventsAsync@126-137",
+        "evidence": "} /// <summary> /// 处理已解决事件（结案） /// </summary> private async Task<List<PenaltyEvent>> ProcessResolvedEventsAsync(List<ResolvedEventInfo> resolvedEvents) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ProcessResolvedEventsAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 131,
+        "symbol": "ProcessResolvedEventsAsync@131-137",
+        "evidence": "private async Task<List<PenaltyEvent>> ProcessResolvedEventsAsync(List<ResolvedEventInfo> resolvedEvents) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ProcessCanceledEventsAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 150,
+        "symbol": "ProcessCanceledEventsAsync@150-162",
+        "evidence": "return updatePenaltyEventList; } /// <summary> /// 处理已取消事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessCanceledEventsAsync(List<CanceledEventInfo> canceledEvents) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ProcessCanceledEventsAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 151,
+        "symbol": "ProcessCanceledEventsAsync@151-162",
+        "evidence": "} /// <summary> /// 处理已取消事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessCanceledEventsAsync(List<CanceledEventInfo> canceledEvents) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ProcessCanceledEventsAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 156,
+        "symbol": "ProcessCanceledEventsAsync@156-162",
+        "evidence": "private async Task<List<PenaltyEvent>> ProcessCanceledEventsAsync(List<CanceledEventInfo> canceledEvents) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      }
+    ],
+    "soft_findings": [
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessNewEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 83,
+        "symbol": "ProcessNewEventsAsync@83-97",
+        "evidence": "} /// <summary> /// 处理新事件（立案） /// </summary> private async Task ProcessNewEventsAsync(List<PenaltyEventData> newEvents) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessNewEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 88,
+        "symbol": "ProcessNewEventsAsync@88-97",
+        "evidence": "private async Task ProcessNewEventsAsync(List<PenaltyEventData> newEvents) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessResolvedEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 125,
+        "symbol": "ProcessResolvedEventsAsync@125-137",
+        "evidence": "} } /// <summary> /// 处理已解决事件（结案） /// </summary> private async Task<List<PenaltyEvent>> ProcessResolvedEventsAsync(List<ResolvedEventInfo> resolvedEvents) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessResolvedEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 126,
+        "symbol": "ProcessResolvedEventsAsync@126-137",
+        "evidence": "} /// <summary> /// 处理已解决事件（结案） /// </summary> private async Task<List<PenaltyEvent>> ProcessResolvedEventsAsync(List<ResolvedEventInfo> resolvedEvents) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessResolvedEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 131,
+        "symbol": "ProcessResolvedEventsAsync@131-137",
+        "evidence": "private async Task<List<PenaltyEvent>> ProcessResolvedEventsAsync(List<ResolvedEventInfo> resolvedEvents) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessCanceledEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 150,
+        "symbol": "ProcessCanceledEventsAsync@150-162",
+        "evidence": "return updatePenaltyEventList; } /// <summary> /// 处理已取消事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessCanceledEventsAsync(List<CanceledEventInfo> canceledEvents) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessCanceledEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 151,
+        "symbol": "ProcessCanceledEventsAsync@151-162",
+        "evidence": "} /// <summary> /// 处理已取消事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessCanceledEventsAsync(List<CanceledEventInfo> canceledEvents) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessCanceledEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 156,
+        "symbol": "ProcessCanceledEventsAsync@156-162",
+        "evidence": "private async Task<List<PenaltyEvent>> ProcessCanceledEventsAsync(List<CanceledEventInfo> canceledEvents) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 UpdatePenaltyEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 173,
+        "symbol": "UpdatePenaltyEventsAsync@173-185",
+        "evidence": "return updatePenaltyEventList; } /// <summary> /// 批量更新罚款事件 /// </summary> private async Task UpdatePenaltyEventsAsync(List<PenaltyEvent> updatePenaltyEventList) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 UpdatePenaltyEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 174,
+        "symbol": "UpdatePenaltyEventsAsync@174-185",
+        "evidence": "} /// <summary> /// 批量更新罚款事件 /// </summary> private async Task UpdatePenaltyEventsAsync(List<PenaltyEvent> updatePenaltyEventList) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 UpdatePenaltyEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 179,
+        "symbol": "UpdatePenaltyEventsAsync@179-185",
+        "evidence": "private async Task UpdatePenaltyEventsAsync(List<PenaltyEvent> updatePenaltyEventList) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 UpdateAuditAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 184,
+        "symbol": "UpdateAuditAsync@184-192",
+        "evidence": "} } /// <summary> /// 更新审计记录 /// </summary> private async Task UpdateAuditAsync(string handlerCode) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 UpdateAuditAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 185,
+        "symbol": "UpdateAuditAsync@185-192",
+        "evidence": "} /// <summary> /// 更新审计记录 /// </summary> private async Task UpdateAuditAsync(string handlerCode) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 UpdateAuditAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 190,
+        "symbol": "UpdateAuditAsync@190-192",
+        "evidence": "private async Task UpdateAuditAsync(string handlerCode) {"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 85,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 87,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 128,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 130,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 153,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 155,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 176,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 178,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 187,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+        "line": 189,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      }
+    ]
+  },
+  "boundary_failure_code": "",
+  "boundary_failure_summary": "",
+  "secondary_boundary_failure_codes": [],
+  "performance_metrics": {
+    "runtime_total_duration_seconds": 439.325,
+    "time_to_first_model_content_seconds": 0.578,
+    "time_after_first_edit_to_finalize_seconds": 178.293,
+    "tool_call_count": 7,
+    "read_call_count": 5,
+    "edit_call_count": 2,
+    "assistant_text_events": 5,
+    "assistant_text_chars": 958,
+    "model_timeout_stage": "",
+    "last_progress_stage": "result_message",
+    "saw_result_event": true,
+    "execution_profile": "full_path",
+    "fast_path_enabled": false,
+    "effective_max_turns": 10,
+    "patch_salvaged": false,
+    "build_duration_seconds": 0.0,
+    "build_invoked": false,
+    "validation_pipeline": [
+      "build",
+      "scope_review",
+      "diff_review"
+    ],
+    "verification_schedule": {
+      "run_boundary_first": true,
+      "run_quality_gate_before_build": true,
+      "run_rule_validation_before_build": true,
+      "skip_build_on_precheck_failure": true,
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.layered_verification",
+        "perf.patch_salvage",
+        "perf.fast_path_max_turns=6"
+      ]
+    }
+  },
+  "model_timeout_stage": "",
+  "patch_salvaged": false,
+  "compliance_summary": {
+    "status": "retry",
+    "summary": "Quality gate rejected the patch with 6 hard violation(s).",
+    "source_path": "D:/MyProjects/pi-sonar-agent/data/csharp-quality-gate.md",
+    "hard_rule_count": 5,
+    "soft_rule_count": 6,
+    "passed_rule_count": 8,
+    "failed_rule_count": 1,
+    "soft_finding_count": 24,
+    "not_applicable_count": 0,
+    "checks": [
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "本次新增或改写的公开类、公开方法、公开属性、公开实体必须有完整 XML 文档注释。",
+        "message": ""
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "异步方法必须以 Async 结尾，返回 Task/Task<T>，严禁 async void（事件处理器除外）。",
+        "message": ""
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "enforcement": "hard",
+        "status": "failed",
+        "summary": "异步方法内部如果没有 await，应改为同步方法或直接返回 Task。",
+        "message": "异步方法 ProcessCanceledEventsAsync 没有实际 await。"
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "新增或改写的 LINQ 表达式优先使用方法语法，不要引入 query syntax。",
+        "message": ""
+      },
+      {
+        "rule_id": "cognitive_complexity",
+        "title": "单方法认知复杂度不超过 30",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "触达的方法应通过提取子方法、提前返回等方式控制认知复杂度。",
+        "message": ""
+      },
+      {
+        "rule_id": "zero_redundant_code",
+        "title": "零冗余代码",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "不要在当前 patch 中留下未使用变量、方法、类或 using。",
+        "message": ""
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "enforcement": "soft",
+        "status": "soft_finding",
+        "summary": "如果新增方法不依赖实例状态，优先标记为 static。",
+        "message": "私有方法 ProcessNewEventsAsync 看起来不依赖实例状态，可考虑标记为 static。"
+      },
+      {
+        "rule_id": "sealed_preferred",
+        "title": "新增不继承的类优先 sealed",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "如果新增类不打算被继承，优先使用 sealed。",
+        "message": ""
+      },
+      {
+        "rule_id": "constructor_dependency_injection",
+        "title": "优先构造函数注入",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "依赖注入优先通过构造函数注入接口，并保持当前仓库既有注册模式一致。",
+        "message": ""
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "enforcement": "soft",
+        "status": "soft_finding",
+        "summary": "新增业务逻辑注释优先使用专业中文表达。",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。"
+      },
+      {
+        "rule_id": "finance_terms_chinese",
+        "title": "财务术语保持专业中文",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "财务及核心业务术语应保持专业中文表达，例如罚息、应收账款、账务、呆滞库存、订单取消。",
+        "message": ""
+      }
+    ]
+  },
+  "follow_up_log_path": ""
+}

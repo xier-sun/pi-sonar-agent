@@ -1,9 +1,9 @@
 {
   "attempt_number": 2,
   "status": "retrying",
-  "started_at": "2026-04-08T06:17:08.100618+00:00",
-  "finished_at": "2026-04-08T06:17:08.101136+00:00",
-  "duration_seconds": 0.001,
+  "started_at": "2026-04-09T15:50:35.856988+00:00",
+  "finished_at": "2026-04-09T15:50:35.857391+00:00",
+  "duration_seconds": 0.0,
   "failure_kind": "no_change",
   "retry_reason": "retryable_failure",
   "retryable_failure": true,
@@ -13,6 +13,12 @@
   "skip_reason": "",
   "summary": "Fixed 0 file(s)",
   "changed_files": [],
+  "boundary_failure_code": "",
+  "secondary_boundary_failure_codes": [],
   "issue_log_path": "logs\\issue_attempts\\repo_issue-no-change_run-no-change.log",
-  "artifact_dir": "logs/issue_artifacts/repo/run-no-change/issue-no-change/attempt-02"
+  "artifact_dir": "logs/issue_artifacts/repo/run-no-change/issue-no-change/attempt-02",
+  "performance_metrics": {
+    "attempt_total_duration_seconds": 0.0
+  },
+  "rollout_flags": []
 }

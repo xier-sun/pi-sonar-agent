@@ -1,0 +1,55 @@
+{
+  "issue_key": "bbd7c135-ef72-4de4-bc0f-b7f36e008062",
+  "repository": "BI",
+  "run_label": "20260410013022-01",
+  "rule_id": "csharpsquid:S107",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs",
+  "line": 869,
+  "status": "skipped",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "skipped",
+      "started_at": "2026-04-09T19:14:12.471152+00:00",
+      "finished_at": "2026-04-09T19:14:12.472609+00:00",
+      "duration_seconds": 0.001,
+      "failure_kind": "policy_skip",
+      "retry_reason": "none",
+      "retryable_failure": false,
+      "build_passed": false,
+      "build_verification_failed": false,
+      "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+      "summary": "Skipped by rule policy",
+      "changed_files": [],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_bbd7c135-ef72-4de4-bc0f-b7f36e008062_20260410013022-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260410013022-01/bbd7c135-ef72-4de4-bc0f-b7f36e008062/attempt-01",
+      "performance_metrics": {
+        "attempt_total_duration_seconds": 0.001
+      },
+      "rollout_flags": []
+    }
+  ],
+  "final_failure_kind": "policy_skip",
+  "final_error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+  "final_skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+  "final_summary": "Skipped by rule policy",
+  "final_boundary_failure_code": "",
+  "final_secondary_boundary_failure_codes": [],
+  "artifact_root": "logs/issue_artifacts/BI/20260410013022-01/bbd7c135-ef72-4de4-bc0f-b7f36e008062",
+  "performance_summary": {
+    "issue_attempt_count": 1,
+    "issue_total_duration_seconds": 0.001,
+    "avg_attempt_duration_seconds": 0.001,
+    "model_timeout_attempts": 0,
+    "scope_reject_attempts": 0,
+    "boundary_hard_reject_attempts": 0,
+    "build_invocation_count": 0,
+    "follow_up_timeout_attempts": 0,
+    "patch_salvaged_attempts": 0,
+    "rollout_flags": []
+  },
+  "rollout_flags": []
+}

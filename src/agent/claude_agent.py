@@ -8,10 +8,9 @@ This module provides the main agent class that:
 """
 
 import json
-import os
 import shutil
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -30,20 +29,39 @@ from pi_sonar_agent.agent.rule_policies import (
     STATEMENT_SCOPE_MODE,
     get_rule_policy,
 )
-from pi_sonar_agent.core.agent_runtime import AgentRuntime, AgentRuntimeError, RuntimeTimeouts
+from pi_sonar_agent.core.agent_runtime import (
+    AgentRuntime,
+    AgentRuntimeError,
+    AgentRuntimeResult,
+    RuntimeTimeouts,
+)
 from pi_sonar_agent.core.attempt_changes import AttemptFileChangeBuilder
+from pi_sonar_agent.core.attempt_context import AttemptContextCache
+from pi_sonar_agent.core.attempt_scheduler import AttemptScheduler
 from pi_sonar_agent.core.claude_adapter import ClaudeAdapter, ClaudeSDKDependencies
+from pi_sonar_agent.core.continuation_recovery import ContinuationRecovery
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange
 from pi_sonar_agent.core.editor_policy import EditorPolicy
+from pi_sonar_agent.core.events import AttemptRuntimeEvent, AttemptRuntimeEventKind
 from pi_sonar_agent.core.fix_verifier import FixVerifier
 from pi_sonar_agent.core.hooks import HookPipeline
 from pi_sonar_agent.core.issue_planner import IssuePlanner
 from pi_sonar_agent.core.issue_prompt import IssuePromptBuilder
+from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.policy import ToolPolicy
+from pi_sonar_agent.core.project_env import read_project_env
+from pi_sonar_agent.core.quality_gate import render_quality_gate_prompt
 from pi_sonar_agent.core.registry import build_fix_tool_registry
 from pi_sonar_agent.core.resource_loader import DEFAULT_CSHARP_QUALITY_GATE_FILE, ResourceLoader
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.scope_guard import IssueEditScope, LegacyScopeGuard
+from pi_sonar_agent.core.tool_surface import (
+    BASE_BUILTIN_FIX_TOOLS,
+    CONTROLLED_BASH_TOOL,
+    build_allowed_fix_tool_rules,
+    build_fix_runtime_tools,
+    controlled_bash_enabled,
+)
 
 # ============== Data Classes ==============
 
@@ -93,26 +111,30 @@ class FixResult:
     retryable_failure: bool = False
     failure_kind: str = ""
     edit_contract: Any | None = None
+    repair_plan: Any | None = None
+    plan_precheck: Any | None = None
     reviewer_result: Any | None = None
     quality_gate_result: Any | None = None
     follow_ups: tuple[Any, ...] = ()
     guardrail_mode: str = ""
     follow_up_log_path: str = ""
+    boundary_failure_code: str = ""
+    boundary_failure_summary: str = ""
+    secondary_boundary_failure_codes: tuple[str, ...] = ()
+    performance_metrics: dict[str, Any] = field(default_factory=dict)
+    execution_profile: str = "full_path"
+    fast_path_enabled: bool = False
+    rollout_flags: tuple[str, ...] = ()
+    model_timeout_stage: str = ""
+    patch_salvaged: bool = False
+    attempt_events: tuple[Any, ...] = ()
 
-BUILTIN_FIX_TOOLS = [
-    "Read",
-    "Edit",
-    "MultiEdit",
-    "Write",
-    "Grep",
-    "Glob",
-]
+BUILTIN_FIX_TOOLS = list(BASE_BUILTIN_FIX_TOOLS)
 
 
 MCP_FIX_TOOLS: list[str] = []
 
 FORBIDDEN_FIX_TOOLS = {
-    "Bash",
     "mcp__sonar-fix__git_add",
     "mcp__sonar-fix__git_commit",
     "mcp__sonar-fix__git_push",
@@ -582,13 +604,22 @@ class ClaudeFixAgent:
         return ResourceLoader.strip_markdown_front_matter(text)
 
     @classmethod
-    def _load_csharp_quality_gate(cls, issue: SonarIssue) -> str:
-        """Load the C# quality gate for C# source files."""
+    def _load_csharp_quality_gate(cls, issue: SonarIssue, edit_contract: Any | None = None) -> str:
+        """Load prompt-facing quality-gate guidance for the current issue."""
 
-        return ResourceLoader.load_csharp_quality_gate(
-            issue.file_path,
-            cls.QUALITY_GATE_PATHS,
-        )
+        if not str(issue.file_path or "").lower().endswith(".cs"):
+            return ""
+
+        active_rules = tuple(getattr(edit_contract, "quality_gate_rules", ()) or ())
+        source_path, _, markdown_body = ResourceLoader.load_markdown_document(cls.QUALITY_GATE_PATHS)
+        if active_rules:
+            rendered = render_quality_gate_prompt(
+                active_rules,
+                source_path=source_path.as_posix() if source_path is not None else "",
+            )
+            if rendered.strip():
+                return rendered
+        return markdown_body.strip()
 
     @classmethod
     def _build_issue_edit_scope(
@@ -647,6 +678,7 @@ class ClaudeFixAgent:
         issue: SonarIssue,
         scope: IssueEditScope | None,
         *,
+        edit_contract: Any | None = None,
         original_content: str | None = None,
         current_content: str | None = None,
     ) -> str | None:
@@ -656,6 +688,7 @@ class ClaudeFixAgent:
             workspace_path,
             issue,
             scope,
+            edit_contract=edit_contract,
             original_content=original_content,
             current_content=current_content,
         )
@@ -672,6 +705,9 @@ class ClaudeFixAgent:
         retry_feedback: str = "",
         retry_context: RetryContext | None = None,
         edit_contract_section: str = "",
+        repair_plan_section: str = "",
+        prefetched_context_section: str = "",
+        execution_mode_section: str = "",
     ) -> str:
         """Build the issue-specific user prompt."""
 
@@ -685,7 +721,264 @@ class ClaudeFixAgent:
             retry_feedback=retry_feedback,
             retry_context=retry_context,
             edit_contract_section=edit_contract_section,
+            repair_plan_section=repair_plan_section,
+            prefetched_context_section=prefetched_context_section,
+            execution_mode_section=execution_mode_section,
         )
+
+    @staticmethod
+    def _build_prefetched_context_section(edit_contract: Any | None) -> str:
+        """Render prefetched related snippets for fast path / boundary-aware fixes."""
+
+        snippets = tuple(getattr(edit_contract, "prefetched_context", ()) or ())
+        if not snippets:
+            return ""
+        lines = ["【预取上下文】", "- 以下片段由外层 planner 预先打包，请优先使用，避免重复 Read 同一片段。"]
+        for snippet in snippets:
+            content = str(getattr(snippet, "content", "") or "").strip()
+            if not content:
+                continue
+            lines.extend(
+                [
+                    f"- {snippet.label} [{snippet.start_line}-{snippet.end_line}] ({snippet.reason})",
+                    content,
+                ]
+            )
+        return "\n".join(lines)
+
+    @staticmethod
+    def _build_execution_mode_section(edit_contract: Any | None) -> str:
+        """Render short-form execution instructions when enabled."""
+
+        if edit_contract is None or not bool(getattr(edit_contract, "fast_path_enabled", False)):
+            return ""
+        return "\n".join(
+            [
+                "【执行模式】",
+                "- 当前 issue 进入 fast-path short-form execution。",
+                "- 只读取完成本次修复所需的最小上下文，避免重复 Read 同一片段。",
+                "- 一旦 patch 已落盘，立即结束，不要输出长篇修复总结或背景分析。",
+                "- 优先直接完成精确 patch，而不是先写大量自然语言解释。",
+            ]
+        )
+
+    @staticmethod
+    def _build_repair_plan_section(edit_contract: Any | None) -> str:
+        """Render structured plan-first guidance for complex rules."""
+
+        if edit_contract is None:
+            return ""
+        return IssuePlanner.render_repair_plan_guidance(edit_contract)
+
+    @staticmethod
+    def _build_runtime_performance_metrics(runtime_result: AgentRuntimeResult | None) -> dict[str, Any]:
+        """Normalize runtime metrics into a stable artifact payload."""
+
+        if runtime_result is None:
+            return {}
+        return {
+            "runtime_total_duration_seconds": round(float(getattr(runtime_result, "total_duration_seconds", 0.0) or 0.0), 3),
+            "time_to_first_model_content_seconds": round(float(getattr(runtime_result, "time_to_first_model_content_seconds", 0.0) or 0.0), 3),
+            "time_after_first_edit_to_finalize_seconds": round(float(getattr(runtime_result, "time_after_first_edit_to_finalize_seconds", 0.0) or 0.0), 3),
+            "tool_call_count": int(getattr(runtime_result, "tool_call_count", 0) or 0),
+            "read_call_count": int(getattr(runtime_result, "read_call_count", 0) or 0),
+            "edit_call_count": int(getattr(runtime_result, "edit_call_count", 0) or 0),
+            "assistant_text_events": int(getattr(runtime_result, "assistant_text_events", 0) or 0),
+            "assistant_text_chars": int(getattr(runtime_result, "assistant_text_chars", 0) or 0),
+            "model_timeout_stage": str(getattr(runtime_result, "timeout_stage", "") or "").strip(),
+            "last_progress_stage": str(getattr(runtime_result, "last_progress_stage", "") or "").strip(),
+            "saw_result_event": bool(getattr(runtime_result, "saw_result_event", False)),
+            "continuation_retry_count": int(getattr(runtime_result, "continuation_retry_count", 0) or 0),
+            "continuation_recovered": bool(getattr(runtime_result, "continuation_recovered", False)),
+            "continuation_timeout_stages": list(
+                getattr(runtime_result, "continuation_timeout_stages", ()) or ()
+            ),
+        }
+
+    @staticmethod
+    def _merge_attempt_events(
+        existing_events: list[AttemptRuntimeEvent],
+        new_events: tuple[Any, ...] | list[Any],
+    ) -> list[AttemptRuntimeEvent]:
+        """Merge runtime-event batches while keeping sequence ordering stable."""
+
+        merged = list(existing_events)
+        for raw_event in tuple(new_events or ()):
+            if not isinstance(raw_event, AttemptRuntimeEvent):
+                continue
+            merged.append(
+                AttemptRuntimeEvent(
+                    kind=raw_event.kind,
+                    sequence=len(merged) + 1,
+                    run_label=raw_event.run_label,
+                    issue_key=raw_event.issue_key,
+                    attempt_number=raw_event.attempt_number,
+                    stage=raw_event.stage,
+                    timestamp=raw_event.timestamp,
+                    payload=dict(raw_event.payload or {}),
+                )
+            )
+        return merged
+
+    @staticmethod
+    def _append_attempt_event(
+        events: list[AttemptRuntimeEvent],
+        kind: AttemptRuntimeEventKind,
+        *,
+        stage: str = "",
+        payload: dict[str, Any] | None = None,
+        runtime_result: AgentRuntimeResult | None = None,
+    ) -> None:
+        """Append one post-runtime attempt event while keeping sequence ordering stable."""
+
+        base_events = tuple(getattr(runtime_result, "runtime_events", ()) or ())
+        run_label = str(base_events[0].run_label) if base_events else ""
+        issue_key = str(base_events[0].issue_key) if base_events else ""
+        attempt_number = int(base_events[0].attempt_number) if base_events else 0
+        event = AttemptRuntimeEvent(
+            kind=kind,
+            sequence=len(events) + 1,
+            run_label=run_label,
+            issue_key=issue_key,
+            attempt_number=attempt_number,
+            stage=str(stage or ""),
+            payload=dict(payload or {}),
+        )
+        events.append(event)
+
+    @classmethod
+    def _run_runtime_with_continuation(
+        cls,
+        *,
+        runtime: AgentRuntime,
+        gateway_request,
+        execution_schedule,
+        workspace_path: Path,
+    ) -> AgentRuntimeResult:
+        """Run the model runtime with bounded same-context continuation recovery."""
+
+        base_request = gateway_request
+        current_request = gateway_request
+        merged_events: list[AttemptRuntimeEvent] = []
+        continuation_count = 0
+        continuation_timeout_stages: list[str] = []
+
+        while True:
+            try:
+                runtime_result = runtime.run(current_request)
+                combined_events = cls._merge_attempt_events(
+                    merged_events,
+                    tuple(getattr(runtime_result, "runtime_events", ()) or ()),
+                )
+                return replace(
+                    runtime_result,
+                    runtime_events=tuple(combined_events),
+                    continuation_retry_count=continuation_count,
+                    continuation_recovered=continuation_count > 0,
+                    continuation_timeout_stages=tuple(continuation_timeout_stages),
+                )
+            except AgentRuntimeError as exc:
+                partial_result = exc.partial_result or AgentRuntimeResult()
+                error_details = cls._format_exception_details(exc.cause) or str(exc.cause)
+                timeout_stage = (
+                    str(getattr(partial_result, "timeout_stage", "") or "").strip()
+                    or cls._infer_timeout_stage(error_details)
+                )
+                merged_events = cls._merge_attempt_events(
+                    merged_events,
+                    tuple(getattr(partial_result, "runtime_events", ()) or ()),
+                )
+                changed_files = tuple(dict.fromkeys(cls._collect_modified_files(workspace_path)))
+                used_forbidden_tool = bool(partial_result.forbidden_tool_uses) or cls._attempt_head_changed(workspace_path)
+                build_tool_failed = (
+                    partial_result.last_tool_name == "mcp__sonar-fix__run_build"
+                    or (partial_result.saw_build_tool and "exit code" in error_details.lower())
+                )
+                if AttemptScheduler.should_continue_after_timeout(
+                    schedule=execution_schedule,
+                    timeout_stage=timeout_stage,
+                    continuation_count=continuation_count,
+                    changes_detected=bool(changed_files),
+                    used_forbidden_tool=used_forbidden_tool,
+                    build_tool_failed=build_tool_failed,
+                ):
+                    continuation_count += 1
+                    continuation_timeout_stages.append(timeout_stage or "follow_up_response_timeout")
+                    context = ContinuationRecovery.build_context(
+                        events=tuple(merged_events),
+                        timeout_stage=timeout_stage or "follow_up_response_timeout",
+                        continuation_index=continuation_count,
+                        last_progress_stage=str(getattr(partial_result, "last_progress_stage", "") or "").strip(),
+                        last_tool_name=str(getattr(partial_result, "last_tool_name", "") or "").strip(),
+                        changed_files=changed_files,
+                    )
+                    cls._append_attempt_event(
+                        merged_events,
+                        AttemptRuntimeEventKind.CONTINUATION_REQUESTED,
+                        stage=context.timeout_stage,
+                        payload=context.to_dict(),
+                        runtime_result=partial_result,
+                    )
+                    print(
+                        "  [TRACE] follow-up 超时，进入同上下文 continuation: "
+                        f"index={continuation_count}, stage={context.timeout_stage}",
+                        flush=True,
+                    )
+                    current_request = replace(
+                        base_request,
+                        user_prompt=ContinuationRecovery.build_prompt(
+                            base_request.user_prompt,
+                            context,
+                        ),
+                        max_turns=max(2, min(base_request.max_turns, 4)),
+                        metadata={
+                            **dict(base_request.metadata),
+                            "continuation_index": str(continuation_count),
+                            "continuation_stage": context.timeout_stage,
+                        },
+                    )
+                    continue
+
+                final_partial = replace(
+                    partial_result,
+                    timeout_stage=timeout_stage or partial_result.timeout_stage,
+                    runtime_events=tuple(merged_events),
+                    continuation_retry_count=continuation_count,
+                    continuation_recovered=False,
+                    continuation_timeout_stages=tuple(continuation_timeout_stages),
+                )
+                raise AgentRuntimeError(exc.cause, final_partial) from exc
+
+    @staticmethod
+    def _merge_performance_metrics(
+        base_metrics: dict[str, Any] | None,
+        **updates: Any,
+    ) -> dict[str, Any]:
+        """Merge runtime/build performance facts into one stable payload."""
+
+        merged = dict(base_metrics or {})
+        for key, value in updates.items():
+            if value is None:
+                continue
+            merged[key] = value
+        return merged
+
+    @staticmethod
+    def _infer_timeout_stage(error_text: str) -> str:
+        """Infer a stable timeout stage from runtime error text."""
+
+        normalized = str(error_text or "")
+        if "阶段分类:" in normalized:
+            return normalized.split("阶段分类:", 1)[1].splitlines()[0].strip()
+        if "没有返回后续响应" in normalized:
+            return "follow_up_response_timeout"
+        if "没有返回首个响应" in normalized:
+            return "first_response_timeout"
+        if "未完成初始化" in normalized:
+            return "client_connect_timeout"
+        if "单个 issue 在" in normalized:
+            return "issue_hard_timeout"
+        return ""
 
     def _extract_snippet(self, data: dict) -> str:
         """Extract snippet text from SonarQube response."""
@@ -740,7 +1033,7 @@ class ClaudeFixAgent:
 
         raw_value = (
             (agent_env or {}).get("ISSUE_GUARDRAIL_MODE")
-            or os.getenv("ISSUE_GUARDRAIL_MODE", "")
+            or read_project_env().get("ISSUE_GUARDRAIL_MODE", "")
         )
         normalized = str(raw_value or "").strip().lower()
         if normalized in {"scope", "contract_review"}:
@@ -755,11 +1048,13 @@ class ClaudeFixAgent:
         scope: IssueEditScope | None,
         retry_context: RetryContext | None,
         workspace_path: Path,
+        source_lines: tuple[str, ...] | None = None,
         agent_env: dict[str, str] | None = None,
     ):
         """Build the issue plan and edit contract for this attempt."""
 
         workspace_rules = ResourceLoader.load_workspace_rules(workspace_path)
+        performance_flags = load_performance_flags()
         scope_mode = scope.mode if scope is not None else STATEMENT_SCOPE_MODE
         scope_start = scope.start_line if scope is not None else issue.line
         scope_end = scope.end_line if scope is not None else issue.line
@@ -777,22 +1072,33 @@ class ClaudeFixAgent:
             scope_end_line=scope_end,
             validation_start_line=validation_start,
             validation_end_line=validation_end,
+            source_lines=source_lines,
+            workspace_path=workspace_path,
             retry_context=retry_context,
             workspace_rules=workspace_rules,
+            performance_flags=performance_flags,
         )
 
     @classmethod
     def _build_fix_tool_policy(cls, edit_contract: Any | None = None) -> ToolPolicy:
         """Build the runtime tool policy for single-issue fix attempts."""
 
+        runtime_builtin_tools = build_fix_runtime_tools()
         registry = build_fix_tool_registry(
-            BUILTIN_FIX_TOOLS,
+            runtime_builtin_tools,
             MCP_FIX_TOOLS,
             FORBIDDEN_FIX_TOOLS,
         )
-        allowed_tools = [*BUILTIN_FIX_TOOLS, *MCP_FIX_TOOLS]
+        allowed_tools = [tool_name for tool_name in runtime_builtin_tools if tool_name != CONTROLLED_BASH_TOOL]
+        allowed_tools.extend(MCP_FIX_TOOLS)
         if edit_contract is not None:
             allowed_tools = list(EditorPolicy.allowed_tool_names(allowed_tools, edit_contract))
+        allowed_tools = list(
+            build_allowed_fix_tool_rules(
+                allowed_tools,
+                include_controlled_bash=controlled_bash_enabled(),
+            )
+        )
         return ToolPolicy(registry, allowed_tools)
 
     @classmethod
@@ -812,6 +1118,8 @@ class ClaudeFixAgent:
         cls,
         workspace_path: Path,
         changed_files: tuple[str, ...] | list[str],
+        *,
+        fallback_before_texts: dict[str, str] | None = None,
     ) -> tuple[ReviewedFileChange, ...]:
         """Build file-level diff facts for diff review."""
 
@@ -819,7 +1127,28 @@ class ClaudeFixAgent:
             workspace_path=workspace_path,
             changed_files=changed_files,
             manifest=cls._load_attempt_state_manifest(workspace_path),
+            fallback_before_texts=fallback_before_texts,
         )
+
+    @staticmethod
+    def _capture_non_git_workspace_snapshot(workspace_path: Path) -> dict[str, str]:
+        """Capture a lightweight text snapshot when git baseline state is unavailable."""
+
+        if (workspace_path / ".git").exists():
+            return {}
+
+        snapshot: dict[str, str] = {}
+        for file_path in workspace_path.rglob("*"):
+            if not file_path.is_file():
+                continue
+            rel_path = file_path.relative_to(workspace_path).as_posix()
+            if rel_path.startswith((".git/", "logs/", ".agent_workspaces/")):
+                continue
+            try:
+                snapshot[rel_path] = file_path.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+        return snapshot
 
     def fix_issue(
         self,
@@ -833,6 +1162,7 @@ class ClaudeFixAgent:
         # Prepare workspace
         workspace_path.mkdir(parents=True, exist_ok=True)
         file_path = workspace_path / issue.file_path.lstrip("/")
+        context_cache = AttemptContextCache()
 
         skip_reason = self._get_rule_skip_reason(issue)
         if skip_reason:
@@ -854,13 +1184,21 @@ class ClaudeFixAgent:
         code_context = ""
         scope: IssueEditScope | None = None
         original_issue_file_content: str | None = None
+        non_git_workspace_snapshot = self._capture_non_git_workspace_snapshot(workspace_path)
+        source_lines: tuple[str, ...] | None = None
         if file_path.exists():
-            content = file_path.read_text(encoding="utf-8")
+            content = context_cache.read_text(file_path, encoding="utf-8")
             original_issue_file_content = content
-            lines = content.splitlines()
-            start = max(0, issue.line - 10)
-            end = min(len(lines), issue.line + 10)
-            code_context = "\n".join(f"{i + 1:4d} | {lines[i]}" for i in range(start, end))
+            lines = list(context_cache.read_lines(file_path, encoding="utf-8"))
+            source_lines = tuple(lines)
+            start_line = max(1, issue.line - 10)
+            end_line = min(len(lines), issue.line + 10)
+            code_context = context_cache.render_numbered_window(
+                file_path,
+                start_line,
+                end_line,
+                encoding="utf-8",
+            )
             scope = self._build_issue_edit_scope(issue, lines)
         else:
             # Fall back to SonarQube snippet
@@ -870,19 +1208,63 @@ class ClaudeFixAgent:
             except Exception:
                 code_context = f"File not found: {file_path}"
 
+        performance_flags = load_performance_flags()
         issue_plan = self._build_issue_plan(
             issue=issue,
             scope=scope,
             retry_context=retry_context,
             workspace_path=workspace_path,
+            source_lines=source_lines,
             agent_env=self.agent_env,
         )
         edit_contract = issue_plan.edit_contract
         guardrail_mode = edit_contract.guardrail_mode
+        execution_schedule = AttemptScheduler.build_execution_schedule(
+            edit_contract=edit_contract,
+            performance_flags=performance_flags,
+            default_max_turns=self.max_turns,
+        )
         result_metadata = {
             "edit_contract": edit_contract,
+            "repair_plan": getattr(edit_contract, "repair_plan", None),
+            "plan_precheck": getattr(edit_contract, "plan_precheck", None),
             "guardrail_mode": guardrail_mode,
+            "execution_profile": str(getattr(edit_contract, "execution_profile", "full_path")),
+            "fast_path_enabled": bool(getattr(edit_contract, "fast_path_enabled", False)),
+            "rollout_flags": tuple(getattr(edit_contract, "rollout_flags", ()) or ()),
         }
+        plan_precheck = getattr(edit_contract, "plan_precheck", None)
+        if bool(getattr(plan_precheck, "blocking", False)):
+            performance_metrics = {
+                "execution_profile": str(getattr(edit_contract, "execution_profile", "full_path")),
+                "fast_path_enabled": bool(getattr(edit_contract, "fast_path_enabled", False)),
+                "plan_first_enabled": bool(getattr(edit_contract, "plan_first_enabled", False)),
+                "plan_precheck_blocking": True,
+                "build_invoked": False,
+            }
+            detail_lines = [str(getattr(plan_precheck, "summary", "")).strip()]
+            detail_lines.extend(
+                str(item).strip() for item in getattr(plan_precheck, "details", ()) if str(item).strip()
+            )
+            detail_lines.extend(
+                f"重试建议: {item}"
+                for item in getattr(plan_precheck, "guidance", ())
+                if str(item).strip()
+            )
+            plan_output = "\n".join(line for line in detail_lines if line)
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=str(file_path),
+                error=str(getattr(plan_precheck, "summary", "")).strip() or "Plan precheck rejected the edit.",
+                summary="Plan precheck rejected the edit before any file changes.",
+                build_command=build_command.strip() or "dotnet build",
+                build_output=plan_output,
+                retryable_failure=False,
+                failure_kind="plan_conflict",
+                performance_metrics=performance_metrics,
+                **result_metadata,
+            )
 
         # Build prompts
         system_prompt = self._build_system_prompt(workspace_path)
@@ -890,28 +1272,40 @@ class ClaudeFixAgent:
         user_prompt = self._build_user_prompt(
             issue,
             code_context,
-            self._load_csharp_quality_gate(issue),
+            self._load_csharp_quality_gate(issue, edit_contract),
             self._build_scope_guidance(issue, scope),
             rule_details,
             resolved_build_command,
             retry_feedback,
             retry_context,
             edit_contract_section=self._build_edit_contract_section(edit_contract),
+            repair_plan_section=self._build_repair_plan_section(edit_contract),
+            prefetched_context_section=self._build_prefetched_context_section(edit_contract),
+            execution_mode_section=self._build_execution_mode_section(edit_contract),
         )
 
         tool_policy = self._build_fix_tool_policy(edit_contract)
+        effective_max_turns = execution_schedule.effective_max_turns
         gateway_request = ClaudeAdapter.build_request(
             agent_env=self.agent_env,
             explicit_model=self.model,
             cwd=str(workspace_path),
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            tools=tuple(BUILTIN_FIX_TOOLS),
+            tools=build_fix_runtime_tools(),
             allowed_tools=tool_policy.allowed_tool_names(),
-            max_turns=self.max_turns,
+            max_turns=effective_max_turns,
             max_budget_usd=self.max_budget_usd,
             stderr_handler=self._handle_cli_stderr,
             build_command=resolved_build_command,
+        )
+        gateway_request.metadata.update(
+            {
+                "issue_key": issue.key,
+                "execution_profile": str(getattr(edit_contract, "execution_profile", "full_path")),
+                "fast_path_enabled": "true" if bool(getattr(edit_contract, "fast_path_enabled", False)) else "false",
+                "execution_schedule": execution_schedule.to_dict(),
+            }
         )
         runtime = AgentRuntime(
             gateway=ClaudeAdapter(self._sdk_dependencies()),
@@ -928,158 +1322,337 @@ class ClaudeFixAgent:
         )
 
         changes: list[dict[str, Any]] = []
-        runtime_result = None
+        attempt_events: list[AttemptRuntimeEvent] = []
+        runtime_result: AgentRuntimeResult | None = None
+        runtime_performance_metrics: dict[str, Any] = {}
+        model_timeout_stage = ""
+        patch_salvaged = False
         self._capture_attempt_workspace_state(workspace_path)
         try:
-            runtime_result = runtime.run(gateway_request)
-        except AgentRuntimeError as e:
-            runtime_result = e.partial_result
-            error_details = self._format_exception_details(e.cause) or str(e.cause)
-            for modified_file in self._collect_modified_files(workspace_path):
-                changes.append({"file": modified_file, "action": "modified"})
-
-            model_timeout = (
-                isinstance(e.cause, TimeoutError)
-                or "没有返回首个响应" in error_details
-                or "没有返回后续响应" in error_details
-                or "单个 issue 在" in error_details
-                or "未完成初始化" in error_details
-            )
-            if model_timeout:
-                self._cleanup_attempt_workspace_state(workspace_path)
-                return FixResult(
-                    success=False,
-                    issue_key=issue.key,
-                    file_path=str(file_path),
-                    changes=changes,
-                    error="Model response timed out",
-                    summary=f"Fixed {len(changes)} file(s)",
-                    build_command=resolved_build_command,
-                    build_output=error_details,
-                    retryable_failure=True,
-                    failure_kind="model_timeout",
-                    **result_metadata,
+            try:
+                runtime_result = self._run_runtime_with_continuation(
+                    runtime=runtime,
+                    gateway_request=gateway_request,
+                    execution_schedule=execution_schedule,
+                    workspace_path=workspace_path,
+                )
+                runtime_performance_metrics = self._build_runtime_performance_metrics(runtime_result)
+                attempt_events = list(getattr(runtime_result, "runtime_events", ()) or ())
+            except AgentRuntimeError as e:
+                runtime_result = e.partial_result
+                runtime_performance_metrics = self._build_runtime_performance_metrics(runtime_result)
+                attempt_events = list(getattr(runtime_result, "runtime_events", ()) or ())
+                error_details = self._format_exception_details(e.cause) or str(e.cause)
+                changed_files = tuple(dict.fromkeys(self._collect_modified_files(workspace_path)))
+                changes = [{"file": modified_file, "action": "modified"} for modified_file in changed_files]
+                model_timeout = (
+                    isinstance(e.cause, TimeoutError)
+                    or "没有返回首个响应" in error_details
+                    or "没有返回后续响应" in error_details
+                    or "单个 issue 在" in error_details
+                    or "未完成初始化" in error_details
+                )
+                model_timeout_stage = (
+                    str(runtime_performance_metrics.get("model_timeout_stage", "")).strip()
+                    or self._infer_timeout_stage(error_details)
+                )
+                used_forbidden_tool = bool(runtime_result.forbidden_tool_uses) or self._attempt_head_changed(workspace_path)
+                build_tool_failed = (
+                    runtime_result.last_tool_name == "mcp__sonar-fix__run_build"
+                    or (runtime_result.saw_build_tool and "exit code" in error_details.lower())
                 )
 
-            used_forbidden_tool = bool(runtime_result.forbidden_tool_uses) or self._attempt_head_changed(workspace_path)
-            if used_forbidden_tool:
-                fallback_build_passed, fallback_build_output = self._run_local_build_fallback(
-                    workspace_path,
-                    resolved_build_command,
-                )
-                output_parts = [
-                    "修复阶段使用了被禁止的工具，当前尝试已作废。",
-                ]
-                if runtime_result.forbidden_tool_uses:
-                    output_parts.append(
-                        "禁止工具: " + ", ".join(dict.fromkeys(runtime_result.forbidden_tool_uses))
+                if model_timeout and AttemptScheduler.should_salvage_timeout(
+                    schedule=execution_schedule,
+                    changes_detected=bool(changes),
+                    used_forbidden_tool=used_forbidden_tool,
+                    build_tool_failed=build_tool_failed,
+                ):
+                    patch_salvaged = True
+                    runtime_performance_metrics = self._merge_performance_metrics(
+                        runtime_performance_metrics,
+                        patch_salvaged=True,
+                        model_timeout_stage=model_timeout_stage,
                     )
-                if self._attempt_head_changed(workspace_path):
-                    output_parts.append("检测到当前 attempt 改写了 Git HEAD/提交历史。")
-                output_parts.append(error_details)
-                output_parts.append(fallback_build_output)
-                self._cleanup_attempt_workspace_state(workspace_path)
-                return FixResult(
-                    success=False,
-                    issue_key=issue.key,
-                    file_path=str(file_path),
-                    changes=changes,
-                    build_passed=fallback_build_passed,
-                    build_verification_failed=not fallback_build_passed,
-                    error="Forbidden tool used during issue fix",
-                    summary=f"Fixed {len(changes)} file(s)",
-                    build_command=resolved_build_command,
-                    build_output="\n\n".join(part for part in output_parts if part),
-                    retryable_failure=True,
-                    failure_kind="forbidden_tool",
-                    **result_metadata,
+                    self._append_attempt_event(
+                        attempt_events,
+                        AttemptRuntimeEventKind.PATCH_SALVAGED,
+                        stage=model_timeout_stage or "follow_up_response_timeout",
+                        payload={"reason": "agent_runtime_timeout", "changes_detected": True},
+                        runtime_result=runtime_result,
+                    )
+                    print(
+                        "  [TRACE] 检测到 timeout 但 patch 已落盘，进入 salvage 验证流程: "
+                        f"stage={model_timeout_stage or 'follow_up_response_timeout'}",
+                        flush=True,
+                    )
+                elif model_timeout:
+                    self._append_attempt_event(
+                        attempt_events,
+                        AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                        stage="model_timeout",
+                        payload={"success": False, "failure_kind": "model_timeout"},
+                        runtime_result=runtime_result,
+                    )
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=str(file_path),
+                        changes=changes,
+                        error="Model response timed out",
+                        summary=f"Fixed {len(changes)} file(s)",
+                        build_command=resolved_build_command,
+                        build_output=error_details,
+                        retryable_failure=True,
+                        failure_kind="model_timeout",
+                        performance_metrics=self._merge_performance_metrics(
+                            runtime_performance_metrics,
+                            patch_salvaged=False,
+                            model_timeout_stage=model_timeout_stage,
+                            build_duration_seconds=0.0,
+                            build_invoked=False,
+                            execution_profile=str(getattr(edit_contract, "execution_profile", "full_path")),
+                            fast_path_enabled=bool(getattr(edit_contract, "fast_path_enabled", False)),
+                            effective_max_turns=effective_max_turns,
+                        ),
+                        model_timeout_stage=model_timeout_stage,
+                        patch_salvaged=False,
+                        attempt_events=tuple(attempt_events),
+                        **result_metadata,
+                    )
+
+                if used_forbidden_tool:
+                    fallback_build_passed, fallback_build_output = self._run_local_build_fallback(
+                        workspace_path,
+                        resolved_build_command,
+                    )
+                    output_parts = ["修复阶段使用了被禁止的工具，当前尝试已作废。"]
+                    if runtime_result.forbidden_tool_uses:
+                        output_parts.append(
+                            "禁止工具: " + ", ".join(dict.fromkeys(runtime_result.forbidden_tool_uses))
+                        )
+                    if self._attempt_head_changed(workspace_path):
+                        output_parts.append("检测到当前 attempt 改写了 Git HEAD/提交历史。")
+                    output_parts.append(error_details)
+                    output_parts.append(fallback_build_output)
+                    self._append_attempt_event(
+                        attempt_events,
+                        AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                        stage="forbidden_tool",
+                        payload={"success": False, "failure_kind": "forbidden_tool"},
+                        runtime_result=runtime_result,
+                    )
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=str(file_path),
+                        changes=changes,
+                        build_passed=fallback_build_passed,
+                        build_verification_failed=not fallback_build_passed,
+                        error="Forbidden tool used during issue fix",
+                        summary=f"Fixed {len(changes)} file(s)",
+                        build_command=resolved_build_command,
+                        build_output="\n\n".join(part for part in output_parts if part),
+                        retryable_failure=True,
+                        failure_kind="forbidden_tool",
+                        performance_metrics=self._merge_performance_metrics(
+                            runtime_performance_metrics,
+                            build_duration_seconds=0.0,
+                            build_invoked=False,
+                            execution_profile=str(getattr(edit_contract, "execution_profile", "full_path")),
+                            fast_path_enabled=bool(getattr(edit_contract, "fast_path_enabled", False)),
+                            effective_max_turns=effective_max_turns,
+                        ),
+                        attempt_events=tuple(attempt_events),
+                        **result_metadata,
+                    )
+
+                if build_tool_failed:
+                    fallback_build_passed, fallback_build_output = self._run_local_build_fallback(
+                        workspace_path,
+                        resolved_build_command,
+                    )
+                    output_parts = [
+                        "run_build 工具执行异常。",
+                        error_details,
+                        fallback_build_output,
+                    ]
+                    self._append_attempt_event(
+                        attempt_events,
+                        AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                        stage="build_tool",
+                        payload={"success": False, "failure_kind": "build_tool"},
+                        runtime_result=runtime_result,
+                    )
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=str(file_path),
+                        changes=changes,
+                        build_passed=fallback_build_passed,
+                        build_verification_failed=True,
+                        error="Build tool execution failed",
+                        summary=f"Fixed {len(changes)} file(s)",
+                        build_command=resolved_build_command,
+                        build_output="\n\n".join(part for part in output_parts if part),
+                        retryable_failure=True,
+                        failure_kind="build_tool",
+                        performance_metrics=self._merge_performance_metrics(
+                            runtime_performance_metrics,
+                            build_duration_seconds=0.0,
+                            build_invoked=False,
+                            execution_profile=str(getattr(edit_contract, "execution_profile", "full_path")),
+                            fast_path_enabled=bool(getattr(edit_contract, "fast_path_enabled", False)),
+                            effective_max_turns=effective_max_turns,
+                        ),
+                        attempt_events=tuple(attempt_events),
+                        **result_metadata,
+                    )
+
+                if not patch_salvaged:
+                    self._append_attempt_event(
+                        attempt_events,
+                        AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                        stage="runtime_error",
+                        payload={"success": False, "failure_kind": "runtime_error"},
+                        runtime_result=runtime_result,
+                    )
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=str(file_path),
+                        changes=changes,
+                        error=error_details,
+                        performance_metrics=self._merge_performance_metrics(
+                            runtime_performance_metrics,
+                            build_duration_seconds=0.0,
+                            build_invoked=False,
+                            execution_profile=str(getattr(edit_contract, "execution_profile", "full_path")),
+                            fast_path_enabled=bool(getattr(edit_contract, "fast_path_enabled", False)),
+                            effective_max_turns=effective_max_turns,
+                        ),
+                        attempt_events=tuple(attempt_events),
+                        **result_metadata,
+                    )
+            except Exception as e:
+                error_details = self._format_exception_details(e) or str(e)
+                changed_files = tuple(dict.fromkeys(self._collect_modified_files(workspace_path)))
+                changes = [{"file": modified_file, "action": "modified"} for modified_file in changed_files]
+                model_timeout = (
+                    isinstance(e, TimeoutError)
+                    or "没有返回首个响应" in error_details
+                    or "没有返回后续响应" in error_details
+                    or "单个 issue 在" in error_details
+                    or "未完成初始化" in error_details
+                )
+                model_timeout_stage = self._infer_timeout_stage(error_details)
+                if model_timeout and execution_schedule.patch_salvage_enabled and changes:
+                    patch_salvaged = True
+                    runtime_result = runtime_result or AgentRuntimeResult(timeout_stage=model_timeout_stage)
+                    runtime_performance_metrics = self._merge_performance_metrics(
+                        runtime_performance_metrics,
+                        patch_salvaged=True,
+                        model_timeout_stage=model_timeout_stage,
+                    )
+                    self._append_attempt_event(
+                        attempt_events,
+                        AttemptRuntimeEventKind.PATCH_SALVAGED,
+                        stage=model_timeout_stage or "follow_up_response_timeout",
+                        payload={"reason": "generic_timeout", "changes_detected": True},
+                        runtime_result=runtime_result,
+                    )
+                    print(
+                        "  [TRACE] 检测到异常型 timeout 但 patch 已落盘，进入 salvage 验证流程: "
+                        f"stage={model_timeout_stage or 'follow_up_response_timeout'}",
+                        flush=True,
+                    )
+                elif model_timeout:
+                    self._append_attempt_event(
+                        attempt_events,
+                        AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                        stage="model_timeout",
+                        payload={"success": False, "failure_kind": "model_timeout"},
+                        runtime_result=runtime_result,
+                    )
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=str(file_path),
+                        changes=changes,
+                        error="Model response timed out",
+                        summary=f"Fixed {len(changes)} file(s)",
+                        build_command=resolved_build_command,
+                        build_output=error_details,
+                        retryable_failure=True,
+                        failure_kind="model_timeout",
+                        performance_metrics=self._merge_performance_metrics(
+                            runtime_performance_metrics,
+                            patch_salvaged=False,
+                            model_timeout_stage=model_timeout_stage,
+                            build_duration_seconds=0.0,
+                            build_invoked=False,
+                            execution_profile=str(getattr(edit_contract, "execution_profile", "full_path")),
+                            fast_path_enabled=bool(getattr(edit_contract, "fast_path_enabled", False)),
+                            effective_max_turns=effective_max_turns,
+                        ),
+                        model_timeout_stage=model_timeout_stage,
+                        patch_salvaged=False,
+                        attempt_events=tuple(attempt_events),
+                        **result_metadata,
+                    )
+
+                if not patch_salvaged:
+                    self._append_attempt_event(
+                        attempt_events,
+                        AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                        stage="runtime_error",
+                        payload={"success": False, "failure_kind": "runtime_error"},
+                        runtime_result=runtime_result,
+                    )
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=str(file_path),
+                        changes=changes,
+                        error=error_details,
+                        performance_metrics=self._merge_performance_metrics(
+                            runtime_performance_metrics,
+                            build_duration_seconds=0.0,
+                            build_invoked=False,
+                            execution_profile=str(getattr(edit_contract, "execution_profile", "full_path")),
+                            fast_path_enabled=bool(getattr(edit_contract, "fast_path_enabled", False)),
+                            effective_max_turns=effective_max_turns,
+                        ),
+                        attempt_events=tuple(attempt_events),
+                        **result_metadata,
+                    )
+
+            if not changes:
+                changed_files = tuple(dict.fromkeys(self._collect_modified_files(workspace_path)))
+                changes = [{"file": modified_file, "action": "modified"} for modified_file in changed_files]
+            if changes:
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.PATCH_DETECTED,
+                    stage="post_runtime_diff",
+                    payload={"changed_files": changed_files if 'changed_files' in locals() else [item["file"] for item in changes]},
+                    runtime_result=runtime_result,
                 )
 
-            build_tool_failed = (
-                runtime_result.last_tool_name == "mcp__sonar-fix__run_build"
-                or (
-                    runtime_result.saw_build_tool
-                    and "exit code" in error_details.lower()
-                )
+            runtime_result = runtime_result or self._run_runtime_with_continuation(
+                runtime=runtime,
+                gateway_request=gateway_request,
+                execution_schedule=execution_schedule,
+                workspace_path=workspace_path,
             )
-            if build_tool_failed:
-                fallback_build_passed, fallback_build_output = self._run_local_build_fallback(
-                    workspace_path,
-                    resolved_build_command,
-                )
-                output_parts = [
-                    "run_build 工具执行异常。",
-                    error_details,
-                    fallback_build_output,
-                ]
-                self._cleanup_attempt_workspace_state(workspace_path)
-                return FixResult(
-                    success=False,
-                    issue_key=issue.key,
-                    file_path=str(file_path),
-                    changes=changes,
-                    build_passed=fallback_build_passed,
-                    build_verification_failed=True,
-                    error="Build tool execution failed",
-                    summary=f"Fixed {len(changes)} file(s)",
-                    build_command=resolved_build_command,
-                    build_output="\n\n".join(part for part in output_parts if part),
-                    retryable_failure=True,
-                    failure_kind="build_tool",
-                    **result_metadata,
-                )
-
-            self._cleanup_attempt_workspace_state(workspace_path)
-            return FixResult(
-                success=False,
-                issue_key=issue.key,
-                file_path=str(file_path),
-                changes=changes,
-                error=error_details,
-                **result_metadata,
+            runtime_performance_metrics = self._merge_performance_metrics(
+                runtime_performance_metrics or self._build_runtime_performance_metrics(runtime_result),
+                execution_profile=str(getattr(edit_contract, "execution_profile", "full_path")),
+                fast_path_enabled=bool(getattr(edit_contract, "fast_path_enabled", False)),
+                effective_max_turns=effective_max_turns,
+                patch_salvaged=patch_salvaged,
+                model_timeout_stage=model_timeout_stage,
             )
-        except Exception as e:
-            error_details = self._format_exception_details(e) or str(e)
-            for modified_file in self._collect_modified_files(workspace_path):
-                changes.append({"file": modified_file, "action": "modified"})
-
-            model_timeout = (
-                isinstance(e, TimeoutError)
-                or "没有返回首个响应" in error_details
-                or "没有返回后续响应" in error_details
-                or "单个 issue 在" in error_details
-                or "未完成初始化" in error_details
-            )
-            if model_timeout:
-                self._cleanup_attempt_workspace_state(workspace_path)
-                return FixResult(
-                    success=False,
-                    issue_key=issue.key,
-                    file_path=str(file_path),
-                    changes=changes,
-                    error="Model response timed out",
-                    summary=f"Fixed {len(changes)} file(s)",
-                    build_command=resolved_build_command,
-                    build_output=error_details,
-                    retryable_failure=True,
-                    failure_kind="model_timeout",
-                    **result_metadata,
-                )
-
-            self._cleanup_attempt_workspace_state(workspace_path)
-            return FixResult(
-                success=False,
-                issue_key=issue.key,
-                file_path=str(file_path),
-                changes=changes,
-                error=error_details,
-                **result_metadata,
-            )
-        try:
-            for modified_file in self._collect_modified_files(workspace_path):
-                changes.append({"file": modified_file, "action": "modified"})
-
-            runtime_result = runtime_result or runtime.run(gateway_request)
             used_forbidden_tool = bool(runtime_result.forbidden_tool_uses) or self._attempt_head_changed(workspace_path)
 
             if used_forbidden_tool:
@@ -1098,6 +1671,13 @@ class ClaudeFixAgent:
                     output_parts.append("检测到当前 attempt 改写了 Git HEAD/提交历史。")
                 if build_output:
                     output_parts.append(build_output)
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    stage="forbidden_tool",
+                    payload={"success": False, "failure_kind": "forbidden_tool"},
+                    runtime_result=runtime_result,
+                )
                 return FixResult(
                     success=False,
                     issue_key=issue.key,
@@ -1111,41 +1691,89 @@ class ClaudeFixAgent:
                     build_output="\n\n".join(part for part in output_parts if part),
                     retryable_failure=True,
                     failure_kind="forbidden_tool",
+                    performance_metrics=self._merge_performance_metrics(
+                        runtime_performance_metrics,
+                        build_duration_seconds=0.0,
+                        build_invoked=False,
+                    ),
+                    attempt_events=tuple(attempt_events),
                     **result_metadata,
                 )
 
-            if runtime_result.agent_error:
+            if runtime_result.agent_error and not patch_salvaged:
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    stage="agent_error",
+                    payload={"success": False, "failure_kind": "agent_error"},
+                    runtime_result=runtime_result,
+                )
                 return FixResult(
                     success=False,
                     issue_key=issue.key,
                     file_path=str(file_path),
                     changes=changes,
                     error=runtime_result.agent_error,
+                    performance_metrics=self._merge_performance_metrics(
+                        runtime_performance_metrics,
+                        build_duration_seconds=0.0,
+                        build_invoked=False,
+                    ),
+                    attempt_events=tuple(attempt_events),
                     **result_metadata,
                 )
 
             if not changes:
+                failure_kind = "model_timeout" if model_timeout_stage else "no_change"
+                error = "Model response timed out" if model_timeout_stage else "Agent completed without modifying any files"
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    stage=failure_kind,
+                    payload={"success": False, "failure_kind": failure_kind},
+                    runtime_result=runtime_result,
+                )
                 return FixResult(
                     success=False,
                     issue_key=issue.key,
                     file_path=str(file_path),
-                    error="Agent completed without modifying any files",
+                    error=error,
                     summary="Fixed 0 file(s)",
+                    build_command=resolved_build_command,
                     retryable_failure=True,
-                    failure_kind="no_change",
+                    failure_kind=failure_kind,
+                    performance_metrics=self._merge_performance_metrics(
+                        runtime_performance_metrics,
+                        build_duration_seconds=0.0,
+                        build_invoked=False,
+                        patch_salvaged=patch_salvaged,
+                        model_timeout_stage=model_timeout_stage,
+                    ),
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=patch_salvaged,
+                    attempt_events=tuple(attempt_events),
                     **result_metadata,
                 )
 
             current_issue_file_content: str | None = None
             if file_path.exists():
-                current_issue_file_content = file_path.read_text(encoding="utf-8")
+                context_cache.invalidate(file_path)
+                current_issue_file_content = context_cache.read_text(file_path, encoding="utf-8")
 
             changed_file_paths = tuple(
                 str(change.get("file", "")).replace("\\", "/").lstrip("/")
                 for change in changes
                 if str(change.get("file", "")).strip()
             )
-            reviewed_changes = self._build_attempt_file_changes(workspace_path, changed_file_paths)
+            fallback_before_texts = dict(non_git_workspace_snapshot)
+            issue_rel_path = str(issue.file_path or "").replace("\\", "/").lstrip("/")
+            if issue_rel_path and original_issue_file_content is not None:
+                fallback_before_texts[issue_rel_path] = original_issue_file_content
+            reviewed_changes = self._build_attempt_file_changes(
+                workspace_path,
+                changed_file_paths,
+                fallback_before_texts=(fallback_before_texts or None),
+            )
             verification = FixVerifier.evaluate_attempt(
                 issue=issue,
                 workspace_path=workspace_path,
@@ -1165,28 +1793,65 @@ class ClaudeFixAgent:
             build_output = verification.build_output
             scope_violation = verification.scope_violation
             quality_gate_result = verification.quality_gate_result
-
-            if not build_passed:
-                return FixResult(
-                    success=False,
-                    issue_key=issue.key,
-                    file_path=str(file_path),
-                    changes=changes,
-                    build_passed=False,
-                    build_verification_failed=True,
-                    error="Issue changes failed local build verification",
-                    summary=f"Fixed {len(changes)} file(s)",
-                    build_command=resolved_build_command,
-                    build_output=verification.combined_output,
-                    retryable_failure=True,
-                    failure_kind="build",
-                    reviewer_result=reviewer_result.to_dict(),
-                    quality_gate_result=quality_gate_result.to_dict(),
-                    follow_ups=reviewer_result.follow_ups,
-                    **result_metadata,
+            boundary_failure_code = verification.boundary_failure_code
+            boundary_failure_summary = verification.boundary_failure_summary
+            secondary_boundary_failure_codes = verification.secondary_boundary_failure_codes
+            performance_metrics = self._merge_performance_metrics(
+                runtime_performance_metrics,
+                build_duration_seconds=verification.build_duration_seconds,
+                build_invoked=verification.build_invoked,
+                validation_pipeline=tuple(edit_contract.validation_plan),
+                verification_schedule=AttemptScheduler.build_verification_schedule(
+                    edit_contract=edit_contract,
+                    performance_flags=performance_flags,
+                ).to_dict(),
+                patch_salvaged=patch_salvaged,
+                model_timeout_stage=model_timeout_stage,
+            )
+            if verification.build_invoked:
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.BUILD_STARTED,
+                    stage="verification_build",
+                    payload={"build_command": resolved_build_command},
+                    runtime_result=runtime_result,
+                )
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.BUILD_FINISHED,
+                    stage="verification_build",
+                    payload={
+                        "build_passed": build_passed,
+                        "duration_seconds": verification.build_duration_seconds,
+                    },
+                    runtime_result=runtime_result,
                 )
 
-            if guardrail_mode == "scope" and scope_violation:
+            if reviewer_result.status == "retry":
+                failure_stage = (
+                    "filesystem_boundary"
+                    if str(boundary_failure_code).startswith("filesystem_")
+                    else "reviewer"
+                )
+                failure_error = (
+                    "Filesystem boundary rejected the patch"
+                    if failure_stage == "filesystem_boundary"
+                    else "Diff reviewer rejected the patch"
+                )
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.BOUNDARY_REJECTED,
+                    stage=failure_stage,
+                    payload={"code": boundary_failure_code, "summary": boundary_failure_summary},
+                    runtime_result=runtime_result,
+                )
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    stage=failure_stage,
+                    payload={"success": False, "failure_kind": "reviewer"},
+                    runtime_result=runtime_result,
+                )
                 return FixResult(
                     success=False,
                     issue_key=issue.key,
@@ -1194,39 +1859,40 @@ class ClaudeFixAgent:
                     changes=changes,
                     build_passed=build_passed,
                     build_verification_failed=False,
-                    error="Issue changes exceeded allowed scope",
+                    error=failure_error,
                     summary=f"Fixed {len(changes)} file(s)",
                     build_command=resolved_build_command,
-                    build_output=verification.combined_output or scope_violation,
-                    retryable_failure=True,
-                    failure_kind="scope",
-                    reviewer_result=reviewer_result.to_dict(),
-                    quality_gate_result=quality_gate_result.to_dict(),
-                    follow_ups=reviewer_result.follow_ups,
-                    **result_metadata,
-                )
-
-            if guardrail_mode == "contract_review" and reviewer_result.status == "retry":
-                return FixResult(
-                    success=False,
-                    issue_key=issue.key,
-                    file_path=str(file_path),
-                    changes=changes,
-                    build_passed=build_passed,
-                    build_verification_failed=False,
-                    error="Diff reviewer rejected the patch",
-                    summary=f"Fixed {len(changes)} file(s)",
-                    build_command=resolved_build_command,
-                    build_output=verification.reviewer_retry_message,
+                    build_output=verification.reviewer_retry_message or verification.combined_output,
                     retryable_failure=True,
                     failure_kind="reviewer",
                     reviewer_result=reviewer_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
+                    boundary_failure_code=boundary_failure_code,
+                    boundary_failure_summary=boundary_failure_summary,
+                    secondary_boundary_failure_codes=secondary_boundary_failure_codes,
+                    performance_metrics=performance_metrics,
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=patch_salvaged,
+                    attempt_events=tuple(attempt_events),
                     **result_metadata,
                 )
 
             if quality_gate_result.status == "retry":
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.QUALITY_GATE_REJECTED,
+                    stage="quality_gate",
+                    payload={"summary": quality_gate_result.summary, "violations": len(quality_gate_result.violations)},
+                    runtime_result=runtime_result,
+                )
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    stage="quality_gate",
+                    payload={"success": False, "failure_kind": "quality_gate"},
+                    runtime_result=runtime_result,
+                )
                 return FixResult(
                     success=False,
                     issue_key=issue.key,
@@ -1243,11 +1909,25 @@ class ClaudeFixAgent:
                     reviewer_result=reviewer_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
+                    boundary_failure_code=boundary_failure_code,
+                    boundary_failure_summary=boundary_failure_summary,
+                    secondary_boundary_failure_codes=secondary_boundary_failure_codes,
+                    performance_metrics=performance_metrics,
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=patch_salvaged,
+                    attempt_events=tuple(attempt_events),
                     **result_metadata,
                 )
 
             rule_validation_message = verification.rule_validation_message
             if rule_validation_message:
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    stage="rule_validation",
+                    payload={"success": False, "failure_kind": "rule_validation"},
+                    runtime_result=runtime_result,
+                )
                 return FixResult(
                     success=False,
                     issue_key=issue.key,
@@ -1264,9 +1944,57 @@ class ClaudeFixAgent:
                     reviewer_result=reviewer_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
+                    boundary_failure_code=boundary_failure_code,
+                    boundary_failure_summary=boundary_failure_summary,
+                    secondary_boundary_failure_codes=secondary_boundary_failure_codes,
+                    performance_metrics=performance_metrics,
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=patch_salvaged,
+                    attempt_events=tuple(attempt_events),
                     **result_metadata,
                 )
 
+            if not build_passed:
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    stage="build",
+                    payload={"success": False, "failure_kind": "build"},
+                    runtime_result=runtime_result,
+                )
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=str(file_path),
+                    changes=changes,
+                    build_passed=False,
+                    build_verification_failed=True,
+                    error="Issue changes failed local build verification",
+                    summary=f"Fixed {len(changes)} file(s)",
+                    build_command=resolved_build_command,
+                    build_output=verification.combined_output,
+                    retryable_failure=True,
+                    failure_kind="build",
+                    reviewer_result=reviewer_result.to_dict(),
+                    quality_gate_result=quality_gate_result.to_dict(),
+                    follow_ups=reviewer_result.follow_ups,
+                    boundary_failure_code=boundary_failure_code,
+                    boundary_failure_summary=boundary_failure_summary,
+                    secondary_boundary_failure_codes=secondary_boundary_failure_codes,
+                    performance_metrics=performance_metrics,
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=patch_salvaged,
+                    attempt_events=tuple(attempt_events),
+                    **result_metadata,
+                )
+
+            self._append_attempt_event(
+                attempt_events,
+                AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                stage="succeeded",
+                payload={"success": True, "failure_kind": ""},
+                runtime_result=runtime_result,
+            )
             return FixResult(
                 success=True,
                 issue_key=issue.key,
@@ -1279,6 +2007,13 @@ class ClaudeFixAgent:
                 reviewer_result=reviewer_result.to_dict(),
                 quality_gate_result=quality_gate_result.to_dict(),
                 follow_ups=reviewer_result.follow_ups,
+                boundary_failure_code=boundary_failure_code,
+                boundary_failure_summary=boundary_failure_summary,
+                secondary_boundary_failure_codes=secondary_boundary_failure_codes,
+                performance_metrics=performance_metrics,
+                model_timeout_stage=model_timeout_stage,
+                patch_salvaged=patch_salvaged,
+                attempt_events=tuple(attempt_events),
                 **result_metadata,
             )
         finally:

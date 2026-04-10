@@ -8,6 +8,7 @@ from pathlib import Path
 
 from pi_sonar_agent.core.artifact_writer import ArtifactWriter
 from pi_sonar_agent.core.git_gateway import GitRepositoryGateway
+from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.preflight import (
     RuntimeEnvironment,
     ensure_remote_branch_exists,
@@ -18,6 +19,7 @@ from pi_sonar_agent.core.state import (
     IssueState,
     TargetState,
     derive_target_status,
+    summarize_target_performance,
     utc_now_iso,
 )
 from pi_sonar_agent.core.state_store import RunStateStore
@@ -80,6 +82,7 @@ class RunCoordinator:
             build_summary_pull_request_description,
             write_markdown_report,
         )
+        from pi_sonar_agent.core.quality_gate import build_compliance_summary
         from pi_sonar_agent.core.recipient_resolution import resolve_recipients
         from pi_sonar_agent.fixers.build_gate import (
             format_build_failure_report,
@@ -107,6 +110,7 @@ class RunCoordinator:
         total_issues = 0
 
         def finalize_target_result(result: TargetRunResult) -> TargetRunResult:
+            rollout_flags = load_performance_flags().enabled_flags()
             target_state = TargetState(
                 run_label=options.run_label,
                 project_key=target_config.project_key,
@@ -123,6 +127,11 @@ class RunCoordinator:
                 issues=tuple(issue_states),
                 started_at=target_started_at,
                 finished_at=utc_now_iso(),
+                performance_summary=summarize_target_performance(
+                    tuple(issue_states),
+                    rollout_flags=rollout_flags,
+                ),
+                rollout_flags=rollout_flags,
             )
             target_summary_path = artifact_writer.write_target_state(target_state)
             self.state_store.record_target_state(
@@ -142,6 +151,46 @@ class RunCoordinator:
                 target_summary_path=target_summary_path.as_posix(),
                 target_state=target_state,
             )
+
+        def extract_boundary_audit(result) -> tuple[str, tuple[str, ...], int]:
+            reviewer_result = getattr(result, "reviewer_result", None)
+            if hasattr(reviewer_result, "to_dict"):
+                reviewer_result = reviewer_result.to_dict()
+            if not isinstance(reviewer_result, dict):
+                return "", (), 0
+
+            summary = str(reviewer_result.get("summary", "")).strip()
+            metrics_payload = reviewer_result.get("metrics", {})
+            metrics = metrics_payload if isinstance(metrics_payload, dict) else {}
+            drift_score = int(metrics.get("drift_score", 0) or 0)
+            findings: list[str] = []
+            for item in reviewer_result.get("violations", []):
+                if not isinstance(item, dict):
+                    continue
+                violation_type = str(item.get("type", "")).strip()
+                file_path = str(item.get("file", "")).strip()
+                changed_lines = [
+                    int(line)
+                    for line in item.get("changed_lines", [])
+                    if str(line).strip()
+                ]
+                if violation_type == "extra_touched_file":
+                    findings.append(f"额外触达文件: {file_path}")
+                    continue
+                if violation_type == "outside_primary_region":
+                    line_preview = ", ".join(str(line) for line in changed_lines[:8]) or "无行号"
+                    findings.append(f"{file_path} 主区域外变更: {line_preview}")
+                    continue
+                if violation_type == "forbidden_path":
+                    findings.append(f"触达受保护路径: {file_path}")
+                    continue
+                if violation_type == "file_created":
+                    findings.append(f"尝试新建文件: {file_path}")
+                    continue
+                if violation_type == "file_deleted":
+                    findings.append(f"尝试删除文件: {file_path}")
+                    continue
+            return summary, tuple(dict.fromkeys(item for item in findings if item)), drift_score
 
         ado_client = AzureDevOpsClient(
             self.runtime_env.ado_base_url,
@@ -312,6 +361,11 @@ class RunCoordinator:
             )
             if isinstance(result.issue_state, IssueState):
                 issue_states.append(result.issue_state)
+            compliance_summary = build_compliance_summary(
+                getattr(getattr(result, "edit_contract", None), "quality_gate_rules", ()),
+                getattr(result, "quality_gate_result", None),
+            )
+            boundary_audit_summary, boundary_audit_findings, boundary_drift_score = extract_boundary_audit(result)
 
             if result.success:
                 suffix = f" (attempt {result.attempts})" if result.attempts > 1 else ""
@@ -335,6 +389,16 @@ class RunCoordinator:
                         changed_files=tuple(
                             change.get("file", "") for change in result.changes if change.get("file")
                         ),
+                        compliance_status=compliance_summary.status,
+                        compliance_summary=compliance_summary.summary,
+                        active_quality_gate_rules=tuple(
+                            check.rule_id for check in compliance_summary.checks
+                        ),
+                        hard_quality_gate_failures=compliance_summary.failed_rule_count,
+                        soft_quality_gate_findings=compliance_summary.soft_finding_count,
+                        boundary_audit_summary=boundary_audit_summary,
+                        boundary_audit_findings=boundary_audit_findings,
+                        boundary_drift_score=boundary_drift_score,
                     )
                 )
             else:
@@ -373,6 +437,16 @@ class RunCoordinator:
                             summary=issue_summary_text,
                             skip_reason=result.skip_reason or message,
                             issue_log_path=result.issue_log_path,
+                            compliance_status=compliance_summary.status,
+                            compliance_summary=compliance_summary.summary,
+                            active_quality_gate_rules=tuple(
+                                check.rule_id for check in compliance_summary.checks
+                            ),
+                            hard_quality_gate_failures=compliance_summary.failed_rule_count,
+                            soft_quality_gate_findings=compliance_summary.soft_finding_count,
+                            boundary_audit_summary=boundary_audit_summary,
+                            boundary_audit_findings=boundary_audit_findings,
+                            boundary_drift_score=boundary_drift_score,
                         )
                     )
                 else:
@@ -390,6 +464,16 @@ class RunCoordinator:
                             summary=issue_summary_text,
                             skip_reason=result.error or message,
                             issue_log_path=result.issue_log_path,
+                            compliance_status=compliance_summary.status,
+                            compliance_summary=compliance_summary.summary,
+                            active_quality_gate_rules=tuple(
+                                check.rule_id for check in compliance_summary.checks
+                            ),
+                            hard_quality_gate_failures=compliance_summary.failed_rule_count,
+                            soft_quality_gate_findings=compliance_summary.soft_finding_count,
+                            boundary_audit_summary=boundary_audit_summary,
+                            boundary_audit_findings=boundary_audit_findings,
+                            boundary_drift_score=boundary_drift_score,
                         )
                     )
 

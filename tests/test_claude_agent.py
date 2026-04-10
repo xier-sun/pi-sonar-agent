@@ -16,8 +16,13 @@ from pi_sonar_agent.agent.rule_policies import (
     LOOP_REWRITE_SCOPE_MODE,
 )
 from pi_sonar_agent.agent.rule_validators import validate_rule_fix
+from pi_sonar_agent.core.agent_runtime import AgentRuntimeError, AgentRuntimeResult
+from pi_sonar_agent.core.events import AttemptRuntimeEvent, AttemptRuntimeEventKind
+from pi_sonar_agent.core.issue_contract import EditContract
+from pi_sonar_agent.core.quality_gate import QualityGateRule
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.scope_guard import IssueEditScope
+from pi_sonar_agent.core.tool_surface import build_allowed_fix_tool_rules
 
 
 def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
@@ -57,6 +62,9 @@ def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
     assert "不要顺手修复本文件中其他位置的相同规则问题" in prompt
     assert "【推荐构建命令】" in prompt
     assert 'dotnet build "src/Foo.sln"' in prompt
+    assert "- 文件路径: src/Foo.cs" in prompt
+    assert "当前优先直接操作的问题文件相对路径是：src/Foo.cs" in prompt
+    assert "调用 finish 标记完成" not in prompt
 
 
 def test_build_user_prompt_renders_structured_retry_context() -> None:
@@ -215,6 +223,40 @@ def test_load_csharp_quality_gate_uses_repo_markdown_as_single_source(
     assert "所有公开的类、方法、属性、实体都必须有完整的 XML 文档注释" in gate
 
 
+def test_load_csharp_quality_gate_prefers_active_rule_summary_when_contract_present() -> None:
+    issue = SonarIssue(
+        key="issue-cs-active-rules",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    edit_contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        quality_gate_rules=(
+            QualityGateRule(
+                rule_id="cognitive_complexity",
+                title="单方法认知复杂度不超过 30",
+                summary="触达方法的认知复杂度不得超过 30。",
+                enforcement="hard",
+                prompt_hint="优先通过拆小局部逻辑或提取 private helper 降低复杂度。",
+            ),
+        ),
+    )
+
+    gate = ClaudeFixAgent._load_csharp_quality_gate(issue, edit_contract)
+
+    assert "本次修复只需遵守下面这些已启用的质量门禁规则" in gate
+    assert "cognitive_complexity 单方法认知复杂度不超过 30" in gate
+    assert "优先通过拆小局部逻辑或提取 private helper 降低复杂度" in gate
+    assert "# C# 代码质量与架构规范门禁" not in gate
+
+
 def test_default_quality_gate_source_points_to_repo_file() -> None:
     assert len(ClaudeFixAgent.QUALITY_GATE_PATHS) == 1
     assert str(ClaudeFixAgent.QUALITY_GATE_PATHS[0]).replace("\\", "/").endswith(
@@ -349,13 +391,89 @@ def test_fix_issue_skips_policy_managed_rule_before_running_agent(monkeypatch, t
     assert "默认跳过" in result.skip_reason
 
 
+def test_fix_issue_fails_fast_when_plan_precheck_blocks_complex_rule(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-plan-conflict",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=5,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    public async Task AutoPlugin(IEnumerable<int> orderIds)",
+                "    {",
+                "        await SaveAsync(orderIds);",
+                "    }",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    def fail_if_runtime_runs(self, request):
+        raise AssertionError("plan conflict should block before runtime execution")
+
+    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fail_if_runtime_runs)
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is False
+    assert result.failure_kind == "plan_conflict"
+    assert result.retryable_failure is False
+    assert result.repair_plan is not None
+    assert result.plan_precheck is not None
+    assert result.plan_precheck.code == "signature_change_not_allowed"
+    assert "signature_change" in result.build_output
+
+
 def test_builtin_tool_policy_allows_editing_tools_without_bash() -> None:
-    assert BUILTIN_FIX_TOOLS == ["Read", "Edit", "MultiEdit", "Write", "Grep", "Glob"]
+    assert BUILTIN_FIX_TOOLS == ["Read", "Edit"]
     assert "Bash" not in BUILTIN_FIX_TOOLS
     assert MCP_FIX_TOOLS == []
     assert "mcp__sonar-fix__git_add" not in MCP_FIX_TOOLS
     assert "mcp__sonar-fix__git_commit" not in MCP_FIX_TOOLS
     assert "mcp__sonar-fix__git_push" not in MCP_FIX_TOOLS
+
+
+def test_allowed_fix_tool_rules_append_controlled_bash_rules() -> None:
+    allowed_tools = build_allowed_fix_tool_rules(["Read", "Edit"], include_controlled_bash=True)
+
+    assert "Read" in allowed_tools
+    assert "Edit" in allowed_tools
+    assert "Bash" in allowed_tools
+    assert "Finish" in allowed_tools
+
+
+def test_claude_fix_tool_policy_allows_finish_and_harmless_shell() -> None:
+    policy = ClaudeFixAgent._build_fix_tool_policy()
+
+    finish_decision = policy.classify("Finish")
+    echo_decision = policy.classify("Bash", {"command": "echo 修复完成"})
+    delete_decision = policy.classify("Bash", {"command": "Remove-Item Foo.cs"})
+
+    assert finish_decision.allowed is True
+    assert echo_decision.allowed is True
+    assert delete_decision.allowed is False
+    assert delete_decision.policy_violation is True
 
 
 def test_fix_issue_fails_when_local_build_verification_fails(monkeypatch, tmp_path) -> None:
@@ -682,7 +800,18 @@ def test_fix_issue_retries_when_follow_up_response_times_out(monkeypatch, tmp_pa
     assert result.error == "Model response timed out"
     assert "没有返回后续响应" in result.build_output
     assert "清理动作: interrupt, close_response_stream, disconnect" in result.build_output
-    assert events == ["__aenter__", "interrupt", "__aexit__"]
+    assert events == [
+        "__aenter__",
+        "interrupt",
+        "__aexit__",
+        "__aenter__",
+        "interrupt",
+        "__aexit__",
+        "__aenter__",
+        "interrupt",
+        "__aexit__",
+    ]
+    assert result.performance_metrics["continuation_retry_count"] == 2
 
 
 def test_fix_issue_retries_when_issue_runtime_exceeds_deadline(monkeypatch, tmp_path) -> None:
@@ -705,6 +834,11 @@ def test_fix_issue_retries_when_issue_runtime_exceeds_deadline(monkeypatch, tmp_
         ClaudeFixAgent,
         "get_rule_details",
         lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: ["src/Foo.cs"]),
     )
     monkeypatch.setattr(
         ClaudeFixAgent,
@@ -865,7 +999,7 @@ def test_collect_modified_files_detects_attempt_local_commit(monkeypatch, tmp_pa
         ClaudeFixAgent._cleanup_attempt_workspace_state(repo)
 
 
-def test_fix_issue_runs_local_build_before_scope_rejection(monkeypatch, tmp_path) -> None:
+def test_fix_issue_runs_build_when_scope_soft_drift_is_ignored(monkeypatch, tmp_path) -> None:
     agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
     issue = SonarIssue(
         key="issue-3b",
@@ -903,10 +1037,109 @@ def test_fix_issue_runs_local_build_before_scope_rejection(monkeypatch, tmp_path
 
     monkeypatch.setattr(claude_agent_module.anyio, "run", lambda func: None)
 
+    build_calls: list[str] = []
+
     class FakeCompletedProcess:
         returncode = 1
         stdout = ""
         stderr = "src/Foo.cs(3,1): error CS0103: name not found [Foo.csproj]"
+
+    def fake_run(*args, **kwargs):
+        build_calls.append("build")
+        return FakeCompletedProcess()
+
+    monkeypatch.setattr(claude_agent_module.subprocess, "run", fake_run)
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is False
+    assert result.error == "Issue changes failed local build verification"
+    assert "error CS0103" in result.build_output
+    assert result.retryable_failure is True
+    assert result.failure_kind == "build"
+    assert build_calls == ["build"]
+
+
+def test_fix_issue_salvages_patch_after_post_edit_timeout(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-salvage",
+        rule="csharpsquid:S1481",
+        message="移除未使用变量",
+        line=5,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text(
+        "\n".join(
+                [
+                    "class Foo",
+                    "{",
+                    "    void Demo()",
+                    "    {",
+                    "        var unused = 1;",
+                    "    }",
+                    "}",
+                    "",
+                ]
+            ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: ["src/Foo.cs"]),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    def fake_runtime_run(self, request):
+        source_file.write_text(
+            "\n".join(
+                [
+                    "class Foo",
+                    "{",
+                    "    void Demo()",
+                    "    {",
+                    "    }",
+                    "}",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        raise AgentRuntimeError(
+            TimeoutError("模型在 180 秒内没有返回后续响应\n阶段分类: post_edit_stall"),
+            AgentRuntimeResult(
+                tool_uses=("Read", "Edit"),
+                last_tool_name="Edit",
+                total_duration_seconds=12.0,
+                time_to_first_model_content_seconds=1.2,
+                time_after_first_edit_to_finalize_seconds=10.8,
+                tool_call_count=2,
+                read_call_count=1,
+                edit_call_count=1,
+                timeout_stage="post_edit_stall",
+                last_progress_stage="tool:Edit",
+            ),
+        )
+
+    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fake_runtime_run)
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
 
     monkeypatch.setattr(
         claude_agent_module.subprocess,
@@ -916,12 +1149,12 @@ def test_fix_issue_runs_local_build_before_scope_rejection(monkeypatch, tmp_path
 
     result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
 
-    assert result.success is False
-    assert result.error == "Issue changes failed local build verification"
-    assert "error CS0103: name not found" in result.build_output
-    assert "Issue changes exceeded the allowed Sonar edit scope." in result.build_output
-    assert result.retryable_failure is True
-    assert result.failure_kind == "build"
+    assert result.success is True
+    assert result.patch_salvaged is True
+    assert result.model_timeout_stage == "post_edit_stall"
+    assert result.performance_metrics["patch_salvaged"] is True
+    assert result.performance_metrics["model_timeout_stage"] == "post_edit_stall"
+    assert result.performance_metrics["build_invoked"] is True
 
 
 def test_fix_issue_scope_validation_ignores_previous_successful_changes_in_same_file(
@@ -1037,6 +1270,172 @@ def test_fix_issue_scope_validation_ignores_previous_successful_changes_in_same_
     assert result.success is True
     assert result.build_passed is True
     assert "allowed Sonar edit scope" not in result.build_output
+
+
+def test_fix_issue_continues_same_issue_after_follow_up_timeout(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-continuation",
+        rule="csharpsquid:S1481",
+        message="Remove this unused local variable.",
+        line=5,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    void Demo()",
+                "    {",
+                "        var unused = 1;",
+                "    }",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    seen_prompts: list[str] = []
+    seen_change_probes = {"count": 0}
+
+    def fake_collect_modified_files(workspace_path):
+        seen_change_probes["count"] += 1
+        if len(seen_prompts) >= 2:
+            return ["src/Foo.cs"]
+        return []
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(fake_collect_modified_files),
+    )
+
+    def fake_runtime_run(self, request):
+        seen_prompts.append(request.user_prompt)
+        if len(seen_prompts) == 1:
+            raise AgentRuntimeError(
+                TimeoutError("模型在 180 秒内没有返回后续响应\n阶段分类: post_read_stall"),
+                AgentRuntimeResult(
+                    tool_uses=("Read",),
+                    last_tool_name="Read",
+                    total_duration_seconds=8.0,
+                    time_to_first_model_content_seconds=1.0,
+                    tool_call_count=1,
+                    read_call_count=1,
+                    timeout_stage="post_read_stall",
+                    last_progress_stage="tool:Read",
+                    runtime_events=(
+                        AttemptRuntimeEvent(
+                            kind=AttemptRuntimeEventKind.ATTEMPT_STARTED,
+                            sequence=1,
+                            stage="initializing",
+                        ),
+                        AttemptRuntimeEvent(
+                            kind=AttemptRuntimeEventKind.TOOL_CALLED,
+                            sequence=2,
+                            stage="tool:Read",
+                            payload={
+                                "tool_name": "Read",
+                                "tool_payload": {"file_path": r"C:\GIT.NEWARE.WORK\BI\src\Foo.cs"},
+                                "tool_preview": '{"file_path":"C:\\\\GIT.NEWARE.WORK\\\\BI\\\\src\\\\Foo.cs"}',
+                                "read_preview": "   4 |     {\n   5 |         var unused = 1;",
+                            },
+                        ),
+                    ),
+                ),
+            )
+
+        source_file.write_text(
+            "\n".join(
+                [
+                    "class Foo",
+                    "{",
+                    "    void Demo()",
+                    "    {",
+                    "    }",
+                    "}",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        return AgentRuntimeResult(
+            tool_uses=("Read", "Edit"),
+            last_tool_name="Edit",
+            total_duration_seconds=6.0,
+            time_to_first_model_content_seconds=0.8,
+            time_after_first_edit_to_finalize_seconds=2.0,
+            tool_call_count=2,
+            read_call_count=1,
+            edit_call_count=1,
+            continuation_retry_count=1,
+            continuation_recovered=True,
+            continuation_timeout_stages=("post_read_stall",),
+            runtime_events=(
+                AttemptRuntimeEvent(
+                    kind=AttemptRuntimeEventKind.ATTEMPT_STARTED,
+                    sequence=1,
+                    stage="initializing",
+                ),
+                AttemptRuntimeEvent(
+                    kind=AttemptRuntimeEventKind.TOOL_CALLED,
+                    sequence=2,
+                    stage="tool:Edit",
+                    payload={"tool_name": "Edit"},
+                ),
+                AttemptRuntimeEvent(
+                    kind=AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    sequence=3,
+                    stage="completed",
+                    payload={"success": True},
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fake_runtime_run)
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    monkeypatch.setattr(
+        claude_agent_module.subprocess,
+        "run",
+        lambda *args, **kwargs: FakeCompletedProcess(),
+    )
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is True
+    assert len(seen_prompts) == 2
+    assert "【继续上一轮修复，不要从头分析】" in seen_prompts[1]
+    assert "绝对路径" in seen_prompts[1]
+    assert "当前优先直接操作的问题文件相对路径是：src/Foo.cs" in seen_prompts[1]
+    assert result.performance_metrics["continuation_retry_count"] == 1
+    assert result.performance_metrics["continuation_recovered"] is True
+    assert "post_read_stall" in result.performance_metrics["continuation_timeout_stages"]
+    assert any(
+        event.kind == AttemptRuntimeEventKind.CONTINUATION_REQUESTED
+        for event in result.attempt_events
+    )
 
 
 def test_scope_validation_rejects_out_of_scope_lines() -> None:

@@ -25,6 +25,26 @@ class EventKind(StrEnum):
     ATTEMPT_FINISHED = "attempt_finished"
 
 
+class AttemptRuntimeEventKind(StrEnum):
+    """Fine-grained runtime events produced inside one attempt."""
+
+    ATTEMPT_STARTED = "attempt_runtime_started"
+    USER_MESSAGE_SENT = "user_message_sent"
+    TOOL_CALLED = "tool_called"
+    TOOL_RESULT_RECEIVED = "tool_result_received"
+    ASSISTANT_TEXT_DELTA = "assistant_text_delta"
+    SDK_TRACE = "sdk_trace"
+    CONTINUATION_REQUESTED = "continuation_requested"
+    PATCH_DETECTED = "patch_detected"
+    BUILD_STARTED = "build_started"
+    BUILD_FINISHED = "build_finished"
+    BOUNDARY_REJECTED = "boundary_rejected"
+    QUALITY_GATE_REJECTED = "quality_gate_rejected"
+    TIMEOUT_CLASSIFIED = "timeout_classified"
+    PATCH_SALVAGED = "patch_salvaged"
+    ATTEMPT_FINISHED = "attempt_runtime_finished"
+
+
 @dataclass(frozen=True)
 class StateEvent:
     """Structured event for run/target/issue lifecycle transitions."""
@@ -53,6 +73,69 @@ class AttemptEvent(StateEvent):
     """Structured event for a single issue attempt."""
 
     attempt_number: int = 0
+
+
+@dataclass(frozen=True)
+class AttemptRuntimeEvent:
+    """Structured in-attempt event for runtime/performance analysis."""
+
+    kind: AttemptRuntimeEventKind
+    sequence: int
+    run_label: str = ""
+    issue_key: str = ""
+    attempt_number: int = 0
+    stage: str = ""
+    timestamp: str = field(default_factory=utc_now_iso)
+    payload: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the runtime event to a JSON-ready dictionary."""
+
+        return serialize_state(self)
+
+
+class AttemptEventStream:
+    """Append-only in-memory event stream for one attempt."""
+
+    def __init__(
+        self,
+        *,
+        run_label: str = "",
+        issue_key: str = "",
+        attempt_number: int = 0,
+    ) -> None:
+        self.run_label = run_label
+        self.issue_key = issue_key
+        self.attempt_number = attempt_number
+        self._events: list[AttemptRuntimeEvent] = []
+        self._sequence = 0
+
+    def emit(
+        self,
+        kind: AttemptRuntimeEventKind,
+        *,
+        stage: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> AttemptRuntimeEvent:
+        """Append one structured runtime event."""
+
+        self._sequence += 1
+        event = AttemptRuntimeEvent(
+            kind=kind,
+            sequence=self._sequence,
+            run_label=self.run_label,
+            issue_key=self.issue_key,
+            attempt_number=self.attempt_number,
+            stage=str(stage or ""),
+            payload=dict(payload or {}),
+        )
+        self._events.append(event)
+        return event
+
+    def snapshot(self) -> tuple[AttemptRuntimeEvent, ...]:
+        """Return the captured runtime events."""
+
+        return tuple(self._events)
 
 
 class EventRecorder:

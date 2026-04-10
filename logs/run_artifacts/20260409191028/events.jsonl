@@ -1,0 +1,1 @@
+{"kind": "run_started", "run_label": "20260409191028", "entity_type": "run", "entity_key": "20260409191028", "repository": "", "author": "", "project_key": "", "issue_key": "", "status": "running", "artifact_path": "", "timestamp": "2026-04-09T11:10:28.396565+00:00", "payload": {"mode": "batch", "target_count": 1, "config_path": "data/targets.json"}}

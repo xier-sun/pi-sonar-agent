@@ -1,0 +1,11 @@
+{
+  "issue_key": "91ed2ea4-a21a-4f0b-8ff3-957435fb0a86",
+  "rule_id": "external_roslyn:CS1591",
+  "message": "缺少对公共可见类型或成员“SalesInvocieExportReq”的 XML 注释",
+  "line": 263,
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/Request/SalesInvoiceReq.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/Request/SalesInvoiceReq.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

@@ -1,0 +1,18 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
+@@ -433,7 +433,7 @@
+             return ledgerEntry;
+
+         }
+
+ 
+
+-        private sealed class InterestRateTier { public int? Min { get; } public int? Max { get; } public decimal Rate { get; } }
+
++        private sealed class InterestRateTier { public int? Min { get; private set; } public int? Max { get; private set; } public decimal Rate { get; private set; } }
+
+ 
+
+         /// <summary>
+
+         /// 共享数据缓存类

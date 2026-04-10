@@ -1,0 +1,11 @@
+{
+  "issue_key": "ea6ad3ea-665d-4e2f-9a3d-cc84d3f9f1c4",
+  "rule_id": "csharpsquid:S1481",
+  "message": "Remove the unused local variable 'slpDict'.",
+  "line": 2224,
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+  "severity": "MINOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

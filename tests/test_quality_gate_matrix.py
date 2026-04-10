@@ -127,12 +127,19 @@ def test_guardrail_modes_diverge_for_undeclared_side_file(monkeypatch, tmp_path:
 
     assert scope_result.success is True
     assert scope_result.guardrail_mode == "scope"
-    assert scope_result.reviewer_result["status"] == "retry"
+    assert scope_result.reviewer_result["status"] == "pass"
     assert scope_result.follow_ups
+    assert any(
+        item["type"] == "extra_touched_file"
+        for item in scope_result.reviewer_result["violations"]
+    )
 
-    assert contract_result.success is False
-    assert contract_result.retryable_failure is True
-    assert contract_result.failure_kind == "reviewer"
+    assert contract_result.success is True
+    assert contract_result.retryable_failure is False
     assert contract_result.guardrail_mode == "contract_review"
-    assert contract_result.reviewer_result["status"] == "retry"
+    assert contract_result.reviewer_result["status"] == "pass"
     assert contract_result.follow_ups
+    assert any(
+        item["type"] == "extra_touched_file"
+        for item in contract_result.reviewer_result["violations"]
+    )

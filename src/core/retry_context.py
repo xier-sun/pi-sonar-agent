@@ -72,6 +72,18 @@ class ReviewFailureContext:
 
 
 @dataclass(frozen=True)
+class BoundaryFailureContext:
+    """Structured runtime boundary failure classification."""
+
+    code: str
+    summary: str = ""
+    secondary_codes: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
+
+
+@dataclass(frozen=True)
 class QualityGateViolationContext:
     """Structured hard quality-gate violation for retry analysis."""
 
@@ -100,6 +112,19 @@ class QualityGateFailureContext:
 
 
 @dataclass(frozen=True)
+class PlanFailureContext:
+    """Structured plan-first precheck conflict for retry analysis."""
+
+    code: str
+    summary: str = ""
+    details: tuple[str, ...] = ()
+    guidance: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
+
+
+@dataclass(frozen=True)
 class RetryContext:
     """Structured retry memory for the next issue attempt."""
 
@@ -114,18 +139,88 @@ class RetryContext:
     changed_files: tuple[str, ...] = ()
     compiler_errors: tuple[CompilerErrorContext, ...] = ()
     guidance: tuple[str, ...] = ()
+    boundary_failure: BoundaryFailureContext | None = None
     scope_violation: ScopeViolationContext | None = None
     review_failure: ReviewFailureContext | None = None
     quality_gate_failure: QualityGateFailureContext | None = None
+    plan_failure: PlanFailureContext | None = None
     model_timeout_summary: str = ""
+    model_timeout_stage: str = ""
     build_tool_failed: bool = False
     forbidden_tool_failed: bool = False
     model_timeout_failed: bool = False
+    patch_salvaged: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the retry context to a JSON-ready dictionary."""
 
         return serialize_state(self)
+
+
+def _dedupe_ordered(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    results: list[str] = []
+    for item in items:
+        normalized = str(item).strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        results.append(normalized)
+    return results
+
+
+def _build_quality_gate_guidance(
+    quality_gate_failure: QualityGateFailureContext | None,
+) -> tuple[str, ...]:
+    if quality_gate_failure is None:
+        return ()
+
+    guidance: list[str] = []
+    for item in quality_gate_failure.violations:
+        if item.retry_hint:
+            guidance.append(item.retry_hint)
+
+        if item.rule_id == "public_xml_docs":
+            guidance.append("只为当前触达的公开成员补齐 XML 文档，包括 <summary>/<param>/<returns>；不要顺手补无关公开成员。")
+        elif item.rule_id == "async_signature":
+            if "没有以 Async 结尾" in item.message:
+                guidance.append("把当前触达的异步方法改成 *Async 结尾；如果这是公开 API 或接口实现，同步接口声明、调用点和 nameof(...)。")
+            if "返回类型不是 Task/Task<T>" in item.message:
+                guidance.append("异步方法返回类型改为 Task 或 Task<T>；纯同步 helper 去掉 async 并改成同步返回。")
+            if "async void" in item.message:
+                guidance.append("不要保留 async void；除事件处理器外改成 Task/Task<T> 或同步方法。")
+        elif item.rule_id == "async_requires_await":
+            guidance.append("如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。")
+
+    guidance.append("只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。")
+    return tuple(_dedupe_ordered(guidance))
+
+
+def _append_quality_gate_details(
+    sections: list[str],
+    quality_gate_failure: QualityGateFailureContext | None,
+) -> None:
+    if quality_gate_failure is None:
+        return
+
+    sections.append(quality_gate_failure.summary)
+    for index, item in enumerate(quality_gate_failure.violations, start=1):
+        detail = f"{index}. [{item.rule_id}] {item.title}: {item.message}"
+        if item.file:
+            location = item.file
+            if item.line > 0:
+                location = f"{location}:{item.line}"
+            detail += f" | location: {location}"
+        sections.append(detail)
+        if item.evidence:
+            sections.append(f"   证据: {item.evidence}")
+        if item.retry_hint:
+            sections.append(f"   原始提示: {item.retry_hint}")
+
+    guidance = _build_quality_gate_guidance(quality_gate_failure)
+    if guidance:
+        sections.append("本次重改要求:")
+        sections.extend(f"- {item}" for item in guidance)
 
 
 def render_retry_context(retry_context: RetryContext | None) -> str:
@@ -138,17 +233,37 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
     scope_violation = retry_context.scope_violation
     review_failure = retry_context.review_failure
     quality_gate_failure = retry_context.quality_gate_failure
+    plan_failure = retry_context.plan_failure
     has_scope_violation = scope_violation is not None
     has_review_failure = review_failure is not None
     has_quality_gate_failure = quality_gate_failure is not None
+    has_plan_failure = plan_failure is not None
     compiler_errors = list(retry_context.compiler_errors)
 
     if not compiler_errors:
         if raw_output:
+            if has_plan_failure:
+                lines = [
+                    "上次尝试在 edit 前的 Plan 预检阶段就被拒绝，请先解决计划层冲突：",
+                    plan_failure.summary if plan_failure else raw_output,
+                ]
+                lines.extend(str(item).strip() for item in (plan_failure.details if plan_failure else ()) if str(item).strip())
+                if plan_failure and plan_failure.guidance:
+                    lines.append("重试约束:")
+                    lines.extend(f"- {item}" for item in plan_failure.guidance if str(item).strip())
+                return "\n".join(lines)
+            if retry_context.boundary_failure is not None and retry_context.boundary_failure.summary:
+                raw_output = (
+                    f"边界主阻塞原因: {retry_context.boundary_failure.code}\n"
+                    f"{retry_context.boundary_failure.summary}\n\n{raw_output}"
+                )
             if retry_context.model_timeout_failed:
+                timeout_label = retry_context.model_timeout_summary or "在等待模型首响应时超时"
+                if retry_context.patch_salvaged:
+                    timeout_label += "（已检测到有效 patch 并尝试回收验证）"
                 return "\n".join(
                     [
-                        f"上次尝试{retry_context.model_timeout_summary or '在等待模型首响应时超时'}，请先确认当前模型网关或 provider 可正常返回工具调用响应：",
+                        f"上次尝试{timeout_label}，请先确认当前模型网关或 provider 可正常返回工具调用响应：",
                         raw_output,
                         "重试约束:",
                         "- 不要更换构建命令，先确认模型能稳定返回工具调用响应。",
@@ -160,7 +275,9 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                     "上次尝试使用了被禁止的工具，或污染了当前 issue 的 Git 基线；本次必须严格按下面约束重试：",
                     raw_output,
                     "重试约束:",
-                    "- 严禁使用 Bash、git_add、git_commit、git_push 或任何自行提交/推送动作。",
+                    "- 严禁使用 git_add、git_commit、git_push 或任何自行提交/推送动作。",
+                    "- 如果使用 shell 工具（工具名 Bash），只写 bash 兼容命令；允许搜索、查看、诊断、echo 等无害操作。",
+                    "- 严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码。",
                     "- 修复阶段只能直接编辑代码并运行推荐构建命令，提交由外层流程统一处理。",
                     "- 先根据下面的本地构建输出修复问题，再重新运行推荐构建命令验证。",
                 ]
@@ -207,16 +324,21 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                     ]
                 )
             if has_quality_gate_failure:
-                sections = [
-                    "上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：",
-                    quality_gate_failure.summary if quality_gate_failure else raw_output,
-                ]
-                for index, item in enumerate(quality_gate_failure.violations if quality_gate_failure else (), start=1):
-                    sections.append(f"{index}. [{item.rule_id}] {item.title}: {item.message}")
-                    if item.retry_hint:
-                        sections.append(f"   重试提示: {item.retry_hint}")
+                sections = ["上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁："]
+                _append_quality_gate_details(sections, quality_gate_failure)
                 return "\n".join(sections)
             return raw_output
+        if has_plan_failure:
+            lines = [
+                "上次尝试在 edit 前的 Plan 预检阶段被拒绝。",
+                plan_failure.summary,
+            ]
+            if plan_failure.details:
+                lines.extend(f"- {item}" for item in plan_failure.details if str(item).strip())
+            if plan_failure.guidance:
+                lines.append("重试约束:")
+                lines.extend(f"- {item}" for item in plan_failure.guidance if str(item).strip())
+            return "\n".join(lines)
         if retry_context.failure_kind == "no_change" or retry_context.error == "Agent completed without modifying any files":
             return "\n".join(
                 [
@@ -232,11 +354,16 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
 
     sections: list[str] = []
     if retry_context.model_timeout_failed:
-        sections.append(f"上次尝试{retry_context.model_timeout_summary or '在等待模型首响应时超时'}。")
+        timeout_label = retry_context.model_timeout_summary or "在等待模型首响应时超时"
+        if retry_context.patch_salvaged:
+            timeout_label += "（已检测到有效 patch 并尝试回收验证）"
+        sections.append(f"上次尝试{timeout_label}。")
         sections.append("先确认当前模型 provider/网关与 Claude SDK 工具调用协议兼容，再继续重试。")
     if retry_context.forbidden_tool_failed:
         sections.append("上次尝试使用了被禁止的工具，或污染了当前 issue 的 Git 基线。")
-        sections.append("这次严禁使用 Bash、git_add、git_commit、git_push；只允许直接编辑代码并运行推荐构建命令。")
+        sections.append("这次严禁使用 git_add、git_commit、git_push；只允许直接编辑代码并运行推荐构建命令。")
+        sections.append("如果使用 shell 工具（工具名 Bash），只写 bash 兼容命令；允许无害操作。")
+        sections.append("严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码。")
     if retry_context.build_tool_failed:
         sections.append("上次尝试在运行构建工具时异常退出；已附加本地回退构建结果。")
     sections.append("上次尝试引入了以下关键编译错误，请先修复这些错误：")
@@ -251,6 +378,18 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
     if retry_context.guidance:
         sections.append("重试约束:")
         sections.extend(f"- {item}" for item in retry_context.guidance)
+
+    if retry_context.boundary_failure is not None:
+        sections.extend(
+            [
+                f"边界主阻塞原因: {retry_context.boundary_failure.code}",
+                retry_context.boundary_failure.summary,
+            ]
+        )
+        if retry_context.boundary_failure.secondary_codes:
+            sections.append(
+                "次级边界原因: " + ", ".join(retry_context.boundary_failure.secondary_codes)
+            )
 
     if has_scope_violation:
         sections.extend(
@@ -272,10 +411,6 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
         )
     if has_quality_gate_failure:
         sections.append("另外，上次 patch 还没有通过 C# 质量门禁：")
-        sections.append(quality_gate_failure.summary if quality_gate_failure else "")
-        for index, item in enumerate(quality_gate_failure.violations if quality_gate_failure else (), start=1):
-            sections.append(f"{index}. [{item.rule_id}] {item.title}: {item.message}")
-            if item.retry_hint:
-                sections.append(f"   重试提示: {item.retry_hint}")
+        _append_quality_gate_details(sections, quality_gate_failure)
 
     return "\n".join(sections)

@@ -1,0 +1,109 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -81,7 +81,7 @@
+                         .Select(x => (OrinDocEntry: x.DocEntry.Value, BaseEntry: x.BaseEntry.Value, BaseType: x.BaseType ?? 0))
+
+                         .Distinct()
+
+                         .ToList();
+
+-                    resolvedDevEntryMap = await ResolveOrderDocEntryFromReturnChainAsync(traceItems);
+
++                    resolvedDevEntryMap = ResolveOrderDocEntryFromReturnChain(traceItems);
+
+                 }
+
+ 
+
+                 // 合并：有 U_DevEntry 的直接用，没有的用回溯结果
+
+@@ -173,7 +173,7 @@
+         /// <summary>
+
+         /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号
+
+         /// </summary>
+
+-        private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync(
+
++        private Dictionary<int, int> ResolveOrderDocEntryFromReturnChain(
+
+             List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems)
+
+         {
+
+             var result = new Dictionary<int, int>();
+
+@@ -197,19 +197,19 @@
+                 var invDocEntries = invoiceBaseEntries.Select(x => x.InvDocEntry).Distinct().ToList();
+
+ 
+
+                 // INV1 → DLN1
+
+-                var inv1ToDln1 = await UnitWork.Find<INV1>(x =>
+
++                var inv1ToDln1 = UnitWork.Find<INV1>(x =>
+
+                     invDocEntries.Contains(x.DocEntry.Value) && x.BaseType == 15 && x.BaseEntry.HasValue)
+
+                     .Select(x => new { x.DocEntry, x.BaseEntry })
+
+                     .Distinct()
+
+-                    .ToListAsync();
+
++                    .ToList();
+
+                 var dlnDocEntries = inv1ToDln1.Select(x => x.BaseEntry.Value).Distinct().ToList();
+
+ 
+
+                 // DLN1 → ORDR
+
+-                var dln1ToOrdr = await UnitWork.Find<DLN1>(x =>
+
++                var dln1ToOrdr = UnitWork.Find<DLN1>(x =>
+
+                     dlnDocEntries.Contains(x.DocEntry.Value) && x.BaseType == 17 && x.BaseEntry.HasValue)
+
+                     .Select(x => new { x.DocEntry, x.BaseEntry })
+
+                     .Distinct()
+
+-                    .ToListAsync();
+
++                    .ToList();
+
+                 var dln1ToOrdrDict = dln1ToOrdr.ToDictionary(x => x.DocEntry.Value, x => x.BaseEntry.Value);
+
+ 
+
+                 // 组装：INV1.DocEntry → DLN1.DocEntry → ORDR.DocEntry
+
+@@ -230,11 +230,11 @@
+             {
+
+                 var dlnDocEntries = deliveryBaseEntries.Select(x => x.DlnDocEntry).Distinct().ToList();
+
+ 
+
+-                var dln1ToOrdr = await UnitWork.Find<DLN1>(x =>
+
++                var dln1ToOrdr = UnitWork.Find<DLN1>(x =>
+
+                     dlnDocEntries.Contains(x.DocEntry.Value) && x.BaseType == 17 && x.BaseEntry.HasValue)
+
+                     .Select(x => new { x.DocEntry, x.BaseEntry })
+
+                     .Distinct()
+
+-                    .ToListAsync();
+
++                    .ToList();
+
+                 var dln1ToOrdrDict = dln1ToOrdr.ToDictionary(x => x.DocEntry.Value, x => x.BaseEntry.Value);
+
+ 
+
+                 foreach (var item in deliveryBaseEntries)

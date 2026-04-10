@@ -38,7 +38,7 @@ def test_issue_planner_builds_edit_contract_for_contract_review() -> None:
     assert "Quality Gate Notes" in plan.prompt_guidance
 
 
-def test_diff_reviewer_rejects_undeclared_file_and_records_follow_up() -> None:
+def test_diff_reviewer_records_extra_touched_file_as_soft_audit() -> None:
     contract = EditContract(
         issue_key="ISSUE-2",
         rule_id="csharpsquid:S6562",
@@ -60,10 +60,11 @@ def test_diff_reviewer_rejects_undeclared_file_and_records_follow_up() -> None:
         ),
     )
 
-    assert result.status == "retry"
-    assert result.violations[0].type == "undeclared_file"
+    assert result.status == "pass"
+    assert result.violations[0].type == "extra_touched_file"
     assert result.follow_ups
     assert result.follow_ups[0].file == "src/Bar.cs"
+    assert result.metrics["drift_score"] >= 3
 
 
 def test_follow_up_store_appends_jsonl(tmp_path: Path) -> None:
@@ -126,7 +127,7 @@ def test_build_retry_feedback_includes_reviewer_rejection(tmp_path: Path) -> Non
     assert "Edit Contract 之外的文件或无关代码行" in feedback
 
 
-def test_fix_issue_contract_review_rejects_out_of_contract_patch(monkeypatch, tmp_path: Path) -> None:
+def test_fix_issue_contract_review_allows_same_file_drift_and_records_audit(monkeypatch, tmp_path: Path) -> None:
     agent = ClaudeFixAgent(
         sonar_host="https://sonar.example",
         sonar_token="token",
@@ -208,10 +209,12 @@ def test_fix_issue_contract_review_rejects_out_of_contract_patch(monkeypatch, tm
 
     result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
 
-    assert result.success is False
-    assert result.retryable_failure is True
-    assert result.failure_kind == "reviewer"
+    assert result.success is True
+    assert result.retryable_failure is False
     assert result.guardrail_mode == "contract_review"
-    assert "Diff reviewer rejected the patch" in result.build_output
-    assert result.reviewer_result["status"] == "retry"
+    assert result.reviewer_result["status"] == "pass"
+    assert any(
+        item["type"] == "outside_primary_region"
+        for item in result.reviewer_result["violations"]
+    )
     assert result.follow_ups

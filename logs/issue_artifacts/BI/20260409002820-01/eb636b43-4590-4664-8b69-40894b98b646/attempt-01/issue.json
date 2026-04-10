@@ -1,0 +1,11 @@
+{
+  "issue_key": "eb636b43-4590-4664-8b69-40894b98b646",
+  "rule_id": "csharpsquid:S3358",
+  "message": "Extract this nested ternary operation into an independent statement.",
+  "line": 93,
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

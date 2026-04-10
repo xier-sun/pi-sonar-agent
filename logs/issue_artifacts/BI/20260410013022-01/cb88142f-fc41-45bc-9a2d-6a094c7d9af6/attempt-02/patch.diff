@@ -1,0 +1,18 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -874,6 +874,8 @@
+                 // 如果只有不可清单或都没有，不添加到remarkDic
+
+             }
+
+ 
+
++            data.RemarkDic = remarkDic;
+
++
+
+             var orders = await UnitWork.Find<ORDR>(o => orderIds.Contains(o.DocEntry)).ToListAsync();
+
+             var slpCodes = orders.Where(o => o.SlpCode.HasValue)
+
+                 .Select(o => o.SlpCode.Value)

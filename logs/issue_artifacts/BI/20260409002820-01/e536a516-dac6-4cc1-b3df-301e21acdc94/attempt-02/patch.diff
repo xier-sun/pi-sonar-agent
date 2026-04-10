@@ -1,0 +1,452 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -1779,6 +1779,225 @@
+         }
+
+ 
+
+         /// <summary>
+
++        /// 从批量数据或回退查询获取销售订单信息
+
++        /// </summary>
+
++        private async Task<HistoricalOverdueCalculationService.SaleOrderForOverDue> GetSaleOrderForCalcAsync(
+
++            ORDR order,
+
++            Dictionary<int, HistoricalOverdueCalculationService.SaleOrderForOverDue> batchSaleOrders,
+
++            HistoricalOverdueCalculationService calculationService)
+
++        {
+
++            if (!batchSaleOrders.TryGetValue(order.DocEntry, out var saleOrderForCalc))
+
++            {
+
++                saleOrderForCalc = await calculationService.GetSaleOrderAsync(order.DocEntry);
+
++            }
+
++            return saleOrderForCalc;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 从批量数据获取付款条件
+
++        /// </summary>
+
++        private static PayTermSave GetPayTermFromBatch(
+
++            HistoricalOverdueCalculationService.SaleOrderForOverDue saleOrderForCalc,
+
++            Dictionary<int, PayTermSave> batchPayTerms)
+
++        {
+
++            PayTermSave payTerm = null;
+
++            if (saleOrderForCalc.GroupNum.HasValue)
+
++            {
+
++                batchPayTerms?.TryGetValue(saleOrderForCalc.GroupNum.Value, out payTerm);
+
++            }
+
++            return payTerm;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 从批量数据或返回默认值获取交货单列表
+
++        /// </summary>
+
++        private static List<HistoricalOverdueCalculationService.DeliveryForOverDue> GetDeliveryListFromBatch(
+
++            ORDR order,
+
++            Dictionary<int, List<HistoricalOverdueCalculationService.DeliveryForOverDue>> batchDeliveries)
+
++        {
+
++            if (!batchDeliveries.TryGetValue(order.DocEntry, out var deliveryList))
+
++            {
+
++                deliveryList = new List<HistoricalOverdueCalculationService.DeliveryForOverDue>();
+
++            }
+
++            return deliveryList;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 从批量数据或返回默认值获取列表
+
++        /// </summary>
+
++        private static List<T> GetListFromBatch<T>(
+
++            int docEntry,
+
++            Dictionary<int, List<T>> batchData)
+
++        {
+
++            if (!batchData.TryGetValue(docEntry, out var list))
+
++            {
+
++                list = new List<T>();
+
++            }
+
++            return list;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 从批量数据获取清账核销单列表
+
++        /// </summary>
+
++        private static List<HistoricalOverdueCalculationService.ClearReconForOverDue> GetClearReconListFromBatch(
+
++            ORDR order,
+
++            Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>> batchClearRecons)
+
++        {
+
++            return GetListFromBatch(order.DocEntry, batchClearRecons);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 从批量数据获取销售订单插件
+
++        /// </summary>
+
++        private static SaleOrderPlugin GetSaleOrderPluginFromBatch(
+
++            ORDR order,
+
++            Dictionary<int, SaleOrderPlugin> batchSaleOrderPlugins)
+
++        {
+
++            batchSaleOrderPlugins.TryGetValue(order.DocEntry, out var saleOrderPlugin);
+
++            return saleOrderPlugin;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 获取客户类型并判断是否为学校或研究机构
+
++        /// </summary>
+
++        private async Task<(MainlandCustomerTypeDto CustomerType, bool IsSchoolOrResearch)> GetCustomerTypeInfoAsync(
+
++            ORDR order,
+
++            List<MainlandCustomerTypeDto> customerTypes)
+
++        {
+
++            customerTypes ??= await _customerCommonApp.GetMainlandCustomerType();
+
++            var customerType = customerTypes.FirstOrDefault(ct => ct.CardCode == order.CardCode);
+
++            var isSchoolOrResearch = customerType != null && (customerType.CardType.Contains("校") || customerType.CardType.Contains("研"));
+
++            return (customerType, isSchoolOrResearch);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 从批量数据或回退查询获取适用的罚息规则
+
++        /// </summary>
+
++        private async Task<PenaltyRuleDefinition> GetApplicableRuleAsync(
+
++            bool isSchoolOrResearch,
+
++            Dictionary<bool, PenaltyRuleDefinition> penaltyRules)
+
++        {
+
++            if (!penaltyRules.TryGetValue(isSchoolOrResearch, out PenaltyRuleDefinition rule))
+
++            {
+
++                rule = await GetApplicablePenaltyRule(isSchoolOrResearch);
+
++            }
+
++            return rule;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 从批量数据或回退查询获取销售员信息
+
++        /// </summary>
+
++        private async Task<OSLP> GetSalespersonAsync(
+
++            ORDR order,
+
++            Dictionary<int, OSLP> batchSlps)
+
++        {
+
++            OSLP slp = null;
+
++            if (order.SlpCode.HasValue && !batchSlps.TryGetValue(order.SlpCode.Value, out slp))
+
++            {
+
++                slp = await UnitWork.Find<OSLP>(s => s.SlpCode == order.SlpCode.Value).FirstOrDefaultAsync();
+
++            }
+
++            return slp;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 构建订单事件列表
+
++        /// </summary>
+
++        private static List<OrderEvent> BuildOrderEvents(
+
++            List<ReceiptForOrder> allReceipts,
+
++            List<HistoricalOverdueCalculationService.DeliveryForOverDue> deliveryForCalcList,
+
++            List<HistoricalOverdueCalculationService.ReturnForOverDue> allReturns,
+
++            List<SaleRefund> allRefunds,
+
++            List<HistoricalOverdueCalculationService.ClearReconForOverDue> allClearRecons)
+
++        {
+
++            var events = new List<OrderEvent>();
+
++
+
++            // 添加付款事件
+
++            foreach (var receipt in allReceipts)
+
++            {
+
++                events.Add(new OrderEvent
+
++                {
+
++                    EventDate = receipt.DocDate.Value,
+
++                    EventType = OrderEventType.Payment,
+
++                    ReferenceId = receipt.DocEntry.ToString(),
+
++                    Amount = receipt.AppliedAmount
+
++                });
+
++            }
+
++
+
++            // 添加交货事件
+
++            foreach (var delivery in deliveryForCalcList)
+
++            {
+
++                events.Add(new OrderEvent
+
++                {
+
++                    EventDate = delivery.DocDate.Value,
+
++                    EventType = OrderEventType.Delivery,
+
++                    ReferenceId = delivery.DocEntry.ToString(),
+
++                    Amount = delivery.DocTotal.Value
+
++                });
+
++            }
+
++
+
++            // 添加退货事件
+
++            foreach (var returnOrder in allReturns)
+
++            {
+
++                events.Add(new OrderEvent
+
++                {
+
++                    EventDate = returnOrder.DocDate.Value,
+
++                    EventType = OrderEventType.Return,
+
++                    ReferenceId = returnOrder.DocEntry.ToString(),
+
++                    Amount = returnOrder.DocTotal.Value
+
++                });
+
++            }
+
++
+
++            // 添加退款事件
+
++            foreach (var refund in allRefunds)
+
++            {
+
++                events.Add(new OrderEvent
+
++                {
+
++                    EventDate = refund.DocDate.Value.Date,
+
++                    EventType = OrderEventType.Refund,
+
++                    ReferenceId = refund.Id.ToString(),
+
++                    Amount = refund.ApplyAmount
+
++                });
+
++            }
+
++
+
++            // 添加核销事件
+
++            foreach (var clearRecon in allClearRecons)
+
++            {
+
++                events.Add(new OrderEvent
+
++                {
+
++                    EventDate = clearRecon.ReconDate,
+
++                    EventType = OrderEventType.CanClearRecon,
+
++                    ReferenceId = clearRecon.DocEntry.ToString(),
+
++                    Amount = clearRecon.ReconAmount
+
++                });
+
++            }
+
++
+
++            return events;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理和验证事件列表
+
++        /// </summary>
+
++        private static List<OrderEvent> ProcessAndValidateEvents(
+
++            List<OrderEvent> events,
+
++            DateTime docDate)
+
++        {
+
++            // 按日期排序
+
++            events = events.OrderBy(e => e.EventDate).ToList();
+
++
+
++            // 过滤掉早于订单日期的付款和退款事件
+
++            events = events.Where(e =>
+
++            {
+
++                if (e.EventType == OrderEventType.Payment || e.EventType == OrderEventType.Refund)
+
++                {
+
++                    return e.EventDate >= docDate;
+
++                }
+
++                return true;
+
++            }).ToList();
+
++
+
++            return events;
+
++        }
+
++
+
++        /// <summary>
+
+         /// 处理单个订单（内部版本，用于并行处理）
+
+         /// </summary>
+
+         private async Task ProcessSingleOrderInternal(

@@ -277,13 +277,14 @@ class DingTalkCorpClient:
 
 def create_dingtalk_client_from_env() -> DingTalkCorpClient | None:
     """Create DingTalk client from environment variables."""
-    import os
+    from pi_sonar_agent.core.project_env import read_project_env
 
-    appkey = os.getenv("DINGTALK_APPKEY", "").strip()
-    appsecret = os.getenv("DINGTALK_APPSECRET", "").strip()
-    agentid = os.getenv("DINGTALK_AGENTID", "").strip()
-    webhook = os.getenv("DINGTALK_WEBHOOK", "").strip()
-    webhook_secret = os.getenv("DINGTALK_SECRET", "").strip()
+    project_env = read_project_env()
+    appkey = project_env.get("DINGTALK_APPKEY", "").strip()
+    appsecret = project_env.get("DINGTALK_APPSECRET", "").strip()
+    agentid = project_env.get("DINGTALK_AGENTID", "").strip()
+    webhook = project_env.get("DINGTALK_WEBHOOK", "").strip()
+    webhook_secret = project_env.get("DINGTALK_SECRET", "").strip()
 
     has_corp = bool(appkey and appsecret)
     has_webhook = bool(webhook)

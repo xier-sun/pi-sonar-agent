@@ -1,0 +1,1718 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -1794,394 +1794,487 @@
+         {
+
+             try
+
+             {
+
++                const int batchSize = 500;
+
+                 var penaltyLedgers = new List<PenaltyLedger>();
+
+-                const int batchSize = 500; // 每500条记录保存一次
+
+-                var pendingEventUpdates = new List<(int EventId, DateTime ResolvedDate, string Description)>(); // 收集待更新的Event
+
+-                var events = new List<OrderEvent>();
+
++                var pendingEventUpdates = new List<(int EventId, DateTime ResolvedDate, string Description)>();
+
++
+
++                var orderData = await InitializeOrderDataInternal(
+
++                    unitWork,
+
++                    historicalOverdueCalculationService,
+
++                    order,
+
++                    batchSaleOrders,
+
++                    batchPayTerm,
+
++                    batchDeliveries,
+
++                    batchReceipts,
+
++                    batchReturns,
+
++                    batchRefunds,
+
++                    batchClearRecons);
+
++
+
++                if (orderData.SaleOrderForCalc == null)
+
++                    return;
+
++
+
++                var events = BuildOrderEventsInternal(
+
++                    order,
+
++                    calculationDate,
+
++                    remarkDic,
+
++                    orderData.DeliveryForCalcList,
+
++                    orderData.AllReceipts,
+
++                    orderData.AllReturns,
+
++                    orderData.AllRefunds);
+
++
+
++                if (events.Count == 0)
+
++                    return;
+
++
+
++                customerTypes ??= await _customerCommonApp.GetMainlandCustomerType();
+
++
+
++                var ruleData = await GetRuleDataInternal(
+
++                    unitWork,
+
++                    customerTypes,
+
++                   ugs,
+
++                    order,
+
++                    batchSaleOrderPlugins);
+
++
+
++                if (ruleData.Rule == null)
+
++                    return;
+
++
+
++                var rateTiers = Newtonsoft.Json.JsonConvert.DeserializeObject<List<InterestRateTier>>(ruleData.Rule.Param_String1);
+
++                var slp = await GetSalesPersonInternal(unitWork, order, batchSlps);
+
++
+
+                 DateTime currentPeriodStart = order.DocDate.Value;
+
+                 PenaltyEvent currentEvent = null;
+
+                 decimal previousOverdueAmount = 0;
+
+ 
+
+-                if (!batchSaleOrders.TryGetValue(order.DocEntry, out var saleOrderForCalc))
+
+-                {
+
+-                    saleOrderForCalc = await historicalOverdueCalculationService.GetSaleOrderAsync(order.DocEntry);
+
+-                    if (saleOrderForCalc == null) return;
+
+-                }
+
+-
+
+-                PayTermSave payTerm = null;
+
+-                if (saleOrderForCalc.GroupNum.HasValue)
+
+-                {
+
+-                    batchPayTerms?.TryGetValue(saleOrderForCalc.GroupNum.Value, out payTerm);
+
+-                }
+
+-
+
+-                List<HistoricalOverdueCalculationService.DeliveryForOverDue> deliveryForCalcList = null;
+
+-                if (!batchDeliveries.TryGetValue(order.DocEntry, out deliveryForCalcList))
+
+-                {
+
+-                    deliveryForCalcList = new List<HistoricalOverdueCalculationService.DeliveryForOverDue>();
+
+-                }
+
+-
+
+-                List<ReceiptForOrder> allReceipts = null;
+
+-                if (!batchReceipts.TryGetValue(order.DocEntry, out allReceipts))
+
+-                {
+
+-                    allReceipts = new List<ReceiptForOrder>();
+
+-                }
+
+-
+
+-                List<HistoricalOverdueCalculationService.ReturnForOverDue> allReturns = null;
+
+-                if (!batchReturns.TryGetValue(order.DocEntry, out allReturns))
+
+-                {
+
+-                    allReturns = new List<HistoricalOverdueCalculationService.ReturnForOverDue>();
+
+-                }
+
+-
+
+-                List<SaleRefund> allRefunds = null;
+
+-                if (batchRefunds == null || !batchRefunds.TryGetValue(order.DocEntry, out allRefunds))
+
+-                {
+
+-                    allRefunds = new List<SaleRefund>();
+
+-                }
+
+-
+
+-                List<HistoricalOverdueCalculationService.ClearReconForOverDue> allClearRecons = null;
+
+-                if (!batchClearRecons.TryGetValue(order.DocEntry, out allClearRecons))
+
+-                {
+
+-                    allClearRecons = new List<HistoricalOverdueCalculationService.ClearReconForOverDue>();
+
+-                }
+
+-
+
+-                // 借用单，重新设置计算逾期的发货日期
+
+-                SetBorrowTypeDeliveryDocDate(deliveryForCalcList, saleOrderForCalc);
+
+-
+
+-                foreach (var receipt in allReceipts)
+
+-                {
+
+-                    events.Add(new OrderEvent
+
+-                    {
+
+-                        EventDate = receipt.DocDate.Value,
+
+-                        EventType = OrderEventType.Payment,
+
+-                        ReferenceId = receipt.DocEntry.ToString(),
+
+-                        Amount = receipt.AppliedAmount
+
+-                    });
+
+-                }
+
+-
+
+-                foreach (var delivery in deliveryForCalcList)
+
+-                {
+
+-                    events.Add(new OrderEvent
+
+-                    {
+
+-                        EventDate = delivery.DocDate.Value,
+
+-                        EventType = OrderEventType.Delivery,
+
+-                        ReferenceId = delivery.DocEntry.ToString(),
+
+-                        Amount = delivery.DocTotal.Value
+
+-                    });
+
+-                }
+
+-
+
+-                foreach (var returnOrder in allReturns)
+
+-                {
+
+-                    events.Add(new OrderEvent
+
+-                    {
+
+-                        EventDate = returnOrder.DocDate.Value,
+
+-                        EventType = OrderEventType.Return,
+
+-                        ReferenceId = returnOrder.DocEntry.ToString(),
+
+-                        Amount = returnOrder.DocTotal.Value
+
+-                    });
+
+-                }
+
+-
+
+-                foreach (var refund in allRefunds)
+
+-                {
+
+-                    events.Add(new OrderEvent
+
+-                    {
+
+-                        EventDate = refund.DocDate.Value.Date,
+
+-                        EventType = OrderEventType.Refund,
+
+-                        ReferenceId = refund.Id.ToString(),
+
+-                        Amount = refund.ApplyAmount
+
+-                    });
+
+-                }
+
+-
+
+-
+
+-                //可清账事件
+
+-                if ( remarkDic!=null && remarkDic.TryGetValue(order.DocEntry, out var remark))
+
+-                {
+
+-                    events.Add(new OrderEvent
+
+-                    {
+
+-                        EventDate = remark.CreateDate.Date,
+
+-                        EventType = OrderEventType.CanClearRecon,
+
+-                        ReferenceId = "CanClearRecon",
+
+-                        Amount = 0
+
+-                    });
+
+-                }
+
+-
+
++                foreach (var @event in events)
+
++                {
+
++                    var (newCurrentEvent, newPreviousOverdueAmount) = await ProcessEventInternal(
+
++                        unitWork,
+
++                        historicalOverdueCalculationService,
+
++                        order,
+
++                        @event,
+
++                        currentPeriodStart,
+
++                        currentEvent,
+
++                        previousOverdueAmount,
+
++                        generationStartDate,
+
++                        orderData,
+
++                        ruleData,
+
++                        rateTiers,
+
++                        slp,
+
++                        ref penaltyLedgers,
+
++                        ref pendingEventUpdates,
+
++                        batchSize);
+
++
+
++                    currentEvent = newCurrentEvent;
+
++                    previousOverdueAmount = newPreviousOverdueAmount;
+
++                    currentPeriodStart = @event.EventDate.AddDays(1);
+
++                }
+
++
+
++                if (penaltyLedgers.Count > 0)
+
++                {
+
++                    await unitWork.BatchAddAsync<PenaltyLedger, int>(penaltyLedgers.ToArray());
+
++                    await unitWork.SaveAsync();
+
++                }
+
++
+
++                if (pendingEventUpdates.Count > 0)
+
++                {
+
++                    await BatchUpdatePenaltyEventsAsync(unitWork, pendingEventUpdates);
+
++                }
+
++            }
+
++            catch (Exception ex)
+
++            {
+
++                LogHelper.Error(ex, $"处理订单{order.DocEntry}失败", nameof(HistoricalOverdueImportService), nameof(ProcessSingleOrderInternal));
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 订单数据上下文（内部版本）
+
++        /// </summary>
+
++        private sealed class OrderDataContext
+
++        {
+
++            public HistoricalOverdueCalculationService.SaleOrderForOverDue SaleOrderForCalc { get; set; }
+
++            public PayTermSave PayTerm { get; set; }
+
++            public List<HistoricalOverdueCalculationService.DeliveryForOverDue> DeliveryForCalcList { get; set; }
+
++            public List<ReceiptForOrder> AllReceipts { get; set; }
+
++            public List<HistoricalOverdueCalculationService.ReturnForOverDue> AllReturns { get; set; }
+
++            public List<SaleRefund> AllRefunds { get; set; }
+
++            public List<HistoricalOverdueCalculationService.ClearReconForOverDue> AllClearRecons { get; set; }
+
++        }
+
++
+
++        /// <summary>
+
++        /// �规则数据上下文（内部版本）
+
++        /// </summary>
+
++        private sealed class RuleDataContext
+
++        {
+
++            public PenaltyRuleDefinition Rule { get; set; }
+
++            public SaleOrderPlugin SaleOrderPlugin { get; set; }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 初始化订单数据（内部版本）
+
++        /// </summary>
+
++        private async Task<OrderDataContext> InitializeOrderDataInternal(
+
++            IUnitWork unitWork,
+
++            HistoricalOverdueCalculationService historicalOverdueCalculationService,
+
++            ORDR order,
+
++            Dictionary<int, HistoricalOverdueCalculationService.SaleOrderForOverDue> batchSaleOrders,
+
++            Dictionary<int, PayTermSave> batchPayTerms,
+
++            Dictionary<int, List<HistoricalOverdueCalculationService.DeliveryForOverDue>> batchDeliveries,
+
++            Dictionary<int, List<ReceiptForOrder>> batchReceipts,
+
++            Dictionary<int, List<HistoricalOverdueCalculationService.ReturnForOverDue>> batchReturns,
+
++            Dictionary<int, List<SaleRefund>> batchRefunds,
+
++            Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>> batchClearRecons)
+
++        {
+
++            var context = new OrderDataContext();
+
++
+
++            if (!batchSaleOrders.TryGetValue(order.DocEntry, out var saleOrderForCalc))
+
++            {
+
++                saleOrderForCalc = await historicalOverdueCalculationService.GetSaleOrderAsync(order.DocEntry);
+
++            }
+
++            context.SaleOrderForCalc = saleOrderForCalc;
+
++
+
++            if (saleOrderForCalc != null && saleOrderForCalc.GroupNum.HasValue)
+
++            {
+
++                batchPayTerms?.TryGetValue(saleOrderForCalc.GroupNum.Value, out context.PayTerm);
+
++            }
+
++
+
++            context.DeliveryForCalcList = batchDeliveries.TryGetValue(order.DocEntry, out var deliveries)
+
++                ? deliveries
+
++                : new List<HistoricalOverdueCalculationService.DeliveryForOverDue>();
+
++
+
++            context.AllReceipts = batchReceipts.TryGetValue(order.DocEntry, out var receipts)
+
++                ? receipts
+
++                : new List<ReceiptForOrder>();
+
++
+
++            context.AllReturns = batchReturns.TryGetValue(order.DocEntry, out var returns)
+
++                ? returns
+
++                : new List<HistoricalOverdueCalculationService.ReturnForOverDue>();
+
++
+
++            context.AllRefunds = (batchRefunds != null && batchRefunds.TryGetValue(order.DocEntry, out var refunds))
+
++                ? refunds
+
++                : new List<SaleRefund>();
+
++
+
++            context.AllClearRecons = batchClearRecons.TryGetValue(order.DocEntry, out var clearRecons)
+
++                ? clearRecons
+
++                : new List<HistoricalOverdueCalculationService.ClearReconForOverDue>();
+
++
+
++            SetBorrowTypeDeliveryDocDate(context.DeliveryForCalcList, context.SaleOrderForCalc);
+
++
+
++            return context;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 构建订单事件列表（内部版本）
+
++        /// </summary>
+
++        private static List<OrderEvent> BuildOrderEventsInternal(
+
++            ORDR order,
+
++            DateTime calculationDate,
+
++            Dictionary<int, SaleOrdrRemark> remarkDic,
+
++            List<HistoricalOverdueCalculationService.DeliveryForOverDue> deliveryForCalcList,
+
++            List<ReceiptForOrder> allReceipts,
+
++            List<HistoricalOverdueCalculationService.ReturnForOverDue> allReturns,
+
++            List<SaleRefund> allRefunds)
+
++        {
+
++            var events = new List<OrderEvent>();
+
++
+
++            foreach (var receipt in allReceipts)
+
++            {
+
+                 events.Add(new OrderEvent
+
+                 {
+
+-                    EventDate = calculationDate,
+
+-                    EventType = OrderEventType.CalculationEnd,
+
+-                    ReferenceId = "CalculationEnd",
+
++                    EventDate = receipt.DocDate.Value,
+
++                    EventType = OrderEventType.Payment,
+
++                    ReferenceId = receipt.DocEntry.ToString(),
+
++                    Amount = receipt.AppliedAmount
+
++                });
+
++            }
+
++
+
++            foreach (var delivery in deliveryForCalcList)
+
++            {
+
++                events.Add(new OrderEvent
+
++                {
+
++                    EventDate = delivery.DocDate.Value,
+
++                    EventType = OrderEventType.Delivery,
+
++                    ReferenceId = delivery.DocEntry.ToString(),
+
++                    Amount = delivery.DocTotal.Value
+
++                });
+
++            }
+
++
+
++            foreach (var returnOrder in allReturns)
+
++            {
+
++                events.Add(new OrderEvent
+
++                {
+
++                    EventDate = returnOrder.DocDate.Value,
+
++                    EventType = OrderEventType.Return,
+
++                    ReferenceId = returnOrder.DocEntry.ToString(),
+
++                    Amount = returnOrder.DocTotal.Value
+
++                });
+
++            }
+
++
+
++            foreach (var refund in allRefunds)
+
++            {
+
++                events.Add(new OrderEvent
+
++                {
+
++                    EventDate = refund.DocDate.Value.Date,
+
++                    EventType = OrderEventType.Refund,
+
++                    ReferenceId = refund.Id.ToString(),
+
++                    Amount = refund.ApplyAmount
+
++                });
+
++            }
+
++
+
++            if (remarkDic != null && remarkDic.TryGetValue(order.DocEntry, out var remark))
+
++            {
+
++                events.Add(new OrderEvent
+
++                {
+
++                    EventDate = remark.CreateDate.Date,
+
++                    EventType = OrderEventType.CanClearRecon,
+
++                    ReferenceId = "CanClearRecon",
+
+                     Amount = 0
+
+                 });
+
+-
+
+-                
+
++            }
+
++
+
++            events.Add(new OrderEvent
+
++            {
+
++                EventDate = calculationDate,
+
++                EventType = OrderEventType.CalculationEnd,
+
++                ReferenceId = "CalculationEnd",
+
++                Amount = 0
+
++            });
+
++
+
++            events = events.OrderBy(e => e.EventDate).ToList();
+
++
+
++            events = events
+
++                .GroupBy(e => new { e.EventDate.Date, e.EventType })
+
++                .Select(g => new OrderEvent
+
++                {
+
++                    EventDate = g.Key.Date,
+
++                    EventType = g.Key.EventType,
+
++                    ReferenceId = string.Join(",", g.Select(e => e.ReferenceId)),
+
++                    Amount = g.Sum(e => e.Amount)
+
++                })
+
++                .OrderBy(e => e.EventDate)
+
++                .ToList();
+
++
+
++            if (events.Any(e => e.EventType == OrderEventType.CanClearRecon))
+
++            {
+
++                var canClearReconIndex = events.FindIndex(e => e.EventType == OrderEventType.CanClearRecon);
+
++                var canClearReconDate = events[canClearReconIndex].EventDate;
+
++
+
++                events = events.Where(e => e.EventType == OrderEventType.CanClearRecon || e.EventDate != canClearReconDate).ToList();
+
+                 events = events.OrderBy(e => e.EventDate).ToList();
+
+-
+
+-                // 合并同一天的同一类型事件（不包括 CanClearRecon 和 CalculationEnd）
+
+-                events = events
+
+-                    .GroupBy(e => new { e.EventDate.Date, e.EventType })
+
+-                    .Select(g => new OrderEvent
+
+-                    {
+
+-                        EventDate = g.Key.Date,
+
+-                        EventType = g.Key.EventType,
+
+-                        ReferenceId = string.Join(",", g.Select(e => e.ReferenceId)),
+
+-                        Amount = g.Sum(e => e.Amount)
+
+-                    })
+
+-                    .OrderBy(e => e.EventDate)
+
+-                    .ToList();
+
+-
+
+-                //然后去掉 events CanClearRecon后面的事件 ，CanClearRecon事件的金额为上一个事件的金额
+
+-                if (events.Any(e => e.EventType == OrderEventType.CanClearRecon)) 
+
+-                {
+
+-                    var canClearReconIndex = events.FindIndex(e => e.EventType == OrderEventType.CanClearRecon);
+
+-                    var canClearReconDate = events[canClearReconIndex].EventDate;
+
+-                    
+
+-                    // 若有和可清单事件同一天的事件，去掉其他同一天的事件，只保留可清单事件
+
+-                    events = events.Where(e => e.EventType == OrderEventType.CanClearRecon || e.EventDate != canClearReconDate).ToList();
+
+-
+
+-                    // 重新排序事件
+
+-                    events = events.OrderBy(e => e.EventDate).ToList();
+
+-                    
+
+-                    // 重新获取 CanClearRecon 事件的索引
+
+-                    canClearReconIndex = events.FindIndex(e => e.EventType == OrderEventType.CanClearRecon);
+
+-
+
+-                    // 如果前面还有别的事件，使用前一个事件的金额作为清账事件的金额
+
+-                    if (canClearReconIndex > 0)
+
+-                    {
+
+-                        events[canClearReconIndex].Amount = events[canClearReconIndex - 1].Amount;
+
+-                    }
+
+-                    events = events.Take(canClearReconIndex + 1).ToList();
+
+-                }
+
+-
+
+-                if (events.Count == 0)
+
+-                    return;
+
+-
+
+-                customerTypes ??= await _customerCommonApp.GetMainlandCustomerType();
+
+-
+
+-                batchSaleOrderPlugins.TryGetValue(order.DocEntry, out SaleOrderPlugin saleOrderPlugin);
+
+-                var customerType = customerTypes.FirstOrDefault(ct => ct.CardCode == order.CardCode);
+
+-                var isSchoolOrResearch = customerType != null && (customerType.CardType.Contains("校") || customerType.CardType.Contains("研"));
+
+-
+
+-                PenaltyRuleDefinition rule = null;
+
+-                if (!penaltyRules.TryGetValue(isSchoolOrResearch, out rule))
+
+-                {
+
+-                    rule = await GetApplicablePenaltyRuleInternal(unitWork, isSchoolOrResearch);
+
+-                }
+
+-
+
+-                if (rule == null)
+
+-                    return;
+
+-
+
+-                var rateTiers = Newtonsoft.Json.JsonConvert.DeserializeObject<List<InterestRateTier>>(rule.Param_String1);
+
+-
+
+-                OSLP slp = null;
+
+-                if (order.SlpCode.HasValue && batchSlps.TryGetValue(order.SlpCode.Value, out slp))
+
+-                {
+
+-                    slp = await unitWork.Find<OSLP>(s => s.SlpCode == order.SlpCode.Value).FirstOrDefaultAsync();   
+
+-                }
+
+-
+
+-                foreach (var @event in events)
+
+-                {
+
+-                    DateTime periodEnd = @event.EventDate;
+
+-                   
+
+-                    // 如果是CanClearRecon事件，在事件当天结束事件
+
+-                    if (@event.EventType == OrderEventType.CanClearRecon)
+
+-                    {
+
+-                        // 处理事件当天
+
+-                        for (DateTime currentDate = currentPeriodStart; currentDate <= periodEnd; currentDate = currentDate.AddDays(1))
+
+-                        {
+
+-                            var overdueInfo = historicalOverdueCalculationService.CalculateHistoricalOverdueInMemory(
+
+-                                saleOrderForCalc,
+
+-                                payTerm,
+
+-                                deliveryForCalcList,
+
+-                                allReceipts,
+
+-                                allReturns,
+
+-                                allRefunds,
+
+-                                allClearRecons,
+
+-                                currentDate);
+
+-
+
+-                            // 应用调整逻辑
+
+-                            if (saleOrderPlugin != null)
+
+-                            {
+
+-                                if (saleOrderPlugin.AdjustOverdueAmount.HasValue)
+
+-                                {
+
+-                                    overdueInfo.U_Due_Amt -= saleOrderPlugin.AdjustOverdueAmount.Value;
+
+-                                    if (overdueInfo.U_Due_Amt < 0) overdueInfo.U_Due_Amt = 0;
+
+-                                }
+
+-                                if (saleOrderPlugin.AdjustOverdueDays.HasValue)
+
+-                                {
+
+-                                    overdueInfo.U_OverDue_Days -= saleOrderPlugin.AdjustOverdueDays.Value;
+
+-                                    if (overdueInfo.U_OverDue_Days < 0) overdueInfo.U_OverDue_Days = 0;
+
+-                                }
+
+-                            }
+
+-
+
+-                            if ( (overdueInfo.U_Due_Amt > 0 && overdueInfo.U_OverDue_Days > 0) || (overdueInfo.U_Due_AmtFC > 0 && overdueInfo.U_OverDue_Days >0))
+
+-                            {
+
+-                                var (penaltyAmount, dayilRate) =  CalculatePenaltyAmountInternal(
+
+-                                    overdueInfo,
+
+-                                    saleOrderPlugin,
+
+-                                    rateTiers);
+
+-
+
+-                                if (penaltyAmount > 0)
+
+-                                {
+
+-                                    if (overdueInfo.U_Due_Amt != previousOverdueAmount)
+
+-                                    {
+
+-                                        if (currentEvent != null)
+
+-                                        {
+
+-                                            QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
+-                                        }
+
+-
+
+-                                        currentEvent = await CreateNewPenaltyEventInternal(unitWork, order, overdueInfo, currentDate, rule, slp);
+
+-                                        previousOverdueAmount = overdueInfo.U_Due_Amt;
+
+-                                    }
+
+-
+
+-                                    if (currentEvent != null && (!generationStartDate.HasValue || currentDate >= generationStartDate.Value))
+
+-                                    {
+
+-                                         CreateDailyPenaltyLedgerEntryInternal( order, overdueInfo, penaltyAmount, currentDate, currentEvent, dayilRate, slp, ref penaltyLedgers);
+
+-
+
+-                                        // 分批保存：每累积500条记录就保存一次
+
+-                                        if (penaltyLedgers.Count >= batchSize)
+
+-                                        {
+
+-                                            await unitWork.BatchAddAsync<PenaltyLedger, int>(penaltyLedgers.ToArray());
+
+-                                            await unitWork.SaveAsync();
+
+-                                            penaltyLedgers.Clear();
+
+-                                        }
+
+-                                    }
+
+-                                }
+
+-                                else
+
+-                                {
+
+-                                    if (currentEvent != null)
+
+-                                    {
+
+-                                        QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
+-                                        currentEvent = null;
+
+-                                        previousOverdueAmount = 0;
+
+-                                    }
+
+-                                }
+
+-                            }
+
+-                            else
+
+-                            {
+
+-                                if (currentEvent != null)
+
+-                                {
+
+-                                    QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
+-                                    currentEvent = null;
+
+-                                    previousOverdueAmount = 0;
+
+-                                }
+
+-                            }
+
+-                        }
+
+-
+
+-                        // CanClearRecon事件当天就结束所有事件
+
++                canClearReconIndex = events.FindIndex(e => e.EventType == OrderEventType.CanClearRecon);
+
++
+
++                if (canClearReconIndex > 0)
+
++                {
+
++                    events[canClearReconIndex].Amount = events[canClearReconIndex - 1].Amount;
+
++                }
+
++                events = events.Take(canClearReconIndex + 1).ToList();
+
++            }
+
++
+
++            return events;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 获取规则数据（内部版本）
+
++        /// </summary>
+
++        private async Task<RuleDataContext> GetRuleDataInternal(
+
++            IUnitWork unitWork,
+
++            List<MainlandCustomerTypeDto> customerTypes,
+
++            Dictionary<bool, PenaltyRuleDefinition> penaltyRules,
+
++            ORDR order,
+
++            Dictionary<int, SaleOrderPlugin> batchSaleOrderPlugins)
+
++        {
+
++            var context = new RuleDataContext();
+
++
+
++            batchSaleOrderPlugins.TryGetValue(order.DocEntry, out context.SaleOrderPlugin);
+
++
+
++            var customerType = customerTypes.FirstOrDefault(ct => ct.CardCode == order.CardCode);
+
++            var isSchoolOrResearch = customerType != null && (customerType.CardType.Contains("校") || customerType.CardType.Contains("研"));
+
++
+
++            if (!penaltyRules.TryGetValue(isSchoolOrResearch, out var rule))
+
++            {
+
++                rule = await GetApplicablePenaltyRuleInternal(unitWork, isSchoolOrResearch);
+
++            }
+
++            context.Rule = rule;
+
++
+
++            return context;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 获取销售人员（内部版本）
+
++        /// </summary>
+
++        private async Task<OSLP> GetSalesPersonInternal(
+
++            IUnitWork unitWork,
+
++            ORDR order,
+
++            Dictionary<int, OSLP> batchSlps)
+
++        {
+
++            if (order.SlpCode.HasValue)
+
++            {
+
++                if (batchSlps.TryGetValue(order.SlpCode.Value, out var slp))
+
++                {
+
++                    return slp;
+
++                }
+
++                return await unitWork.Find<OSLP>(s => s.SlpCode == order.SlpCode.Value).FirstOrDefaultAsync();
+
++            }
+
++            return null;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 调整逾期信息（内部版本）
+
++        /// </summary>
+
++        private static void AdjustOverdueInfo(
+
++            SaleOrderPlugin saleOrderPlugin,
+
++            ref HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo)
+
++        {
+
++            if (saleOrderPlugin == null) return;
+
++
+
++            if (saleOrderPlugin.AdjustOverdueAmount.HasValue)
+
++            {
+
++                overdueInfo.U_Due_Amt -= saleOrderPlugin.AdjustOverdueAmount.Value;
+
++                if (overdueInfo.U_Due_Amt < 0) overdueInfo.U_Due_Amt = 0;
+
++            }
+
++
+
++            if (saleOrderPlugin.AdjustOverdueDays.HasValue)
+
++            {
+
++                overdueInfo.U_OverDue_Days -= saleOrderPlugin.AdjustOverdueDays.Value;
+
++                if (overdueInfo.U_OverDue_Days < 0) overdueInfo.U_OverDue_Days = 0;
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理单日逾期（内部版本）
+
++        /// </summary>
+
++        private static async Task<(PenaltyEvent CurrentEvent, decimal PreviousOverdueAmount)> ProcessDailyOverdueInternal(
+
++            IUnitWork unitWork,
+
++            ORDR order,
+
++            DateTime currentDate,
+
++            PenaltyEvent currentEvent,
+
++            decimal previousOverdueAmount,
+
++            DateTime? generationStartDate,
+
++            HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo,
+
++            SaleOrderPlugin saleOrderPlugin,
+
++            PenaltyRuleDefinition rule,
+
++            List<InterestRateTier> rateTiers,
+
++            OSLP slp,
+
++            bool isCanClearReconEvent,
+
++            ref List<PenaltyLedger> penaltyLedgers,
+
++            ref List<(int EventId, DateTime ResolvedDate, string Description)> pendingEventUpdates,
+
++            int batchSize)
+
++        {
+
++            bool hasOverdue = isCanClearReconEvent
+
++                ? (overdueInfo.U_Due_Amt > 0 && overdueInfo.U_OverDue_Days > 0) || (overdueInfo.U_Due_AmtFC > 0 && overdueInfo.U_OverDue_Days > 0)
+
++                : (overdueInfo.U_Due_Amt > 0 && overdueInfo.U_OverDue_Days > 0);
+
++
+
++            if (hasOverdue)
+
++            {
+
++                var (penaltyAmount, dailyRate) = CalculatePenaltyAmountInternal(overdueInfo, saleOrderPlugin, rateTiers);
+
++
+
++                if (penaltyAmount > 0)
+
++                {
+
++                    if (overdueInfo.U_Due_Amt != previousOverdueAmount)
+
++                    {
+
+                         if (currentEvent != null)
+
+                         {
+
+-                            QueueEventUpdate(pendingEventUpdates, currentEvent, periodEnd);
+
++                            QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
+                         }
+
++                        currentEvent = await CreateNewPenaltyEventInternal(unitWork, order, overdueInfo, currentDate, rule, slp);
+
++                        previousOverdueAmount = overdueInfo.U_Due_Amt;
+
++                    }
+
++
+
++                    if (currentEvent != null && (!generationStartDate.HasValue || currentDate >= generationStartDate.Value))
+
++                    {
+
++                        CreateDailyPenaltyLedgerEntryInternal(order, overdueInfo, penaltyAmount, currentDate, currentEvent, dailyRate, slp, ref penaltyLedgers);
+
++
+
++                        if (penaltyLedgers.Count >= batchSize)
+
++                        {
+
++                            await unitWork.BatchAddAsync<PenaltyLedger, int>(penaltyLedgers.ToArray());
+
++                            await unitWork.SaveAsync();
+
++                            penaltyLedgers.Clear();
+
++                        }
+
++                    }
+
++                }
+
++                else
+
++                {
+
++                    if (currentEvent != null)
+
++                    {
+
++                        QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
+                         currentEvent = null;
+
+                         previousOverdueAmount = 0;
+
+-                        currentPeriodStart = periodEnd.AddDays(1);
+
+-                        continue; // 跳过后续处理
+
+                     }
+
+-                    
+
+-                    // 普通事件处理
+
+-                    for (DateTime currentDate = currentPeriodStart; currentDate <= periodEnd; currentDate = currentDate.AddDays(1))
+
+-                    {
+
+-                         var overdueInfo = historicalOverdueCalculationService.CalculateHistoricalOverdueInMemory(
+
+-                            saleOrderForCalc,
+
+-                            payTerm,
+
+-                            deliveryForCalcList,
+
+-                            allReceipts,
+
+-                            allReturns,
+
+-                            allRefunds,
+
+-                            allClearRecons,
+
+-                            currentDate);
+
+-
+
+-                        // 应用调整逻辑
+
+-                        if (saleOrderPlugin != null)
+
+-                        {
+
+-                            if (saleOrderPlugin.AdjustOverdueAmount.HasValue)
+
+-                            {
+
+-                                overdueInfo.U_Due_Amt -= saleOrderPlugin.AdjustOverdueAmount.Value;
+
+-                                if (overdueInfo.U_Due_Amt < 0) overdueInfo.U_Due_Amt = 0;
+
+-                            }
+
+-                            if (saleOrderPlugin.AdjustOverdueDays.HasValue)
+
+-                            {
+
+-                                overdueInfo.U_OverDue_Days -= saleOrderPlugin.AdjustOverdueDays.Value;
+
+-                                if (overdueInfo.U_OverDue_Days < 0) overdueInfo.U_OverDue_Days = 0;
+
+-                            }
+
+-                        }
+
+-
+
+-                        if (overdueInfo.U_Due_Amt > 0 && overdueInfo.U_OverDue_Days > 0)
+
+-                        {
+
+-                            var (penaltyAmount, dayilRate) =  CalculatePenaltyAmountInternal(
+
+-                                overdueInfo,
+
+-                                saleOrderPlugin,
+
+-                                rateTiers);
+
+-
+
+-                            if (penaltyAmount > 0)
+
+-                            {
+
+-                                if (overdueInfo.U_Due_Amt != previousOverdueAmount)
+
+-                                {
+
+-                                    if (currentEvent != null)
+
+-                                    {
+
+-                                        await EndCurrentEventInternal(unitWork, currentEvent, currentDate.AddDays(-1));
+
+-                                    }
+
+-
+
+-                                    currentEvent = await CreateNewPenaltyEventInternal(unitWork, order, overdueInfo, currentDate, rule, slp);
+
+-                                    previousOverdueAmount = overdueInfo.U_Due_Amt;
+
+-                                }
+
+-
+
+-                                if (currentEvent != null && (!generationStartDate.HasValue || currentDate >= generationStartDate.Value))
+
+-                                {
+
+-                                    CreateDailyPenaltyLedgerEntryInternal(order, overdueInfo, penaltyAmount, currentDate, currentEvent, dayilRate, slp, ref penaltyLedgers);
+
+-
+
+-                                    // 分批保存：每累积500条记录就保存一次
+
+-                                    if (penaltyLedgers.Count >= batchSize)
+
+-                                    {
+
+-                                        await unitWork.BatchAddAsync<PenaltyLedger, int>(penaltyLedgers.ToArray());
+
+-                                        await unitWork.SaveAsync();
+
+-                                        penaltyLedgers.Clear();
+
+-                                    }
+
+-                                }
+
+-                            }
+
+-                            else
+
+-                            {
+
+-                                if (currentEvent != null)
+
+-                                {
+
+-                                    QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
+-                                    currentEvent = null;
+
+-                                    previousOverdueAmount = 0;
+
+-                                }
+
+-                            }
+
+-                        }
+
+-                        else
+
+-                        {
+
+-                            if (currentEvent != null)
+
+-                            {
+
+-                                await EndCurrentEventInternal(unitWork, currentEvent, currentDate.AddDays(-1));
+
+-                                currentEvent = null;
+
+-                                previousOverdueAmount = 0;
+
+-                            }
+
+-                        }
+
++                }
+
++            }
+
++            else
+
++            {
+
++                if (currentEvent != null)
+
++                {
+
++                    if (isCanClearReconEvent)
+
++                    {
+
++                        QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
++                   ));
+
+                     }
+
+-
+
+-
+
+-                    currentPeriodStart = periodEnd.AddDays(1);
+
+-                    
+
+-                }
+
+-
+
+-
+
+-                // 保存剩余的PenaltyLedger记录
+
+-                if (penaltyLedgers.Count > 0)
+
+-                {
+
+-                    await unitWork.BatchAddAsync<PenaltyLedger, int>(penaltyLedgers.ToArray());
+
+-                    await unitWork.SaveAsync();
+
+-                }
+
+-
+
+-                // 批量更新所有待结束的 PenaltyEvent（使用单条 SQL）
+
+-                if (pendingEventUpdates.Count > 0)
+
+-                {
+
+-                    await BatchUpdatePenaltyEventsAsync(unitWork, pendingEventUpdates);
+
+-                }
+
+-            }
+
+-            catch (Exception ex)
+
+-            {
+
+-                LogHelper.Error(ex, $"处理订单{order.DocEntry}失败", nameof(HistoricalOverdueImportService), nameof(ProcessSingleOrderInternal));
+
+-            }
+
++                    else
+
++                    {
+
++                        await EndCurrentEventInternal(unitWork, currentEvent, currentDate.AddDays(-1));
+
++                    }
+
++                    currentEvent = null;
+
++                    previousOverdueAmount = 0;
+
++                }
+
++            }
+
++
+
++            return (currentEvent, previousOverdueAmount);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理事件（内部版本）
+
++        /// </summary>
+
++        private async Task<(PenaltyEvent CurrentEvent, decimal PreviousOverdueAmount)> ProcessEventInternal(
+
++            IUnitWork unitWork,
+
++            HistoricalOverdueCalculationService historicalOverdueCalculationService,
+
++            ORDR order,
+
++            OrderEvent @event,
+
++            DateTime currentPeriodStart,
+
++            PenaltyEvent currentEvent,
+
++            decimal previousOverdueAmount,
+
++            DateTime? generationStartDate,
+
++            OrderDataContext orderData,
+
++            RuleDataContext ruleData,
+
++            List<InterestRateTier> rateTiers,
+
++            OSLP slp,
+
++            ref List<PenaltyLedger> penaltyLedgers,
+
++            ref List<(int EventId, DateTime ResolvedDate, string Description)> pendingEventUpdates,
+
++            int batchSize)
+
++        {
+
++            DateTime periodEnd = @event.EventDate;
+
++            bool isCanClearRecon = @event.EventType == OrderEventType.CanClearRecon;
+
++
+
++            for (DateTime currentDate = currentPeriodStart; currentDate <= periodEnd; currentDate = currentDate.AddDays(1))
+
++            {
+
++                var overdueInfo = historicalOverdueCalculationService.CalculateHistoricalOverdueInMemory(
+
++                    orderData.SaleOrderForCalc,
+
++                    orderData.PayTerm,
+
++                    orderData.DeliveryForCalcList,
+
++                    orderData.AllReceipts,
+
++                    orderData.AllReturns,
+
++                    orderData.AllRefunds,
+
++                    orderData.AllClearRecons,
+
++                    currentDate);
+
++
+
++                AdjustOverdueInfo(ruleData.SaleOrderPlugin, ref overdueInfo);
+
++
+
++                var (newCurrentEvent, newPreviousOverdueAmount) = await ProcessDailyOverdueInternal(
+
++                    unitWork, order, currentDate, currentEvent, previousOverdueAmount,
+
++                    generationStartDate, overdueInfo, ruleData.SaleOrderPlugin, ruleData.Rule,
+
++                    rateTiers, slp, isCanClearRecon, ref penaltyLedgers, ref pendingEventUpdates, batchSize);
+
++
+
++                currentEvent = newCurrentEvent;
+
++                previousOverdueAmount = newPreviousOverdueAmount;
+
++            }
+
++
+
++            if (isCanClearRecon && currentEvent != null)
+
++            {
+
++                QueueEventUpdate(pendingEventUpdates, currentEvent, periodEnd);
+
++                currentEvent = null;
+
++                previousOverdueAmount = 0;
+
++            }
+
++
+
++            return (currentEvent, previousOverdueAmount);
+
+         }
+
+ 
+
+         #region 事件跟踪相关类型定义

@@ -13,6 +13,7 @@ from pi_sonar_agent.core.artifact_writer import ArtifactWriter
 from pi_sonar_agent.core.db_client import create_mysql_client_from_env
 from pi_sonar_agent.core.events import EventKind, StateEvent
 from pi_sonar_agent.core.model_env import load_project_env
+from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.preflight import load_runtime_environment
 from pi_sonar_agent.core.run_coordinator import (
     RunCoordinator,
@@ -20,7 +21,13 @@ from pi_sonar_agent.core.run_coordinator import (
     TargetRunResult,
 )
 from pi_sonar_agent.core.run_logging import RunLogSession
-from pi_sonar_agent.core.state import RunState, TargetState, derive_run_status, utc_now_iso
+from pi_sonar_agent.core.state import (
+    RunState,
+    TargetState,
+    derive_run_status,
+    summarize_run_performance,
+    utc_now_iso,
+)
 from pi_sonar_agent.core.state_store import RunStateStore
 from pi_sonar_agent.core.target_config import (
     missing_required_target_fields,
@@ -130,12 +137,18 @@ def main() -> None:
             if result.target_state is not None:
                 target_states.append(result.target_state)
 
+        rollout_flags = load_performance_flags().enabled_flags()
         run_state = RunState(
             run_label=run_label,
             status=derive_run_status(target_states),
             targets=tuple(target_states),
             started_at=run_started_at,
             finished_at=utc_now_iso(),
+            performance_summary=summarize_run_performance(
+                tuple(target_states),
+                rollout_flags=rollout_flags,
+            ),
+            rollout_flags=rollout_flags,
         )
         run_summary_path = ArtifactWriter().write_run_state(run_state)
         state_store.record_run_state(run_state, artifact_path=run_summary_path.as_posix())

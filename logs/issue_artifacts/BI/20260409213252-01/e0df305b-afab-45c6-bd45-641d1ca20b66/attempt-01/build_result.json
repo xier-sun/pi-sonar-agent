@@ -1,0 +1,1153 @@
+{
+  "success": false,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "retryable_failure": true,
+  "failure_kind": "quality_gate",
+  "error": "Quality gate verification failed",
+  "skip_reason": "",
+  "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+  "build_output": "Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:\n1. [async_signature] 异步签名规范: 异步方法 LoadSalesPersonNamesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:487\n   Evidence: return cache; } /// <summary> /// 加载所有业务员信息 /// </summary> private async Task<Dictionary<int, string>> LoadSalesPersonNamesAsync() {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n2. [async_signature] 异步签名规范: 异步方法 LoadSalesPersonNamesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:488\n   Evidence: } /// <summary> /// 加载所有业务员信息 /// </summary> private async Task<Dictionary<int, string>> LoadSalesPersonNamesAsync() {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n3. [async_signature] 异步签名规范: 异步方法 LoadSalesPersonNamesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:493\n   Evidence: private async Task<Dictionary<int, string>> LoadSalesPersonNamesAsync() {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n4. [async_signature] 异步签名规范: 异步方法 LoadCustomerTypesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:496\n   Evidence: } /// <summary> /// 加载所有客户类型信息 /// </summary> private async Task<Dictionary<string, MainlandCustomerType>> LoadCustomerTypesAsync() {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n5. [async_signature] 异步签名规范: 异步方法 LoadCustomerTypesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:501\n   Evidence: private async Task<Dictionary<string, MainlandCustomerType>> LoadCustomerTypesAsync() {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n6. [async_signature] 异步签名规范: 异步方法 LoadInvoicesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:505\n   Evidence: } /// <summary> /// 批量加载开票信息 /// </summary> private async Task<Dictionary<int, List<InvoiceHistoryItem>>> LoadInvoicesAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n7. [async_signature] 异步签名规范: 异步方法 LoadInvoicesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:510\n   Evidence: private async Task<Dictionary<int, List<InvoiceHistoryItem>>> LoadInvoicesAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n8. [async_signature] 异步签名规范: 异步方法 LoadReceiptsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:535\n   Evidence: return invoiceDict; } /// <summary> /// 批量加载收款信息 /// </summary> private async Task<Dictionary<int, List<ReceiptForOrder>>> LoadReceiptsAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n9. [async_signature] 异步签名规范: 异步方法 LoadReceiptsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:536\n   Evidence: } /// <summary> /// 批量加载收款信息 /// </summary> private async Task<Dictionary<int, List<ReceiptForOrder>>> LoadReceiptsAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n10. [async_signature] 异步签名规范: 异步方法 LoadReceiptsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:541\n   Evidence: private async Task<Dictionary<int, List<ReceiptForOrder>>> LoadReceiptsAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n11. [async_signature] 异步签名规范: 异步方法 Task< 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:584\n   Evidence: return directReceiptsList; } /// <summary> /// 加载间接收款相关数据 /// </summary> private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n12. [async_signature] 异步签名规范: 异步方法 Task< 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:584\n   Evidence: return directReceiptsList; } /// <summary> /// 加载间接收款相关数据 /// </summary> private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n13. [async_signature] 异步签名规范: 异步方法 Task< 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:585\n   Evidence: } /// <summary> /// 加载间接收款相关数据 /// </summary> private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n14. [async_signature] 异步签名规范: 异步方法 Task< 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:585\n   Evidence: } /// <summary> /// 加载间接收款相关数据 /// </summary> private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n15. [async_signature] 异步签名规范: 异步方法 Task< 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:590\n   Evidence: private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n16. [async_signature] 异步签名规范: 异步方法 Task< 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:590\n   Evidence: private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n17. [async_signature] 异步签名规范: 异步方法 LoadSaleOrderPluginsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:786\n   Evidence: return receiptDict; } /// <summary> /// 批量加载SaleOrderPlugin /// </summary> private async Task<Dictionary<int, SaleOrderPlugin>> LoadSaleOrderPluginsAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n18. [async_signature] 异步签名规范: 异步方法 LoadSaleOrderPluginsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:787\n   Evidence: } /// <summary> /// 批量加载SaleOrderPlugin /// </summary> private async Task<Dictionary<int, SaleOrderPlugin>> LoadSaleOrderPluginsAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n19. [async_signature] 异步签名规范: 异步方法 LoadSaleOrderPluginsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:792\n   Evidence: private async Task<Dictionary<int, SaleOrderPlugin>> LoadSaleOrderPluginsAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n20. [async_signature] 异步签名规范: 异步方法 LoadPenaltyEventsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:796\n   Evidence: } /// <summary> /// 批量加载PenaltyEvent /// </summary> private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n21. [async_signature] 异步签名规范: 异步方法 LoadPenaltyEventsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:801\n   Evidence: private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n22. [async_signature] 异步签名规范: 异步方法 LoadCanClearCutOffDatesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:817\n   Evidence: } /// <summary> /// 加载可清截止日期 /// </summary> private async Task<Dictionary<int, DateTime?>> LoadCanClearCutOffDatesAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n23. [async_signature] 异步签名规范: 异步方法 LoadCanClearCutOffDatesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:822\n   Evidence: private async Task<Dictionary<int, DateTime?>> LoadCanClearCutOffDatesAsync(List<int> orderIds) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n24. [async_signature] 异步签名规范: 异步方法 ProcessSingleOrderByRangeOptimized 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:852\n   Evidence: } return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n25. [async_signature] 异步签名规范: 异步方法 ProcessSingleOrderByRangeOptimized 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:853\n   Evidence: return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n26. [async_signature] 异步签名规范: 异步方法 RecalculateHistoricalAfterBillOverdueParallel 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:1098\n   Evidence: public async Task<RecalculationResult> RecalculateHistoricalAfterBillOverdueParallel( DateTime startDate, DateTime endDate, List<int> ruleDefinitionIds = null, int maxDegreeOfParallelism = 4) {\n   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。\n27. [async_requires_await] 异步方法必须真正 await: 异步方法 PreloadSharedDataAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:457\n   Evidence: private async Task<SharedDataCache> PreloadSharedDataAsync(List<ORDR> orders) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n28. [async_requires_await] 异步方法必须真正 await: 异步方法 LoadPenaltyEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:796\n   Evidence: } /// <summary> /// 批量加载PenaltyEvent /// </summary> private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n29. [async_requires_await] 异步方法必须真正 await: 异步方法 LoadPenaltyEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:801\n   Evidence: private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n30. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessSingleOrderByRangeOptimized 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:852\n   Evidence: } return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n31. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessSingleOrderByRangeOptimized 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:853\n   Evidence: return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。",
+  "guardrail_mode": "scope",
+  "quality_gate_result": {
+    "status": "retry",
+    "summary": "Quality gate rejected the patch with 31 hard violation(s).",
+    "applied_rule_ids": [
+      "public_xml_docs",
+      "async_signature",
+      "async_requires_await",
+      "linq_method_syntax",
+      "cognitive_complexity",
+      "zero_redundant_code",
+      "static_preferred",
+      "sealed_preferred",
+      "constructor_dependency_injection",
+      "business_comments_chinese",
+      "finance_terms_chinese"
+    ],
+    "violations": [
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadSalesPersonNamesAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 487,
+        "symbol": "LoadSalesPersonNamesAsync@487-495",
+        "evidence": "return cache; } /// <summary> /// 加载所有业务员信息 /// </summary> private async Task<Dictionary<int, string>> LoadSalesPersonNamesAsync() {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadSalesPersonNamesAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 488,
+        "symbol": "LoadSalesPersonNamesAsync@488-495",
+        "evidence": "} /// <summary> /// 加载所有业务员信息 /// </summary> private async Task<Dictionary<int, string>> LoadSalesPersonNamesAsync() {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadSalesPersonNamesAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 493,
+        "symbol": "LoadSalesPersonNamesAsync@493-495",
+        "evidence": "private async Task<Dictionary<int, string>> LoadSalesPersonNamesAsync() {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadCustomerTypesAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 496,
+        "symbol": "LoadCustomerTypesAsync@496-504",
+        "evidence": "} /// <summary> /// 加载所有客户类型信息 /// </summary> private async Task<Dictionary<string, MainlandCustomerType>> LoadCustomerTypesAsync() {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadCustomerTypesAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 501,
+        "symbol": "LoadCustomerTypesAsync@501-504",
+        "evidence": "private async Task<Dictionary<string, MainlandCustomerType>> LoadCustomerTypesAsync() {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadInvoicesAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 505,
+        "symbol": "LoadInvoicesAsync@505-513",
+        "evidence": "} /// <summary> /// 批量加载开票信息 /// </summary> private async Task<Dictionary<int, List<InvoiceHistoryItem>>> LoadInvoicesAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadInvoicesAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 510,
+        "symbol": "LoadInvoicesAsync@510-513",
+        "evidence": "private async Task<Dictionary<int, List<InvoiceHistoryItem>>> LoadInvoicesAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadReceiptsAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 535,
+        "symbol": "LoadReceiptsAsync@535-548",
+        "evidence": "return invoiceDict; } /// <summary> /// 批量加载收款信息 /// </summary> private async Task<Dictionary<int, List<ReceiptForOrder>>> LoadReceiptsAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadReceiptsAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 536,
+        "symbol": "LoadReceiptsAsync@536-548",
+        "evidence": "} /// <summary> /// 批量加载收款信息 /// </summary> private async Task<Dictionary<int, List<ReceiptForOrder>>> LoadReceiptsAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadReceiptsAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 541,
+        "symbol": "LoadReceiptsAsync@541-548",
+        "evidence": "private async Task<Dictionary<int, List<ReceiptForOrder>>> LoadReceiptsAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 Task< 没有以 Async 结尾。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 584,
+        "symbol": "Task<@584-598",
+        "evidence": "return directReceiptsList; } /// <summary> /// 加载间接收款相关数据 /// </summary> private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 Task< 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 584,
+        "symbol": "Task<@584-598",
+        "evidence": "return directReceiptsList; } /// <summary> /// 加载间接收款相关数据 /// </summary> private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 Task< 没有以 Async 结尾。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 585,
+        "symbol": "Task<@585-598",
+        "evidence": "} /// <summary> /// 加载间接收款相关数据 /// </summary> private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 Task< 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 585,
+        "symbol": "Task<@585-598",
+        "evidence": "} /// <summary> /// 加载间接收款相关数据 /// </summary> private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 Task< 没有以 Async 结尾。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 590,
+        "symbol": "Task<@590-598",
+        "evidence": "private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 Task< 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 590,
+        "symbol": "Task<@590-598",
+        "evidence": "private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadSaleOrderPluginsAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 786,
+        "symbol": "LoadSaleOrderPluginsAsync@786-794",
+        "evidence": "return receiptDict; } /// <summary> /// 批量加载SaleOrderPlugin /// </summary> private async Task<Dictionary<int, SaleOrderPlugin>> LoadSaleOrderPluginsAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadSaleOrderPluginsAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 787,
+        "symbol": "LoadSaleOrderPluginsAsync@787-794",
+        "evidence": "} /// <summary> /// 批量加载SaleOrderPlugin /// </summary> private async Task<Dictionary<int, SaleOrderPlugin>> LoadSaleOrderPluginsAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadSaleOrderPluginsAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 792,
+        "symbol": "LoadSaleOrderPluginsAsync@792-794",
+        "evidence": "private async Task<Dictionary<int, SaleOrderPlugin>> LoadSaleOrderPluginsAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadPenaltyEventsAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 796,
+        "symbol": "LoadPenaltyEventsAsync@796-803",
+        "evidence": "} /// <summary> /// 批量加载PenaltyEvent /// </summary> private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadPenaltyEventsAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 801,
+        "symbol": "LoadPenaltyEventsAsync@801-803",
+        "evidence": "private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadCanClearCutOffDatesAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 817,
+        "symbol": "LoadCanClearCutOffDatesAsync@817-826",
+        "evidence": "} /// <summary> /// 加载可清截止日期 /// </summary> private async Task<Dictionary<int, DateTime?>> LoadCanClearCutOffDatesAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 LoadCanClearCutOffDatesAsync 的返回类型不是 Task/Task<T>。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 822,
+        "symbol": "LoadCanClearCutOffDatesAsync@822-826",
+        "evidence": "private async Task<Dictionary<int, DateTime?>> LoadCanClearCutOffDatesAsync(List<int> orderIds) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 ProcessSingleOrderByRangeOptimized 没有以 Async 结尾。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 852,
+        "symbol": "ProcessSingleOrderByRangeOptimized@852-866",
+        "evidence": "} return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 ProcessSingleOrderByRangeOptimized 没有以 Async 结尾。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 853,
+        "symbol": "ProcessSingleOrderByRangeOptimized@853-866",
+        "evidence": "return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "message": "异步方法 RecalculateHistoricalAfterBillOverdueParallel 没有以 Async 结尾。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 1098,
+        "symbol": "RecalculateHistoricalAfterBillOverdueParallel@1098-1153",
+        "evidence": "public async Task<RecalculationResult> RecalculateHistoricalAfterBillOverdueParallel( DateTime startDate, DateTime endDate, List<int> ruleDefinitionIds = null, int maxDegreeOfParallelism = 4) {",
+        "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 PreloadSharedDataAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 457,
+        "symbol": "PreloadSharedDataAsync@457-459",
+        "evidence": "private async Task<SharedDataCache> PreloadSharedDataAsync(List<ORDR> orders) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 LoadPenaltyEventsAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 796,
+        "symbol": "LoadPenaltyEventsAsync@796-803",
+        "evidence": "} /// <summary> /// 批量加载PenaltyEvent /// </summary> private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 LoadPenaltyEventsAsync 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 801,
+        "symbol": "LoadPenaltyEventsAsync@801-803",
+        "evidence": "private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ProcessSingleOrderByRangeOptimized 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 852,
+        "symbol": "ProcessSingleOrderByRangeOptimized@852-866",
+        "evidence": "} return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "message": "异步方法 ProcessSingleOrderByRangeOptimized 没有实际 await。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 853,
+        "symbol": "ProcessSingleOrderByRangeOptimized@853-866",
+        "evidence": "return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {",
+        "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      }
+    ],
+    "soft_findings": [
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 PreloadSharedDataAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 457,
+        "symbol": "PreloadSharedDataAsync@457-459",
+        "evidence": "private async Task<SharedDataCache> PreloadSharedDataAsync(List<ORDR> orders) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadSalesPersonNamesAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 487,
+        "symbol": "LoadSalesPersonNamesAsync@487-495",
+        "evidence": "return cache; } /// <summary> /// 加载所有业务员信息 /// </summary> private async Task<Dictionary<int, string>> LoadSalesPersonNamesAsync() {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadSalesPersonNamesAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 488,
+        "symbol": "LoadSalesPersonNamesAsync@488-495",
+        "evidence": "} /// <summary> /// 加载所有业务员信息 /// </summary> private async Task<Dictionary<int, string>> LoadSalesPersonNamesAsync() {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadSalesPersonNamesAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 493,
+        "symbol": "LoadSalesPersonNamesAsync@493-495",
+        "evidence": "private async Task<Dictionary<int, string>> LoadSalesPersonNamesAsync() {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadInvoicesAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 505,
+        "symbol": "LoadInvoicesAsync@505-513",
+        "evidence": "} /// <summary> /// 批量加载开票信息 /// </summary> private async Task<Dictionary<int, List<InvoiceHistoryItem>>> LoadInvoicesAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadInvoicesAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 510,
+        "symbol": "LoadInvoicesAsync@510-513",
+        "evidence": "private async Task<Dictionary<int, List<InvoiceHistoryItem>>> LoadInvoicesAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadReceiptsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 535,
+        "symbol": "LoadReceiptsAsync@535-548",
+        "evidence": "return invoiceDict; } /// <summary> /// 批量加载收款信息 /// </summary> private async Task<Dictionary<int, List<ReceiptForOrder>>> LoadReceiptsAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadReceiptsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 536,
+        "symbol": "LoadReceiptsAsync@536-548",
+        "evidence": "} /// <summary> /// 批量加载收款信息 /// </summary> private async Task<Dictionary<int, List<ReceiptForOrder>>> LoadReceiptsAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadReceiptsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 541,
+        "symbol": "LoadReceiptsAsync@541-548",
+        "evidence": "private async Task<Dictionary<int, List<ReceiptForOrder>>> LoadReceiptsAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadDirectReceiptsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 568,
+        "symbol": "LoadDirectReceiptsAsync@568-580",
+        "evidence": "} /// <summary> /// 加载直接收款信息（ORCT） /// </summary> private async Task<List<ORCT>> LoadDirectReceiptsAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadDirectReceiptsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 573,
+        "symbol": "LoadDirectReceiptsAsync@573-580",
+        "evidence": "private async Task<List<ORCT>> LoadDirectReceiptsAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 Task< 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 584,
+        "symbol": "Task<@584-598",
+        "evidence": "return directReceiptsList; } /// <summary> /// 加载间接收款相关数据 /// </summary> private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 Task< 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 585,
+        "symbol": "Task<@585-598",
+        "evidence": "} /// <summary> /// 加载间接收款相关数据 /// </summary> private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 Task< 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 590,
+        "symbol": "Task<@590-598",
+        "evidence": "private async Task<(Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadIndirectReceiptDataAsync(List<int> orderIds, List<ORCT> directReceiptsList) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 BuildOrderToInv1Entries 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 649,
+        "symbol": "BuildOrderToInv1Entries@649-672",
+        "evidence": "} /// <summary> /// 构建订单到发票的映射关系 /// </summary> private Dictionary<int, List<int>> BuildOrderToInv1Entries(List<int> orderIds, Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 BuildOrderToInv1Entries 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 654,
+        "symbol": "BuildOrderToInv1Entries@654-672",
+        "evidence": "private Dictionary<int, List<int>> BuildOrderToInv1Entries(List<int> orderIds, Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessIndirectReceipts 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 672,
+        "symbol": "ProcessIndirectReceipts@672-681",
+        "evidence": "} /// <summary> /// 处理间接收款 /// </summary> private void ProcessIndirectReceipts(List<int> orderIds, List<ORCT> directReceiptsList, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2, Dictionary<int, List<int>> orderToInv1Entries, Dictionary<int, List<ReceiptForOrder>> receiptDict) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessIndirectReceipts 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 677,
+        "symbol": "ProcessIndirectReceipts@677-681",
+        "evidence": "private void ProcessIndirectReceipts(List<int> orderIds, List<ORCT> directReceiptsList, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2, Dictionary<int, List<int>> orderToInv1Entries, Dictionary<int, List<ReceiptForOrder>> receiptDict) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadIndirectReceiptsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 720,
+        "symbol": "LoadIndirectReceiptsAsync@720-731",
+        "evidence": "} /// <summary> /// 加载间接收款信息（ORCT） /// </summary> private async Task<List<ORCT>> LoadIndirectReceiptsAsync(List<int> indirectRct2DocNums) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadIndirectReceiptsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 725,
+        "symbol": "LoadIndirectReceiptsAsync@725-731",
+        "evidence": "private async Task<List<ORCT>> LoadIndirectReceiptsAsync(List<int> indirectRct2DocNums) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessDirectReceipts 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 733,
+        "symbol": "ProcessDirectReceipts@733-762",
+        "evidence": "} return indirectReceiptsList; } /// <summary> /// 处理直接收款 /// </summary> private void ProcessDirectReceipts(List<int> orderIds, Dictionary<int, List<ORCT>> directReceiptsByOrder, Dictionary<int, List<ReceiptForOrder>> receiptDict) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessDirectReceipts 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 734,
+        "symbol": "ProcessDirectReceipts@734-762",
+        "evidence": "return indirectReceiptsList; } /// <summary> /// 处理直接收款 /// </summary> private void ProcessDirectReceipts(List<int> orderIds, Dictionary<int, List<ORCT>> directReceiptsByOrder, Dictionary<int, List<ReceiptForOrder>> receiptDict) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessDirectReceipts 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 735,
+        "symbol": "ProcessDirectReceipts@735-762",
+        "evidence": "} /// <summary> /// 处理直接收款 /// </summary> private void ProcessDirectReceipts(List<int> orderIds, Dictionary<int, List<ORCT>> directReceiptsByOrder, Dictionary<int, List<ReceiptForOrder>> receiptDict) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessDirectReceipts 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 740,
+        "symbol": "ProcessDirectReceipts@740-762",
+        "evidence": "private void ProcessDirectReceipts(List<int> orderIds, Dictionary<int, List<ORCT>> directReceiptsByOrder, Dictionary<int, List<ReceiptForOrder>> receiptDict) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 NormalizeReceipts 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 762,
+        "symbol": "NormalizeReceipts@762-773",
+        "evidence": "} /// <summary> /// 规范化收款数据（去重合并同 DocEntry 的金额） /// </summary> private Dictionary<int, List<ReceiptForOrder>> NormalizeReceipts(Dictionary<int, List<ReceiptForOrder>> receiptDict) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 NormalizeReceipts 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 767,
+        "symbol": "NormalizeReceipts@767-773",
+        "evidence": "private Dictionary<int, List<ReceiptForOrder>> NormalizeReceipts(Dictionary<int, List<ReceiptForOrder>> receiptDict) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadSaleOrderPluginsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 786,
+        "symbol": "LoadSaleOrderPluginsAsync@786-794",
+        "evidence": "return receiptDict; } /// <summary> /// 批量加载SaleOrderPlugin /// </summary> private async Task<Dictionary<int, SaleOrderPlugin>> LoadSaleOrderPluginsAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadSaleOrderPluginsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 787,
+        "symbol": "LoadSaleOrderPluginsAsync@787-794",
+        "evidence": "} /// <summary> /// 批量加载SaleOrderPlugin /// </summary> private async Task<Dictionary<int, SaleOrderPlugin>> LoadSaleOrderPluginsAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadSaleOrderPluginsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 792,
+        "symbol": "LoadSaleOrderPluginsAsync@792-794",
+        "evidence": "private async Task<Dictionary<int, SaleOrderPlugin>> LoadSaleOrderPluginsAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadPenaltyEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 796,
+        "symbol": "LoadPenaltyEventsAsync@796-803",
+        "evidence": "} /// <summary> /// 批量加载PenaltyEvent /// </summary> private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadPenaltyEventsAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 801,
+        "symbol": "LoadPenaltyEventsAsync@801-803",
+        "evidence": "private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadRuleDefinitionAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 809,
+        "symbol": "LoadRuleDefinitionAsync@809-816",
+        "evidence": "} /// <summary> /// 加载规则定义 /// </summary> private async Task<PenaltyRuleDefinition> LoadRuleDefinitionAsync(string ruleType) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadRuleDefinitionAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 814,
+        "symbol": "LoadRuleDefinitionAsync@814-816",
+        "evidence": "private async Task<PenaltyRuleDefinition> LoadRuleDefinitionAsync(string ruleType) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadCanClearCutOffDatesAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 817,
+        "symbol": "LoadCanClearCutOffDatesAsync@817-826",
+        "evidence": "} /// <summary> /// 加载可清截止日期 /// </summary> private async Task<Dictionary<int, DateTime?>> LoadCanClearCutOffDatesAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 LoadCanClearCutOffDatesAsync 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 822,
+        "symbol": "LoadCanClearCutOffDatesAsync@822-826",
+        "evidence": "private async Task<Dictionary<int, DateTime?>> LoadCanClearCutOffDatesAsync(List<int> orderIds) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessSingleOrderByRangeOptimized 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 852,
+        "symbol": "ProcessSingleOrderByRangeOptimized@852-866",
+        "evidence": "} return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {"
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessSingleOrderByRangeOptimized 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 853,
+        "symbol": "ProcessSingleOrderByRangeOptimized@853-866",
+        "evidence": "return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 490,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 492,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 498,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 500,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 507,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 509,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 538,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 540,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 570,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 572,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 587,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 589,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 651,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 653,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 674,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 676,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 722,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 724,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 737,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 739,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 764,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 766,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 789,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 791,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 798,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 800,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 811,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 813,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 819,
+        "symbol": "",
+        "evidence": "/// <summary>"
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+        "line": 821,
+        "symbol": "",
+        "evidence": "/// </summary>"
+      }
+    ]
+  },
+  "boundary_failure_code": "",
+  "boundary_failure_summary": "",
+  "secondary_boundary_failure_codes": [],
+  "performance_metrics": {
+    "runtime_total_duration_seconds": 210.736,
+    "time_to_first_model_content_seconds": 0.595,
+    "time_after_first_edit_to_finalize_seconds": 35.724,
+    "tool_call_count": 10,
+    "read_call_count": 5,
+    "edit_call_count": 4,
+    "assistant_text_events": 7,
+    "assistant_text_chars": 565,
+    "model_timeout_stage": "",
+    "last_progress_stage": "result_message",
+    "saw_result_event": true,
+    "continuation_retry_count": 0,
+    "continuation_recovered": false,
+    "continuation_timeout_stages": [],
+    "execution_profile": "plan_first_full_path",
+    "fast_path_enabled": false,
+    "effective_max_turns": 10,
+    "patch_salvaged": false,
+    "build_duration_seconds": 0.0,
+    "build_invoked": false,
+    "validation_pipeline": [
+      "build",
+      "scope_review",
+      "diff_review"
+    ],
+    "verification_schedule": {
+      "run_boundary_first": true,
+      "run_quality_gate_before_build": true,
+      "run_rule_validation_before_build": true,
+      "skip_build_on_precheck_failure": true,
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.plan_first_complex_rules",
+        "perf.layered_verification",
+        "perf.patch_salvage",
+        "perf.continuation_retry",
+        "perf.fast_path_max_turns=6",
+        "perf.continuation_retry_limit=2"
+      ]
+    }
+  },
+  "model_timeout_stage": "",
+  "patch_salvaged": false,
+  "compliance_summary": {
+    "status": "retry",
+    "summary": "Quality gate rejected the patch with 31 hard violation(s).",
+    "source_path": "D:/MyProjects/pi-sonar-agent/data/csharp-quality-gate.md",
+    "hard_rule_count": 5,
+    "soft_rule_count": 6,
+    "passed_rule_count": 7,
+    "failed_rule_count": 2,
+    "soft_finding_count": 67,
+    "not_applicable_count": 0,
+    "checks": [
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "本次新增或改写的公开类、公开方法、公开属性、公开实体必须有完整 XML 文档注释。",
+        "message": ""
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "enforcement": "hard",
+        "status": "failed",
+        "summary": "异步方法必须以 Async 结尾，返回 Task/Task<T>，严禁 async void（事件处理器除外）。",
+        "message": "异步方法 RecalculateHistoricalAfterBillOverdueParallel 没有以 Async 结尾。"
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "enforcement": "hard",
+        "status": "failed",
+        "summary": "异步方法内部如果没有 await，应改为同步方法或直接返回 Task。",
+        "message": "异步方法 ProcessSingleOrderByRangeOptimized 没有实际 await。"
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "新增或改写的 LINQ 表达式优先使用方法语法，不要引入 query syntax。",
+        "message": ""
+      },
+      {
+        "rule_id": "cognitive_complexity",
+        "title": "单方法认知复杂度不超过 30",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "触达的方法应通过提取子方法、提前返回等方式控制认知复杂度。",
+        "message": ""
+      },
+      {
+        "rule_id": "zero_redundant_code",
+        "title": "零冗余代码",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "不要在当前 patch 中留下未使用变量、方法、类或 using。",
+        "message": ""
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "enforcement": "soft",
+        "status": "soft_finding",
+        "summary": "如果新增方法不依赖实例状态，优先标记为 static。",
+        "message": "私有方法 PreloadSharedDataAsync 看起来不依赖实例状态，可考虑标记为 static。"
+      },
+      {
+        "rule_id": "sealed_preferred",
+        "title": "新增不继承的类优先 sealed",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "如果新增类不打算被继承，优先使用 sealed。",
+        "message": ""
+      },
+      {
+        "rule_id": "constructor_dependency_injection",
+        "title": "优先构造函数注入",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "依赖注入优先通过构造函数注入接口，并保持当前仓库既有注册模式一致。",
+        "message": ""
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "enforcement": "soft",
+        "status": "soft_finding",
+        "summary": "新增业务逻辑注释优先使用专业中文表达。",
+        "message": "当前 patch 新增了非中文业务注释，建议改成简洁专业的中文。"
+      },
+      {
+        "rule_id": "finance_terms_chinese",
+        "title": "财务术语保持专业中文",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "财务及核心业务术语应保持专业中文表达，例如罚息、应收账款、账务、呆滞库存、订单取消。",
+        "message": ""
+      }
+    ]
+  },
+  "follow_up_log_path": "logs/follow_ups/BI/20260409213252-01/e0df305b-afab-45c6-bd45-641d1ca20b66.jsonl",
+  "repair_plan": {
+    "repair_shape": "method_rewrite_with_helpers",
+    "primary_file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+    "primary_method_name": "PreloadSharedData",
+    "proposed_method_name": "PreloadSharedDataAsync",
+    "target_symbols": [
+      "PreloadSharedData",
+      "method@455-721"
+    ],
+    "new_helpers": [
+      "private helper(s) extracted from the target method"
+    ],
+    "helper_async_map": [
+      {
+        "name": "extracted_private_helper",
+        "is_async": false,
+        "reason": "Only keep helpers async when they contain a real await.",
+        "await_source": "Prefer sync helper extraction unless the helper owns an awaited call."
+      }
+    ],
+    "requires_signature_change": true,
+    "requires_propagation": false,
+    "requires_new_type": false,
+    "propagation_targets": [],
+    "expected_boundary_capabilities": [
+      "method_rewrite",
+      "helper_extract",
+      "signature_change"
+    ],
+    "expected_quality_gates": [
+      "public_xml_docs",
+      "async_signature",
+      "async_requires_await",
+      "linq_method_syntax",
+      "cognitive_complexity",
+      "zero_redundant_code",
+      "static_preferred",
+      "sealed_preferred",
+      "constructor_dependency_injection",
+      "business_comments_chinese",
+      "finance_terms_chinese"
+    ],
+    "risk_notes": [
+      "目标方法 PreloadSharedData 是异步方法但未使用 Async 后缀；如当前 patch 触达该方法签名，可能需要显式允许 signature_change。",
+      "提取 helper 时，只有真实包含 await 的 helper 才保留 async；否则改为同步 helper。"
+    ]
+  },
+  "plan_precheck": {
+    "status": "pass",
+    "blocking": false,
+    "code": "plan_precheck_passed",
+    "summary": "Plan 预检通过，可以进入 edit 阶段。",
+    "details": [
+      "Plan 与当前 contract/quality gate 的显式前置约束没有发现直接冲突。"
+    ],
+    "guidance": []
+  }
+}

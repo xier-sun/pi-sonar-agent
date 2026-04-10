@@ -1,0 +1,31 @@
+[2026-04-09 04:03:53] Attempt 1/3 started for cb88142f-fc41-45bc-9a2d-6a094c7d9af6
+[2026-04-09 04:07:28] Attempt 1 failed: Model response timed out
+[2026-04-09 04:07:28] Build failure report:
+错误: Model response timed out
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+模型在 180 秒内没有返回后续响应
+阶段分类: post_read_stall
+取消原因: follow_up_response_timeout
+清理动作: interrupt, close_response_stream, disconnect
+[2026-04-09 04:07:29] Workspace restored to issue baseline
+[2026-04-09 04:07:29] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 04:07:29] Attempt 2/3 started for cb88142f-fc41-45bc-9a2d-6a094c7d9af6
+[2026-04-09 04:22:30] Attempt 2 failed: Model response timed out
+[2026-04-09 04:22:30] Build failure report:
+错误: Model response timed out
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+单个 issue 在 900 秒内未完成
+取消原因: issue_hard_timeout
+清理动作: interrupt, close_response_stream, disconnect
+[2026-04-09 04:22:31] Workspace restored to issue baseline
+[2026-04-09 04:22:31] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 04:22:31] Attempt 3/3 started for cb88142f-fc41-45bc-9a2d-6a094c7d9af6
+[2026-04-09 04:25:06] Attempt 3 failed: Agent completed without modifying any files
+[2026-04-09 04:25:07] Workspace restored to issue baseline
+[2026-04-09 04:25:07] Issue skipped: Agent completed without modifying any files after 3 attempt(s)

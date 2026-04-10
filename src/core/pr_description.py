@@ -25,6 +25,14 @@ class PullRequestIssueSummary:
     skip_reason: str = ""
     issue_log_path: str = ""
     changed_files: tuple[str, ...] = field(default_factory=tuple)
+    compliance_status: str = ""
+    compliance_summary: str = ""
+    active_quality_gate_rules: tuple[str, ...] = field(default_factory=tuple)
+    hard_quality_gate_failures: int = 0
+    soft_quality_gate_findings: int = 0
+    boundary_audit_summary: str = ""
+    boundary_audit_findings: tuple[str, ...] = field(default_factory=tuple)
+    boundary_drift_score: int = 0
 
 
 def _dedupe_preserve_order(values: tuple[str, ...]) -> tuple[str, ...]:
@@ -83,6 +91,28 @@ def _render_issue_item(index: int, item: PullRequestIssueSummary) -> list[str]:
     if changed_files:
         lines.append(f"   - 涉及文件: {', '.join(changed_files)}")
         lines.append("   - 审阅建议: 重点确认上述文件中的修改确实只覆盖当前 Sonar 问题，且未引入额外逻辑变更。")
+    if item.active_quality_gate_rules:
+        lines.append(f"   - 启用规范门禁: {', '.join(_dedupe_preserve_order(item.active_quality_gate_rules))}")
+    if item.compliance_status or item.compliance_summary:
+        summary = item.compliance_summary or "已完成质量门禁校验。"
+        lines.append(f"   - 规范校验: {item.compliance_status or 'pass'} | {summary}")
+        if item.hard_quality_gate_failures > 0 or item.soft_quality_gate_findings > 0:
+            lines.append(
+                "   - 规范细项: "
+                f"hard failures={item.hard_quality_gate_failures}, "
+                f"soft findings={item.soft_quality_gate_findings}"
+            )
+    if item.boundary_audit_summary and (
+        item.boundary_drift_score > 0 or item.boundary_audit_findings
+    ):
+        lines.append(
+            "   - 边界审计: "
+            f"drift score={item.boundary_drift_score} | {item.boundary_audit_summary}"
+        )
+    if item.boundary_audit_findings:
+        lines.append(
+            "   - 漂移记录: " + "；".join(_dedupe_preserve_order(item.boundary_audit_findings))
+        )
     if item.skip_reason:
         lines.append(f"   - 跳过原因: {item.skip_reason}")
     if item.issue_log_path:

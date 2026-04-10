@@ -1,0 +1,223 @@
+{
+  "issue_key": "ea97b5e2-bca2-42b2-b678-a91347eca09d",
+  "repository": "BI",
+  "run_label": "20260409002820-01",
+  "rule_id": "csharpsquid:S3776",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+  "line": 51,
+  "status": "skipped",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "retrying",
+      "started_at": "2026-04-08T17:53:24.424623+00:00",
+      "finished_at": "2026-04-08T17:56:36.440140+00:00",
+      "duration_seconds": 192.014,
+      "failure_kind": "model_timeout",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": false,
+      "error": "Model response timed out",
+      "skip_reason": "",
+      "summary": "Fixed 0 file(s)",
+      "changed_files": [],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_ea97b5e2-bca2-42b2-b678-a91347eca09d_20260409002820-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260409002820-01/ea97b5e2-bca2-42b2-b678-a91347eca09d/attempt-01",
+      "performance_metrics": {
+        "runtime_total_duration_seconds": 191.694,
+        "time_to_first_model_content_seconds": 0.556,
+        "time_after_first_edit_to_finalize_seconds": 0.0,
+        "tool_call_count": 1,
+        "read_call_count": 1,
+        "edit_call_count": 0,
+        "assistant_text_events": 1,
+        "assistant_text_chars": 39,
+        "model_timeout_stage": "post_read_stall",
+        "last_progress_stage": "aborting:follow_up_response_timeout",
+        "saw_result_event": false,
+        "patch_salvaged": false,
+        "build_duration_seconds": 0.0,
+        "build_invoked": false,
+        "execution_profile": "full_path",
+        "fast_path_enabled": false,
+        "effective_max_turns": 10,
+        "attempt_total_duration_seconds": 192.014
+      },
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.layered_verification",
+        "perf.patch_salvage",
+        "perf.fast_path_max_turns=6"
+      ]
+    },
+    {
+      "attempt_number": 2,
+      "status": "retrying",
+      "started_at": "2026-04-08T17:56:36.780653+00:00",
+      "finished_at": "2026-04-08T18:03:56.566281+00:00",
+      "duration_seconds": 439.781,
+      "failure_kind": "quality_gate",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": false,
+      "error": "Quality gate verification failed",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs"
+      ],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_ea97b5e2-bca2-42b2-b678-a91347eca09d_20260409002820-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260409002820-01/ea97b5e2-bca2-42b2-b678-a91347eca09d/attempt-02",
+      "performance_metrics": {
+        "runtime_total_duration_seconds": 439.325,
+        "time_to_first_model_content_seconds": 0.578,
+        "time_after_first_edit_to_finalize_seconds": 178.293,
+        "tool_call_count": 7,
+        "read_call_count": 5,
+        "edit_call_count": 2,
+        "assistant_text_events": 5,
+        "assistant_text_chars": 958,
+        "model_timeout_stage": "",
+        "last_progress_stage": "result_message",
+        "saw_result_event": true,
+        "execution_profile": "full_path",
+        "fast_path_enabled": false,
+        "effective_max_turns": 10,
+        "patch_salvaged": false,
+        "build_duration_seconds": 0.0,
+        "build_invoked": false,
+        "validation_pipeline": [
+          "build",
+          "scope_review",
+          "diff_review"
+        ],
+        "verification_schedule": {
+          "run_boundary_first": true,
+          "run_quality_gate_before_build": true,
+          "run_rule_validation_before_build": true,
+          "skip_build_on_precheck_failure": true,
+          "rollout_flags": [
+            "perf.short_form_prompt",
+            "perf.fast_path",
+            "perf.layered_verification",
+            "perf.patch_salvage",
+            "perf.fast_path_max_turns=6"
+          ]
+        },
+        "attempt_total_duration_seconds": 439.781
+      },
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.layered_verification",
+        "perf.patch_salvage",
+        "perf.fast_path_max_turns=6"
+      ]
+    },
+    {
+      "attempt_number": 3,
+      "status": "skipped",
+      "started_at": "2026-04-08T18:03:56.978727+00:00",
+      "finished_at": "2026-04-08T18:06:09.525484+00:00",
+      "duration_seconds": 132.545,
+      "failure_kind": "quality_gate",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": false,
+      "error": "C# quality gate verification failed after 3 attempt(s)",
+      "skip_reason": "C# quality gate verification failed after 3 attempt(s)",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs"
+      ],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_ea97b5e2-bca2-42b2-b678-a91347eca09d_20260409002820-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260409002820-01/ea97b5e2-bca2-42b2-b678-a91347eca09d/attempt-03",
+      "performance_metrics": {
+        "runtime_total_duration_seconds": 131.992,
+        "time_to_first_model_content_seconds": 0.606,
+        "time_after_first_edit_to_finalize_seconds": 34.234,
+        "tool_call_count": 3,
+        "read_call_count": 2,
+        "edit_call_count": 1,
+        "assistant_text_events": 3,
+        "assistant_text_chars": 1436,
+        "model_timeout_stage": "",
+        "last_progress_stage": "result_message",
+        "saw_result_event": true,
+        "execution_profile": "full_path",
+        "fast_path_enabled": false,
+        "effective_max_turns": 10,
+        "patch_salvaged": false,
+        "build_duration_seconds": 0.0,
+        "build_invoked": false,
+        "validation_pipeline": [
+          "build",
+          "scope_review",
+          "diff_review"
+        ],
+        "verification_schedule": {
+          "run_boundary_first": true,
+          "run_quality_gate_before_build": true,
+          "run_rule_validation_before_build": true,
+          "skip_build_on_precheck_failure": true,
+          "rollout_flags": [
+            "perf.short_form_prompt",
+            "perf.fast_path",
+            "perf.layered_verification",
+            "perf.patch_salvage",
+            "perf.fast_path_max_turns=6"
+          ]
+        },
+        "attempt_total_duration_seconds": 132.545
+      },
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.layered_verification",
+        "perf.patch_salvage",
+        "perf.fast_path_max_turns=6"
+      ]
+    }
+  ],
+  "final_failure_kind": "quality_gate",
+  "final_error": "C# quality gate verification failed after 3 attempt(s)",
+  "final_skip_reason": "C# quality gate verification failed after 3 attempt(s)",
+  "final_summary": "Fixed 1 file(s)",
+  "final_boundary_failure_code": "",
+  "final_secondary_boundary_failure_codes": [],
+  "artifact_root": "logs/issue_artifacts/BI/20260409002820-01/ea97b5e2-bca2-42b2-b678-a91347eca09d",
+  "performance_summary": {
+    "issue_attempt_count": 3,
+    "issue_total_duration_seconds": 764.34,
+    "avg_attempt_duration_seconds": 254.78,
+    "model_timeout_attempts": 1,
+    "scope_reject_attempts": 0,
+    "build_invocation_count": 0,
+    "follow_up_timeout_attempts": 1,
+    "patch_salvaged_attempts": 0,
+    "rollout_flags": [
+      "perf.short_form_prompt",
+      "perf.fast_path",
+      "perf.layered_verification",
+      "perf.patch_salvage",
+      "perf.fast_path_max_turns=6"
+    ]
+  },
+  "rollout_flags": [
+    "perf.short_form_prompt",
+    "perf.fast_path",
+    "perf.layered_verification",
+    "perf.patch_salvage",
+    "perf.fast_path_max_turns=6"
+  ]
+}

@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from pi_sonar_agent.agent.claude_agent import FixResult, SonarIssue
+from pi_sonar_agent.core.quality_gate import (
+    build_compliance_summary,
+    load_default_quality_gate_catalog,
+)
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.state import (
     AttemptState,
@@ -32,8 +36,10 @@ class AttemptArtifactBundle:
     edit_contract_json: Path
     prompt_context_json: Path
     patch_diff: Path
+    attempt_events_jsonl: Path
     reviewer_result_json: Path
     build_result_json: Path
+    compliance_summary_json: Path
     attempt_summary_json: Path
 
 
@@ -75,9 +81,21 @@ class ArtifactWriter:
             edit_contract_json=attempt_root / "edit_contract.json",
             prompt_context_json=attempt_root / "prompt_context.json",
             patch_diff=attempt_root / "patch.diff",
+            attempt_events_jsonl=attempt_root / "attempt_events.jsonl",
             reviewer_result_json=attempt_root / "reviewer_result.json",
             build_result_json=attempt_root / "build_result.json",
+            compliance_summary_json=attempt_root / "compliance_summary.json",
             attempt_summary_json=attempt_root / "attempt_summary.json",
+        )
+
+        active_quality_gate_rules = tuple(
+            rule.to_dict()
+            for rule in getattr(getattr(result, "edit_contract", None), "quality_gate_rules", ())
+        )
+        compliance_summary = build_compliance_summary(
+            getattr(getattr(result, "edit_contract", None), "quality_gate_rules", ()),
+            getattr(result, "quality_gate_result", None),
+            source_path=load_default_quality_gate_catalog().source_path,
         )
 
         self._write_json(bundle.issue_json, _issue_payload(issue))
@@ -101,11 +119,33 @@ class ArtifactWriter:
                 "workspace_path": workspace_path.as_posix(),
                 "baseline_head_commit": baseline.head_commit,
                 "guardrail_mode": getattr(result, "guardrail_mode", ""),
+                "active_quality_gate_rules": active_quality_gate_rules,
+                "execution_profile": getattr(result, "execution_profile", "full_path"),
+                "fast_path_enabled": bool(getattr(result, "fast_path_enabled", False)),
+                "plan_first_enabled": bool(getattr(getattr(result, "edit_contract", None), "plan_first_enabled", False)),
+                "rollout_flags": list(getattr(result, "rollout_flags", ())),
+                "repair_plan": _serialize_optional_payload(getattr(result, "repair_plan", None), None),
+                "plan_precheck": _serialize_optional_payload(getattr(result, "plan_precheck", None), None),
+                "planner_lessons": [
+                    lesson.to_dict()
+                    for lesson in getattr(getattr(result, "edit_contract", None), "planner_lessons", ())
+                ],
+                "prefetched_context": [
+                    snippet.to_dict()
+                    for snippet in getattr(getattr(result, "edit_contract", None), "prefetched_context", ())
+                ],
             },
         )
         bundle.patch_diff.write_text(
             self._build_patch_diff(workspace_path, baseline, attempt_state.changed_files),
             encoding="utf-8",
+        )
+        self._write_jsonl(
+            bundle.attempt_events_jsonl,
+            [
+                event.to_dict() if hasattr(event, "to_dict") else serialize_state(event)
+                for event in getattr(result, "attempt_events", ())
+            ],
         )
         self._write_json(
             bundle.reviewer_result_json,
@@ -137,19 +177,38 @@ class ArtifactWriter:
                         "reason": "Quality gate result was not attached to this attempt.",
                     },
                 ),
+                "boundary_failure_code": getattr(result, "boundary_failure_code", ""),
+                "boundary_failure_summary": getattr(result, "boundary_failure_summary", ""),
+                "secondary_boundary_failure_codes": list(
+                    getattr(result, "secondary_boundary_failure_codes", ())
+                ),
+                "performance_metrics": dict(getattr(result, "performance_metrics", {}) or {}),
+                "model_timeout_stage": getattr(result, "model_timeout_stage", ""),
+                "patch_salvaged": bool(getattr(result, "patch_salvaged", False)),
+                "compliance_summary": compliance_summary.to_dict(),
                 "follow_up_log_path": getattr(result, "follow_up_log_path", ""),
+                "repair_plan": _serialize_optional_payload(getattr(result, "repair_plan", None), None),
+                "plan_precheck": _serialize_optional_payload(getattr(result, "plan_precheck", None), None),
             },
         )
+        self._write_json(bundle.compliance_summary_json, compliance_summary.to_dict())
         self._write_json(bundle.attempt_summary_json, attempt_state.to_dict())
         return bundle
 
-    def write_issue_state(self, issue_state: IssueState) -> Path:
+    def write_issue_state(
+        self,
+        issue_state: IssueState,
+        *,
+        compliance_summary: dict[str, Any] | None = None,
+    ) -> Path:
         """Write the final issue state summary."""
 
         issue_root = Path(issue_state.artifact_root)
         issue_root.mkdir(parents=True, exist_ok=True)
         issue_summary_path = issue_root / "issue_summary.json"
         self._write_json(issue_summary_path, issue_state.to_dict())
+        if compliance_summary is not None:
+            self._write_json(issue_root / "compliance_summary.json", compliance_summary)
         return issue_summary_path
 
     def write_target_state(self, target_state: TargetState) -> Path:
@@ -271,6 +330,13 @@ class ArtifactWriter:
             json.dumps(serialize_state(payload), ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
+
+    @staticmethod
+    def _write_jsonl(path: Path, payload: list[dict[str, Any]]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as handle:
+            for item in payload:
+                handle.write(json.dumps(serialize_state(item), ensure_ascii=False) + "\n")
 
 
 def _issue_payload(issue: SonarIssue) -> dict[str, Any]:

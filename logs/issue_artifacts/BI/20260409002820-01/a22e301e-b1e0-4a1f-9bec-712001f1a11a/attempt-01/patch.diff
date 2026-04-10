@@ -1,0 +1,233 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -121,46 +121,14 @@
+                 var delivrdProductsLookUp = delivrdProducts.ToLookup(x => x.DocEntry);
+
+                 foreach (var group in returnProductsInFilter.GroupBy(x => x.U_DevEntry))
+
+                 {
+
+-                    var thisOrdrReturnItems = group.GroupBy(x => x.ItemCode).Select(x => new { ItemCode = x.Key, TotalQty = x.Sum(s => s.Quantity) }).ToDictionary(k => k.ItemCode, v => v.TotalQty);
+
+-                    var delivrdItemsInThisOrdr = delivrdProductsLookUp[group.Key].GroupBy(x=>x.ItemCode).Select(x=> new { ItemCode = x.Key, TotalQty = x.Sum(s=>s.DelivrdQty) }).ToDictionary(k=>k.ItemCode,v=>v.TotalQty);
+
+-                    //遍历订单中所有有价物料，检查每个物料是否都已退完
+
+-                    if( delivrdItemsInThisOrdr.All(x=> x.Value == (thisOrdrReturnItems.TryGetValue(x.Key,out var returnedQty) ? returnedQty : 0 )))
+
+-                    {
+
+-                        // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+
+-                        var returnedZeroPriceQtyByItem = returnItemsWithDevEntry
+
+-                            .Where(x => x.Price == 0 && x.ResolvedDevEntry == group.Key)
+
+-                            .GroupBy(x => x.ItemCode)
+
+-                            .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+
+-                        // 未退的 Price=0 物料成本 = sum(未退数量 * LastPurPrc)
+
+-                        var fixedPenaltyAmount = delivrdItems
+
+-                            .Where(x => x.Price == 0 && x.DocEntry == group.Key)
+
+-                            .GroupBy(x => x.ItemCode)
+
+-                            .Sum(g =>
+
+-                            {
+
+-                                var totalDelivrdQty = g.Sum(s => s.DelivrdQty);
+
+-                                returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+
+-                                var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+
+-                                return unreturnedQty > 0 ? unreturnedQty * g.First().LastPurPrc : (decimal?)0;
+
+-                            });
+
+-                        var slpCode = delivrdItems.FirstOrDefault(x => x.Price == 0 && x.DocEntry == group.Key)?.SlpCode;
+
+-                        
+
+-                        if(fixedPenaltyAmount.HasValue && fixedPenaltyAmount != 0)
+
+-                        {
+
+-                            var PenaltyEvent = new PenaltyEventData
+
+-                            {
+
+-                                RuleDefinitionId = rule.Id,
+
+-                                SlpCode = slpCode,
+
+-                                SlpName = slpCodeToNameMap[slpCode.Value],
+
+-                                TriggerDocType = "ORDR",
+
+-                                TriggerDocEntry = group.Key.ToString(),
+
+-                                SEDocEntry = group.Key, 
+
+-                                PenaltyBaseAmount = fixedPenaltyAmount.Value,
+
+-                                TriggerEventDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
+-                                PenaltyStartDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
+-                            };
+
+-                            newEvents.Add(PenaltyEvent);
+
+-                        }
+
+-                    }
+
++                    await ProcessSingleReturnGroupAsync(
+
++                        group,
+
++                        delivrdProductsLookUp,
+
++                        returnItemsWithDevEntry,
+
++                        delivrdItems,
+
++                        slpCodeToNameMap,
+
++                        rule,
+
++                        newEvents);
+
+                 }
+
+             }
+
+             catch (Exception ex)
+
+@@ -246,5 +214,61 @@
+ 
+
+             return result;
+
+         }
+
++
+
++        /// <summary>
+
++        /// 处理单个退货组的罚息事件
+
++        /// </summary>
+
++        private async Task ProcessSingleReturnGroupAsync(
+
++            IGrouping<int, dynamic> group,
+
++            ILookup<int, dynamic> delivrdProductsLookUp,
+
++            List<dynamic> returnItemsWithDevEntry,
+
++            List<dynamic> delivrdItems,
+
++            Dictionary<short, string> slpCodeToNameMap,
+
++            PenaltyRuleDefinition rule,
+
++            List<PenaltyEventData> newEvents)
+
++        {
+
++            var thisOrdrReturnItems = group.GroupBy(x => x.ItemCode).Select(x => new { ItemCode = x.Key, TotalQty = x.Sum(s => s.Quantity) }).ToDictionary(k => k.ItemCode, v => v.TotalQty);
+
++            var delivrdItemsInThisOrdr = delivrdProductsLookUp[group.Key].GroupBy(x => x.ItemCode).Select(x => new { ItemCode = x.Key, TotalQty = x.Sum(s => s.DelivrdQty) }).ToDictionary(k => k.ItemCode, v => v.TotalQty);
+
++            //遍历订单中所有有价物料，检查每个物料是否都已退完
+
++            if (delivrdItemsInThisOrdr.All(x => x.Value == (thisOrdrReturnItems.TryGetValue(x.Key, out var returnedQty) ? returnedQty : 0)))
+
++            {
+
++                // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+
++                var returnedZeroPriceQtyByItem = returnItemsWithDevEntry
+
++                    .Where(x => x.Price == 0 && x.ResolvedDevEntry == group.Key)
+
++                    .GroupBy(x => x.ItemCode)
+
++                    .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+
++                // 未退的 Price=0 物料成本 = sum(未退数量 * LastPurPrc)
+
++                var fixedPenaltyAmount = delivrdItems
+
++                    .Where(x => x.Price == 0 && x.DocEntry == group.Key)
+
++                    .GroupBy(x => x.ItemCode)
+
++                    .Sum(g =>
+
++                    {
+
++                        var totalDelivrdQty = g.Sum(s => s.DelivrdQty);
+
++                        returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+
++                        var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+
++                        return unreturnedQty > 0 ? unreturnedQty * g.First().LastPurPrc : (decimal?)0;
+
++                    });
+
++                var slpCode = delivrdItems.FirstOrDefault(x => x.Price == 0 && x.DocEntry == group.Key)?.SlpCode;
+
++
+
++                if (fixedPenaltyAmount.HasValue && fixedPenaltyAmount != 0)
+
++                {
+
++                    var PenaltyEvent = new PenaltyEventData
+
++                    {
+
++                        RuleDefinitionId = rule.Id,
+
++                        SlpCode = slpCode,
+
++                        SlpName = slpCodeToNameMap[slpCode.Value],
+
++                        TriggerDocType = "ORDR",
+
++                        TriggerDocEntry = group.Key.ToString(),
+
++                        SEDocEntry = group.Key,
+
++                        PenaltyBaseAmount = fixedPenaltyAmount.Value,
+
++                        TriggerEventDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
++                        PenaltyStartDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
++                    };
+
++                    newEvents.Add(PenaltyEvent);
+
++                }
+
++            }
+
++
+
++            await Task.CompletedTask;
+
++        }
+
+     }
+
+ }

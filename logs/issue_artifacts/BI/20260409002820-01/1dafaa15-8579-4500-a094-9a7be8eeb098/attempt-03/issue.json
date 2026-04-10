@@ -1,0 +1,11 @@
+{
+  "issue_key": "1dafaa15-8579-4500-a094-9a7be8eeb098",
+  "rule_id": "csharpsquid:S3459",
+  "message": "Remove unassigned auto-property 'Min', or set its value.",
+  "line": 436,
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+  "severity": "MINOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

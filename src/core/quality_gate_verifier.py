@@ -73,6 +73,23 @@ class _TypeDeclaration:
 class QualityGateVerifier:
     """Verify the active quality-gate rules for one issue attempt."""
 
+    _MODIFIER_TOKENS = {
+        "public",
+        "private",
+        "protected",
+        "internal",
+        "static",
+        "async",
+        "virtual",
+        "override",
+        "sealed",
+        "partial",
+        "unsafe",
+        "extern",
+        "new",
+        "abstract",
+    }
+
     @classmethod
     def review(
         cls,
@@ -95,8 +112,17 @@ class QualityGateVerifier:
 
         issue_file = cls._normalize_path(issue_file_path)
         primary_change = cls._select_issue_file_change(issue_file, reviewed_changes)
+        lines = current_issue_file_content.splitlines()
         changed_lines = (
-            tuple(sorted({line for line in primary_change.quality_gate_changed_lines if line > 0}))
+            tuple(
+                sorted(
+                    {
+                        line
+                        for line in primary_change.quality_gate_changed_lines
+                        if 0 < line <= len(lines)
+                    }
+                )
+            )
             if primary_change is not None
             else ()
         )
@@ -107,7 +133,6 @@ class QualityGateVerifier:
                 applied_rule_ids=tuple(rule.rule_id for rule in rules),
             )
 
-        lines = current_issue_file_content.splitlines()
         touched_methods = cls._collect_touched_methods(lines, changed_lines)
         touched_types = cls._collect_touched_types(lines, changed_lines)
         touched_public_declarations = cls._collect_touched_public_declarations(
@@ -319,47 +344,203 @@ class QualityGateVerifier:
             return None
 
         signature_text = " ".join(part for part in signature_lines if part).strip()
-        if not cls._looks_like_method_signature(signature_text):
+        signature_parts = cls._parse_method_signature(signature_text)
+        if signature_parts is None:
             return None
 
         body_end_line = cls._find_block_end_line(lines, candidate_line, signature_end_line)
         if body_end_line <= 0:
             return None
 
-        prefix = signature_text.split("(", 1)[0].strip()
-        tokens = [item for item in re.split(r"\s+", prefix) if item]
-        if len(tokens) < 2:
-            return None
-        name = tokens[-1]
-        if name in _CONTROL_KEYWORDS:
-            return None
-
-        access = next(
-            (token for token in tokens if token in {"public", "private", "protected", "internal"}),
-            "",
-        )
-        return_type = tokens[-2] if len(tokens) >= 2 else ""
         return _MethodWindow(
-            name=name,
-            access=access,
-            return_type=return_type,
+            name=str(signature_parts["name"]),
+            access=str(signature_parts["access"]),
+            return_type=str(signature_parts["return_type"]),
             signature=signature_text,
             declaration_line=candidate_line,
             start_line=candidate_line,
             end_line=body_end_line,
-            is_async="async" in tokens or "Task" in return_type or "ValueTask" in return_type,
-            is_static="static" in tokens,
+            is_async=bool(signature_parts["is_async"]),
+            is_static=bool(signature_parts["is_static"]),
         )
 
+    @classmethod
+    def _looks_like_method_signature(cls, signature_text: str) -> bool:
+        return cls._parse_method_signature(signature_text) is not None
+
+    @classmethod
+    def _parse_method_signature(cls, signature_text: str) -> dict[str, object] | None:
+        if not signature_text or "=" in signature_text:
+            return None
+
+        parameter_open = cls._find_method_parameter_open_index(signature_text)
+        if parameter_open < 0:
+            return None
+        parameter_close = cls._find_matching_parenthesis(signature_text, parameter_open)
+        if parameter_close < 0:
+            return None
+
+        prefix = signature_text[:parameter_open].strip()
+        if not prefix:
+            return None
+        name, prefix_before_name = cls._extract_method_name(prefix)
+        if not name or name in _CONTROL_KEYWORDS:
+            return None
+
+        tokens = [item for item in re.split(r"\s+", prefix_before_name) if item]
+        access = next(
+            (token for token in tokens if token in {"public", "private", "protected", "internal"}),
+            "",
+        )
+        return_type = " ".join(
+            token for token in tokens if token not in cls._MODIFIER_TOKENS
+        ).strip()
+        return {
+            "name": name,
+            "access": access,
+            "return_type": return_type,
+            "parameter_text": signature_text[parameter_open + 1:parameter_close].strip(),
+            "is_async": bool(re.search(r"\basync\b", prefix_before_name))
+            or "Task" in return_type
+            or "ValueTask" in return_type,
+            "is_static": bool(re.search(r"\bstatic\b", prefix_before_name)),
+        }
+
     @staticmethod
-    def _looks_like_method_signature(signature_text: str) -> bool:
-        if "(" not in signature_text or ")" not in signature_text:
-            return False
-        prefix = signature_text.split("(", 1)[0].strip()
-        if not prefix or "=" in prefix:
-            return False
-        name = prefix.split()[-1]
-        return name not in _CONTROL_KEYWORDS
+    def _find_method_parameter_open_index(signature_text: str) -> int:
+        angle_depth = 0
+        bracket_depth = 0
+        brace_depth = 0
+        for index, char in enumerate(signature_text):
+            if char == "<":
+                angle_depth += 1
+            elif char == ">":
+                angle_depth = max(0, angle_depth - 1)
+            elif char == "[":
+                bracket_depth += 1
+            elif char == "]":
+                bracket_depth = max(0, bracket_depth - 1)
+            elif char == "{":
+                brace_depth += 1
+            elif char == "}":
+                brace_depth = max(0, brace_depth - 1)
+            elif char == "(" and angle_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+                return index
+        return -1
+
+    @staticmethod
+    def _find_matching_parenthesis(signature_text: str, open_index: int) -> int:
+        paren_depth = 0
+        angle_depth = 0
+        bracket_depth = 0
+        brace_depth = 0
+        for index in range(open_index, len(signature_text)):
+            char = signature_text[index]
+            if char == "<":
+                angle_depth += 1
+                continue
+            if char == ">":
+                angle_depth = max(0, angle_depth - 1)
+                continue
+            if char == "[":
+                bracket_depth += 1
+                continue
+            if char == "]":
+                bracket_depth = max(0, bracket_depth - 1)
+                continue
+            if char == "{":
+                brace_depth += 1
+                continue
+            if char == "}":
+                brace_depth = max(0, brace_depth - 1)
+                continue
+            if angle_depth > 0 or bracket_depth > 0 or brace_depth > 0:
+                continue
+            if char == "(":
+                paren_depth += 1
+            elif char == ")":
+                paren_depth -= 1
+                if paren_depth == 0:
+                    return index
+        return -1
+
+    @staticmethod
+    def _extract_method_name(prefix: str) -> tuple[str, str]:
+        end_index = len(prefix) - 1
+        while end_index >= 0 and prefix[end_index].isspace():
+            end_index -= 1
+        if end_index < 0:
+            return "", prefix
+
+        if prefix[end_index] == ">":
+            angle_depth = 1
+            end_index -= 1
+            while end_index >= 0:
+                char = prefix[end_index]
+                if char == ">":
+                    angle_depth += 1
+                elif char == "<":
+                    angle_depth -= 1
+                    if angle_depth == 0:
+                        end_index -= 1
+                        break
+                end_index -= 1
+
+        while end_index >= 0 and prefix[end_index].isspace():
+            end_index -= 1
+        if end_index < 0:
+            return "", prefix
+
+        name_end = end_index
+        while end_index >= 0 and (prefix[end_index].isalnum() or prefix[end_index] == "_"):
+            end_index -= 1
+        name = prefix[end_index + 1:name_end + 1]
+        return name, prefix[:end_index + 1].rstrip()
+
+    @staticmethod
+    def _split_top_level_items(text: str) -> tuple[str, ...]:
+        items: list[str] = []
+        current: list[str] = []
+        angle_depth = 0
+        paren_depth = 0
+        bracket_depth = 0
+        brace_depth = 0
+        for char in text:
+            if char == "<":
+                angle_depth += 1
+            elif char == ">":
+                angle_depth = max(0, angle_depth - 1)
+            elif char == "(":
+                paren_depth += 1
+            elif char == ")":
+                paren_depth = max(0, paren_depth - 1)
+            elif char == "[":
+                bracket_depth += 1
+            elif char == "]":
+                bracket_depth = max(0, bracket_depth - 1)
+            elif char == "{":
+                brace_depth += 1
+            elif char == "}":
+                brace_depth = max(0, brace_depth - 1)
+
+            if (
+                char == ","
+                and angle_depth == 0
+                and paren_depth == 0
+                and bracket_depth == 0
+                and brace_depth == 0
+            ):
+                item = "".join(current).strip()
+                if item:
+                    items.append(item)
+                current = []
+                continue
+            current.append(char)
+
+        tail = "".join(current).strip()
+        if tail:
+            items.append(tail)
+        return tuple(items)
 
     @classmethod
     def _find_block_end_line(
@@ -424,6 +605,8 @@ class QualityGateVerifier:
         lines: list[str],
         line_number: int,
     ) -> dict[str, object] | None:
+        if line_number < 1 or line_number > len(lines):
+            return None
         stripped = lines[line_number - 1].strip()
         if "public" not in stripped:
             return None
@@ -481,16 +664,16 @@ class QualityGateVerifier:
             break
         return doc_lines
 
-    @staticmethod
-    def _parse_method_parameter_names(signature: str) -> tuple[str, ...]:
-        match = re.search(r"\((?P<params>.*)\)", signature)
-        if match is None:
+    @classmethod
+    def _parse_method_parameter_names(cls, signature: str) -> tuple[str, ...]:
+        signature_parts = cls._parse_method_signature(signature)
+        if signature_parts is None:
             return ()
-        params_text = match.group("params").strip()
+        params_text = str(signature_parts.get("parameter_text", "")).strip()
         if not params_text:
             return ()
         names: list[str] = []
-        for item in params_text.split(","):
+        for item in cls._split_top_level_items(params_text):
             part = re.sub(r"=\s*.+$", "", item).strip()
             if not part:
                 continue

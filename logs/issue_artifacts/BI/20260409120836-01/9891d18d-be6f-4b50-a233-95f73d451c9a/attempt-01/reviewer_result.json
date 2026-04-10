@@ -1,0 +1,33 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/FinanceAfterSaleBonusApplicationApp.cs",
+      "reason": "This hunk changes lines outside the edit contract window 2373-2373.",
+      "symbol": "statement@2373-2373",
+      "changed_lines": [
+        2374
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceAfterSaleBonusApplicationApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceAfterSaleBonusApplicationApp.cs\n@@ -2373,2 +2372,0 @@\n-            var deliveryDocEntrys = deliveryInfos.Select(x => x.DeliveryDocEntry).ToList();\n-"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "9891d18d-be6f-4b50-a233-95f73d451c9a",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/FinanceAfterSaleBonusApplicationApp.cs",
+      "symbol": "statement@2373-2373",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceAfterSaleBonusApplicationApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceAfterSaleBonusApplicationApp.cs\n@@ -2373,2 +2372,0 @@\n-            var deliveryDocEntrys = deliveryInfos.Select(x => x.DeliveryDocEntry).ToList();\n-",
+      "discovered_at": "2026-04-09T04:11:48.046354+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 1,
+    "total_changed_lines": 2
+  }
+}

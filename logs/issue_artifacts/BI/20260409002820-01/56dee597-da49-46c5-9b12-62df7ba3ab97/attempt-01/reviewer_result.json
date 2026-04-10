@@ -1,0 +1,34 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "reason": "This hunk changes lines outside the edit contract window 1495-1621.",
+      "symbol": "method@1495-1501",
+      "changed_lines": [
+        1476,
+        1477
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -1476,2 +1475,0 @@\n-            var result = new Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>>();\n-\n@@ -1495,9 +1493,8 @@\n-            // 按订单ID分组\n-            foreach (var group in clearRecons.GroupBy(r => r.OrderId))\n-            {\n-                result[group.Key] = group.Select(r => r.ClearRecon)\n-                                         .OrderBy(r => r.CreateDate)\n-                                         .ToList();\n-            }\n-\n-            return result;\n+            // 按订单ID分组并转换为字典\n+            return clearRecons\n+                .GroupBy(r => r.OrderId)\n+                .ToDictionary(\n+                    g => g.Key,\n+                    g => g.Select(r => r.ClearRecon)\n+                          .OrderBy(r => r.CreateDate)\n+                          .ToList());"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "56dee597-da49-46c5-9b12-62df7ba3ab97",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "symbol": "method@1495-1501",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -1476,2 +1475,0 @@\n-            var result = new Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>>();\n-\n@@ -1495,9 +1493,8 @@\n-            // 按订单ID分组\n-            foreach (var group in clearRecons.GroupBy(r => r.OrderId))\n-            {\n-                result[group.Key] = group.Select(r => r.ClearRecon)\n-                                         .OrderBy(r => r.CreateDate)\n-                                         .ToList();\n-            }\n-\n-            return result;\n+            // 按订单ID分组并转换为字典\n+            return clearRecons\n+                .GroupBy(r => r.OrderId)\n+                .ToDictionary(\n+                    g => g.Key,\n+                    g => g.Select(r => r.ClearRecon)\n+                          .OrderBy(r => r.CreateDate)\n+                          .ToList());",
+      "discovered_at": "2026-04-08T19:19:16.202760+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 2,
+    "total_changed_lines": 11
+  }
+}

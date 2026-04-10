@@ -2,35 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-import dotenv
+from pi_sonar_agent.core.project_env import MODEL_ENV_KEYS, read_project_env
+from pi_sonar_agent.core.project_env import load_project_env as _load_project_env
 
-FORWARDED_MODEL_ENV_KEYS = (
-    "ANTHROPIC_AUTH_TOKEN",
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_BASE_URL",
-    "ANTHROPIC_CUSTOM_MODEL_OPTION",
-    "ANTHROPIC_CUSTOM_MODEL_OPTION_NAME",
-    "ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL_NAME",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL_DESCRIPTION",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL_SUPPORTED_CAPABILITIES",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL_NAME",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL_SUPPORTED_CAPABILITIES",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL_DESCRIPTION",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL_SUPPORTED_CAPABILITIES",
-    "CLAUDE_CODE_SUBAGENT_MODEL",
-    "OPENAI_API_KEY",
-    "OPENAI_BASE_URL",
-)
+FORWARDED_MODEL_ENV_KEYS = MODEL_ENV_KEYS
 
 STANDARD_MODEL_ALIASES = {
     "default",
@@ -62,16 +40,12 @@ def _should_bridge_auth_token_to_api_key(file_values: dict[str, str]) -> bool:
 def load_project_env(env_file: str | Path = ".env") -> None:
     """Load the project's dotenv file and let it override inherited environment values."""
 
-    dotenv.load_dotenv(dotenv_path=env_file, override=True)
+    _load_project_env(env_file)
+    return None
 
 
 def _load_file_values(env_file: str | Path = ".env") -> dict[str, str]:
-    env_path = Path(env_file)
-    return {
-        key: str(value).strip()
-        for key, value in dotenv.dotenv_values(env_path).items()
-        if value is not None and str(value).strip()
-    }
+    return read_project_env(Path(env_file))
 
 
 def resolve_agent_model(env_file: str | Path = ".env") -> str | None:
@@ -150,7 +124,7 @@ def build_agent_env(env_file: str | Path = ".env") -> dict[str, str]:
 
     agent_env: dict[str, str] = {}
     for key in FORWARDED_MODEL_ENV_KEYS:
-        value = file_values.get(key) or os.getenv(key, "").strip()
+        value = file_values.get(key, "").strip()
         if value:
             agent_env[key] = value
 

@@ -40,6 +40,59 @@ def test_load_runtime_environment_resolves_required_values(monkeypatch) -> None:
     assert runtime_env.workspace_root == Path(".custom-workspaces")
 
 
+def test_load_runtime_environment_uses_project_dotenv_only(monkeypatch, tmp_path) -> None:
+    import pi_sonar_agent.core.preflight as preflight_module
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "SONARQUBE_HOST=https://dotenv-sonar.example",
+                "SONARQUBE_TOKEN=dotenv-sonar-token",
+                "ADO_BASE_URL=https://dotenv-dev.azure.com/acme/project",
+                "ADO_PROJECT=dotenv-pi",
+                "ADO_PAT=dotenv-ado-token",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("SONARQUBE_HOST", "https://machine-sonar.example")
+    monkeypatch.setenv("ADO_PAT", "machine-ado-token")
+    monkeypatch.setattr(preflight_module, "validate_agent_env", lambda: [])
+
+    runtime_env = load_runtime_environment()
+
+    assert runtime_env.sonar_host == "https://dotenv-sonar.example"
+    assert runtime_env.ado_pat == "dotenv-ado-token"
+
+
+def test_load_runtime_environment_does_not_fall_back_to_process_when_dotenv_missing(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    import pi_sonar_agent.core.preflight as preflight_module
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "SONARQUBE_HOST=https://dotenv-sonar.example",
+                "SONARQUBE_TOKEN=dotenv-sonar-token",
+                "ADO_BASE_URL=https://dotenv-dev.azure.com/acme/project",
+                "ADO_PROJECT=dotenv-pi",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ADO_PAT", "machine-ado-token")
+    monkeypatch.setattr(preflight_module, "validate_agent_env", lambda: [])
+
+    with pytest.raises(RuntimeError) as exc_info:
+        load_runtime_environment()
+
+    assert str(exc_info.value) == "缺少环境变量: ADO_PAT"
+
+
 def test_load_runtime_environment_raises_for_invalid_model_env(monkeypatch) -> None:
     import pi_sonar_agent.core.preflight as preflight_module
 

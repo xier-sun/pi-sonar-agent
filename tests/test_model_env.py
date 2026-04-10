@@ -24,6 +24,20 @@ def test_load_project_env_overrides_existing_values(monkeypatch, tmp_path) -> No
     assert os.getenv("OPENAI_API_KEY") == "from-dotenv"
 
 
+def test_load_project_env_clears_managed_machine_fallbacks(monkeypatch, tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("OPENAI_API_KEY=from-dotenv\n", encoding="utf-8")
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "machine-anthropic-key")
+    monkeypatch.setenv("ADO_PAT", "machine-ado-pat")
+
+    load_project_env(env_file)
+
+    assert os.getenv("OPENAI_API_KEY") == "from-dotenv"
+    assert os.getenv("ANTHROPIC_API_KEY") is None
+    assert os.getenv("ADO_PAT") is None
+
+
 def test_build_agent_env_prefers_dotenv_and_maps_openai_values(monkeypatch, tmp_path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text(
@@ -52,6 +66,24 @@ def test_build_agent_env_prefers_dotenv_and_maps_openai_values(monkeypatch, tmp_
     assert agent_env["OPENAI_MODEL"] == "glm-4.7"
     assert agent_env["ANTHROPIC_CUSTOM_MODEL_OPTION"] == "glm-4.7"
     assert agent_env["ANTHROPIC_CUSTOM_MODEL_OPTION_NAME"] == "glm-4.7"
+
+
+def test_build_agent_env_does_not_fall_back_to_process_values(monkeypatch, tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("OPENAI_API_KEY=dotenv-openai-key\n", encoding="utf-8")
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "process-anthropic-key")
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://machine.example/anthropic")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://machine.example/openai")
+    monkeypatch.setenv("CLAUDE_MODEL", "machine-model")
+
+    agent_env = build_agent_env(env_file)
+
+    assert agent_env["OPENAI_API_KEY"] == "dotenv-openai-key"
+    assert agent_env["ANTHROPIC_API_KEY"] == "dotenv-openai-key"
+    assert "ANTHROPIC_BASE_URL" not in agent_env
+    assert "OPENAI_BASE_URL" not in agent_env
+    assert agent_env["CLAUDE_MODEL"] == ""
 
 
 def test_resolve_agent_model_uses_only_dotenv_values(monkeypatch, tmp_path) -> None:

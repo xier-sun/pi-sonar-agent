@@ -14,15 +14,28 @@
     "changed_files": [],
     "compiler_errors": [],
     "guidance": [],
+    "boundary_failure": null,
     "scope_violation": null,
     "review_failure": null,
     "quality_gate_failure": null,
+    "plan_failure": null,
     "model_timeout_summary": "",
+    "model_timeout_stage": "",
     "build_tool_failed": false,
     "forbidden_tool_failed": false,
-    "model_timeout_failed": false
+    "model_timeout_failed": false,
+    "patch_salvaged": false
   },
-  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-174/test_process_issue_with_retrie1/repo",
-  "baseline_head_commit": "c38d0da95f1e5ae37469c8d98f833af3ba6be561",
-  "guardrail_mode": ""
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-248/test_process_issue_with_retrie1/repo",
+  "baseline_head_commit": "0a7a3170f0ac5903c0242fc9e172468343612534",
+  "guardrail_mode": "",
+  "active_quality_gate_rules": [],
+  "execution_profile": "full_path",
+  "fast_path_enabled": false,
+  "plan_first_enabled": false,
+  "rollout_flags": [],
+  "repair_plan": null,
+  "plan_precheck": null,
+  "planner_lessons": [],
+  "prefetched_context": []
 }

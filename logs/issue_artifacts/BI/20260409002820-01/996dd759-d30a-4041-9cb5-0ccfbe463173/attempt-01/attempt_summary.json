@@ -1,0 +1,49 @@
+{
+  "attempt_number": 1,
+  "status": "retrying",
+  "started_at": "2026-04-08T17:25:48.871481+00:00",
+  "finished_at": "2026-04-08T17:28:09.967099+00:00",
+  "duration_seconds": 141.094,
+  "failure_kind": "forbidden_tool",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "Forbidden tool used during issue fix",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+  ],
+  "boundary_failure_code": "",
+  "secondary_boundary_failure_codes": [],
+  "issue_log_path": "logs\\issue_attempts\\BI_996dd759-d30a-4041-9cb5-0ccfbe463173_20260409002820-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260409002820-01/996dd759-d30a-4041-9cb5-0ccfbe463173/attempt-01",
+  "performance_metrics": {
+    "runtime_total_duration_seconds": 65.814,
+    "time_to_first_model_content_seconds": 0.682,
+    "time_after_first_edit_to_finalize_seconds": 11.18,
+    "tool_call_count": 6,
+    "read_call_count": 4,
+    "edit_call_count": 1,
+    "assistant_text_events": 4,
+    "assistant_text_chars": 551,
+    "model_timeout_stage": "",
+    "last_progress_stage": "result_message",
+    "saw_result_event": true,
+    "execution_profile": "full_path",
+    "fast_path_enabled": false,
+    "effective_max_turns": 10,
+    "patch_salvaged": false,
+    "build_duration_seconds": 0.0,
+    "build_invoked": false,
+    "attempt_total_duration_seconds": 141.094
+  },
+  "rollout_flags": [
+    "perf.short_form_prompt",
+    "perf.fast_path",
+    "perf.layered_verification",
+    "perf.patch_salvage",
+    "perf.fast_path_max_turns=6"
+  ]
+}

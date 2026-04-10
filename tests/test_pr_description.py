@@ -36,6 +36,13 @@ def test_build_pull_request_description_lists_issue_outcomes() -> None:
                 attempts=1,
                 summary="Fixed 1 file(s)",
                 changed_files=("OpenAuth.Core/OpenAuth.App/Finance/UnTransportDailyNPercentProcessor.cs",),
+                compliance_status="pass",
+                compliance_summary="Hard quality gates passed.",
+                active_quality_gate_rules=("public_xml_docs", "async_signature"),
+                soft_quality_gate_findings=1,
+                boundary_audit_summary="Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit.",
+                boundary_audit_findings=("OpenAuth.Core/OpenAuth.App/Finance/UnTransportDailyNPercentProcessor.cs 主区域外变更: 80",),
+                boundary_drift_score=1,
             ),
             PullRequestIssueSummary(
                 status="SKIPPED",
@@ -62,6 +69,11 @@ def test_build_pull_request_description_lists_issue_outcomes() -> None:
     assert "状态: FIXED" in description
     assert "涉及文件: OpenAuth.Core/OpenAuth.App/Finance/UnTransportDailyNPercentProcessor.cs" in description
     assert "审阅建议: 重点确认上述文件中的修改确实只覆盖当前 Sonar 问题" in description
+    assert "启用规范门禁: public_xml_docs, async_signature" in description
+    assert "规范校验: pass | Hard quality gates passed." in description
+    assert "规范细项: hard failures=0, soft findings=1" in description
+    assert "边界审计: drift score=1 | Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit." in description
+    assert "漂移记录: OpenAuth.Core/OpenAuth.App/Finance/UnTransportDailyNPercentProcessor.cs 主区域外变更: 80" in description
     assert "## 已跳过 Issues" in description
     assert "1. csharpsquid:S3776" in description
     assert "Issue Key: issue-skipped-1" in description

@@ -19,6 +19,7 @@ from pi_sonar_agent.agent.rule_policies import (
 )
 from pi_sonar_agent.core.attempt_changes import AttemptFileChangeBuilder
 from pi_sonar_agent.core.boundary_policy import BoundaryPolicy
+from pi_sonar_agent.core.issue_contract import EditContract
 
 if TYPE_CHECKING:
     from pi_sonar_agent.agent.claude_agent import SonarIssue
@@ -54,6 +55,26 @@ class IssueEditScope:
 
 class LegacyScopeGuard:
     """Best-effort scope calculation and validation for legacy guardrail mode."""
+
+    @staticmethod
+    def _resolve_allowed_line_ranges(
+        scope: IssueEditScope,
+        edit_contract: EditContract | None = None,
+    ) -> tuple[tuple[int, int], ...]:
+        if edit_contract is not None:
+            contract_ranges = BoundaryPolicy.contract_line_ranges(edit_contract)
+            if contract_ranges:
+                return contract_ranges
+        return ((scope.validation_start_line, scope.validation_end_line),)
+
+    @staticmethod
+    def _format_allowed_line_ranges(
+        allowed_line_ranges: tuple[tuple[int, int], ...],
+    ) -> str:
+        normalized_ranges = BoundaryPolicy.normalize_line_ranges(allowed_line_ranges)
+        if not normalized_ranges:
+            return ""
+        return ", ".join(f"{start_line}-{end_line}" for start_line, end_line in normalized_ranges)
 
     @staticmethod
     def _looks_like_method_signature(header_text: str) -> bool:
@@ -524,6 +545,7 @@ class LegacyScopeGuard:
         issue: SonarIssue,
         scope: IssueEditScope | None,
         *,
+        edit_contract: EditContract | None = None,
         original_content: str | None = None,
         current_content: str | None = None,
     ) -> str | None:
@@ -557,14 +579,20 @@ class LegacyScopeGuard:
         if not changed_lines:
             return None
 
-        offending_lines = cls.find_out_of_scope_lines(scope, changed_lines)
+        allowed_line_ranges = cls._resolve_allowed_line_ranges(scope, edit_contract)
+        offending_lines = list(
+            BoundaryPolicy.find_outside_lines(
+                changed_lines,
+                allowed_line_ranges,
+            )
+        )
         if not offending_lines:
             return None
 
         offending_text = ", ".join(str(line) for line in offending_lines[:12])
         return (
             "Issue changes exceeded the allowed Sonar edit scope.\n"
-            f"Allowed lines: {scope.validation_start_line}-{scope.validation_end_line}\n"
+            f"Allowed lines: {cls._format_allowed_line_ranges(allowed_line_ranges)}\n"
             f"Changed lines outside scope: {offending_text}\n"
             "只允许修复 Sonar 指向的这一处代码，不要顺手修改本文件其他同类位置。"
         )

@@ -1,0 +1,20 @@
+{
+  "attempt_number": 3,
+  "status": "skipped",
+  "started_at": "2026-04-08T13:18:03.783924+00:00",
+  "finished_at": "2026-04-08T13:21:05.494193+00:00",
+  "duration_seconds": 181.709,
+  "failure_kind": "model_timeout",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "error": "Model response timed out after 3 attempt(s)",
+  "skip_reason": "Model response timed out after 3 attempt(s)",
+  "summary": "Fixed 0 file(s)",
+  "changed_files": [],
+  "boundary_failure_code": "",
+  "secondary_boundary_failure_codes": [],
+  "issue_log_path": "logs\\issue_attempts\\BI_ea97b5e2-bca2-42b2-b678-a91347eca09d_20260408184952-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260408184952-01/ea97b5e2-bca2-42b2-b678-a91347eca09d/attempt-03"
+}

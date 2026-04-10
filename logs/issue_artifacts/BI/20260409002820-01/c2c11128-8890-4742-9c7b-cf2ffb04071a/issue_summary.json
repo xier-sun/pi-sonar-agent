@@ -1,0 +1,223 @@
+{
+  "issue_key": "c2c11128-8890-4742-9c7b-cf2ffb04071a",
+  "repository": "BI",
+  "run_label": "20260409002820-01",
+  "rule_id": "csharpsquid:S3776",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs",
+  "line": 856,
+  "status": "fixed",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "retrying",
+      "started_at": "2026-04-08T18:50:04.012429+00:00",
+      "finished_at": "2026-04-08T18:53:21.973402+00:00",
+      "duration_seconds": 197.959,
+      "failure_kind": "model_timeout",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": false,
+      "error": "Model response timed out",
+      "skip_reason": "",
+      "summary": "Fixed 0 file(s)",
+      "changed_files": [],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_c2c11128-8890-4742-9c7b-cf2ffb04071a_20260409002820-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260409002820-01/c2c11128-8890-4742-9c7b-cf2ffb04071a/attempt-01",
+      "performance_metrics": {
+        "runtime_total_duration_seconds": 197.561,
+        "time_to_first_model_content_seconds": 0.63,
+        "time_after_first_edit_to_finalize_seconds": 0.0,
+        "tool_call_count": 3,
+        "read_call_count": 3,
+        "edit_call_count": 0,
+        "assistant_text_events": 1,
+        "assistant_text_chars": 18,
+        "model_timeout_stage": "post_read_stall",
+        "last_progress_stage": "aborting:follow_up_response_timeout",
+        "saw_result_event": false,
+        "patch_salvaged": false,
+        "build_duration_seconds": 0.0,
+        "build_invoked": false,
+        "execution_profile": "full_path",
+        "fast_path_enabled": false,
+        "effective_max_turns": 10,
+        "attempt_total_duration_seconds": 197.959
+      },
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.layered_verification",
+        "perf.patch_salvage",
+        "perf.fast_path_max_turns=6"
+      ]
+    },
+    {
+      "attempt_number": 2,
+      "status": "retrying",
+      "started_at": "2026-04-08T18:53:22.429323+00:00",
+      "finished_at": "2026-04-08T18:55:07.693281+00:00",
+      "duration_seconds": 105.263,
+      "failure_kind": "scope",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": false,
+      "error": "Issue changes exceeded allowed scope",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs"
+      ],
+      "boundary_failure_code": "scope_line_window_reject",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_c2c11128-8890-4742-9c7b-cf2ffb04071a_20260409002820-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260409002820-01/c2c11128-8890-4742-9c7b-cf2ffb04071a/attempt-02",
+      "performance_metrics": {
+        "runtime_total_duration_seconds": 104.662,
+        "time_to_first_model_content_seconds": 0.601,
+        "time_after_first_edit_to_finalize_seconds": 9.259,
+        "tool_call_count": 4,
+        "read_call_count": 3,
+        "edit_call_count": 1,
+        "assistant_text_events": 4,
+        "assistant_text_chars": 708,
+        "model_timeout_stage": "",
+        "last_progress_stage": "result_message",
+        "saw_result_event": true,
+        "execution_profile": "full_path",
+        "fast_path_enabled": false,
+        "effective_max_turns": 10,
+        "patch_salvaged": false,
+        "build_duration_seconds": 0.0,
+        "build_invoked": false,
+        "validation_pipeline": [
+          "build",
+          "scope_review",
+          "diff_review"
+        ],
+        "verification_schedule": {
+          "run_boundary_first": true,
+          "run_quality_gate_before_build": true,
+          "run_rule_validation_before_build": true,
+          "skip_build_on_precheck_failure": true,
+          "rollout_flags": [
+            "perf.short_form_prompt",
+            "perf.fast_path",
+            "perf.layered_verification",
+            "perf.patch_salvage",
+            "perf.fast_path_max_turns=6"
+          ]
+        },
+        "attempt_total_duration_seconds": 105.263
+      },
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.layered_verification",
+        "perf.patch_salvage",
+        "perf.fast_path_max_turns=6"
+      ]
+    },
+    {
+      "attempt_number": 3,
+      "status": "succeeded",
+      "started_at": "2026-04-08T18:55:08.163700+00:00",
+      "finished_at": "2026-04-08T19:00:26.988452+00:00",
+      "duration_seconds": 318.818,
+      "failure_kind": "",
+      "retry_reason": "none",
+      "retryable_failure": false,
+      "build_passed": true,
+      "build_verification_failed": false,
+      "error": "",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs"
+      ],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_c2c11128-8890-4742-9c7b-cf2ffb04071a_20260409002820-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260409002820-01/c2c11128-8890-4742-9c7b-cf2ffb04071a/attempt-03",
+      "performance_metrics": {
+        "runtime_total_duration_seconds": 236.854,
+        "time_to_first_model_content_seconds": 0.565,
+        "time_after_first_edit_to_finalize_seconds": 53.974,
+        "tool_call_count": 6,
+        "read_call_count": 5,
+        "edit_call_count": 1,
+        "assistant_text_events": 2,
+        "assistant_text_chars": 430,
+        "model_timeout_stage": "",
+        "last_progress_stage": "result_message",
+        "saw_result_event": true,
+        "execution_profile": "full_path",
+        "fast_path_enabled": false,
+        "effective_max_turns": 10,
+        "patch_salvaged": false,
+        "build_duration_seconds": 81.293,
+        "build_invoked": true,
+        "validation_pipeline": [
+          "build",
+          "scope_review",
+          "diff_review"
+        ],
+        "verification_schedule": {
+          "run_boundary_first": true,
+          "run_quality_gate_before_build": true,
+          "run_rule_validation_before_build": true,
+          "skip_build_on_precheck_failure": true,
+          "rollout_flags": [
+            "perf.short_form_prompt",
+            "perf.fast_path",
+            "perf.layered_verification",
+            "perf.patch_salvage",
+            "perf.fast_path_max_turns=6"
+          ]
+        },
+        "attempt_total_duration_seconds": 318.818
+      },
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.layered_verification",
+        "perf.patch_salvage",
+        "perf.fast_path_max_turns=6"
+      ]
+    }
+  ],
+  "final_failure_kind": "",
+  "final_error": "",
+  "final_skip_reason": "",
+  "final_summary": "Fixed 1 file(s)",
+  "final_boundary_failure_code": "",
+  "final_secondary_boundary_failure_codes": [],
+  "artifact_root": "logs/issue_artifacts/BI/20260409002820-01/c2c11128-8890-4742-9c7b-cf2ffb04071a",
+  "performance_summary": {
+    "issue_attempt_count": 3,
+    "issue_total_duration_seconds": 622.04,
+    "avg_attempt_duration_seconds": 207.347,
+    "model_timeout_attempts": 1,
+    "scope_reject_attempts": 1,
+    "build_invocation_count": 1,
+    "follow_up_timeout_attempts": 1,
+    "patch_salvaged_attempts": 0,
+    "rollout_flags": [
+      "perf.short_form_prompt",
+      "perf.fast_path",
+      "perf.layered_verification",
+      "perf.patch_salvage",
+      "perf.fast_path_max_turns=6"
+    ]
+  },
+  "rollout_flags": [
+    "perf.short_form_prompt",
+    "perf.fast_path",
+    "perf.layered_verification",
+    "perf.patch_salvage",
+    "perf.fast_path_max_turns=6"
+  ]
+}

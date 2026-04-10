@@ -1,0 +1,76 @@
+{
+  "attempt_number": 1,
+  "status": "succeeded",
+  "started_at": "2026-04-09T19:27:54.734488+00:00",
+  "finished_at": "2026-04-09T19:29:50.481733+00:00",
+  "duration_seconds": 115.745,
+  "failure_kind": "",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": true,
+  "build_verification_failed": false,
+  "error": "",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs"
+  ],
+  "boundary_failure_code": "",
+  "secondary_boundary_failure_codes": [],
+  "issue_log_path": "logs\\issue_attempts\\BI_ec828433-949d-42c5-80e7-503b3c385ea5_20260410013022-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260410013022-01/ec828433-949d-42c5-80e7-503b3c385ea5/attempt-01",
+  "performance_metrics": {
+    "runtime_total_duration_seconds": 37.812,
+    "time_to_first_model_content_seconds": 0.578,
+    "time_after_first_edit_to_finalize_seconds": 4.728,
+    "tool_call_count": 3,
+    "read_call_count": 1,
+    "edit_call_count": 1,
+    "assistant_text_events": 4,
+    "assistant_text_chars": 170,
+    "model_timeout_stage": "",
+    "last_progress_stage": "result_message",
+    "saw_result_event": true,
+    "continuation_retry_count": 0,
+    "continuation_recovered": false,
+    "continuation_timeout_stages": [],
+    "execution_profile": "fast_path_short_form",
+    "fast_path_enabled": true,
+    "effective_max_turns": 6,
+    "patch_salvaged": false,
+    "build_duration_seconds": 77.64,
+    "build_invoked": true,
+    "validation_pipeline": [
+      "build",
+      "scope_review",
+      "diff_review"
+    ],
+    "verification_schedule": {
+      "run_boundary_first": true,
+      "run_quality_gate_before_build": true,
+      "run_rule_validation_before_build": true,
+      "skip_build_on_precheck_failure": true,
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.plan_first_complex_rules",
+        "perf.layered_verification",
+        "perf.patch_salvage",
+        "perf.continuation_retry",
+        "perf.fast_path_max_turns=6",
+        "perf.continuation_retry_limit=2"
+      ]
+    },
+    "attempt_total_duration_seconds": 115.745
+  },
+  "rollout_flags": [
+    "perf.short_form_prompt",
+    "perf.fast_path",
+    "perf.plan_first_complex_rules",
+    "perf.layered_verification",
+    "perf.patch_salvage",
+    "perf.continuation_retry",
+    "perf.fast_path_max_turns=6",
+    "perf.continuation_retry_limit=2"
+  ]
+}

@@ -25,6 +25,7 @@
    - 处理结果: 已完成修复，并通过该 issue 的本地构建验证。
    - 涉及文件: src/Foo.cs
    - 审阅建议: 重点确认上述文件中的修改确实只覆盖当前 Sonar 问题，且未引入额外逻辑变更。
+   - 规范校验: not_applicable | No active quality gates were declared for this attempt.
 
 ## 已跳过 Issues
 - 无跳过 issue

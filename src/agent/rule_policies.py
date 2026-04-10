@@ -4,6 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pi_sonar_agent.core.boundary_capabilities import (
+    ADJACENT_CLEANUP_CAPABILITY,
+    BOUNDARY_PROFILE_COMMENT_ADJACENT_CLEANUP,
+    BOUNDARY_PROFILE_DECLARATION_ANCHOR,
+    BOUNDARY_PROFILE_MEMBER_CLUSTER,
+    DECLARATION_DELETE_CAPABILITY,
+    MEMBER_DELETE_CAPABILITY,
+    METHOD_CLUSTER_DELETE_CAPABILITY,
+)
+
 STATEMENT_SCOPE_MODE = "statement"
 METHOD_SCOPE_MODE = "method"
 CONTROL_BLOCK_SCOPE_MODE = "control_block"
@@ -18,6 +28,8 @@ class RuleHandlingPolicy:
     """Policy for handling a specific Sonar rule."""
 
     scope_mode: str = STATEMENT_SCOPE_MODE
+    boundary_profile: str = ""
+    boundary_capabilities: tuple[str, ...] = ()
     validation_leading_lines: int = 0
     validation_trailing_lines: int = 0
     prompt_guards: tuple[str, ...] = ()
@@ -97,6 +109,8 @@ RULE_HANDLING_POLICIES: dict[str, RuleHandlingPolicy] = {
         ),
     ),
     "csharpsquid:S125": RuleHandlingPolicy(
+        boundary_profile=BOUNDARY_PROFILE_COMMENT_ADJACENT_CLEANUP,
+        boundary_capabilities=(ADJACENT_CLEANUP_CAPABILITY,),
         validation_leading_lines=4,
         validation_trailing_lines=1,
         prompt_guards=(
@@ -105,8 +119,22 @@ RULE_HANDLING_POLICIES: dict[str, RuleHandlingPolicy] = {
         ),
     ),
     "csharpsquid:S1481": RuleHandlingPolicy(
+        boundary_profile=BOUNDARY_PROFILE_DECLARATION_ANCHOR,
+        boundary_capabilities=(DECLARATION_DELETE_CAPABILITY,),
         prompt_guards=(
             "只删除当前 issue 对应的未使用局部变量，不要顺手改同一方法里的其他清理项。",
+        ),
+    ),
+    "csharpsquid:S1144": RuleHandlingPolicy(
+        scope_mode=METHOD_SCOPE_MODE,
+        boundary_profile=BOUNDARY_PROFILE_MEMBER_CLUSTER,
+        boundary_capabilities=(
+            MEMBER_DELETE_CAPABILITY,
+            METHOD_CLUSTER_DELETE_CAPABILITY,
+        ),
+        prompt_guards=(
+            "优先删除当前未使用的 private 成员本身；只有当紧邻 private helper 也因此变成未使用时，才允许一并删除。",
+            "不要顺手删除同文件中更远位置的其他 private 成员。",
         ),
     ),
     "csharpsquid:S107": RuleHandlingPolicy(

@@ -6,8 +6,11 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 
+from pi_sonar_agent.core.tool_surface import FINISH_TOOL
+
 READ_ONLY_FIX_TOOLS = frozenset({"Read", "Grep", "Glob"})
 WRITE_FIX_TOOLS = frozenset({"Edit", "MultiEdit", "Write"})
+CONTROLLED_FIX_TOOLS = frozenset({"Bash", "Finish"})
 BUILD_TOOL_NAMES = frozenset({"mcp__sonar-fix__run_build"})
 
 
@@ -80,6 +83,23 @@ def build_fix_tool_registry(
             register(ToolSpec(name=tool_name, kind=ToolKind.READ_ONLY))
         elif tool_name in WRITE_FIX_TOOLS:
             register(ToolSpec(name=tool_name, kind=ToolKind.WRITE))
+        elif tool_name in CONTROLLED_FIX_TOOLS:
+            tags: tuple[str, ...] = ()
+            description = ""
+            if tool_name == "Bash":
+                tags = ("shell", "scoped")
+                description = "Bash-compatible shell tool constrained by runtime command policy."
+            elif tool_name == "Finish":
+                tags = ("finish",)
+                description = "Terminal completion marker for the current issue attempt."
+            register(
+                ToolSpec(
+                    name=tool_name,
+                    kind=ToolKind.CONTROLLED,
+                    tags=tags,
+                    description=description,
+                )
+            )
         else:
             register(ToolSpec(name=tool_name, kind=ToolKind.UNKNOWN))
 
@@ -95,6 +115,15 @@ def build_fix_tool_registry(
                 description="Build/test tool managed by the outer workflow.",
             )
         )
+
+    register(
+        ToolSpec(
+            name=FINISH_TOOL,
+            kind=ToolKind.CONTROLLED,
+            tags=("finish",),
+            description="Terminal completion marker for the current issue attempt.",
+        )
+    )
 
     for tool_name in forbidden_tools:
         tags: tuple[str, ...] = ()

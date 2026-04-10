@@ -1,0 +1,33 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "reason": "This hunk changes lines outside the edit contract window 942-942.",
+      "symbol": "statement@942-942",
+      "changed_lines": [
+        948
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -948 +948 @@\n-            public Dictionary<int, SaleOrdrRemark> RemarkDic { get; set; }\n+            public Dictionary<int, SaleOrdrRemark> RemarkDic { get; }"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "bed2ec1c-8990-4b9f-aae6-4ae12fcc4fa6",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "symbol": "statement@942-942",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -948 +948 @@\n-            public Dictionary<int, SaleOrdrRemark> RemarkDic { get; set; }\n+            public Dictionary<int, SaleOrdrRemark> RemarkDic { get; }",
+      "discovered_at": "2026-04-08T19:53:46.714514+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 1,
+    "total_changed_lines": 1
+  }
+}

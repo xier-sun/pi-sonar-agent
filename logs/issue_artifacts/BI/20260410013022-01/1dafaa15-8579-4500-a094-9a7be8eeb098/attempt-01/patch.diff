@@ -1,0 +1,18 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
+@@ -441,7 +441,7 @@
+             /// <summary>
+
+             /// 最小天数
+
+             /// </summary>
+
+-            public int? Min { get; set; }
+
++            public int? Min { get; set; } = null;
+
+             /// <summary>
+
+             /// 最大天数
+
+             /// </summary>

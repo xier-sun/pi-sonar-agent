@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from argparse import Namespace
+from pathlib import Path
 
 from pi_sonar_agent.core.target_config import (
     missing_required_target_fields,
@@ -140,3 +141,52 @@ def test_resolve_cli_target_config_does_not_fall_back_to_os_environ_for_empty_ma
     assert config.project_key == ""
     assert config.repository == ""
     assert config.author == ""
+
+
+def test_resolve_cli_target_config_uses_project_dotenv_when_environ_not_provided(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    args = Namespace(
+        project_key="",
+        repository="",
+        author="",
+        max_issues=None,
+        base_branch="",
+        build_command="",
+        test_command="",
+        solution_path="",
+    )
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "PROJECT_KEY=dotenv-project",
+                "REPOSITORY=dotenv-repo",
+                "AUTHOR=dotenv-author",
+                "BUILD_COMMAND=dotnet build dotenv.sln",
+                "TEST_COMMAND=dotnet test dotenv.sln",
+                "SOLUTION_PATH=dotenv.sln",
+                "MAX_ISSUES=4",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PROJECT_KEY", "machine-project")
+    monkeypatch.setenv("REPOSITORY", "machine-repo")
+    monkeypatch.setenv("AUTHOR", "machine-author")
+
+    config = resolve_cli_target_config(
+        args,
+        {},
+        default_base_branch="develop",
+        default_max_issues=0,
+    )
+
+    assert config.project_key == "dotenv-project"
+    assert config.repository == "dotenv-repo"
+    assert config.author == "dotenv-author"
+    assert config.build_command == "dotnet build dotenv.sln"
+    assert config.test_command == "dotnet test dotenv.sln"
+    assert config.solution_path == "dotenv.sln"
+    assert config.max_issues == 4

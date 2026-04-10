@@ -2,18 +2,23 @@ from __future__ import annotations
 
 import asyncio
 
-from pi_sonar_agent.core.agent_runtime import AgentRuntime, RuntimeTimeouts
+import pytest
+
+from pi_sonar_agent.core.agent_runtime import AgentRuntime, AgentRuntimeError, RuntimeTimeouts
 from pi_sonar_agent.core.claude_adapter import ClaudeAdapter, ClaudeSDKDependencies
+from pi_sonar_agent.core.events import AttemptRuntimeEventKind
 from pi_sonar_agent.core.hooks import HookPipeline
 from pi_sonar_agent.core.model_gateway import (
     GatewayRequest,
     ResultEvent,
     TextEvent,
     ToolCallEvent,
+    TraceEvent,
 )
 from pi_sonar_agent.core.policy import ToolPolicy
 from pi_sonar_agent.core.registry import ToolKind, build_fix_tool_registry
 from pi_sonar_agent.core.resource_loader import ResourceLoader
+from pi_sonar_agent.core.tool_surface import build_allowed_fix_tool_rules
 
 
 def test_resource_loader_compose_system_prompt_prefers_workspace_rules(tmp_path) -> None:
@@ -68,11 +73,11 @@ def test_resource_loader_loads_json_front_matter_and_markdown_body(tmp_path) -> 
 
 def test_tool_policy_classifies_allowed_build_and_forbidden_tools() -> None:
     registry = build_fix_tool_registry(
-        builtin_tools=["Read", "Edit", "Write"],
+        builtin_tools=["Read", "Edit", "Write", "Finish"],
         mcp_tools=[],
         forbidden_tools={"Bash", "mcp__sonar-fix__git_push"},
     )
-    policy = ToolPolicy(registry, ["Read", "Edit", "Write"])
+    policy = ToolPolicy(registry, ["Read", "Edit", "Write", "Finish"])
 
     read_decision = policy.classify("Read")
     build_decision = policy.classify("mcp__sonar-fix__run_build")
@@ -86,6 +91,35 @@ def test_tool_policy_classifies_allowed_build_and_forbidden_tools() -> None:
     assert forbidden_decision.allowed is False
     assert forbidden_decision.kind == ToolKind.FORBIDDEN
     assert policy.is_forbidden_tool("Bash") is True
+
+
+def test_tool_policy_allows_bash_commands_but_rejects_filesystem_mutation() -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Bash", "Finish"],
+        mcp_tools=[],
+        forbidden_tools={"mcp__sonar-fix__git_push"},
+    )
+    policy = ToolPolicy(
+        registry,
+        build_allowed_fix_tool_rules(["Read", "Finish"], include_controlled_bash=True),
+    )
+
+    allowed = policy.classify("Bash", {"command": "find . -name FinanceHomeApp.cs"})
+    harmless_echo = policy.classify("Bash", {"command": "echo 修复完成"})
+    blocked_delete = policy.classify("Bash", {"command": "Remove-Item Foo.cs"})
+    blocked_write = policy.classify("Bash", {"command": "Set-Content Foo.cs 'class Foo {}'"})
+    finish_allowed = policy.classify("Finish")
+
+    assert allowed.allowed is True
+    assert allowed.kind == ToolKind.CONTROLLED
+    assert allowed.matched_rule == "windows-shell-safe"
+    assert harmless_echo.allowed is True
+    assert blocked_delete.allowed is False
+    assert blocked_delete.policy_violation is True
+    assert blocked_write.allowed is False
+    assert blocked_write.policy_violation is True
+    assert finish_allowed.allowed is True
+    assert policy.is_forbidden_tool("Bash", {"command": "Remove-Item Foo.cs"}) is True
 
 
 def test_agent_runtime_runs_hooks_and_collects_tool_usage() -> None:
@@ -173,6 +207,11 @@ def test_agent_runtime_runs_hooks_and_collects_tool_usage() -> None:
     assert result.tool_uses == ("Read", "mcp__sonar-fix__run_build")
     assert result.last_tool_name == "mcp__sonar-fix__run_build"
     assert result.saw_build_tool is True
+    assert result.runtime_events[0].kind == AttemptRuntimeEventKind.ATTEMPT_STARTED
+    assert any(event.kind == AttemptRuntimeEventKind.USER_MESSAGE_SENT for event in result.runtime_events)
+    assert any(event.kind == AttemptRuntimeEventKind.TOOL_CALLED for event in result.runtime_events)
+    assert any(event.kind == AttemptRuntimeEventKind.ASSISTANT_TEXT_DELTA for event in result.runtime_events)
+    assert result.runtime_events[-1].kind == AttemptRuntimeEventKind.ATTEMPT_FINISHED
     assert hook_spy.before_tools == ["Read", "mcp__sonar-fix__run_build"]
     assert hook_spy.after_tools == ["Read", "mcp__sonar-fix__run_build"]
     assert hook_spy.finalized == [("Read", "mcp__sonar-fix__run_build")]
@@ -209,14 +248,23 @@ def test_claude_adapter_session_translates_sdk_messages() -> None:
     class FakeToolUseBlock:
         def __init__(self, name: str) -> None:
             self.name = name
+            self.input = {"file_path": "Foo.cs", "offset": 10, "limit": 5}
 
     class FakeTextBlock:
         def __init__(self, text: str) -> None:
             self.text = text
 
+    class FakeThinkingBlock:
+        def __init__(self, thinking: str) -> None:
+            self.thinking = thinking
+
     class FakeAssistantMessage:
         def __init__(self) -> None:
-            self.content = [FakeToolUseBlock("Read"), FakeTextBlock("hello")]
+            self.content = [
+                FakeThinkingBlock("first inspect the file"),
+                FakeToolUseBlock("Read"),
+                FakeTextBlock("hello"),
+            ]
 
     class FakeResultMessage:
         def __init__(self) -> None:
@@ -275,9 +323,161 @@ def test_claude_adapter_session_translates_sdk_messages() -> None:
 
     events = asyncio.run(collect_events())
 
-    assert isinstance(events[0], ToolCallEvent)
-    assert events[0].name == "Read"
-    assert isinstance(events[1], TextEvent)
-    assert events[1].text == "hello"
-    assert isinstance(events[2], ResultEvent)
-    assert events[2].total_cost_usd == 0.1
+    assert isinstance(events[0], TraceEvent)
+    assert events[0].message_type == "FakeThinkingBlock"
+    assert "first inspect the file" in events[0].preview
+    assert isinstance(events[1], ToolCallEvent)
+    assert events[1].name == "Read"
+    assert events[1].payload["file_path"] == "Foo.cs"
+    assert isinstance(events[2], TextEvent)
+    assert events[2].text == "hello"
+    assert isinstance(events[3], ResultEvent)
+    assert events[3].total_cost_usd == 0.1
+
+
+def test_agent_runtime_classifies_follow_up_timeout_after_edit() -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit"],
+        mcp_tools=[],
+        forbidden_tools={"Bash"},
+    )
+    policy = ToolPolicy(registry, ["Read", "Edit"])
+
+    class FakeSession:
+        async def connect(self, timeout_seconds: float) -> None:
+            return None
+
+        async def send(self, user_prompt: str) -> None:
+            return None
+
+        def stream_events(self):
+            async def iterate():
+                yield ToolCallEvent("Edit")
+                await asyncio.sleep(0.05)
+                yield ResultEvent(total_cost_usd=0.1, agent_error=None)
+
+            return iterate()
+
+        async def abort(self, reason: str):
+            class AbortResult:
+                reason = reason
+                actions = ("interrupt", "disconnect")
+                errors = ()
+
+            return AbortResult()
+
+        async def close(self):
+            class Result:
+                reason = "normal_shutdown"
+                actions = ("disconnect",)
+                errors = ()
+
+            return Result()
+
+    class FakeGateway:
+        def create_session(self, request: GatewayRequest):
+            return FakeSession()
+
+    runtime = AgentRuntime(
+        gateway=FakeGateway(),
+        tool_policy=policy,
+        timeouts=RuntimeTimeouts(
+            client_connect_seconds=1,
+            first_response_seconds=1,
+            follow_up_seconds=0.01,
+            issue_hard_timeout_seconds=5,
+            heartbeat_interval_seconds=10,
+        ),
+    )
+
+    with pytest.raises(AgentRuntimeError) as exc_info:
+        runtime.run(
+            GatewayRequest(
+                system_prompt="system",
+                user_prompt="user",
+                cwd="workspace",
+                tools=("Read", "Edit"),
+                allowed_tools=("Read", "Edit"),
+                max_turns=4,
+                max_budget_usd=1.0,
+                env={},
+            )
+        )
+
+    assert exc_info.value.partial_result.timeout_stage == "post_edit_stall"
+
+
+def test_agent_runtime_reports_connect_timeout_diagnostic() -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit"],
+        mcp_tools=[],
+        forbidden_tools={"Bash"},
+    )
+    policy = ToolPolicy(registry, ["Read", "Edit"])
+
+    class FakeSession:
+        async def connect(self, timeout_seconds: float) -> None:
+            raise asyncio.TimeoutError()
+
+        async def diagnose_connect_timeout(self) -> str:
+            return "连接诊断：Failed to authenticate. API Error: 403 quota exhausted"
+
+        async def send(self, user_prompt: str) -> None:
+            return None
+
+        def stream_events(self):
+            async def iterate():
+                if False:
+                    yield None
+
+            return iterate()
+
+        async def abort(self, reason: str):
+            class AbortResult:
+                actions = ("disconnect",)
+                errors = ()
+
+            result = AbortResult()
+            result.reason = reason
+            return result
+
+        async def close(self):
+            class Result:
+                reason = "normal_shutdown"
+                actions = ("disconnect",)
+                errors = ()
+
+            return Result()
+
+    class FakeGateway:
+        def create_session(self, request: GatewayRequest):
+            return FakeSession()
+
+    runtime = AgentRuntime(
+        gateway=FakeGateway(),
+        tool_policy=policy,
+        timeouts=RuntimeTimeouts(
+            client_connect_seconds=1,
+            first_response_seconds=1,
+            follow_up_seconds=1,
+            issue_hard_timeout_seconds=5,
+            heartbeat_interval_seconds=10,
+        ),
+    )
+
+    with pytest.raises(AgentRuntimeError) as exc_info:
+        runtime.run(
+            GatewayRequest(
+                system_prompt="system",
+                user_prompt="user",
+                cwd="workspace",
+                tools=("Read", "Edit"),
+                allowed_tools=("Read", "Edit"),
+                max_turns=4,
+                max_budget_usd=1.0,
+                env={},
+            )
+        )
+
+    assert "未完成初始化" in str(exc_info.value)
+    assert "Failed to authenticate" in str(exc_info.value)

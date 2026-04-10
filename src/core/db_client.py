@@ -463,14 +463,15 @@ class MySQLClient:
 
 def create_mysql_client_from_env() -> MySQLClient | None:
     """Create MySQL client from environment variables."""
-    import os
+    from pi_sonar_agent.core.project_env import read_project_env
 
-    host = os.getenv("DB_HOST", "").strip()
-    port = os.getenv("DB_PORT", "").strip()
-    user = os.getenv("DB_USER", "").strip()
-    password = os.getenv("DB_PASSWORD", "").strip()
-    database = os.getenv("DB_NAME", "").strip()
-    connection_timeout = os.getenv("DB_CONNECT_TIMEOUT", "").strip()
+    project_env = read_project_env()
+    host = project_env.get("DB_HOST", "").strip()
+    port = project_env.get("DB_PORT", "").strip()
+    user = project_env.get("DB_USER", "").strip()
+    password = project_env.get("DB_PASSWORD", "").strip()
+    database = project_env.get("DB_NAME", "").strip()
+    connection_timeout = project_env.get("DB_CONNECT_TIMEOUT", "").strip()
 
     if not all([host, user, password, database]):
         return None

@@ -6,9 +6,15 @@ from pathlib import Path
 from pi_sonar_agent.agent.claude_agent import FixResult, SonarIssue
 from pi_sonar_agent.core.artifact_writer import ArtifactWriter
 from pi_sonar_agent.core.diff_reviewer import ReviewerResult
-from pi_sonar_agent.core.issue_contract import ContractTargetSymbol, EditContract
+from pi_sonar_agent.core.events import AttemptRuntimeEvent, AttemptRuntimeEventKind
+from pi_sonar_agent.core.issue_contract import (
+    ContractContextSnippet,
+    ContractTargetSymbol,
+    EditContract,
+)
 from pi_sonar_agent.core.issue_retry import capture_workspace_baseline, cleanup_workspace_baseline
 from pi_sonar_agent.core.quality_gate import QualityGateRule
+from pi_sonar_agent.core.repair_plan import PlanPrecheckResult, RepairPlan
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.state import (
     AttemptState,
@@ -107,6 +113,30 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
                         enforcement="hard",
                     ),
                 ),
+                prefetched_context=(
+                    ContractContextSnippet(
+                        file="tracked.cs",
+                        label="issue_window",
+                        reason="Primary issue window.",
+                        start_line=1,
+                        end_line=1,
+                        content="   1 | class Foo {}",
+                    ),
+                ),
+                plan_first_enabled=True,
+                repair_plan=RepairPlan(
+                    repair_shape="method_rewrite_with_helpers",
+                    target_symbols=("AutoPlugin",),
+                    requires_signature_change=True,
+                    expected_boundary_capabilities=("method_rewrite", "helper_extract"),
+                    expected_quality_gates=("async_signature",),
+                ),
+                plan_precheck=PlanPrecheckResult(
+                    status="conflict",
+                    blocking=True,
+                    code="signature_change_not_allowed",
+                    summary="Plan 预检发现本次修复需要 signature_change，但当前 contract 不允许该能力。",
+                ),
                 scope_mode="statement",
                 target_line_range=(1, 1),
                 validation_line_range=(1, 1),
@@ -123,7 +153,36 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
                 "applied_rule_ids": ["public_xml_docs"],
                 "soft_findings": [],
             },
+            repair_plan=RepairPlan(
+                repair_shape="method_rewrite_with_helpers",
+                target_symbols=("AutoPlugin",),
+                requires_signature_change=True,
+                expected_boundary_capabilities=("method_rewrite", "helper_extract"),
+                expected_quality_gates=("async_signature",),
+            ),
+            plan_precheck=PlanPrecheckResult(
+                status="conflict",
+                blocking=True,
+                code="signature_change_not_allowed",
+                summary="Plan 预检发现本次修复需要 signature_change，但当前 contract 不允许该能力。",
+            ),
             guardrail_mode="contract_review",
+            attempt_events=(
+                AttemptRuntimeEvent(
+                    kind=AttemptRuntimeEventKind.ATTEMPT_STARTED,
+                    sequence=1,
+                    issue_key=issue.key,
+                    stage="initializing",
+                    payload={"build_command": 'dotnet build "tracked.sln"'},
+                ),
+                AttemptRuntimeEvent(
+                    kind=AttemptRuntimeEventKind.PATCH_DETECTED,
+                    sequence=2,
+                    issue_key=issue.key,
+                    stage="post_runtime_diff",
+                    payload={"changed_files": ["tracked.cs"]},
+                ),
+            ),
         )
         attempt_state = AttemptState(
             attempt_number=1,
@@ -178,20 +237,32 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
             final_summary=result.summary,
             artifact_root=bundle.issue_root.as_posix(),
         )
-        summary_path = writer.write_issue_state(issue_state)
+        summary_path = writer.write_issue_state(
+            issue_state,
+            compliance_summary={"status": "pass", "summary": "All active quality gates passed for this issue."},
+        )
 
         assert bundle.issue_json.exists()
         assert bundle.edit_contract_json.exists()
         assert bundle.prompt_context_json.exists()
         assert bundle.patch_diff.exists()
+        assert bundle.attempt_events_jsonl.exists()
         assert bundle.reviewer_result_json.exists()
         assert bundle.build_result_json.exists()
+        assert bundle.compliance_summary_json.exists()
         assert bundle.attempt_summary_json.exists()
         assert summary_path.exists()
+        assert (bundle.issue_root / "compliance_summary.json").exists()
         prompt_context = bundle.prompt_context_json.read_text(encoding="utf-8")
         assert '"failure_kind": "build"' in prompt_context
         assert '"source_attempt_number": 1' in prompt_context
         assert '"guardrail_mode": "contract_review"' in prompt_context
+        assert '"active_quality_gate_rules": [' in prompt_context
+        assert '"planner_lessons": []' in prompt_context
+        assert '"prefetched_context": [' in prompt_context
+        assert '"repair_plan": {' in prompt_context
+        assert '"plan_precheck": {' in prompt_context
+        assert '"rule_id": "public_xml_docs"' in prompt_context
         edit_contract = bundle.edit_contract_json.read_text(encoding="utf-8")
         assert '"issue_key": "ISSUE-1"' in edit_contract
         assert '"target_files": [' in edit_contract
@@ -199,7 +270,18 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
         assert '"status": "pass"' in reviewer_result
         build_result = bundle.build_result_json.read_text(encoding="utf-8")
         assert '"quality_gate_result": {' in build_result
+        assert '"compliance_summary": {' in build_result
+        assert '"repair_plan": {' in build_result
+        assert '"plan_precheck": {' in build_result
         assert '"applied_rule_ids": [' in build_result
+        attempt_events = bundle.attempt_events_jsonl.read_text(encoding="utf-8")
+        assert '"kind": "attempt_runtime_started"' in attempt_events
+        assert '"kind": "patch_detected"' in attempt_events
+        compliance_summary = bundle.compliance_summary_json.read_text(encoding="utf-8")
+        assert '"status": "pass"' in compliance_summary
+        assert '"rule_id": "public_xml_docs"' in compliance_summary
+        issue_compliance_summary = (bundle.issue_root / "compliance_summary.json").read_text(encoding="utf-8")
+        assert '"status": "pass"' in issue_compliance_summary
         patch_text = bundle.patch_diff.read_text(encoding="utf-8")
         assert "--- a/tracked.cs" in patch_text
         assert "+++ b/tracked.cs" in patch_text

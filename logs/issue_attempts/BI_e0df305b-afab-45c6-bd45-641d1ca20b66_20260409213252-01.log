@@ -1,0 +1,72 @@
+[2026-04-09 22:38:15] Attempt 1/3 started for e0df305b-afab-45c6-bd45-641d1ca20b66
+[2026-04-09 22:41:46] Attempt 1 failed: Quality gate verification failed
+[2026-04-09 22:41:46] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+... (省略前 54 行)
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+19. [async_signature] 异步签名规范: 异步方法 LoadSaleOrderPluginsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:792
+   Evidence: private async Task<Dictionary<int, SaleOrderPlugin>> LoadSaleOrderPluginsAsync(List<int> orderIds) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+20. [async_signature] 异步签名规范: 异步方法 LoadPenaltyEventsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:796
+   Evidence: } /// <summary> /// 批量加载PenaltyEvent /// </summary> private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+21. [async_signature] 异步签名规范: 异步方法 LoadPenaltyEventsAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:801
+   Evidence: private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+22. [async_signature] 异步签名规范: 异步方法 LoadCanClearCutOffDatesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:817
+   Evidence: } /// <summary> /// 加载可清截止日期 /// </summary> private async Task<Dictionary<int, DateTime?>> LoadCanClearCutOffDatesAsync(List<int> orderIds) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+23. [async_signature] 异步签名规范: 异步方法 LoadCanClearCutOffDatesAsync 的返回类型不是 Task/Task<T>。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:822
+   Evidence: private async Task<Dictionary<int, DateTime?>> LoadCanClearCutOffDatesAsync(List<int> orderIds) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+24. [async_signature] 异步签名规范: 异步方法 ProcessSingleOrderByRangeOptimized 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:852
+   Evidence: } return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+25. [async_signature] 异步签名规范: 异步方法 ProcessSingleOrderByRangeOptimized 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:853
+   Evidence: return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+26. [async_signature] 异步签名规范: 异步方法 RecalculateHistoricalAfterBillOverdueParallel 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:1098
+   Evidence: public async Task<RecalculationResult> RecalculateHistoricalAfterBillOverdueParallel( DateTime startDate, DateTime endDate, List<int> ruleDefinitionIds = null, int maxDegreeOfParallelism = 4) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+27. [async_requires_await] 异步方法必须真正 await: 异步方法 PreloadSharedDataAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:457
+   Evidence: private async Task<SharedDataCache> PreloadSharedDataAsync(List<ORDR> orders) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+28. [async_requires_await] 异步方法必须真正 await: 异步方法 LoadPenaltyEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:796
+   Evidence: } /// <summary> /// 批量加载PenaltyEvent /// </summary> private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+29. [async_requires_await] 异步方法必须真正 await: 异步方法 LoadPenaltyEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:801
+   Evidence: private async Task<Dictionary<int, List<PenaltyEvent>>> LoadPenaltyEventsAsync(List<int> orderIds) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+30. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessSingleOrderByRangeOptimized 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:852
+   Evidence: } return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+31. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessSingleOrderByRangeOptimized 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:853
+   Evidence: return canClearCutOffDates; } /// <summary> /// 优化后的单订单处理方法（使用预加载数据） /// </summary> private async Task ProcessSingleOrderByRangeOptimized(ORDR order, DateTime startDate, DateTime endDate, SharedDataCache sharedData) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+[2026-04-09 22:41:47] Workspace restored to issue baseline
+[2026-04-09 22:41:47] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 22:41:47] Attempt 2/3 started for e0df305b-afab-45c6-bd45-641d1ca20b66
+[2026-04-09 22:42:54] Attempt 2 failed: Agent completed without modifying any files
+[2026-04-09 22:42:55] Workspace restored to issue baseline
+[2026-04-09 22:42:55] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 22:42:55] Attempt 3/3 started for e0df305b-afab-45c6-bd45-641d1ca20b66
+[2026-04-09 22:44:29] Attempt 3 failed: Quality gate verification failed
+[2026-04-09 22:44:29] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_signature] 异步签名规范: 异步方法 RecalculateHistoricalAfterBillOverdueParallel 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:881
+   Evidence: public async Task<RecalculationResult> RecalculateHistoricalAfterBillOverdueParallel( DateTime startDate, DateTime endDate, List<int> ruleDefinitionIds = null, int maxDegreeOfParallelism = 4) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+2. [async_requires_await] 异步方法必须真正 await: 异步方法 PreloadSharedDataAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs:457
+   Evidence: private async Task<SharedDataCache> PreloadSharedDataAsync(List<ORDR> orders) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+[2026-04-09 22:44:30] Workspace restored to issue baseline
+[2026-04-09 22:44:30] Issue skipped: C# quality gate verification failed after 3 attempt(s)

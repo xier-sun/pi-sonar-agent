@@ -640,7 +640,7 @@ Git 认证必须由单一 `GitRepositoryGateway` 承担。
 - `Phase 4`：已完成
 - `4.1 标准化包结构`：已完成。`src/pi_sonar_agent/` 已成为正式包入口，顶层 `__init__.py` 和子包 `__init__.py` 已提供稳定导出；`__path__` 注入兼容方案已删除
 - `4.2 清理入口 hack`：已完成。`run.py` 已移除开发机私有 SDK fallback，仅保留本仓库 `src/` bootstrap 和标准 `python -m pip install -e .` 提示
-- `4.3 删除旧实现`：已完成第一批。legacy 包 `__init__.py` 已改为相对导出，消除了移除 `__path__` 后的循环导入；`ClaudeFixAgent` 中的 issue prompt、legacy scope guard、build/rule verification 已继续下沉到 `issue_prompt.py / scope_guard.py / fix_verifier.py`
+- `4.3 删除旧实现`：已完成。legacy 包 `__init__.py` 已改为相对导出，消除了移除 `__path__` 后的循环导入；`ClaudeFixAgent` 中的 issue prompt、legacy scope guard、build/rule verification 已继续下沉到 `issue_prompt.py / scope_guard.py / fix_verifier.py`。保留的 `GitClient / workspace` 兼容 facade 现仅作为公共兼容 API，不再视为主链路待删除旧实现
 - `4.4 补齐质量门槛`：已完成。全仓 `ruff check .` 已通过，仓库已新增 GitHub Actions CI，关键验收场景已由现有回归测试和新增质量门槛测试共同覆盖
 - `4.5 继续收口边界检查职责`：已完成。边界检查已下沉为 `BoundaryRuntime + BoundaryPolicy`，不再由 `ClaudeFixAgent` 或 verifier 各自猜测 touched-region；质量门禁现与 reviewer/scope 共用统一 patch 事实，并已明确切换为 `scope/reviewer -> before-lines`、`quality gate -> after-lines`
 - `补充说明`：`GitClient`、`workspace` 等公共兼容 facade 仍保留，但主运行链路已不再依赖这层兼容接口；它们现作为公共兼容 API 保留，不再阻塞本轮重构收口
@@ -699,6 +699,1485 @@ Git 认证必须由单一 `GitRepositoryGateway` 承担。
 - `pip install -e .` 后 CLI 可直接运行
 - 无需路径 hack
 - `ruff`、`pytest`、关键集成测试全部通过
+
+## 8.5 后续补强：规范遵守闭环
+
+### 目标
+
+在现有 `CLAUDE.md + csharp-quality-gate.md + EditContract + QualityGateVerifier + RetryContext` 的基础上，继续提升“严格遵守规范”的稳定性，但避免回退到“只靠 prompt”的旧模式。
+
+这部分不是重做已有 Phase，而是在当前重构完成后继续增强规范治理闭环。
+
+### 当前执行状态（2026-04-09）
+
+- `8.5.1 精准规范加载`：已完成。prompt 已改为优先注入“本次启用的 quality gate 规则摘要”，不再默认依赖整篇 `csharp-quality-gate.md` 全文；`prompt_context.json` 也已落盘 `active_quality_gate_rules`
+- `8.5.2 合规审计工件`：已完成。已新增 `compliance_summary` 生成逻辑，并接入 `attempt artifact / issue artifact / build_result.json / PR 详细说明`；`attempt-xx/compliance_summary.json` 与 issue 根目录 `compliance_summary.json` 均已稳定落盘
+- `8.5.3 结构化 lessons memory`：已完成。已新增 `lessons_store.py`，将 repeated failure pattern 收口为 `quality_gate_lessons.jsonl / boundary_failure_patterns.json / rule_failure_patterns.json`；`IssuePlanner` 现可按 `rule_id / failure_kind / scope_mode / guardrail_mode` 读取 lessons，并自动补充到 strategy / review_hints / prompt guidance
+
+### 需要补强的方向
+
+#### 8.5.1 精准规范加载
+
+当前问题：
+
+- prompt 里仍可能注入整段质量门禁正文
+- 运行时虽然已经知道 `EditContract.quality_gate_rules`，但 prompt 消费层还没有完全切到“只注入本次适用规则”
+
+补强目标：
+
+- 默认只向模型注入本次 issue 真正适用的 quality gate 条目
+- 整篇 `data/csharp-quality-gate.md` 作为规则真源和审计材料保留，但不再默认全文塞进每次 prompt
+- 对于 `rule_id / file_path / scope_mode / retry_context` 可明显缩窄的场景，只传本次适用规则、规则摘要和 `prompt_hint`
+
+建议落点：
+
+- `resource_loader.py`
+- `issue_planner.py`
+- `issue_prompt.py`
+
+验收标准：
+
+- 模型 prompt 中的规范信息以“本次适用规则清单”为主，不再依赖整篇 markdown 全文注入
+- `prompt_context.json` 中能看到本次实际启用的质量门禁规则列表
+
+#### 8.5.2 合规审计工件
+
+当前问题：
+
+- 质量门禁结果已经结构化，但还缺一个明确的“本次规范遵守摘要”
+- PR 报告与工件里还没有稳定的合规总结对象
+
+补强目标：
+
+- 为每个 attempt 和最终 issue 生成 `compliance_summary.json`
+- 显式记录：
+  - 本次启用的 hard/soft 规则
+  - hard pass/fail
+  - soft findings
+  - waived / not_applicable / skipped checks
+- 将该摘要接入 PR 详细报告，而不是依赖模型自行输出“我遵守了哪些规范”
+
+建议落点：
+
+- `quality_gate.py`
+- `quality_gate_verifier.py`
+- `artifact_writer.py`
+- `pr_description.py`
+
+验收标准：
+
+- 每个 attempt artifact 中都能看到结构化 `compliance_summary`
+- PR 详细说明中能稳定展示“启用规则 / 通过项 / 失败项 / 软提示”
+
+#### 8.5.3 结构化 lessons memory
+
+当前问题：
+
+- 失败模式已经能通过 `RetryContext` 回传，但还没有沉淀为长期经验
+- 不同 run 中重复出现的 reviewer / scope / quality gate 失败，尚未形成结构化经验记忆
+
+补强目标：
+
+- 不使用自由文本 `tasks/lessons.md` 作为主方案
+- 将 repeated failure pattern 沉淀为结构化 lessons memory，例如：
+  - `quality_gate_lessons.jsonl`
+  - `rule_failure_patterns.json`
+  - `boundary_failure_patterns.json`
+- `IssuePlanner` 可以按 `rule_id / failure_kind / scope_mode` 读取最近高频失败模式，自动补充到 strategy / review_hints / retry guidance
+
+建议落点：
+
+- `retry_context.py`
+- `issue_retry.py`
+- `issue_planner.py`
+- `state_store.py` 或新的 `lessons_store.py`
+
+验收标准：
+
+- 同一类失败重复出现时，planner 能拿到结构化 lessons，而不是只依赖上一轮 raw retry output
+- lessons memory 可审计、可清理、可按规则聚合
+
+### 对 Plan → Edit → Verify 方案的吸收原则
+
+这套思路总体值得吸收，但不能原样照搬，建议按下面方式并入项目：
+
+#### Plan
+
+值得补充：
+
+- planner 输出里显式增加“本次改动如何满足当前启用的 quality gate / contract / boundary policy”
+- 将“本次适用规范”写成结构化对象，而不是只在 prompt 里自然语言描述
+
+不建议照搬：
+
+- 不建议再单独引入 `CODE_NORMS.md`
+- 本项目继续以 `CLAUDE.md` 作为长期工作规则、`data/csharp-quality-gate.md` 作为代码规范真源
+
+#### Edit
+
+值得补充：
+
+- 继续强化 patch-only / Search-Replace / MultiEdit 优先
+- 对“精确 old_string -> new_string”可以作为优先策略，但应理解为“优先做确定性 patch”，不是强制所有修复都必须依赖单一唯一 old_string
+
+不建议照搬：
+
+- 不应把“old_string 必须全文件唯一”设为通用硬门禁
+- 某些多行重写、helper 提取、注释补全和邻接清理场景仍需要结构化 patch，而不是单一字符串替换
+
+#### Verify
+
+值得补充：
+
+- 保持现有 `build + boundary review + quality gate + rule validator` 闭环
+- 在其上增加 `compliance_summary`，让验证结果更可审计
+
+不建议照搬：
+
+- 不建议每次 attempt 都强制“重新跑一次 Sonar 全量扫描”
+- Sonar re-scan 更适合作为 target 级或最终验收级步骤，而不是每次 issue attempt 的必经步骤，否则成本和时延过高
+
+#### Self-improvement loop
+
+值得补充：
+
+- 保留“从纠正中学习”的思路
+- 但要以结构化 lessons memory 为主，而不是持续膨胀的自由文本 `tasks/lessons.md`
+
+### 推荐实施顺序
+
+1. 先做 `8.5.1 精准规范加载`
+2. 再做 `8.5.2 合规审计工件`
+3. 最后做 `8.5.3 结构化 lessons memory`
+
+不要反过来做。先让“规范如何进入本次任务”和“结果如何被稳定审计”变清楚，再引入长期经验沉淀。
+
+## 8.6 后续补强：全局边界框架与首批规则验证
+
+### 目标
+
+参考 `pi-mono` 与 Claude Code 的架构思想，把当前边界治理继续升级成“全局框架 + 规则能力映射”的形态，而不是继续走“两种极端”：
+
+- 不是只用一个全局 statement/window 规则硬卡所有 issue
+- 也不是继续为每条规则零散打补丁
+
+这一部分与 `8.5 规范遵守闭环` 是互补关系，不是重复建设：
+
+- `8.5` 解决的是“模型如何按规范修、如何被验证、如何被审计”
+- `8.6` 解决的是“运行时如何为不同修复形状生成正确边界，不把合法修复误判为越界”
+
+对应到系统层次：
+
+- `8.5` 的核心是 `quality gate`
+- `8.6` 的核心是 `task / contract / boundary runtime / capability model`
+
+### 当前执行状态（2026-04-08）
+
+- `8.6`：已完成
+- `8.6.1 建立全局 Boundary Capability Model`：已完成。已新增 `boundary_capabilities.py`，并将 capability/profile 解析接入 `rule_policies.py / issue_contract.py / boundary_policy.py`
+- `8.6.2 contract 升级为 symbol + capability + 多范围`：已完成。`EditContract` 已新增 `boundary_profile / allowed_capabilities / allowed_related_symbols`，`IssuePlanner` 已为 `S1481 / S125 / S1144` 生成多范围与相关 symbol 合同
+- `8.6.3 BoundaryRuntime 成为唯一边界判定入口`：已完成。`BoundaryRuntime` 已统一输出主次边界失败原因，`FixVerifier / RetryContext / issue_retry / artifact_writer` 已贯通边界失败码
+- `8.6.4 规则通过 profile 映射到 capability`：已完成。`rule_policies.py` 已将 `S1481 / S125 / S1144` 收口为 `boundary_profile + capability` 映射，而不是散乱特判
+- `8.6.5 lessons 驱动 contract 调整`：已完成。`lessons_store.py` 已沉淀 `boundary_failure_code`，`IssuePlanner` 现可基于历史边界失败自动补 `allowed_line_ranges / allowed_related_symbols / review_hints`
+- `8.6.6 用首批真实规则做回归验证`：已完成。已新增 `tests/test_boundary_regressions.py`，并补强 `test_boundary_runtime.py / test_fix_verifier.py / test_issue_planner.py / test_lessons_store.py`
+- `8.6.7 Filesystem Hard Boundary + Soft Drift Audit`：已完成。边界已从 `line-window / scope hard fail` 迁移为“目录/文件系统硬边界 + 修复偏离软审计”；同文件额外修改、额外 touched files 不再作为 hard fail，而是作为 drift audit 写入 `reviewer_result` 与 PR 详细报告附件
+- `日志驱动补充整改（2026-04-09 13:07 run）`：已完成。针对 `batch_20260409130720.log` 中 `S1144` 的 `method_cluster_not_declared`，`IssuePlanner` 已修正相邻 private member cluster 的扫描与合同生成逻辑，不再因为重复使用原始 `scope_end_line` 而漏掉后续 helper 范围；`BoundaryRuntime` 也已支持在“同文件 + capability 已声明”的前提下，对 `member_cluster / adjacent cleanup / declaration anchor` 做运行时合同放宽，避免合法的同文件局部扩展继续被静态行窗误拒
+- `验证结果`：`.venv` 下 `pytest -q` 通过，`174 passed`；`ruff check .` 通过；`compileall src tests` 通过
+- `日志驱动补充整改（2026-04-08 18:21 run）`：已完成。针对 `batch_20260408182111.log` 中 `S1481` 的假性 scope reject，legacy `scope` 校验已改为优先消费 `EditContract.allowed_line_ranges`，不再只看原始 `validation_line_range`；这使 `declaration_anchor / adjacent_cleanup` 这类多范围合同在 `guardrail_mode=scope` 下也能与新 contract 保持一致
+
+### 设计原则
+
+#### 8.6.0 为什么不能只做“重点规则补洞”
+
+`batch_20260408153551.log` 暴露出的 `S1481 / S125 / S1144` 失败很典型，但它们应该被视为**首批验证样本**，不是整个方案的边界本身。
+
+原因是：
+
+- `S1481` 代表 `declaration_delete`
+- `S125` 代表 `comment_cleanup + adjacent_cleanup`
+- `S1144` 代表 `member_delete / method_cluster_delete`
+
+这三条规则的价值在于：它们分别覆盖了三种不同的合法修复拓扑，适合用来验证全局边界框架是否成立。
+
+所以 `8.6` 的目标不是“只修三条规则”，而是：
+
+- 先建立全局 boundary capability model
+- 再用这三条规则做第一批验证样本
+
+这也更符合：
+
+- `pi-mono` 的 runtime/hook/policy 思路
+- Claude Code 分析文档里“任务是一等对象、边界是运行时决策、恢复性来自显式状态”的原则
+
+### 需要补强的方向
+
+#### 8.6.1 建立全局 Boundary Capability Model
+
+状态：已完成
+
+已实现：
+
+- 新增 `src/core/boundary_capabilities.py`，定义 `statement_edit / declaration_delete / adjacent_cleanup / method_cluster_delete` 等统一 capability
+- `RuleHandlingPolicy` 已支持 `boundary_profile + boundary_capabilities`
+- `BoundaryPolicy` 已统一从 contract 中解析 capability，不再只依赖默认 `scope_mode`
+
+当前问题：
+
+- 当前边界模型仍偏向“行窗 + scope mode”
+- 规则差异主要靠零散 `prompt_guards / review_hints / trailing_lines`
+- 这不足以表达不同修复形状
+
+补强目标：
+
+- 引入一组全局的 `boundary capabilities`
+- 让规则不再直接操作原始行窗，而是声明自己需要哪种编辑能力
+
+第一批建议能力：
+
+- `statement_edit`
+- `declaration_delete`
+- `adjacent_cleanup`
+- `method_rewrite`
+- `member_delete`
+- `method_cluster_delete`
+- `helper_extract`
+- `signature_change`
+- `new_type_add`
+- `multi_file_refactor`
+
+建议落点：
+
+- `rule_policies.py`
+- `issue_contract.py`
+- `boundary_policy.py`
+
+验收标准：
+
+- 规则边界不再主要依赖“默认 statement + trailing lines”
+- 运行时可以回答“当前规则属于哪种编辑能力”
+
+#### 8.6.2 将 contract 从“行窗”升级为“symbol + capability + 多范围”
+
+状态：已完成
+
+已实现：
+
+- `EditContract` 已新增 `allowed_related_symbols / boundary_profile / allowed_capabilities`
+- `IssuePlanner` 已能为 `S1481 / S125 / S1144` 生成相关 symbol 与非连续范围
+- 已补“statement 范围去空白前后缀”与“邻接声明锚点”逻辑，避免 sparse / delete 场景把相关范围放大成假窗口
+- 已补 `member_cluster` 连续相邻 private member 扫描逻辑，planner 现在会持续向后扩展 cluster，而不是在首个 helper 后停止
+
+当前问题：
+
+- 当前 `EditContract.allowed_line_ranges` 仍主要是一个 validation window
+- `target_symbols` 虽然已经存在，但还没有真正成为边界判定主轴
+
+补强目标：
+
+- 让 `EditContract` 成为真正的任务对象，显式表达：
+  - `target_symbols`
+  - `allowed_capabilities`
+  - `allowed_line_ranges`
+  - `allowed_related_symbols`
+  - `boundary_profile`
+
+建议策略：
+
+- contract 默认以 symbol 为主，line range 为辅
+- 支持非连续范围与相关符号声明，例如：
+  - `S125`: `comment_line_range + adjacent_cleanup_range`
+  - `S1144`: `method_range + dependent_helper_range`
+  - `S1481`: `issue_line + declaration_anchor_range`
+
+建议落点：
+
+- `issue_contract.py`
+- `issue_planner.py`
+- `boundary_policy.py`
+
+验收标准：
+
+- contract 能清楚表达“本次允许改哪些符号 / 范围 / 能力、为什么允许”
+- reviewer 输出可以解释命中的具体 symbol/range/capability，而不只是一个总窗口
+
+#### 8.6.3 让 BoundaryRuntime 成为唯一边界判定入口
+
+状态：已完成
+
+已实现：
+
+- `BoundaryRuntime` 已统一消费 `patch facts + contract + boundary profile`
+- runtime 现可输出 `scope_symbol_anchor_miss / adjacent_cleanup_not_declared / method_cluster_not_declared / scope_line_window_reject` 等细分失败码
+- `FixVerifier / ClaudeFixAgent / RetryContext / issue_retry / build_result.json / issue_summary` 已贯通 `boundary_failure_code` 与 `secondary_boundary_failure_codes`
+- legacy `scope` 校验现已优先使用 `BoundaryPolicy.contract_line_ranges(edit_contract)`，`declaration_anchor / adjacent_cleanup` 等多范围合同不会再因为旧 `validation_line_range` 过窄而被假性拒绝
+- 在“同文件 + 目标文件未越界 + capability 已声明”的前提下，`BoundaryRuntime` 现可进行运行时合同放宽，再次复核 reviewer/scope，避免 declaration anchor、adjacent cleanup、member cluster 这类合法局部扩展继续被静态窗口拒绝
+
+当前问题：
+
+- 虽然 `BoundaryRuntime` 已存在，但规则级边界能力还没有完全在这里收口
+- 失败结果仍容易表现为 `build`、`scope` 混杂，真实主阻塞原因不够显式
+
+补强目标：
+
+- 继续把边界判定从分散逻辑收口到 runtime/policy
+- 让 runtime 统一消费：
+  - patch facts
+  - contract
+  - boundary profile
+  - lessons
+
+建议策略：
+
+- runtime 输出更细的原因，例如：
+  - `scope_line_window_reject`
+  - `scope_symbol_anchor_miss`
+  - `adjacent_cleanup_not_declared`
+  - `member_cluster_not_declared`
+  - `capability_not_allowed`
+- 当 build 与 scope 同时出现时，显式记录主次原因，避免日志只剩 build 噪音
+
+建议落点：
+
+- `boundary_runtime.py`
+- `fix_verifier.py`
+- `retry_context.py`
+- `issue_retry.py`
+
+验收标准：
+
+- 每个失败 issue 都能明确回答“模型不会修”还是“边界不允许修”
+- `issue_summary.json` 中能稳定反映真实主阻塞原因
+
+#### 8.6.4 规则通过 profile 映射到 capability，而不是手写散乱特判
+
+状态：已完成
+
+已实现：
+
+- `S1481 -> declaration_anchor + declaration_delete`
+- `S125 -> comment_adjacent_cleanup + statement_edit + adjacent_cleanup`
+- `S1144 -> member_cluster + member_delete + method_cluster_delete`
+- 首批规则已经按“profile -> capability”落地，后续规则可沿同一模型继续扩展
+
+当前问题：
+
+- 如果继续只为 `S1481 / S125 / S1144` 写散乱特判，后续会再次回到“规则越修越碎”的状态
+
+补强目标：
+
+- 将规则实现收口为“profile -> capability”映射
+- 首批规则只是验证样本，不是专案式一次性补丁
+
+首批映射建议：
+
+- `S1481 -> declaration_delete`
+- `S125 -> statement_edit + adjacent_cleanup`
+- `S1144 -> member_delete + method_cluster_delete`
+
+后续规则可继续按同一模型接入，而不是再发明新的一套 scope 逻辑。
+
+建议落点：
+
+- `rule_policies.py`
+- `issue_planner.py`
+- `boundary_policy.py`
+
+验收标准：
+
+- 首批规则的实现形式是“映射到 capability”，不是独立散乱 patch
+- 后续规则可以沿同一模型扩展
+
+#### 8.6.5 把 lessons 真正用于 contract 生成，而不是只做 guidance
+
+状态：已完成
+
+已实现：
+
+- `LessonsStore` 已持久化 `boundary_failure_code`
+- planner 读取 lessons 时已可按 `rule_id / failure_kind / scope_mode / guardrail_mode / boundary_failure_code` 过滤
+- 当命中 `scope_symbol_anchor_miss / adjacent_cleanup_not_declared` 等高频模式时，`IssuePlanner` 会自动补 `allowed_line_ranges` 与 `allowed_related_symbols`
+
+当前问题：
+
+- `lessons_store.py` 已存在
+- 但目前 lessons 更多用于 planner guidance，还没有充分改变 contract 本身
+
+补强目标：
+
+- 当某条规则反复因相同边界原因失败时，planner 可以主动调整 contract 生成策略
+
+建议策略：
+
+- 对高频模式建立结构化 lessons：
+  - `S1481 + scope_symbol_anchor_miss`
+  - `S125 + adjacent_cleanup_not_declared`
+  - `S1144 + method_cluster_not_declared`
+- planner 读取 lessons 后，可自动：
+  - 放宽到更合适的 `allowed_line_ranges`
+  - 增加 `allowed_capabilities`
+  - 增加 `allowed_related_symbols`
+  - 补充针对性的 review hints
+
+建议落点：
+
+- `lessons_store.py`
+- `issue_planner.py`
+- `retry_context.py`
+
+验收标准：
+
+- 同一规则、同一失败模式连续出现时，后续 attempt 的 contract 会显式体现 lessons 的影响
+
+#### 8.6.6 用首批真实规则做回归验证
+
+状态：已完成
+
+已实现：
+
+- 新增 `tests/test_boundary_regressions.py`，覆盖 `batch_20260408153551.log` 对应的 `S1481 / S125` 和同类 `S1144` contract 生成回归
+- `tests/test_boundary_runtime.py` 已覆盖 declaration-anchor 边界失败分类
+- `tests/test_fix_verifier.py` 已覆盖边界失败码向 verifier 结果传递
+- `tests/test_lessons_store.py / tests/test_issue_planner.py` 已覆盖 lessons 反哺 contract 的回归
+
+当前问题：
+
+- 当前很多回归还是 unit test 层
+- 但这类问题更适合用真实日志/真实 patch 做 regression fixtures
+
+补强目标：
+
+- 让首批验证样本成为长期回归资产
+
+第一批样本：
+
+- `batch_20260408153551.log` 中的 `S1481`
+- `batch_20260408153551.log` 中的 `S125`
+- 同类 `S1144` private method deletion 场景
+
+验证点包括：
+
+- contract 是否合理生成
+- capability 是否正确映射
+- reviewer 是否接受
+- scope 是否不再误拒
+- build/quality gate 是否不被边界误伤
+
+建议落点：
+
+- `tests/test_boundary_runtime.py`
+- `tests/test_fix_verifier.py`
+- 新增 capability/regression fixtures
+
+验收标准：
+
+- 这批真实失败样本在回归测试中可重放
+- 修复后不会因为重构再次退回旧的 scope reject
+
+#### 8.6.7 将 line-window hard fail 迁移为 filesystem hard boundary + soft drift audit
+
+状态：已完成
+
+已实现：
+
+- `DiffReviewer` 现在只对真正的文件系统高风险行为做 hard fail：
+  - 触达受保护路径
+  - 新建文件
+  - 删除文件
+- 同文件额外修改、主区域外 hunk、额外 touched files 不再触发 `scope / reviewer` 硬失败，而是记为 soft drift finding
+- `BoundaryRuntime / FixVerifier / ClaudeFixAgent` 已切到“只有 filesystem boundary 才阻断 attempt”，不再因为 `scope_line_window_reject / declaration_anchor / member_cluster` 这类边界问题直接判失败
+- `reviewer_result.metrics` 已新增：
+  - `drift_score`
+  - `soft_boundary_violation_count`
+  - `extra_touched_file_count`
+  - `outside_primary_region_line_count`
+- PR 详细报告附件现在会展示：
+  - `边界审计`
+  - `drift score`
+  - `漂移记录`
+
+当前问题：
+
+- 旧边界模型里，“最小化修复”主要靠 line-window/scope 做 hard enforcement，副作用已经大于收益
+- 很多合法修复会因为：
+  - 相邻清理
+  - helper 提取
+  - 同文件额外 hunk
+  被判成 `scope error`
+
+迁移后的原则：
+
+- 硬边界只管安全：
+  - 只允许工作区内已有源文件
+  - 禁止新建、删除、重命名、整文件覆盖
+  - 禁止受保护目录
+- 软边界只管偏离：
+  - 同文件额外修改
+  - 主区域外 hunk
+  - 额外 touched files
+  这些只审计、不直接判死
+
+验收标准：
+
+- `scope` 不再成为当前主链路里的常见最终失败原因
+- 修复偏离信息会稳定写入：
+  - `reviewer_result.json`
+  - `issue_summary/compliance_summary` 相关工件
+  - PR 详细报告附件
+- 文件系统高风险行为仍然会被阻断
+
+### 推荐实施顺序
+
+1. 先做 `8.6.1 建立全局 Boundary Capability Model`
+2. 再做 `8.6.2 contract 升级为 symbol + capability + 多范围`
+3. 接着做 `8.6.3 BoundaryRuntime 成为唯一边界判定入口`
+4. 然后做 `8.6.4 规则通过 profile 映射到 capability`
+5. 再做 `8.6.5 lessons 驱动 contract 调整`
+6. 最后做 `8.6.6 用首批真实规则做回归验证`
+7. 在规则能力稳定后，将 `line-window hard fail` 迁移为 `filesystem hard boundary + soft drift audit`
+
+不要反过来做。先建立全局边界框架，再让 `S1481 / S125 / S1144` 作为首批验证样本落地，而不是把它们当成整个方案本身。
+
+## 8.7 后续补强：性能优化专项方案
+
+### 目标
+
+针对 `batch_20260408182111.log` 暴露出的“单 issue 耗时过长、模型后续响应超时、同一小问题因多轮 retry 被放大”的现象，补一轮专门的性能优化。
+
+这一轮优化的目标不是单纯“更快”，而是：
+
+- 在不降低修复能力的前提下减少平均单题耗时
+- 在不降低成功率的前提下降低超时和无效重试
+- 在不降低修复质量的前提下减少模型啰嗦交互、重复读取和不必要的重验证
+
+### 硬约束
+
+本专项必须遵守以下硬约束：
+
+- 不降低最终修复成功率
+- 不降低最终 patch 质量
+- 不放松最终质量门禁、边界门禁和 build gate 的最终验收要求
+- 不把“减少耗时”建立在“减少必要验证”或“缩小模型能力”之上
+- 所有性能优化都必须支持 feature flag 或可回滚开关
+- 每项优化都必须配套回归测试和至少一轮真实 batch 指标对比
+
+换句话说：这是一次“无损优化”，不是用速度换质量。
+
+### 当前问题判断
+
+从 `batch_20260408182111.log` 来看，当前慢主要由四类因素叠加：
+
+1. 模型后续响应偏慢，`follow_up_response_timeout` 多次触发
+2. 当前 Agent 在小问题上仍有较多 `Read / Edit / 再 Read / 再总结` 往返
+3. 每个成功候选 patch 后都会触发全量 `dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"`，单次 build 成本高
+4. retry 会把上述成本乘上去，尤其是假性 scope reject 或重复 timeout 会显著拉长尾耗时
+
+因此本专项不是“只换更快模型”，而是“模型交互瘦身 + 验证分层 + retry 降噪 + 指标化 rollout”。
+
+结合 `batch_20260408184952.log` 的进一步观察，还需要补充两个更具体的问题：
+
+5. 存在“工具返回后模型不再继续响应”的中途挂起，典型表现为停在 `tool:Read / tool:Edit / sdk_message:UserMessage` 之后，最终触发 `follow_up_response_timeout`
+6. 存在“patch 已形成，但模型仍继续长篇解释/总结”的后处理拖延，导致本可进入 verifier 的 attempt 最终被 timeout 判废
+
+因此 `8.7` 不只是“让整体更快”，还要专门解决：
+
+- tool-after-response stall
+- post-edit narration overrun
+- patch 已有效但未被及时 salvage 的问题
+
+### 需要补强的方向
+
+#### 8.7.1 建立性能基线与验收指标
+
+状态：已完成
+
+目标：
+
+- 先把性能问题量化，再做优化
+- 明确区分：模型等待时间、工具往返时间、build 时间、retry 放大时间
+
+建议指标：
+
+- `attempt_total_duration_seconds`
+- `time_to_first_model_content_seconds`
+- `time_after_first_edit_to_finalize_seconds`
+- `tool_call_count`
+- `read_call_count`
+- `edit_call_count`
+- `build_duration_seconds`
+- `retry_count_per_issue`
+- `model_timeout_rate`
+- `scope_reject_rate`
+
+建议落点：
+
+- `events.py`
+- `artifact_writer.py`
+- `run_summary / target_summary / attempt_summary`
+
+本轮实现：
+
+- `AgentRuntimeResult` 已补齐 `total_duration_seconds / time_to_first_model_content_seconds / time_after_first_edit_to_finalize_seconds / tool_call_count / read_call_count / edit_call_count / assistant_text_events / assistant_text_chars / timeout_stage / last_progress_stage / saw_result_event`
+- `FixResult`、`AttemptState`、`IssueState`、`TargetState`、`RunState` 已贯通 `performance_metrics / performance_summary / rollout_flags`
+- 新增 `summarize_issue_performance / summarize_target_performance / summarize_run_performance`
+- `build_result.json / prompt_context.json / run_summary / target_summary / attempt_summary` 已能落盘性能基线与 rollout flags
+
+验收标准：
+
+- 能从 artifact 或 run summary 直接回答“慢在模型、慢在 build，还是慢在 retry”
+
+#### 8.7.2 模型交互瘦身，但不削弱修复能力
+
+状态：已完成
+
+目标：
+
+- 让模型把 token 和时间花在“读必要上下文并改代码”上，而不是花在长篇自然语言说明和重复读文件上
+
+建议策略：
+
+- 对小规则启用“short-form execution prompt”，要求：
+  - 少解释
+  - 少总结
+  - 优先直接读必要片段并下 patch
+- 增加 `post-edit narration cutoff`：
+  - 一旦 patch 已完成，优先进入 `Finish` 或最短确认
+  - 避免在修复完成后继续输出长篇“修复总结 / 背景分析 / 逐条解释”
+- 对同一文件/同一区域的重复 `Read` 做去重缓存
+- 对同一 attempt 中无效的连续 `Edit -> Read -> Edit -> Read` 循环增加 runtime 侧检测
+- 对 `tool -> assistant_text -> tool -> assistant_text` 的冗长往返增加短路约束，尤其是小规则与 fast path 场景
+- planner 输出继续保留，但更多转成结构化 guidance，而不是让模型在聊天文本里重复解释一遍
+
+注意：
+
+- 不是压缩上下文到让模型看不懂
+- 不是禁止分析
+- 而是去掉“对修复没有增益的啰嗦说明”
+
+建议落点：
+
+- `issue_prompt.py`
+- `agent_runtime.py`
+- `registry.py / policy.py`
+- `resource_loader.py`
+
+本轮实现：
+
+- `IssuePlanner` 已为低风险规则生成 `execution_profile=fast_path_short_form`
+- `IssuePromptBuilder` 已增加 `execution_mode_section`，将 short-form fast path 指令显式注入 prompt
+- `ClaudeFixAgent` 已在 fast path 场景下收紧 `max_turns`
+- `AgentRuntime` 已显式记录 `assistant_text_events / assistant_text_chars / last_progress_stage`，为后续继续压缩 narration 提供基线
+- `prompt_context.json` 已落盘 `execution_profile / fast_path_enabled / rollout_flags`
+
+验收标准：
+
+- 小问题的 `Read/Edit` 往返次数明显下降
+- 平均 prompt 体积和 assistant narration 长度下降
+- `follow_up_response_timeout` 中由“长篇修后总结”触发的比例下降
+- 修复成功率不下降
+
+#### 8.7.3 建立低风险规则 fast path
+
+状态：已完成
+
+目标：
+
+- 对明显属于“局部、低风险、单文件”的规则走更轻执行路径
+- 避免所有问题都走同样重的完整交互流程
+
+第一批候选：
+
+- `S1481`
+- `S125`
+- `S1144`
+- 其他可以稳定映射到 `declaration_delete / adjacent_cleanup / member_delete` 的规则
+
+建议策略：
+
+- fast path 只减少模型交互和上下文加载，不减少最终验证
+- 一旦触发以下任一条件，立即回退到 full path：
+  - 跨文件
+  - 需要 helper extract
+  - 需要 signature change
+  - 出现 boundary ambiguity
+  - 第一次 attempt 未成功
+
+建议落点：
+
+- `issue_planner.py`
+- `rule_policies.py`
+- `agent_runtime.py`
+
+本轮实现：
+
+- 已建立首批 fast path 规则集合：`S1481 / S125 / S1144`
+- `IssuePlanner._should_enable_fast_path()` 已根据 `retry_context / allowed_capabilities / related_symbols` 决定是否启用 fast path
+- 一旦进入 retry、需要 `signature_change / helper_extract / new_type_add / multi_file_refactor`，会自动回退到 full path
+- `EditContract` 已补齐 `execution_profile / fast_path_enabled / rollout_flags`
+
+验收标准：
+
+- fast path 命中的 issue 平均耗时下降
+- fast path 回退机制明确
+- fast path 问题的成功率与 full path 持平或更高
+
+#### 8.7.4 验证分层，但保持最终 gate 不降级
+
+状态：已完成
+
+目标：
+
+- 减少每轮 attempt 都去做最重验证的浪费
+- 但最终成功判定和提 PR 前，仍保留现有严格门禁
+
+建议策略：
+
+- 保留 `boundary review / quality gate / full build` 的最终严格要求
+- 引入“分层验证顺序”：
+  1. 先跑最便宜的 boundary / reviewer / quality gate
+  2. 只有当前 patch 成为有效候选时，再跑全量 build
+- 对“无变更 / 明显 timeout / forbidden tool / 明显 boundary reject”的 attempt，避免进入昂贵 build
+- 对 target 级最终成功结果，保留一次完整全量 build 作为最终验收
+
+注意：
+
+- 这不是取消 full build
+- 而是避免在明显无效的 attempt 上浪费 full build
+
+建议落点：
+
+- `fix_verifier.py`
+- `run_coordinator.py`
+- `build_gate.py`
+
+本轮实现：
+
+- `FixVerifier` 已改为 `BoundaryRuntime -> QualityGateVerifier -> Rule Validator -> Build` 的分层顺序
+- 对 `scope / reviewer / quality_gate / rule_validation` 已明确失败的 attempt，会跳过昂贵 build
+- build 执行事实已通过 `build_invoked / build_duration_seconds` 进入性能指标链
+- 最终成功结果仍保留现有严格 gate，不降低质量门禁与边界门禁
+
+验收标准：
+
+- 无效 attempt 的 build 次数下降
+- 最终成功 issue 仍保留严格 full build 验收
+- build 相关成功率和质量不下降
+
+#### 8.7.5 Retry 降噪与超时恢复优化
+
+状态：已完成
+
+目标：
+
+- 减少“同一错误反复重试”
+- 尽早识别“这次 retry 不会比上次更好”的场景
+
+建议策略：
+
+- 对重复 patch / 重复 boundary failure / 重复 timeout 做更强的短路
+- 对 `model_timeout` 区分：
+  - 首响应超时
+  - follow-up 超时
+  - 工具后无响应超时
+- 对 `follow_up_response_timeout` 再细分：
+  - `post_read_stall`
+  - `post_edit_stall`
+  - `post_summary_stall`
+- 如果上一次已经产出有效 patch，但卡在后续解释或总结阶段，优先把 patch 进入验证，而不是整轮判废
+- 引入 `patch salvage`：
+  - 若 attempt 内已产生有效 diff，且边界/文件变更可解析，则优先进入 verifier
+  - 不要求模型必须再补一段自然语言“我修好了”的结束语
+- 对“工具后挂起但 diff 未变化”的场景，直接终止当前 attempt，避免空转到 180 秒
+- 对同一 issue 的重复失败模式，直接使用 lessons 调整 contract 或切换 fast/full path
+
+建议落点：
+
+- `issue_retry.py`
+- `retry_context.py`
+- `lessons_store.py`
+- `agent_runtime.py`
+
+本轮实现：
+
+- `AgentRuntime` 已将 follow-up timeout 细分为：`post_read_stall / post_edit_stall / post_summary_stall / post_text_stall`
+- `ClaudeFixAgent` 已支持 `patch salvage`：在 timeout 但 patch 已落盘时进入 verifier，而不是整轮直接判废
+- `ClaudeFixAgent` 已补充同上下文 continuation retry：对 `follow_up_response_timeout` 且未形成有效 patch 的场景，会基于最近 runtime events、工具摘要和工作区现状构造 resume prompt，在同一 issue attempt 内最多续跑 2 次
+- `RetryContext` 已补齐 `model_timeout_stage / patch_salvaged`
+- `issue_retry` 已将 timeout 分类与 salvage 信息写入 retry feedback、attempt artifact 和 issue state
+- `lessons` 链路已可继续利用这些结构化失败原因调整后续 contract
+
+验收标准：
+
+- 同一 issue 的平均 attempt 数下降
+- `model_timeout` 导致的无效重试下降
+- `follow_up_response_timeout` 中“已形成有效 patch 但最终判废”的比例下降
+- 真实成功率不下降
+
+#### 8.7.6 通过指标对比渐进 rollout
+
+状态：已完成
+
+目标：
+
+- 不凭感觉判断“变快了”
+- 用真实 batch 对比验证“快了但没有变差”
+
+建议策略：
+
+- 每项优化都挂 feature flag
+- 至少记录以下对比：
+  - 平均单 issue 耗时
+  - P95 单 issue 耗时
+  - 平均 attempt 数
+  - model timeout rate
+  - scope reject rate
+  - 最终修复成功率
+  - 最终 PR 成功率
+- 先灰度到低风险规则，再逐步放开
+
+建议落点：
+
+- `RunCoordinator`
+- `run_summary.json`
+- `target_summary.json`
+- `state_store.py`
+
+本轮实现：
+
+- 新增 `perf_flags.py`，所有 8.7 优化均已挂到 feature flag：
+  - `PI_SONAR_PERF_SHORT_FORM_PROMPT`
+  - `PI_SONAR_PERF_FAST_PATH`
+  - `PI_SONAR_PERF_LAYERED_VERIFICATION`
+  - `PI_SONAR_PERF_PATCH_SALVAGE`
+  - `PI_SONAR_PERF_CONTINUATION_RETRY`
+  - `PI_SONAR_PERF_FAST_PATH_MAX_TURNS`
+  - `PI_SONAR_PERF_CONTINUATION_RETRY_LIMIT`
+- `EditContract / FixResult / AttemptState / IssueState / TargetState / RunState` 已贯通 `rollout_flags`
+- `run_summary / target_summary / prompt_context / build_result` 已能落盘 rollout flag 与性能汇总，支持前后批次指标对比
+- 当前 rollout 默认安全开启，且所有优化都可通过环境变量快速回退
+
+验收标准：
+
+- 每项优化都能用一轮前后对比证明“更快且不更差”
+- 若成功率或质量回落，可用 flag 快速回滚
+
+#### 8.7.7 引入 Attempt Event Stream（参考 `pi-mono` EventStream 思想）
+
+状态：已完成
+
+目标：
+
+- 把 attempt 运行过程里的关键阶段统一成一条事件流
+- 不再让 `logger / retry / metrics / state store / lessons` 各自猜状态
+- 为 `follow_up_response_timeout`、`patch salvage`、`boundary reject` 提供单一事实来源
+
+为什么要做：
+
+- 当前项目虽然已有 `events.py` 和结构化 state，但更偏“结果落盘事件”
+- 对 attempt 内部的 `tool -> text -> timeout -> salvage -> verifier` 过程，还缺统一运行时事件流
+- `pi-mono` 的 `EventStream` 设计值得借鉴的不是 TUI，而是“生产者与消费者解耦、事件渐进消费、零等待推送”
+
+建议事件：
+
+- `attempt_started`
+- `tool_called`
+- `tool_result_received`
+- `assistant_text_delta`
+- `patch_detected`
+- `boundary_rejected`
+- `quality_gate_rejected`
+- `build_started`
+- `build_finished`
+- `timeout_classified`
+- `patch_salvaged`
+- `attempt_finished`
+
+建议落点：
+
+- `agent_runtime.py`
+- `events.py`
+- `issue_retry.py`
+- `state_store.py`
+- `artifact_writer.py`
+
+本轮实现：
+
+- `events.py` 已新增 `AttemptRuntimeEventKind / AttemptRuntimeEvent / AttemptEventStream`
+- `AgentRuntimeResult` 已携带 `runtime_events`
+- `AgentRuntime` 已发出 `attempt_runtime_started / tool_called / tool_result_received / assistant_text_delta / timeout_classified / attempt_runtime_finished`
+- `ClaudeFixAgent` 已补齐 `patch_detected / patch_salvaged / build_started / build_finished / boundary_rejected / quality_gate_rejected / attempt_finished`
+- `ArtifactWriter` 已稳定落盘 `attempt_events.jsonl`
+- 运行日志现在会额外展示 `user message` 摘要、`ThinkingBlock`/SDK trace 预览，以及 `Read/Edit/Write/Bash` 等工具的输入摘要；`Read` 还会输出对应文件片段预览
+
+验收标准：
+
+- 同一 attempt 的 timeout、salvage、boundary、build 事实只在一处生成
+- 日志、state、metrics、retry feedback 使用同一份事件事实
+- 能从事件流重建单次 attempt 的关键路径
+
+#### 8.7.8 引入 Attempt-Local Read Cache（参考 `pi-mono` 文件缓存思想）
+
+状态：已完成
+
+目标：
+
+- 减少同一 attempt 内对同一文件、同一区域的重复 `Read`
+- 降低小规则上的无效工具往返和 follow-up stall 概率
+
+为什么要做：
+
+- 当前 `8.7.2` 已做 short-form prompt，但 still 可能出现重复 `Read`
+- `pi-mono` 性能分析里最适合本项目借鉴的部分之一，就是基于文件变化事实做局部缓存，而不是每次都重新读
+- 对本项目来说，最值得缓存的不是完整消息序列化，而是“文件片段 / issue 行上下文 / related symbol 片段”
+
+建议策略：
+
+- 按 `path + requested_range + file_mtime_or_hash` 做 attempt-local cache
+- 缓存：
+  - issue line 上下文
+  - declaration anchor 片段
+  - adjacent cleanup 片段
+  - member cluster 片段
+- 文件一旦被 `Edit / MultiEdit / Write` 触达，立即失效相关缓存
+- cache 只在单 attempt 生命周期内有效，不跨 attempt 复用
+
+建议落点：
+
+- `agent_runtime.py`
+- `issue_prompt.py`
+- `issue_planner.py`
+- `attempt_changes.py`
+
+本轮实现：
+
+- 新增 `attempt_context.py`，提供 `AttemptContextCache`
+- `ClaudeFixAgent.fix_issue()` 现在通过 cache 读取 issue 文件、编号窗口和后续验证前的最新文件内容
+- 发生 patch 后会对目标文件做显式失效，避免 host 侧上下文读取陈旧内容
+- 当前 cache 生命周期限定在单 attempt 内，不跨 attempt 复用
+
+验收标准：
+
+- 小规则 attempt 的 `read_call_count` 下降
+- 同一文件/同一区域重复读取显著下降
+- 修复成功率与 patch 质量不下降
+
+#### 8.7.9 引入 Planner Prefetch / Context Packing（参考 `pi-mono` 批量读取与预取思想）
+
+状态：已完成
+
+目标：
+
+- 在模型开始修复前，把当前 issue 必需的上下文一次性打包好
+- 减少“模型先读一小段，再回头读相邻声明/方法/注释”的往返
+
+为什么要做：
+
+- `pi-mono` 性能分析里“批量读取/预加载”的思想，对本项目不应直接实现成通用 BatchRead tool
+- 更适合变成 planner 侧的结构化预取：先由本地逻辑收集 boundary 相关片段，再一次性注入 prompt/context
+
+建议预取内容：
+
+- issue line 附近上下文
+- `allowed_line_ranges` 对应片段
+- `allowed_related_symbols` 对应片段
+- declaration anchor / adjacent cleanup / member cluster 片段
+- 当前 attempt 的 active quality gate 规则摘要
+
+建议策略：
+
+- fast path 默认启用 prefetch
+- full path 只对 boundary profile 明确的规则启用 prefetch
+- prompt 中优先注入结构化片段，减少模型自己多轮 `Read`
+
+建议落点：
+
+- `issue_planner.py`
+- `issue_prompt.py`
+- `resource_loader.py`
+- `artifact_writer.py`
+
+本轮实现：
+
+- `EditContract` 已补齐 `prefetched_context`
+- `IssuePlanner` 已根据 `allowed_line_ranges / allowed_related_symbols / issue_window` 生成预取片段
+- `IssuePromptBuilder` 已新增 `【预取上下文】` 区块，把 boundary 相关片段一次性打包给模型
+- `prompt_context.json` 已落盘 `prefetched_context`
+- fast path 和 boundary-aware 规则现在会优先拿到 declaration anchor / adjacent cleanup / member cluster 等相关片段
+
+验收标准：
+
+- fast path 命中的问题 `tool_call_count` 和 `read_call_count` 下降
+- `time_to_first_model_content_seconds` 与 `time_after_first_edit_to_finalize_seconds` 改善
+- prompt 仍保持“足够理解，不盲改”
+
+#### 8.7.10 显式调度 Attempt 内验证与工具阶段（参考 `pi-mono` 智能调度思想）
+
+状态：已完成
+
+目标：
+
+- 把“先做什么、哪些可以跳过、何时进入昂贵 build”的判断升级成显式调度层
+- 避免把调度逻辑继续散落在 `FixVerifier`、`ClaudeFixAgent`、`issue_retry` 的条件分支里
+
+为什么要做：
+
+- `pi-mono` 值得借鉴的不是“并行一切”，而是“调度是一等能力”
+- 本项目现在已经有：
+  - fast path / full path
+  - layered verification
+  - patch salvage
+  - boundary runtime
+- 下一步更适合把这些提升成统一的 `AttemptScheduler` / `VerificationScheduler` 策略层
+
+建议职责：
+
+- 决定当前 attempt 走 `fast_path_short_form` 还是 `full_path`
+- 决定 verifier 顺序与 build 是否可跳过
+- 决定 timeout 后是直接失败、salvage 还是快速终止
+- 决定 lessons 是否触发 contract 扩展或路径切换
+
+建议落点：
+
+- `agent_runtime.py`
+- `fix_verifier.py`
+- `issue_retry.py`
+- `perf_flags.py`
+
+本轮实现：
+
+- 新增 `attempt_scheduler.py`
+- `AttemptScheduler.build_execution_schedule()` 已统一决定：
+  - `execution_profile`
+  - `effective_max_turns`
+  - `enable_prefetch`
+  - `enable_attempt_context_cache`
+  - `patch_salvage_enabled`
+- `AttemptScheduler.build_verification_schedule()` 已统一决定 layered verification 行为
+- `ClaudeFixAgent` 已改为通过 scheduler 决定 fast path、salvage 资格和 execution metadata
+- `FixVerifier` 已改为通过 scheduler 决定是否在 precheck 失败时跳过 build
+- execution / verification schedule 已进入 metadata 与 performance metrics，便于审计和回滚
+
+验收标准：
+
+- 运行时调度规则可测试、可解释、可回滚
+- 不再依赖多个模块各自猜测“下一步该做什么”
+- 新增规则/优化时只需扩展 scheduler/policy，而不是复制条件分支
+
+#### 8.7.11 同上下文 continuation retry（有限参考 Claude Code 的恢复式续跑）
+
+状态：已完成
+
+目标：
+
+- 不把所有 `follow_up_response_timeout` 都直接判成整轮失败
+- 在不复制 Claude Code 整套 transcript loop 的前提下，引入适合本项目的恢复式续跑
+- 让“工具后卡住但尚未形成有效 patch”的 attempt 有一次到两次低成本补救机会
+
+为什么要做：
+
+- 当前项目的超时主形态不是“完全没首响应”，而是 `Read / Edit / assistant_text` 之后的 follow-up stall
+- 这类场景如果直接整轮判废，会把小问题放大成多次 attempt、重复 build 和重复 prompt
+- Claude Code 值得借鉴的不是照搬 Teleport/Session 全量机制，而是：
+  - 保留最近运行事实
+  - 清理坏尾巴
+  - 用短续跑指令继续，而不是整轮重头开始
+
+建议策略：
+
+- 只对 `follow_up_response_timeout` 相关阶段开放 continuation：
+  - `post_read_stall`
+  - `post_edit_stall`
+  - `post_summary_stall`
+  - `post_text_stall`
+- 如果已经形成有效 patch，优先走 `patch salvage`，而不是 continuation
+- continuation 不是重发整轮 retry，而是：
+  - 保留原始 prompt
+  - 基于最近 runtime events 构造 compact resume section
+  - 附加最近工具摘要、assistant 摘要、read preview、变更文件信息
+  - 强制提示“不要从头分析、只用仓库相对路径、修好就直接结束”
+- continuation 次数严格受 rollout flag 控制，默认最多 2 次
+
+建议落点：
+
+- `continuation_recovery.py`
+- `claude_agent.py`
+- `attempt_scheduler.py`
+- `perf_flags.py`
+- `events.py`
+
+本轮实现：
+
+- 新增 `continuation_recovery.py`，将 recent tool trace / assistant preview / read preview 收敛成 compact resume context
+- `AttemptScheduler` 已新增 `continuation_retry_enabled / continuation_retry_limit` 与 `should_continue_after_timeout()`
+- `ClaudeFixAgent` 已新增 `_run_runtime_with_continuation()`，对 eligible follow-up stall 执行 bounded continuation
+- continuation 会落 `continuation_requested` 事件，并把 `continuation_retry_count / continuation_recovered / continuation_timeout_stages` 贯通到 performance metrics
+- `Read` 事件已把 `read_preview` 进入 attempt events，便于续跑复用
+- 修复 prompt 已额外强调：文件访问只使用仓库相对路径，避免重走日志里反复出现的 `C:\\...` 绝对路径错误
+- 已补充 `client_connect_timeout` 根因透传：当 Claude SDK 初始化超时时，会触发一次同配置最小 CLI 连接诊断，并把 `403 认证/额度错误` 等 provider 根因拼回 timeout 文本，不再只留下空泛的 `client_connect_timeout`
+
+验收标准：
+
+- `follow_up_response_timeout` 中“无 patch 且直接整轮判废”的比例下降
+- 同一 issue 的平均 attempt 数下降
+- continuation 不引入成功率和质量回退
+- 事件流能够还原 continuation 触发、resume 信息和最终结果
+
+#### 8.7.12 受控 Shell / Finish 语义收口（有限参考 Claude Code 的 shell 权限模型）
+
+状态：已完成
+
+目标：
+
+- 在不放松安全边界的前提下，为修复模型补齐 shell 搜索/查看/诊断能力
+- 让 prompt、运行时和底层 SDK 的 shell 语义完全一致，不再让模型在 PowerShell / CMD / Bash 之间猜测
+- 只把高危文件系统变更判为策略违规，避免 harmless shell 命令和 `Finish` 收尾动作污染成功修复
+- 让 issue 文件路径约束和 prompt 对齐，只允许使用 workspace 相对路径定位目标文件
+
+为什么要做：
+
+- 当前主链路虽然已有 `Read / Grep / Glob / Edit / MultiEdit / Write`，但复杂定位场景仍容易退化成大量 `Read -> Thinking -> Read`
+- 之前的 `Bash(pattern)` 白名单对 Windows 不友好，且把 `echo`、`pwd && ls`、`Finish` 这类正常收尾/诊断动作也误伤成 `forbidden_tool`
+- Claude Code 值得借的不是“无脑放开 shell”，而是：
+  - shell 能力是第一类工具
+  - 权限判断要按命令风险，而不是只按工具名
+  - 完成信号要有正式语义，不能和违规工具混在一起
+
+建议策略：
+
+- 运行时 builtin tool surface 继续暴露 SDK 内建 `Bash`，但 prompt 必须明确它的真实语义就是 bash-compatible shell
+- prompt 只能描述真实可用的工具面，不能继续宣称 `Grep / Glob / Finish` 必然可用
+- `ToolPolicy` 改为按“高危文件系统变更”判定策略违规，而不是继续用窄白名单误伤 harmless shell 行为
+- 高危 shell 操作至少包括：
+  - 删除文件/目录
+  - 创建文件/目录
+  - 覆盖文件/通过 shell 直接改写源码
+- `echo`、搜索、查看、诊断、路径定位等无害 shell 操作不再直接判废
+- `Finish` 必须成为正式受控工具语义，不再因为未注册/未允许而落成 `forbidden_tool`
+- issue 文件路径在 prompt 中必须一律渲染成 workspace 相对路径，不再允许 `C:\...` 或 `/repo/...` 这类误导性路径
+
+建议落点：
+
+- `tool_surface.py`
+- `registry.py`
+- `policy.py`
+- `claude_agent.py`
+- `issue_prompt.py`
+- `retry_context.py`
+
+本轮实现：
+
+- `tool_surface.py` 已改为 bash-compatible shell 语义：
+  - runtime builtin tools 只保留真实可用的 `Read / Edit / Bash`
+  - `Finish` 继续作为受控完成语义存在于 allow rules / policy 层，但不再由 prompt 强制调用
+  - prompt 约束改成“工具名为 `Bash`，且只写 bash 兼容命令；不要写 PowerShell / CMD 语法”
+- `ToolRegistry` 已将 `Finish` 正式注册为受控工具，并将 `Bash` 描述切换为 bash-compatible shell
+- `ToolPolicy` 已从窄白名单切换为高危命令识别：
+  - 允许 harmless shell 命令，例如 `echo`、`find`、路径定位、只读搜索
+  - 拒绝高危文件系统变更命令，例如 `Remove-Item`、`New-Item`、`Set-Content`
+- `ClaudeFixAgent` 的运行时 tool policy 已允许 `Finish`，不再把完成信号误判为 `forbidden_tool`
+- `IssuePromptBuilder` 与 `RetryContext` 已更新为 bash-compatible shell 口径，不再要求 PowerShell/CMD
+- `IssuePromptBuilder` 已将 issue 文件路径统一渲染为 workspace 相对路径，并明确“唯一允许直接操作的目标文件相对路径”
+- prompt 已去掉对 `Grep / Glob / finish` 的虚假承诺，只描述当前真实工具面和真实完成语义
+- 已补回归测试，覆盖：
+  - `Finish` 允许通过
+  - `echo`/`find` 等 harmless shell 命令允许通过
+  - `Remove-Item` / `Set-Content` 仍被判为策略违规
+
+验收标准：
+
+- 修复模型可在当前 SDK 实际 shell 语义下稳定使用 shell 工具进行搜索、查看、诊断和 harmless 收尾
+- `Finish` 不再制造伪 `forbidden_tool`
+- 只有高危文件系统变更型 shell 命令才会被判为策略违规
+- harmless shell 命令不会再把已成功的 patch attempt 判废
+- prompt 描述、运行时工具面和底层 SDK 实际能力保持一致
+- issue 文件定位不再依赖绝对路径或带前导 `/` 的伪根路径
+
+### 参考 `pi-mono` 性能分析的适配边界
+
+以下内容适合借鉴并已转化为本项目可执行项：
+
+- 事件流驱动的运行时观测
+- 文件/片段级缓存
+- planner 侧预取与上下文打包
+- 显式调度与分层验证
+
+以下内容不建议直接照搬：
+
+- TUI 差分渲染
+- 面向交互式终端的 UI 优化
+- 为通用 agent 平台设计的激进并行工具执行
+- 对本项目当前单 issue 修复场景没有直接收益的“完整消息序列化缓存”
+
+### 推荐实施顺序
+
+1. 先做 `8.7.1 性能基线与验收指标`
+2. 再做 `8.7.7 Attempt Event Stream`
+3. 接着做 `8.7.8 Attempt-Local Read Cache`
+4. 然后做 `8.7.9 Planner Prefetch / Context Packing`
+5. 再做 `8.7.10 显式调度 Attempt 内验证与工具阶段`
+6. 继续收紧 `8.7.2 模型交互瘦身`
+7. 复核并迭代 `8.7.4 验证分层`
+8. 持续优化 `8.7.5 Retry 降噪与超时恢复`
+9. 在稳定基础上扩展 `8.7.3 低风险规则 fast path`
+10. 最后通过 `8.7.6 指标化 rollout` 做前后对比和灰度放开
+
+不要反过来做。先把“慢在哪里”量化，再补事件流、缓存、预取和调度这些全局骨架，最后才扩 fast path 和 rollout。
+
+## 8.8 后续补强：复杂规则 Plan-First 工作流
+
+### 目标
+
+针对 `S3776 / S1144 / S107` 这类复杂规则，引入“先 Plan、再机器检查、最后 Edit”的结构化工作流，减少以下典型浪费：
+
+- 第 1 次 attempt 先因为 boundary/scope 被拒
+- 第 2 次 attempt 再因为 quality gate 被拒
+- 第 3 次 attempt 才暴露 contract 与 quality gate 的策略冲突
+
+这部分的目标不是让所有 issue 都变慢，而是**只在高风险规则上，用一轮轻量的 Plan 来避免 2~3 次重型 attempt 的反复试错。**
+
+### 为什么需要这层
+
+从 `batch_20260409130720.log` 的第 5 个 `S3776` 可以看到：
+
+- 第 1 次失败：`scope_line_window_reject`
+- 第 2 次失败：`quality_gate`
+- 第 3 次失败：仍是 `quality_gate`
+
+这类问题不是“模型完全不会修”，而是 edit 前没有一次性想清楚：
+
+- 是否需要提取 helper
+- helper 是同步还是异步
+- 是否会触发 `async_signature / async_requires_await`
+- 是否需要改公开方法名
+- 当前 contract 是否允许 `signature_change`
+- 改方法头/注释会不会越过当前边界
+
+如果这些问题在 edit 前不显式化，就很容易把一个复杂规则拆成三次失败的 attempt。
+
+### 设计原则
+
+- 不是全局默认开启 plan mode
+- 不是把 prompt 写得更长
+- 不是让模型多说一轮自由文本解释
+
+而是：
+
+- 只对复杂/高风险规则启用
+- 让 planner 产出结构化修复形状
+- 在 edit 前做一次机器检查
+- 只有 plan 与 contract/quality gate 不冲突时，才进入 edit
+
+这和 Claude Code 的思路保持一致：
+
+- 任务是一等对象
+- 边界是运行时决策
+- 失败应尽可能在 edit 前显式暴露
+
+### 当前执行状态（2026-04-09）
+
+- `8.8`：已完成
+- 已完成：在 `issue_planner.py` 中为复杂规则接入 `Plan-First`，当前默认覆盖 `S3776 / S1144 / S107` 和带 `helper_extract / signature_change / new_type_add / multi_file_refactor / method_cluster_delete` 能力的高风险规则
+- 已完成：新增 `repair_plan.py`，正式定义 `RepairPlan / RepairHelperPlan / PlanPrecheckResult`，并将其挂入 `EditContract`
+- 已完成：`ClaudeFixAgent.fix_issue()` 已在进入 runtime 前执行 plan precheck；如发现 `signature_change_not_allowed` 等显式冲突，会直接返回 `plan_conflict`，不再浪费 2~3 次 attempt
+- 已完成：`RetryContext / issue_retry / artifact_writer` 已贯通 plan 冲突的结构化记录与提示；`prompt_context.json / build_result.json / edit_contract.json` 现均可落盘 `repair_plan / plan_precheck`
+- 已完成：`perf_flags.py / attempt_scheduler.py` 已接入 `Plan-First` 的启用标记，复杂规则走 `plan_first_full_path`，小规则继续保持 fast path / normal path
+- 已完成：补充回归测试，覆盖 `S3776` 的 `signature_change` 冲突、agent 级 fail-fast、retry prompt 与 artifact 落盘；全量验证已通过
+- 已完成（2026-04-09）：`Plan-First` 已升级为“受控 signature_change + propagation”。当复杂规则触达公开异步方法且缺少 `Async` 后缀时，`IssuePlanner` 现会在当前 workspace 内识别接口声明、调用点与 `nameof(...)` 传播目标；若目标齐全，会自动提升 `signature_change + multi_file_refactor`，并把相关文件加入 `EditContract.target_files`。同时，`PlanPrecheck` 新增 `signature_propagation_targets_missing / signature_propagation_not_allowed`，避免“只放开改名但漏掉接口/调用点联动”的假放行。
+- 已完成（2026-04-09）：已补齐“质量门禁返工闭环”。`quality_gate_verifier.py` 已修复 `Task<(...)>`、`Task<Dictionary<...>>` 等签名的误判，避免把 tuple 返回值、嵌套泛型返回值误识别成方法名或参数列表；`retry_context.py` 已把质量门禁失败升级成可执行返工单，明确提示“只修当前 gate 问题、保留已通过改动、必要时同步接口/调用点/nameof 传播”。
+
+### 需要补强的方向
+
+#### 8.8.1 为复杂规则引入 Plan-First 模式
+
+状态：已完成
+
+适用规则第一批建议：
+
+- `S3776`
+- `S1144`
+- `S107`
+- 其他满足以下任一条件的规则：
+  - 允许 `helper_extract`
+  - 可能需要 `signature_change`
+  - 可能新增 type / helper cluster
+  - 易与 quality gate/contract 冲突
+
+目标：
+
+- 在真正 edit 前，先产出结构化 plan
+- plan 不要求长篇解释，只要求把“修复形状”说清楚
+
+建议落点：
+
+- `issue_planner.py`
+- 新增 `plan_mode.py` 或 `plan_contract.py`
+- `claude_agent.py / agent_runtime.py`
+
+验收标准：
+
+- 复杂规则在 edit 前可拿到结构化 plan
+- 小规则继续直接走 fast path 或 normal path，不被额外拖慢
+
+#### 8.8.2 结构化 Plan 对象，而不是自由文本解释
+
+状态：已完成
+
+Plan 至少应包含：
+
+- `repair_shape`
+- `target_symbols`
+- `new_helpers`
+- `helper_async_map`
+- `requires_signature_change`
+- `requires_new_type`
+- `expected_boundary_capabilities`
+- `expected_quality_gates`
+- `risk_notes`
+
+目标：
+
+- 不依赖模型聊天式“我准备怎么改”
+- 而是让 runtime 能消费 plan 并做预检
+
+建议落点：
+
+- `issue_contract.py`
+- 新增 `repair_plan.py`
+- `artifact_writer.py`
+
+验收标准：
+
+- 每次 plan 都能落成结构化 artifact
+- 后续 runtime 可以直接读取 plan 并做兼容性检查
+
+#### 8.8.3 Edit 前做 Contract / Quality Gate 兼容性预检
+
+状态：已完成
+
+目标：
+
+- 在进入 edit 前，尽早暴露“这次 plan 根本不被当前 contract/quality gate 允许”的场景
+
+预检示例：
+
+- `requires_signature_change=true`，但 contract 未允许 `signature_change`
+- helper 被声明为 `async`，但 plan 中没有真实 `await` 来源
+- 计划新增公开方法/类型，但未覆盖 XML doc 需求
+- 计划触达的 symbol/range 超过当前 boundary profile
+
+建议落点：
+
+- 新增 `plan_reviewer.py`
+- `boundary_runtime.py`
+- `quality_gate.py`
+
+验收标准：
+
+- 能在 edit 前就明确回答“当前 plan 会不会被 boundary / quality gate 拒绝”
+- 复杂规则的无效 attempt 数下降
+
+#### 8.8.4 将 Plan 失败显式写入 RetryContext
+
+状态：已完成
+
+目标：
+
+- 如果 plan 预检失败，不要等 edit 之后再把错误反馈给模型
+- 直接把 `plan_conflict`、`signature_change_not_allowed`、`async_helper_invalid` 等写入 retry context
+
+建议落点：
+
+- `retry_context.py`
+- `issue_retry.py`
+- `artifact_writer.py`
+
+验收标准：
+
+- 复杂规则重试时，模型拿到的是“计划层冲突”的结构化反馈，而不是一堆后置失败日志
+
+#### 8.8.5 只对复杂规则启用，保留小规则直修
+
+状态：已完成
+
+目标：
+
+- 不让 `S1481 / S125` 这类小规则也先跑一轮 plan，避免整体变慢
+
+建议策略：
+
+- `Plan-First` 只对复杂规则或高风险能力启用
+- 小规则继续：
+  - `fast_path_short_form`
+  - 或现有 normal path
+
+建议落点：
+
+- `perf_flags.py`
+- `issue_planner.py`
+- `attempt_scheduler.py`
+
+验收标准：
+
+- 复杂规则的平均重试次数下降
+- 小规则平均耗时不升高
+
+#### 8.8.6 受控 signature_change + propagation
+
+状态：已完成
+
+目标：
+
+- 不再只因为 `signature_change_not_allowed` 就直接跳过像 `S3776` 这样的复杂规则
+- 对公开异步方法的命名修正，允许在**明确识别到传播目标**时放开受控签名变更
+- 传播范围只限于：
+  - 接口声明
+  - 同仓可定位的调用点
+  - `nameof(...)` 引用
+
+设计原则：
+
+- 不做全局放开
+- 不把 `signature_change` 单独裸放开
+- 只有当 planner 在当前 workspace 中识别到可信传播目标时，才提升 contract 能力
+- 如果需要改名但找不到传播目标，Plan-First 继续在 edit 前阻断
+
+本轮实施结果：
+
+- `RepairPlan` 已新增：
+  - `primary_method_name`
+  - `proposed_method_name`
+  - `requires_propagation`
+  - `propagation_targets`
+- `IssuePlanner` 现支持在 `workspace_path` 下扫描 `.cs` 文件，识别：
+  - `signature_declaration`
+  - `callsite`
+  - `nameof_ref`
+- 当 `S3776` 等复杂规则触达公开异步方法且缺少 `Async` 后缀时，planner 会：
+  - 先生成带传播目标的 repair plan
+  - 在传播目标齐全时自动提升 `signature_change`
+  - 如果跨文件传播成立，同时提升 `multi_file_refactor`
+- `EditContract` 现会把传播目标相关文件加入 `target_files`，并把相关 symbol 纳入 `allowed_related_symbols`
+- `PlanPrecheck` 已新增：
+  - `signature_propagation_targets_missing`
+  - `signature_propagation_not_allowed`
+- 2026-04-09 补充修复：`IssuePlanner._iter_workspace_cs_files()` 已改为基于 `workspace_path` 相对路径过滤受保护目录，避免真实 batch 工作区位于 `.agent_workspaces/...` 时把所有 `.cs` 文件误判成受保护目录，导致 propagation 扫描结果为空
+- 2026-04-09 补充修复：signature propagation 扫描读取源码时已改成 `utf-8` + `errors="replace"`，避免个别非 UTF-8 `.cs` 文件中断扫描
+- 2026-04-09 回归补强：已新增覆盖真实 `.agent_workspaces/...` 目录形态的 planner 测试，确保 `S3776` 这类公开异步方法改名场景在真实运行目录下也会自动提升 `signature_change + multi_file_refactor`
+
+验收标准：
+
+- 类似 `AutoPlugin -> AutoPluginAsync` 的公开异步方法改名，不再因为 contract 固定缺失 `signature_change` 而直接跳过
+- 如果需要联动接口或调用点，contract/plan 必须显式识别这些目标
+- 如果传播目标缺失，必须在 edit 前 fail-fast，而不是放进去等 build 再炸
+
+### 推荐实施顺序
+
+1. 先做 `8.8.1 Plan-First 开关与适用规则集`
+2. 再做 `8.8.2 结构化 Plan 对象`
+3. 然后做 `8.8.3 Edit 前 plan 预检`
+4. 再做 `8.8.4 RetryContext 接 plan 冲突`
+5. 最后做 `8.8.5 与 fast path / scheduler 联动`
+
+不要反过来做。先把“计划长什么样”和“谁需要 plan”定义清楚，再去接入 retry 与调度。
 
 ## 9. 执行顺序与里程碑
 

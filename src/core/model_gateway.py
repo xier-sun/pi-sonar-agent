@@ -64,6 +64,8 @@ class ToolCallEvent:
     """Normalized tool-call event emitted by a model gateway."""
 
     name: str
+    payload: dict[str, Any] = field(default_factory=dict)
+    preview: str = ""
 
 
 @dataclass(frozen=True)
@@ -71,6 +73,7 @@ class TextEvent:
     """Normalized assistant text event emitted by a model gateway."""
 
     text: str
+    block_type: str = "TextBlock"
 
 
 @dataclass(frozen=True)
@@ -86,6 +89,8 @@ class TraceEvent:
     """Normalized trace event for unhandled SDK payload types."""
 
     message_type: str
+    payload: dict[str, Any] = field(default_factory=dict)
+    preview: str = ""
 
 
 GatewayEvent = ToolCallEvent | TextEvent | ResultEvent | TraceEvent
@@ -108,6 +113,9 @@ class ModelGatewaySession(Protocol):
 
     async def close(self) -> GatewayAbortResult:
         """Close the current model session cleanly."""
+
+    async def diagnose_connect_timeout(self) -> str:
+        """Return a short diagnostic string for connect-time failures when available."""
 
 
 class ModelGateway(Protocol):

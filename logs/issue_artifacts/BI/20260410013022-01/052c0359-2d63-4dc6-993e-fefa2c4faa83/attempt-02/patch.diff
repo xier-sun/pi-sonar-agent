@@ -1,0 +1,154 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -2263,6 +2263,19 @@
+         #endregion
+
+ 
+
+         /// <summary>
+
++        /// 结束当前事件并重置状态
+
++        /// </summary>
+
++        private static void EndCurrentEventAndReset(
+
++            PenaltyEvent currentEvent,
+
++            DateTime endDate,
+
++            List<(int EventId, DateTime ResolvedDate, string Description)> pendingEventUpdates,
+
++            ref decimal previousOverdueAmount)
+
++        {
+
++            QueueEventUpdate(pendingEventUpdates, currentEvent, endDate);
+
++            previousOverdueAmount = 0;
+
++        }
+
++
+
++        /// <summary>
+
+         /// 处理指定期间的逾期情况，带事件跟踪
+
+         /// </summary>
+
+         private async Task<EventTrackingResult> ProcessOverduePeriodWithEventTracking(
+
+@@ -2322,31 +2335,25 @@
+                 // 只有当天有逾期金额和逾期天数时才计算罚息
+
+                 if (overdueInfo.U_Due_Amt > 0 && overdueInfo.U_OverDue_Days > 0)
+
+                 {
+
+-                    // 计算当天的罚息金额
+
+                     var (penaltyAmount,dayilRate) = CalculatePenaltyAmount( overdueInfo, saleOrderPlugin, rateTiers);
+
+ 
+
+                     if (penaltyAmount > 0)
+
+                     {
+
+-                        // 检查逾期金额是否发生变化
+
+                         if (overdueInfo.U_Due_Amt != previousOverdueAmount)
+
+                         {
+
+-                            // 如果有当前事件，结束它
+
+                             if (currentEvent != null)
+
+                             {
+
+                                 QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
+                             }
+
+ 
+
+-                            // 创建新的PenaltyEvent
+
+                             currentEvent = await CreateNewPenaltyEvent(order, overdueInfo, currentDate, rule, slp);
+
+                             previousOverdueAmount = overdueInfo.U_Due_Amt;
+
+                         }
+
+ 
+
+-                        // 创建当天的PenaltyLedger记录（仅在允许的生成日期范围内）
+
+                         if (currentEvent != null && (!generationStartDate.HasValue || currentDate >= generationStartDate.Value))
+
+                         {
+
+                             CreateDailyPenaltyLedgerEntry(order, overdueInfo, penaltyAmount, currentDate, currentEvent,dayilRate, slp,ref penaltyLedgers);
+
+ 
+
+-                            // 分批保存：每累积500条记录就保存一次
+
+                             if (penaltyLedgers.Count >= batchSize)
+
+                             {
+
+                                 await UnitWork.BatchAddAsync<PenaltyLedger, int>(penaltyLedgers.ToArray());
+
+@@ -2357,23 +2364,19 @@
+                     }
+
+                     else
+
+                     {
+
+-                        // 如果当天没有罚息，但有当前事件，结束它
+
+                         if (currentEvent != null)
+
+                         {
+
+-                            QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
++                            EndCurrentEventAndReset(currentEvent, currentDate.AddDays(-1), pendingEventUpdates, ref previousOverdueAmount);
+
+                             currentEvent = null;
+
+-                            previousOverdueAmount = 0;
+
+                         }
+
+                     }
+
+                 }
+
+                 else
+
+                 {
+
+-                    // 如果当天没有逾期，但有当前事件，结束它
+
+                     if (currentEvent != null)
+
+                     {
+
+-                        QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
++                        EndCurrentEventAndReset(currentEvent, currentDate.AddDays(-1), pendingEventUpdates, ref previousOverdueAmount);
+
+                         currentEvent = null;
+
+-                        previousOverdueAmount = 0;
+
+                     }
+
+                 }
+
+             }

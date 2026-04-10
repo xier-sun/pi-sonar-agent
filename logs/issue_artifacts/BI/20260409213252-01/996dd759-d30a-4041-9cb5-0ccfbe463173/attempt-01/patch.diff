@@ -1,0 +1,86 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -83,15 +83,33 @@
+                 }
+
+ 
+
+                 // 合并：有 U_DevEntry 的直接用，没有的用回溯结果
+
+-                var returnItemsWithDevEntry = returnItems.Select(x => new
+
+-                {
+
+-                    x.DocEntry, x.U_New_ORDRID, x.ItemCode, x.Price, x.Quantity, x.StockValue, x.LastPurPrc, x.CreateDate,
+
+-                    ResolvedDevEntry = !string.IsNullOrEmpty(x.U_DevEntry)
+
+-                        ? (int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0)
+
+-                        : (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved) ? resolved : 0)
+
+-                }).Where(x => x.ResolvedDevEntry > 0 
+
+-                //&& !csOrders.Contains(x.ResolvedDevEntry)
+
+-                ).ToList();
+
++                var returnItemsWithDevEntry = returnItems
+
++                    .Select(x =>
+
++                    {
+
++                        // 解析 DevEntry：优先使用 U_DevEntry，否则从回溯结果获取
+
++                        int resolvedDevEntry;
+
++                        if (!string.IsNullOrEmpty(x.U_DevEntry))
+
++                        {
+
++                            int.TryParse(x.U_DevEntry, out var parsed);
+
++                            resolvedDevEntry = parsed;
+
++                        }
+
++                        else if (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved))
+
++                        {
+
++                            resolvedDevEntry = resolved;
+
++                        }
+
++                        else
+
++                        {
+
++                            resolvedDevEntry = 0;
+
++                        }
+
++
+
++                        return new
+
++                        {
+
++                            x.DocEntry, x.U_New_ORDRID, x.ItemCode, x.Price, x.Quantity, x.StockValue, x.LastPurPrc, x.CreateDate,
+
++                            ResolvedDevEntry = resolvedDevEntry
+
++                        };
+
++                    })
+
++                    .Where(x => x.ResolvedDevEntry > 0)
+
++                    .ToList();
+
+ 
+
+                 var returnProducts = returnItemsWithDevEntry.Where(m => m.Price > 0).ToList();
+
+                 var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)

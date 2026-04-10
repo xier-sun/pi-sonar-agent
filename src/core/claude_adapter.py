@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
+import os
+import shutil
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
@@ -17,6 +22,7 @@ from pi_sonar_agent.core.model_gateway import (
     ToolCallEvent,
     TraceEvent,
 )
+from pi_sonar_agent.core.project_env import MODEL_ENV_KEYS
 
 THIRD_PARTY_MODEL_ENV_KEYS = (
     "ANTHROPIC_CUSTOM_MODEL_OPTION",
@@ -37,6 +43,8 @@ THIRD_PARTY_MODEL_ENV_KEYS = (
     "CLAUDE_MODEL",
     "OPENAI_MODEL",
 )
+
+_CONNECT_DIAGNOSTIC_CACHE: dict[tuple[str, str, str], str] = {}
 
 
 @dataclass(frozen=True)
@@ -122,10 +130,16 @@ class _ClaudeSDKSessionController:
 class ClaudeGatewaySession(ModelGatewaySession):
     """Claude SDK-backed gateway session that emits normalized events."""
 
-    def __init__(self, client_manager: Any, dependencies: ClaudeSDKDependencies) -> None:
+    def __init__(
+        self,
+        client_manager: Any,
+        dependencies: ClaudeSDKDependencies,
+        request: GatewayRequest,
+    ) -> None:
         self._dependencies = dependencies
         self._controller = _ClaudeSDKSessionController(client_manager)
         self._client: Any | None = None
+        self._request = request
 
     async def connect(self, timeout_seconds: float) -> None:
         self._client = await self._controller.connect(timeout_seconds)
@@ -145,18 +159,33 @@ class ClaudeGatewaySession(ModelGatewaySession):
                 if isinstance(message, self._dependencies.assistant_message_cls):
                     for block in message.content:
                         if isinstance(block, self._dependencies.tool_use_block_cls):
-                            yield ToolCallEvent(name=block.name)
+                            payload = _extract_tool_payload(block)
+                            yield ToolCallEvent(
+                                name=block.name,
+                                payload=payload,
+                                preview=_build_preview_from_payload(payload),
+                            )
                         elif isinstance(block, self._dependencies.text_block_cls) and block.text.strip():
-                            yield TextEvent(text=block.text)
+                            yield TextEvent(text=block.text, block_type=type(block).__name__)
                         else:
-                            yield TraceEvent(message_type=type(block).__name__)
+                            payload = _extract_trace_payload(block)
+                            yield TraceEvent(
+                                message_type=type(block).__name__,
+                                payload=payload,
+                                preview=_build_preview_from_payload(payload),
+                            )
                 elif isinstance(message, self._dependencies.result_message_cls):
                     yield ResultEvent(
                         total_cost_usd=float(message.total_cost_usd or 0.0),
                         agent_error=self._extract_agent_error(message),
                     )
                 else:
-                    yield TraceEvent(message_type=type(message).__name__)
+                    payload = _extract_trace_payload(message)
+                    yield TraceEvent(
+                        message_type=type(message).__name__,
+                        payload=payload,
+                        preview=_build_preview_from_payload(payload),
+                    )
 
         return iterate()
 
@@ -165,6 +194,69 @@ class ClaudeGatewaySession(ModelGatewaySession):
 
     async def close(self) -> GatewayAbortResult:
         return await self._controller.close()
+
+    async def diagnose_connect_timeout(self) -> str:
+        cli_path = _resolve_sdk_cli_path()
+        endpoint = str(self._request.env.get("ANTHROPIC_BASE_URL", "")).strip()
+        model = str(
+            self._request.model
+            or self._request.env.get("CLAUDE_MODEL")
+            or self._request.env.get("OPENAI_MODEL")
+            or self._request.metadata.get("model_display", "")
+        ).strip()
+        cache_key = (cli_path, endpoint, model)
+        cached = _CONNECT_DIAGNOSTIC_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
+        command = [cli_path, "--print"]
+        if model:
+            command.extend(["--model", model])
+        for flag, value in self._request.extra_args.items():
+            if value is None:
+                command.append(f"--{flag}")
+            else:
+                command.extend([f"--{flag}", str(value)])
+        command.append("Reply with OK only.")
+
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if key != "CLAUDECODE" and key not in MODEL_ENV_KEYS
+        }
+        env.update(self._request.env)
+        env["CLAUDE_CODE_ENTRYPOINT"] = "sdk-py"
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                cwd=self._request.cwd,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except Exception as exc:
+            diagnostic = f"连接诊断失败：无法启动 Claude CLI 探针: {exc}"
+            _CONNECT_DIAGNOSTIC_CACHE[cache_key] = diagnostic
+            return diagnostic
+
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=12)
+        except asyncio.TimeoutError:
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+            with contextlib.suppress(Exception):
+                await process.communicate()
+            diagnostic = "连接诊断：使用同配置执行最小 CLI 请求时也在 12 秒内无响应。"
+            _CONNECT_DIAGNOSTIC_CACHE[cache_key] = diagnostic
+            return diagnostic
+
+        stdout_text = (stdout or b"").decode("utf-8", errors="replace").strip()
+        stderr_text = (stderr or b"").decode("utf-8", errors="replace").strip()
+        combined = stdout_text or stderr_text
+        diagnostic = _summarize_connect_probe_output(combined, process.returncode)
+        _CONNECT_DIAGNOSTIC_CACHE[cache_key] = diagnostic
+        return diagnostic
 
     @staticmethod
     def _extract_agent_error(message: Any) -> str | None:
@@ -326,4 +418,129 @@ class ClaudeAdapter(ModelGateway):
             extra_args=request.extra_args,
         )
         client_manager = self._dependencies.client_cls(options=options)
-        return ClaudeGatewaySession(client_manager, self._dependencies)
+        return ClaudeGatewaySession(client_manager, self._dependencies, request)
+
+
+def _resolve_sdk_cli_path() -> str:
+    """Resolve the Claude CLI path using the same precedence as the SDK."""
+
+    import claude_agent_sdk
+
+    cli_name = "claude.exe" if os.name == "nt" else "claude"
+    bundled_path = Path(claude_agent_sdk.__file__).resolve().parent / "_bundled" / cli_name
+    if bundled_path.exists() and bundled_path.is_file():
+        return str(bundled_path)
+
+    which_path = shutil.which("claude")
+    if which_path:
+        return which_path
+
+    return "claude"
+
+
+def _truncate_diagnostic_text(value: str, *, max_chars: int = 240) -> str:
+    text = str(value or "").replace("\r\n", "\n").strip()
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3].rstrip() + "..."
+
+
+def _summarize_connect_probe_output(output: str, return_code: int | None) -> str:
+    text = _truncate_diagnostic_text(output)
+    if not text:
+        if return_code not in (None, 0):
+            return f"连接诊断：Claude CLI 最小请求退出码为 {return_code}，但没有返回可读错误信息。"
+        return "连接诊断：Claude CLI 最小请求未返回额外错误信息。"
+    if "Failed to authenticate" in text or "API Error" in text:
+        return f"连接诊断：{text}"
+    if return_code not in (None, 0):
+        return f"连接诊断：Claude CLI 最小请求失败（exit={return_code}）：{text}"
+    return f"连接诊断：Claude CLI 最小请求可用，返回：{text}"
+
+
+def _truncate_text(value: str, *, max_chars: int = 600) -> str:
+    text = str(value or "").replace("\r\n", "\n").strip()
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 3].rstrip() + "..."
+
+
+def _summarize_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (bool, int, float)):
+        return value
+    if isinstance(value, str):
+        return _truncate_text(value)
+    if isinstance(value, dict):
+        summarized: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if key_text in {"old_string", "new_string", "content", "command"}:
+                text = str(item or "")
+                summarized[f"{key_text}_preview"] = _truncate_text(text)
+                summarized[f"{key_text}_length"] = len(text)
+            else:
+                summarized[key_text] = _summarize_value(item)
+        return summarized
+    if isinstance(value, (list, tuple, set)):
+        items = list(value)
+        summarized_items = [_summarize_value(item) for item in items[:8]]
+        if len(items) > 8:
+            summarized_items.append(f"... (+{len(items) - 8} more)")
+        return summarized_items
+    if hasattr(value, "__dict__"):
+        raw = {
+            key: item
+            for key, item in vars(value).items()
+            if not key.startswith("_")
+        }
+        if raw:
+            return _summarize_value(raw)
+    return _truncate_text(repr(value))
+
+
+def _extract_tool_payload(block: Any) -> dict[str, Any]:
+    raw_input = getattr(block, "input", None)
+    if isinstance(raw_input, dict):
+        return {str(key): _summarize_value(value) for key, value in raw_input.items()}
+    if raw_input is not None:
+        return {"input": _summarize_value(raw_input)}
+    return {}
+
+
+def _extract_trace_payload(value: Any) -> dict[str, Any]:
+    candidate_keys = (
+        "thinking",
+        "text",
+        "role",
+        "id",
+        "name",
+        "type",
+        "content",
+        "result",
+        "errors",
+    )
+    payload: dict[str, Any] = {}
+    for key in candidate_keys:
+        if hasattr(value, key):
+            payload[key] = _summarize_value(getattr(value, key))
+    if payload:
+        return payload
+    if hasattr(value, "__dict__"):
+        raw = {
+            str(key): _summarize_value(item)
+            for key, item in vars(value).items()
+            if not str(key).startswith("_")
+        }
+        return raw
+    return {"repr": _truncate_text(repr(value))}
+
+
+def _build_preview_from_payload(payload: dict[str, Any]) -> str:
+    if not payload:
+        return ""
+    try:
+        return _truncate_text(json.dumps(payload, ensure_ascii=False))
+    except TypeError:
+        return _truncate_text(str(payload))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from pi_sonar_agent.core.boundary_capabilities import normalize_boundary_capabilities
 from pi_sonar_agent.core.issue_contract import EditContract
 
 
@@ -28,6 +29,10 @@ class BoundaryPolicy:
         if len(edit_contract.validation_line_range) == 2:
             return cls.normalize_line_ranges((edit_contract.validation_line_range,))
         return ()
+
+    @staticmethod
+    def contract_capabilities(edit_contract: EditContract) -> tuple[str, ...]:
+        return normalize_boundary_capabilities(edit_contract.allowed_capabilities)
 
     @classmethod
     def find_outside_lines(

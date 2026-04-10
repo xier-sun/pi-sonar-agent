@@ -1,0 +1,33 @@
+{
+  "status": "retry",
+  "guardrail_mode": "scope",
+  "summary": "Patch touches undeclared files or lines outside the declared edit contract.",
+  "violations": [
+    {
+      "type": "incidental_fix",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "reason": "This hunk changes lines outside the edit contract window 111-125.",
+      "symbol": "statement@115-124",
+      "changed_lines": [
+        126
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n@@ -126 +125,0 @@\n-                //&& !csOrders.Contains(x.ResolvedDevEntry)"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "bcdc9839-b1ff-4fa2-a5e0-7e3d6ce6b4a1",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "symbol": "statement@115-124",
+      "summary": "Potential adjacent cleanup found outside the current edit contract window.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n@@ -126 +125,0 @@\n-                //&& !csOrders.Contains(x.ResolvedDevEntry)",
+      "discovered_at": "2026-04-08T17:43:13.719107+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 1,
+    "total_changed_lines": 1
+  }
+}

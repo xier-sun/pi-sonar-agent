@@ -1,0 +1,70 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -84,13 +84,28 @@
+                 }
+
+ 
+
+                 // 合并：有 U_DevEntry 的直接用，没有的用回溯结果
+
+-                var returnItemsWithDevEntry = returnItems.Select(x => new
+
+-                {
+
+-                    x.DocEntry, x.U_New_ORDRID, x.ItemCode, x.Price, x.Quantity, x.StockValue, x.LastPurPrc, x.CreateDate,
+
+-                    ResolvedDevEntry = !string.IsNullOrEmpty(x.U_DevEntry)
+
+-                        ? (int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0)
+
+-                        : (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved) ? resolved : 0)
+
+-                }).Where(x => x.ResolvedDevEntry > 0 
+
++                var returnItemsWithDevEntry = returnItems.Select(x =>
+
++                {
+
++                    int resolvedDevEntry;
+
++                    if (!string.IsNullOrEmpty(x.U_DevEntry))
+
++                    {
+
++                        resolvedDevEntry = int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0;
+
++                    }
+
++                    else if (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved))
+
++                    {
+
++                        resolvedDevEntry = resolved;
+
++                    }
+
++                    else
+
++                    {
+
++                        resolvedDevEntry = 0;
+
++                    }
+
++
+
++                    return new
+
++                    {
+
++                        x.DocEntry, x.U_New_ORDRID, x.ItemCode, x.Price, x.Quantity, x.StockValue, x.LastPurPrc, x.CreateDate,
+
++                        ResolvedDevEntry = resolvedDevEntry
+
++                    };
+
++                }).Where(x => x.ResolvedDevEntry > 0
+
+                 //&& !csOrders.Contains(x.ResolvedDevEntry)
+
+                 ).ToList();

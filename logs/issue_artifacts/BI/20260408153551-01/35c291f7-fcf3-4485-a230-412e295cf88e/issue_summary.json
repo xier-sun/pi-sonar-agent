@@ -1,0 +1,76 @@
+{
+  "issue_key": "35c291f7-fcf3-4485-a230-412e295cf88e",
+  "repository": "BI",
+  "run_label": "20260408153551-01",
+  "rule_id": "csharpsquid:S125",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+  "line": 2228,
+  "status": "skipped",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "retrying",
+      "started_at": "2026-04-08T07:56:14.134973+00:00",
+      "finished_at": "2026-04-08T08:09:34.591058+00:00",
+      "duration_seconds": 800.451,
+      "failure_kind": "forbidden_tool",
+      "retry_reason": "build_verification_failed",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": true,
+      "error": "Forbidden tool used during issue fix",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+      ],
+      "issue_log_path": "logs\\issue_attempts\\BI_35c291f7-fcf3-4485-a230-412e295cf88e_20260408153551-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260408153551-01/35c291f7-fcf3-4485-a230-412e295cf88e/attempt-01"
+    },
+    {
+      "attempt_number": 2,
+      "status": "retrying",
+      "started_at": "2026-04-08T08:09:38.071171+00:00",
+      "finished_at": "2026-04-08T08:21:33.656796+00:00",
+      "duration_seconds": 715.582,
+      "failure_kind": "scope",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": true,
+      "build_verification_failed": false,
+      "error": "Issue changes exceeded allowed scope",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+      ],
+      "issue_log_path": "logs\\issue_attempts\\BI_35c291f7-fcf3-4485-a230-412e295cf88e_20260408153551-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260408153551-01/35c291f7-fcf3-4485-a230-412e295cf88e/attempt-02"
+    },
+    {
+      "attempt_number": 3,
+      "status": "skipped",
+      "started_at": "2026-04-08T08:21:35.019408+00:00",
+      "finished_at": "2026-04-08T08:25:48.730217+00:00",
+      "duration_seconds": 253.709,
+      "failure_kind": "scope",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": true,
+      "build_verification_failed": false,
+      "error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+      ],
+      "issue_log_path": "logs\\issue_attempts\\BI_35c291f7-fcf3-4485-a230-412e295cf88e_20260408153551-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260408153551-01/35c291f7-fcf3-4485-a230-412e295cf88e/attempt-03"
+    }
+  ],
+  "final_failure_kind": "scope",
+  "final_error": "Issue changes exceeded allowed scope after 3 attempt(s)",
+  "final_skip_reason": "Issue changes exceeded allowed scope after 3 attempt(s)",
+  "final_summary": "Fixed 1 file(s)",
+  "artifact_root": "logs/issue_artifacts/BI/20260408153551-01/35c291f7-fcf3-4485-a230-412e295cf88e"
+}

@@ -1,0 +1,61 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -1455,12 +1455,8 @@
+             allReturns.AddRange(directReturns.Select(x=> (x.OrderId,x.Return)));
+
+             allReturns.AddRange(processedIndirectReturns.Select(x=> (x.OrderId.Value, x.Return)));
+
+ 
+
+-            foreach (var group in allReturns.GroupBy(r => r.OrderId))
+
+-            {
+
+-                result[group.Key] = group.Select(r => r.Return)
+
+-                                     .OrderBy(r => r.DocDate)
+
+-                                     .ToList();
+
+-            }
+
++            result = allReturns.GroupBy(r => r.OrderId)
+
++                              .ToDictionary(g => g.Key, g => g.Select(r => r.Return).OrderBy(r => r.DocDate).ToList());
+
+ 
+
+             return result;
+
+         }
+
+@@ -1492,13 +1488,8 @@
+                 })
+
+                 .ToListAsync();
+
+ 
+
+-            // 按订单ID分组
+
+-            foreach (var group in clearRecons.GroupBy(r => r.OrderId))
+
+-            {
+
+-                result[group.Key] = group.Select(r => r.ClearRecon)
+
+-                                         .OrderBy(r => r.CreateDate)
+
+-                                         .ToList();
+
+-            }
+
++            result = clearRecons.GroupBy(r => r.OrderId)
+
++                                .ToDictionary(g => g.Key, g => g.Select(r => r.ClearRecon).OrderBy(r => r.CreateDate).ToList());
+
+ 
+
+             return result;
+
+         }

@@ -21,8 +21,12 @@ from pi_sonar_agent.agent.rule_policies import (
 )
 from pi_sonar_agent.core.artifact_writer import ArtifactWriter
 from pi_sonar_agent.core.follow_up_store import FollowUpStore
+from pi_sonar_agent.core.lessons_store import LessonsStore
+from pi_sonar_agent.core.quality_gate import build_compliance_summary
 from pi_sonar_agent.core.retry_context import (
+    BoundaryFailureContext,
     CompilerErrorContext,
+    PlanFailureContext,
     QualityGateFailureContext,
     QualityGateViolationContext,
     RetryContext,
@@ -38,6 +42,7 @@ from pi_sonar_agent.core.state import (
     IssueStatus,
     RetryReason,
     WorkspaceBaseline,
+    summarize_issue_performance,
     utc_now_iso,
 )
 from pi_sonar_agent.core.state_store import RunStateStore
@@ -219,10 +224,22 @@ def _extract_review_failure_context(result: FixResult) -> ReviewFailureContext |
         for item in reviewer_result.get("violations", [])
         if isinstance(item, dict)
     )
+    violation_types = {item.violation_type for item in violations}
+    filesystem_only = violation_types and violation_types.issubset(
+        {"forbidden_path", "file_created", "file_deleted"}
+    )
     constraints = (
-        "只保留完成当前 Sonar issue 所必需的修改。",
-        "不要触碰 Edit Contract 之外的文件或无关代码行。",
-        "把相邻问题记录到 follow-up，而不是混入当前 patch。",
+        (
+            "只修改工作区内已有的源文件。",
+            "不要新建、删除、重命名文件，也不要整文件覆盖写入。",
+            "继续使用 Edit 做局部补丁，不要通过工具改坏文件系统边界。",
+        )
+        if filesystem_only
+        else (
+            "只保留完成当前 Sonar issue 所必需的修改。",
+            "不要触碰 Edit Contract 之外的文件或无关代码行。",
+            "把相邻问题记录到 follow-up，而不是混入当前 patch。",
+        )
     )
     raw_output = str(result.build_output or "").strip()
     summary = str(reviewer_result.get("summary", "")).strip() or "Diff reviewer rejected the patch."
@@ -267,6 +284,55 @@ def _extract_quality_gate_failure_context(result: FixResult) -> QualityGateFailu
     )
 
 
+def _extract_plan_failure_context(result: FixResult) -> PlanFailureContext | None:
+    """Extract structured plan-first precheck conflicts from a FixResult."""
+
+    payload = getattr(result, "plan_precheck", None)
+    if payload is None:
+        return None
+    if hasattr(payload, "to_dict"):
+        payload = payload.to_dict()
+    if not isinstance(payload, dict):
+        return None
+    if result.failure_kind != "plan_conflict" and not bool(payload.get("blocking")):
+        return None
+    code = str(payload.get("code", "")).strip()
+    if not code:
+        return None
+    return PlanFailureContext(
+        code=code,
+        summary=str(payload.get("summary", "")).strip(),
+        details=tuple(
+            str(item).strip()
+            for item in payload.get("details", [])
+            if str(item).strip()
+        ),
+        guidance=tuple(
+            str(item).strip()
+            for item in payload.get("guidance", [])
+            if str(item).strip()
+        ),
+    )
+
+
+def _extract_boundary_failure_context(result: FixResult) -> BoundaryFailureContext | None:
+    """Extract structured runtime boundary failure details from a FixResult."""
+
+    code = str(getattr(result, "boundary_failure_code", "")).strip()
+    if not code:
+        return None
+    secondary_codes = tuple(
+        str(item).strip()
+        for item in getattr(result, "secondary_boundary_failure_codes", ())
+        if str(item).strip()
+    )
+    return BoundaryFailureContext(
+        code=code,
+        summary=str(getattr(result, "boundary_failure_summary", "")).strip(),
+        secondary_codes=secondary_codes,
+    )
+
+
 def build_retry_context(
     workspace_path: Path,
     result: FixResult,
@@ -290,13 +356,21 @@ def build_retry_context(
         changed_files=_normalize_changed_files(result),
         compiler_errors=compiler_errors,
         guidance=tuple(_build_retry_guidance(list(compiler_errors))) if compiler_errors else (),
+        boundary_failure=_extract_boundary_failure_context(result),
         scope_violation=_extract_scope_violation_context(raw_output, issue),
         review_failure=_extract_review_failure_context(result),
         quality_gate_failure=_extract_quality_gate_failure_context(result),
-        model_timeout_summary=_summarize_model_timeout(raw_output) if result.failure_kind == "model_timeout" else "",
+        plan_failure=_extract_plan_failure_context(result),
+        model_timeout_summary=(
+            _summarize_model_timeout(raw_output, getattr(result, "model_timeout_stage", ""))
+            if result.failure_kind == "model_timeout"
+            else ""
+        ),
+        model_timeout_stage=str(getattr(result, "model_timeout_stage", "")).strip(),
         build_tool_failed=result.failure_kind == "build_tool",
         forbidden_tool_failed=result.failure_kind == "forbidden_tool",
         model_timeout_failed=result.failure_kind == "model_timeout",
+        patch_salvaged=bool(getattr(result, "patch_salvaged", False)),
     )
 
 
@@ -310,9 +384,22 @@ def build_retry_feedback(
     return render_retry_context(build_retry_context(workspace_path, result, issue))
 
 
-def _summarize_model_timeout(raw_output: str) -> str:
+def _summarize_model_timeout(raw_output: str, timeout_stage: str = "") -> str:
     """Summarize the timeout mode for retry feedback."""
 
+    normalized_stage = str(timeout_stage or "").strip()
+    stage_map = {
+        "post_read_stall": "在 Read 工具返回后等待模型继续响应时超时",
+        "post_edit_stall": "在 Edit 工具返回后等待模型继续响应时超时",
+        "post_summary_stall": "在修复已完成后的总结阶段超时",
+        "post_text_stall": "在助手文本输出后等待进一步响应时超时",
+        "follow_up_response_timeout": "在等待模型后续响应时超时",
+        "first_response_timeout": "在等待模型首响应时超时",
+        "client_connect_timeout": "在初始化模型客户端时超时",
+        "issue_hard_timeout": "在单个 issue 执行过程中超时",
+    }
+    if normalized_stage in stage_map:
+        return stage_map[normalized_stage]
     if "没有返回后续响应" in raw_output:
         return "在等待模型后续响应时超时"
     if "单个 issue 在" in raw_output:
@@ -328,9 +415,13 @@ def _build_final_skip_reason(result: FixResult, attempts: int) -> str:
     if result.failure_kind == "scope":
         return f"Issue changes exceeded allowed scope after {attempts} attempt(s)"
     if result.failure_kind == "reviewer":
+        if str(getattr(result, "boundary_failure_code", "")).startswith("filesystem_"):
+            return f"Filesystem boundary rejected the patch after {attempts} attempt(s)"
         return f"Diff reviewer rejected the patch after {attempts} attempt(s)"
     if result.failure_kind == "quality_gate":
         return f"C# quality gate verification failed after {attempts} attempt(s)"
+    if result.failure_kind == "plan_conflict":
+        return f"Plan precheck rejected the edit after {attempts} attempt(s)"
     if result.failure_kind == "no_change":
         return f"Agent completed without modifying any files after {attempts} attempt(s)"
     if result.failure_kind == "rule_validation":
@@ -585,8 +676,19 @@ def _build_attempt_state(
         skip_reason=result.skip_reason,
         summary=result.summary,
         changed_files=_normalize_changed_files(result),
+        boundary_failure_code=str(getattr(result, "boundary_failure_code", "")).strip(),
+        secondary_boundary_failure_codes=tuple(
+            str(item).strip()
+            for item in getattr(result, "secondary_boundary_failure_codes", ())
+            if str(item).strip()
+        ),
         issue_log_path=result.issue_log_path,
         artifact_dir=artifact_dir,
+        performance_metrics={
+            **dict(getattr(result, "performance_metrics", {}) or {}),
+            "attempt_total_duration_seconds": round(duration_seconds, 3),
+        },
+        rollout_flags=tuple(str(item).strip() for item in getattr(result, "rollout_flags", ()) if str(item).strip()),
     )
 
 
@@ -621,7 +723,22 @@ def _build_issue_state(
         final_error=result.error or "",
         final_skip_reason=result.skip_reason,
         final_summary=result.summary,
+        final_boundary_failure_code=str(getattr(result, "boundary_failure_code", "")).strip(),
+        final_secondary_boundary_failure_codes=tuple(
+            str(item).strip()
+            for item in getattr(result, "secondary_boundary_failure_codes", ())
+            if str(item).strip()
+        ),
         artifact_root=artifact_root,
+        performance_summary=summarize_issue_performance(
+            tuple(attempts),
+            rollout_flags=tuple(
+                str(item).strip() for item in getattr(result, "rollout_flags", ()) if str(item).strip()
+            ),
+        ),
+        rollout_flags=tuple(
+            str(item).strip() for item in getattr(result, "rollout_flags", ()) if str(item).strip()
+        ),
     )
 
 
@@ -636,6 +753,7 @@ def process_issue_with_retries(
     author: str = "",
     project_key: str = "",
     state_store: RunStateStore | None = None,
+    lessons_store: LessonsStore | None = None,
     max_build_retries: int = DEFAULT_MAX_BUILD_RETRIES,
 ) -> FixResult:
     """Retry a single issue fix on build failure, then roll back only that issue if needed."""
@@ -643,6 +761,7 @@ def process_issue_with_retries(
     logger = IssueAttemptLogger(repository=repository, issue_key=issue.key, run_label=run_label)
     artifact_writer = ArtifactWriter()
     follow_up_store = FollowUpStore()
+    lessons_store = lessons_store or LessonsStore()
     issue_artifact_root = _build_issue_artifact_root(repository, run_label, issue.key)
     baseline = capture_workspace_baseline(
         workspace_path,
@@ -698,7 +817,14 @@ def process_issue_with_retries(
             artifact_root=result.artifact_root,
         )
         result.issue_state = issue_state
-        artifact_writer.write_issue_state(issue_state)
+        compliance_summary = build_compliance_summary(
+            getattr(getattr(result, "edit_contract", None), "quality_gate_rules", ()),
+            getattr(result, "quality_gate_result", None),
+        )
+        artifact_writer.write_issue_state(
+            issue_state,
+            compliance_summary=compliance_summary.to_dict(),
+        )
         if state_store is not None:
             state_store.record_issue_state(
                 issue_state,
@@ -803,6 +929,19 @@ def process_issue_with_retries(
                 result,
                 issue,
                 source_attempt_number=attempt,
+            )
+            lessons_store.record_failure(
+                repository=repository,
+                run_label=run_label,
+                issue_key=issue.key,
+                issue_rule_id=issue.rule,
+                retry_context=next_retry_context,
+                scope_mode=str(getattr(getattr(result, "edit_contract", None), "scope_mode", "")).strip(),
+                guardrail_mode=str(getattr(result, "guardrail_mode", "")).strip(),
+                quality_gate_rule_ids=tuple(
+                    rule.rule_id
+                    for rule in getattr(getattr(result, "edit_contract", None), "quality_gate_rules", ())
+                ),
             )
             next_retry_feedback = render_retry_context(next_retry_context)
             attempt_state = write_attempt_artifacts(

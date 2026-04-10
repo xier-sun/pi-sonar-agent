@@ -1,0 +1,62 @@
+{
+  "issue_key": "35c291f7-fcf3-4485-a230-412e295cf88e",
+  "repository": "BI",
+  "run_label": "20260408182111-01",
+  "rule_id": "csharpsquid:S125",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs",
+  "line": 2228,
+  "status": "fixed",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "retrying",
+      "started_at": "2026-04-08T10:35:35.080969+00:00",
+      "finished_at": "2026-04-08T10:43:18.794099+00:00",
+      "duration_seconds": 463.689,
+      "failure_kind": "scope",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": true,
+      "build_verification_failed": false,
+      "error": "Issue changes exceeded allowed scope",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+      ],
+      "boundary_failure_code": "adjacent_cleanup_not_declared",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_35c291f7-fcf3-4485-a230-412e295cf88e_20260408182111-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260408182111-01/35c291f7-fcf3-4485-a230-412e295cf88e/attempt-01"
+    },
+    {
+      "attempt_number": 2,
+      "status": "succeeded",
+      "started_at": "2026-04-08T10:43:19.200389+00:00",
+      "finished_at": "2026-04-08T10:48:59.538711+00:00",
+      "duration_seconds": 340.326,
+      "failure_kind": "",
+      "retry_reason": "none",
+      "retryable_failure": false,
+      "build_passed": true,
+      "build_verification_failed": false,
+      "error": "",
+      "skip_reason": "",
+      "summary": "Fixed 1 file(s)",
+      "changed_files": [
+        "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+      ],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\BI_35c291f7-fcf3-4485-a230-412e295cf88e_20260408182111-01.log",
+      "artifact_dir": "logs/issue_artifacts/BI/20260408182111-01/35c291f7-fcf3-4485-a230-412e295cf88e/attempt-02"
+    }
+  ],
+  "final_failure_kind": "",
+  "final_error": "",
+  "final_skip_reason": "",
+  "final_summary": "Fixed 1 file(s)",
+  "final_boundary_failure_code": "",
+  "final_secondary_boundary_failure_codes": [],
+  "artifact_root": "logs/issue_artifacts/BI/20260408182111-01/35c291f7-fcf3-4485-a230-412e295cf88e"
+}

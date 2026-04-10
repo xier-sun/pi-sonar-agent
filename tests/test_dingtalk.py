@@ -142,12 +142,17 @@ def test_send_run_notification_includes_warning_message(monkeypatch) -> None:
     assert "PR 创建失败：HTTP 400" in calls[0][3]["markdown"]["text"]
 
 
-def test_create_dingtalk_client_from_env_supports_webhook_only(monkeypatch) -> None:
-    monkeypatch.delenv("DINGTALK_APPKEY", raising=False)
-    monkeypatch.delenv("DINGTALK_APPSECRET", raising=False)
-    monkeypatch.delenv("DINGTALK_AGENTID", raising=False)
-    monkeypatch.setenv("DINGTALK_WEBHOOK", "https://oapi.dingtalk.com/robot/send?access_token=test")
-    monkeypatch.setenv("DINGTALK_SECRET", "SEC-test")
+def test_create_dingtalk_client_from_env_supports_webhook_only(monkeypatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "DINGTALK_WEBHOOK=https://oapi.dingtalk.com/robot/send?access_token=test",
+                "DINGTALK_SECRET=SEC-test",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
     client = create_dingtalk_client_from_env()
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,8 +11,10 @@ from typing import TYPE_CHECKING, Any
 
 from pi_sonar_agent.agent.rule_policies import get_rule_policy
 from pi_sonar_agent.agent.rule_validators import validate_rule_fix
+from pi_sonar_agent.core.attempt_scheduler import AttemptScheduler
 from pi_sonar_agent.core.boundary_runtime import BoundaryRuntime
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange, ReviewerResult
+from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.quality_gate import QualityGateResult
 from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
 from pi_sonar_agent.core.scope_guard import IssueEditScope
@@ -32,6 +35,11 @@ class VerificationOutcome:
     quality_gate_result: QualityGateResult
     combined_output: str
     rule_validation_message: str
+    boundary_failure_code: str = ""
+    boundary_failure_summary: str = ""
+    secondary_boundary_failure_codes: tuple[str, ...] = ()
+    build_invoked: bool = False
+    build_duration_seconds: float = 0.0
 
 
 class FixVerifier:
@@ -165,13 +173,6 @@ class FixVerifier:
 
         build_passed = False
         build_output = ""
-        if workspace_path.exists():
-            build_passed, build_output = cls.run_local_build(
-                workspace_path,
-                build_command,
-                build_runner=build_runner,
-            )
-
         boundary_outcome = BoundaryRuntime.review(
             issue_key=issue.key,
             rule_id=issue.rule,
@@ -188,10 +189,7 @@ class FixVerifier:
         reviewer_result = boundary_outcome.reviewer_result
         reviewer_retry_message = boundary_outcome.reviewer_retry_message
         scope_violation = boundary_outcome.scope_violation
-        guardrail_message = scope_violation if guardrail_mode == "scope" else reviewer_retry_message
-        combined_output_parts = [part for part in [build_output.strip(), guardrail_message] if part]
-        combined_output = "\n\n".join(combined_output_parts)
-
+        guardrail_message = reviewer_retry_message or scope_violation or ""
         quality_gate_result = QualityGateVerifier.review(
             issue_file_path=issue.file_path,
             edit_contract=edit_contract,
@@ -199,6 +197,36 @@ class FixVerifier:
             original_issue_file_content=original_issue_file_content,
             current_issue_file_content=current_issue_file_content,
         )
+        rule_validation_message = ""
+        if current_issue_file_content is not None:
+            effective_rule_validator = rule_validator or cls.run_rule_specific_validation
+            rule_validation_message = effective_rule_validator(issue, current_issue_file_content)
+
+        verification_schedule = AttemptScheduler.build_verification_schedule(
+            edit_contract=edit_contract,
+            performance_flags=load_performance_flags(),
+        )
+        should_run_build = workspace_path.exists()
+        if verification_schedule.skip_build_on_precheck_failure:
+            if reviewer_result.status == "retry":
+                should_run_build = False
+            if quality_gate_result.status == "retry":
+                should_run_build = False
+            if rule_validation_message:
+                should_run_build = False
+
+        build_duration_seconds = 0.0
+        if should_run_build:
+            build_started_at = time.monotonic()
+            build_passed, build_output = cls.run_local_build(
+                workspace_path,
+                build_command,
+                build_runner=build_runner,
+            )
+            build_duration_seconds = time.monotonic() - build_started_at
+
+        combined_output_parts = [part for part in [build_output.strip(), guardrail_message] if part]
+        combined_output = "\n\n".join(combined_output_parts)
         if quality_gate_result.status == "retry":
             quality_retry_message = quality_gate_result.to_retry_message()
             combined_output = "\n\n".join(
@@ -206,11 +234,12 @@ class FixVerifier:
                 for part in [combined_output.strip(), quality_retry_message]
                 if str(part).strip()
             )
-
-        rule_validation_message = ""
-        if current_issue_file_content is not None:
-            effective_rule_validator = rule_validator or cls.run_rule_specific_validation
-            rule_validation_message = effective_rule_validator(issue, current_issue_file_content)
+        if rule_validation_message:
+            combined_output = "\n\n".join(
+                part
+                for part in [combined_output.strip(), rule_validation_message]
+                if str(part).strip()
+            )
 
         return VerificationOutcome(
             build_passed=build_passed,
@@ -221,4 +250,9 @@ class FixVerifier:
             quality_gate_result=quality_gate_result,
             combined_output=combined_output,
             rule_validation_message=rule_validation_message,
+            boundary_failure_code=boundary_outcome.primary_failure_code,
+            boundary_failure_summary=boundary_outcome.primary_failure_summary,
+            secondary_boundary_failure_codes=boundary_outcome.secondary_failure_codes,
+            build_invoked=should_run_build,
+            build_duration_seconds=round(build_duration_seconds, 3),
         )

@@ -1,0 +1,32 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -89,7 +89,14 @@
+                         int resolvedDevEntry;
+
+                         if (!string.IsNullOrEmpty(x.U_DevEntry))
+
+                         {
+
+-                            resolvedDevEntry = int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0;
+
++                            if (int.TryParse(x.U_DevEntry, out var parsed))
+
++                            {
+
++                                resolvedDevEntry = parsed;
+
++                            }
+
++                            else
+
++                            {
+
++                                resolvedDevEntry = 0;
+
++                            }
+
+                         }
+
+                         else if (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved))
+
+                         {

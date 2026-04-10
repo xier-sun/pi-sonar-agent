@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
 from pi_sonar_agent.core.git_gateway import GitRepositoryGateway
 from pi_sonar_agent.core.model_env import validate_agent_env
+from pi_sonar_agent.core.project_env import resolve_project_env
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ def load_runtime_environment(
 ) -> RuntimeEnvironment:
     """Validate and resolve the environment needed to run the agent."""
 
-    env = os.environ if environ is None else environ
+    env = resolve_project_env(environ)
 
     if validate_model_environment:
         model_env_errors = validate_agent_env()
@@ -55,7 +55,7 @@ def load_runtime_environment(
 def require_env(name: str, environ: Mapping[str, str] | None = None) -> str:
     """Get a required environment variable with a user-friendly error."""
 
-    env = os.environ if environ is None else environ
+    env = resolve_project_env(environ)
     value = _text_value(env.get(name))
     if not value:
         raise RuntimeError(f"缺少环境变量: {name}")

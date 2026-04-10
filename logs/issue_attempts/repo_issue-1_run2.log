@@ -2614,3 +2614,1767 @@ C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-174\test_process_issu
 C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-174\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
 [2026-04-08 14:17:07] Workspace restored to issue baseline
 [2026-04-08 14:17:07] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 14:43:14] Attempt 1/3 started for issue-1
+[2026-04-08 14:43:14] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 14:43:14] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-176\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-176\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 14:43:14] Workspace restored to issue baseline
+[2026-04-08 14:43:14] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 14:43:14] Attempt 2/3 started for issue-1
+[2026-04-08 14:43:14] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 14:43:14] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-176\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-176\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 14:43:14] Workspace restored to issue baseline
+[2026-04-08 14:43:14] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 14:43:14] Attempt 3/3 started for issue-1
+[2026-04-08 14:43:14] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 14:43:14] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-176\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-176\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 14:43:14] Workspace restored to issue baseline
+[2026-04-08 14:43:14] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 15:06:41] Attempt 1/3 started for issue-1
+[2026-04-08 15:06:41] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 15:06:41] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-177\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-177\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 15:06:41] Workspace restored to issue baseline
+[2026-04-08 15:06:41] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 15:06:41] Attempt 2/3 started for issue-1
+[2026-04-08 15:06:41] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 15:06:41] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-177\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-177\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 15:06:41] Workspace restored to issue baseline
+[2026-04-08 15:06:41] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 15:06:41] Attempt 3/3 started for issue-1
+[2026-04-08 15:06:41] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 15:06:41] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-177\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-177\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 15:06:41] Workspace restored to issue baseline
+[2026-04-08 15:06:41] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 15:10:10] Attempt 1/3 started for issue-1
+[2026-04-08 15:10:10] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 15:10:10] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-178\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-178\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 15:10:10] Workspace restored to issue baseline
+[2026-04-08 15:10:10] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 15:10:10] Attempt 2/3 started for issue-1
+[2026-04-08 15:10:10] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 15:10:10] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-178\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-178\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 15:10:10] Workspace restored to issue baseline
+[2026-04-08 15:10:10] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 15:10:10] Attempt 3/3 started for issue-1
+[2026-04-08 15:10:10] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 15:10:10] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-178\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-178\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 15:10:10] Workspace restored to issue baseline
+[2026-04-08 15:10:10] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 15:10:14] Attempt 1/3 started for issue-1
+[2026-04-08 15:10:14] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 15:10:14] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-179\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-179\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 15:10:14] Workspace restored to issue baseline
+[2026-04-08 15:10:14] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 15:10:14] Attempt 2/3 started for issue-1
+[2026-04-08 15:10:14] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 15:10:14] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-179\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-179\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 15:10:14] Workspace restored to issue baseline
+[2026-04-08 15:10:14] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 15:10:14] Attempt 3/3 started for issue-1
+[2026-04-08 15:10:14] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 15:10:14] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-179\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-179\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 15:10:14] Workspace restored to issue baseline
+[2026-04-08 15:10:14] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 16:49:42] Attempt 1/3 started for issue-1
+[2026-04-08 16:49:42] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 16:49:42] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-181\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-181\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 16:49:42] Workspace restored to issue baseline
+[2026-04-08 16:49:42] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 16:49:42] Attempt 2/3 started for issue-1
+[2026-04-08 16:49:42] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 16:49:42] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-181\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-181\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 16:49:42] Workspace restored to issue baseline
+[2026-04-08 16:49:42] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 16:49:42] Attempt 3/3 started for issue-1
+[2026-04-08 16:49:42] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 16:49:42] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-181\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-181\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 16:49:42] Workspace restored to issue baseline
+[2026-04-08 16:49:42] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 18:04:04] Attempt 1/3 started for issue-1
+[2026-04-08 18:04:04] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 18:04:04] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-186\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-186\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:04:04] Workspace restored to issue baseline
+[2026-04-08 18:04:04] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 18:04:04] Attempt 2/3 started for issue-1
+[2026-04-08 18:04:04] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 18:04:04] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-186\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-186\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:04:04] Workspace restored to issue baseline
+[2026-04-08 18:04:04] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 18:04:04] Attempt 3/3 started for issue-1
+[2026-04-08 18:04:04] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 18:04:04] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-186\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-186\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:04:05] Workspace restored to issue baseline
+[2026-04-08 18:04:05] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 18:04:54] Attempt 1/3 started for issue-1
+[2026-04-08 18:04:54] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 18:04:54] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-187\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-187\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:04:54] Workspace restored to issue baseline
+[2026-04-08 18:04:54] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 18:04:54] Attempt 2/3 started for issue-1
+[2026-04-08 18:04:54] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 18:04:54] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-187\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-187\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:04:54] Workspace restored to issue baseline
+[2026-04-08 18:04:54] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 18:04:54] Attempt 3/3 started for issue-1
+[2026-04-08 18:04:54] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 18:04:54] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-187\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-187\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:04:54] Workspace restored to issue baseline
+[2026-04-08 18:04:54] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 18:12:30] Attempt 1/3 started for issue-1
+[2026-04-08 18:12:30] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 18:12:30] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-189\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-189\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:12:30] Workspace restored to issue baseline
+[2026-04-08 18:12:30] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 18:12:30] Attempt 2/3 started for issue-1
+[2026-04-08 18:12:30] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 18:12:30] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-189\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-189\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:12:30] Workspace restored to issue baseline
+[2026-04-08 18:12:30] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 18:12:30] Attempt 3/3 started for issue-1
+[2026-04-08 18:12:30] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 18:12:30] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-189\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-189\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:12:31] Workspace restored to issue baseline
+[2026-04-08 18:12:31] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 18:48:39] Attempt 1/3 started for issue-1
+[2026-04-08 18:48:39] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 18:48:39] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-192\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-192\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:48:39] Workspace restored to issue baseline
+[2026-04-08 18:48:39] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 18:48:39] Attempt 2/3 started for issue-1
+[2026-04-08 18:48:39] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 18:48:39] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-192\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-192\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:48:39] Workspace restored to issue baseline
+[2026-04-08 18:48:39] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 18:48:39] Attempt 3/3 started for issue-1
+[2026-04-08 18:48:39] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 18:48:39] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-192\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-192\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 18:48:39] Workspace restored to issue baseline
+[2026-04-08 18:48:39] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 22:56:07] Attempt 1/3 started for issue-1
+[2026-04-08 22:56:07] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 22:56:07] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-193\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-193\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 22:56:07] Workspace restored to issue baseline
+[2026-04-08 22:56:07] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 22:56:07] Attempt 2/3 started for issue-1
+[2026-04-08 22:56:07] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 22:56:07] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-193\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-193\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 22:56:07] Workspace restored to issue baseline
+[2026-04-08 22:56:07] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 22:56:07] Attempt 3/3 started for issue-1
+[2026-04-08 22:56:07] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 22:56:07] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-193\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-193\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 22:56:08] Workspace restored to issue baseline
+[2026-04-08 22:56:08] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 23:00:02] Attempt 1/3 started for issue-1
+[2026-04-08 23:00:02] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 23:00:02] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-194\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-194\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:00:02] Workspace restored to issue baseline
+[2026-04-08 23:00:02] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 23:00:02] Attempt 2/3 started for issue-1
+[2026-04-08 23:00:02] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 23:00:02] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-194\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-194\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:00:02] Workspace restored to issue baseline
+[2026-04-08 23:00:02] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 23:00:02] Attempt 3/3 started for issue-1
+[2026-04-08 23:00:02] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 23:00:02] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-194\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-194\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:00:02] Workspace restored to issue baseline
+[2026-04-08 23:00:02] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 23:00:45] Attempt 1/3 started for issue-1
+[2026-04-08 23:00:45] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 23:00:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-195\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-195\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:00:45] Workspace restored to issue baseline
+[2026-04-08 23:00:45] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 23:00:45] Attempt 2/3 started for issue-1
+[2026-04-08 23:00:45] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 23:00:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-195\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-195\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:00:45] Workspace restored to issue baseline
+[2026-04-08 23:00:45] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 23:00:45] Attempt 3/3 started for issue-1
+[2026-04-08 23:00:45] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 23:00:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-195\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-195\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:00:45] Workspace restored to issue baseline
+[2026-04-08 23:00:45] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 23:02:45] Attempt 1/3 started for issue-1
+[2026-04-08 23:02:45] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 23:02:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-196\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-196\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:02:45] Workspace restored to issue baseline
+[2026-04-08 23:02:45] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 23:02:45] Attempt 2/3 started for issue-1
+[2026-04-08 23:02:45] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 23:02:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-196\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-196\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:02:45] Workspace restored to issue baseline
+[2026-04-08 23:02:45] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 23:02:45] Attempt 3/3 started for issue-1
+[2026-04-08 23:02:45] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 23:02:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-196\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-196\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:02:45] Workspace restored to issue baseline
+[2026-04-08 23:02:45] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 23:04:04] Attempt 1/3 started for issue-1
+[2026-04-08 23:04:04] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 23:04:04] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-197\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-197\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:04:04] Workspace restored to issue baseline
+[2026-04-08 23:04:04] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 23:04:04] Attempt 2/3 started for issue-1
+[2026-04-08 23:04:04] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 23:04:04] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-197\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-197\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:04:04] Workspace restored to issue baseline
+[2026-04-08 23:04:04] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 23:04:04] Attempt 3/3 started for issue-1
+[2026-04-08 23:04:04] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 23:04:04] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-197\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-197\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:04:04] Workspace restored to issue baseline
+[2026-04-08 23:04:04] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 23:06:18] Attempt 1/3 started for issue-1
+[2026-04-08 23:06:18] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 23:06:18] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-198\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-198\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:06:18] Workspace restored to issue baseline
+[2026-04-08 23:06:18] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 23:06:18] Attempt 2/3 started for issue-1
+[2026-04-08 23:06:18] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 23:06:18] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-198\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-198\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:06:18] Workspace restored to issue baseline
+[2026-04-08 23:06:18] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 23:06:18] Attempt 3/3 started for issue-1
+[2026-04-08 23:06:18] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 23:06:18] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-198\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-198\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:06:18] Workspace restored to issue baseline
+[2026-04-08 23:06:18] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 23:07:51] Attempt 1/3 started for issue-1
+[2026-04-08 23:07:51] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 23:07:51] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-199\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-199\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:07:51] Workspace restored to issue baseline
+[2026-04-08 23:07:51] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 23:07:51] Attempt 2/3 started for issue-1
+[2026-04-08 23:07:51] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 23:07:51] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-199\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-199\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:07:51] Workspace restored to issue baseline
+[2026-04-08 23:07:51] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 23:07:51] Attempt 3/3 started for issue-1
+[2026-04-08 23:07:51] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 23:07:51] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-199\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-199\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:07:51] Workspace restored to issue baseline
+[2026-04-08 23:07:51] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 23:33:24] Attempt 1/3 started for issue-1
+[2026-04-08 23:33:24] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 23:33:24] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-200\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-200\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:33:24] Workspace restored to issue baseline
+[2026-04-08 23:33:24] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 23:33:24] Attempt 2/3 started for issue-1
+[2026-04-08 23:33:24] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 23:33:24] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-200\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-200\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:33:24] Workspace restored to issue baseline
+[2026-04-08 23:33:24] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 23:33:24] Attempt 3/3 started for issue-1
+[2026-04-08 23:33:24] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 23:33:24] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-200\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-200\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:33:24] Workspace restored to issue baseline
+[2026-04-08 23:33:24] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 23:34:43] Attempt 1/3 started for issue-1
+[2026-04-08 23:34:43] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 23:34:43] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-201\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-201\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:34:43] Workspace restored to issue baseline
+[2026-04-08 23:34:43] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 23:34:43] Attempt 2/3 started for issue-1
+[2026-04-08 23:34:43] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 23:34:43] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-201\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-201\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:34:43] Workspace restored to issue baseline
+[2026-04-08 23:34:43] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 23:34:43] Attempt 3/3 started for issue-1
+[2026-04-08 23:34:43] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 23:34:43] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-201\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-201\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:34:44] Workspace restored to issue baseline
+[2026-04-08 23:34:44] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 23:36:26] Attempt 1/3 started for issue-1
+[2026-04-08 23:36:26] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 23:36:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-202\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-202\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:36:26] Workspace restored to issue baseline
+[2026-04-08 23:36:26] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 23:36:26] Attempt 2/3 started for issue-1
+[2026-04-08 23:36:26] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 23:36:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-202\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-202\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:36:26] Workspace restored to issue baseline
+[2026-04-08 23:36:26] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 23:36:26] Attempt 3/3 started for issue-1
+[2026-04-08 23:36:26] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 23:36:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-202\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-202\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:36:26] Workspace restored to issue baseline
+[2026-04-08 23:36:26] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-08 23:37:30] Attempt 1/3 started for issue-1
+[2026-04-08 23:37:30] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-08 23:37:30] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-203\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-203\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:37:30] Workspace restored to issue baseline
+[2026-04-08 23:37:30] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 23:37:30] Attempt 2/3 started for issue-1
+[2026-04-08 23:37:30] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 23:37:30] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-203\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-203\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:37:30] Workspace restored to issue baseline
+[2026-04-08 23:37:30] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 23:37:30] Attempt 3/3 started for issue-1
+[2026-04-08 23:37:30] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-08 23:37:30] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-203\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-203\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-08 23:37:30] Workspace restored to issue baseline
+[2026-04-08 23:37:30] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 00:27:32] Attempt 1/3 started for issue-1
+[2026-04-09 00:27:32] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 00:27:32] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-205\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-205\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 00:27:32] Workspace restored to issue baseline
+[2026-04-09 00:27:32] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 00:27:32] Attempt 2/3 started for issue-1
+[2026-04-09 00:27:32] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 00:27:32] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-205\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-205\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 00:27:32] Workspace restored to issue baseline
+[2026-04-09 00:27:32] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 00:27:32] Attempt 3/3 started for issue-1
+[2026-04-09 00:27:32] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 00:27:32] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-205\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-205\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 00:27:32] Workspace restored to issue baseline
+[2026-04-09 00:27:32] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 09:44:05] Attempt 1/3 started for issue-1
+[2026-04-09 09:44:05] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 09:44:05] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-210\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-210\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 09:44:05] Workspace restored to issue baseline
+[2026-04-09 09:44:05] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 09:44:05] Attempt 2/3 started for issue-1
+[2026-04-09 09:44:05] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 09:44:05] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-210\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-210\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 09:44:06] Workspace restored to issue baseline
+[2026-04-09 09:44:06] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 09:44:06] Attempt 3/3 started for issue-1
+[2026-04-09 09:44:06] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 09:44:06] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-210\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-210\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 09:44:06] Workspace restored to issue baseline
+[2026-04-09 09:44:06] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 10:08:00] Attempt 1/3 started for issue-1
+[2026-04-09 10:08:00] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 10:08:00] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-211\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-211\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 10:08:00] Workspace restored to issue baseline
+[2026-04-09 10:08:00] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 10:08:00] Attempt 2/3 started for issue-1
+[2026-04-09 10:08:00] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 10:08:00] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-211\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-211\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 10:08:00] Workspace restored to issue baseline
+[2026-04-09 10:08:00] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 10:08:00] Attempt 3/3 started for issue-1
+[2026-04-09 10:08:00] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 10:08:00] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-211\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-211\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 10:08:00] Workspace restored to issue baseline
+[2026-04-09 10:08:00] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 10:09:39] Attempt 1/3 started for issue-1
+[2026-04-09 10:09:39] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 10:09:39] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-212\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-212\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 10:09:39] Workspace restored to issue baseline
+[2026-04-09 10:09:39] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 10:09:39] Attempt 2/3 started for issue-1
+[2026-04-09 10:09:39] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 10:09:39] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-212\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-212\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 10:09:39] Workspace restored to issue baseline
+[2026-04-09 10:09:39] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 10:09:39] Attempt 3/3 started for issue-1
+[2026-04-09 10:09:39] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 10:09:39] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-212\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-212\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 10:09:39] Workspace restored to issue baseline
+[2026-04-09 10:09:39] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 10:10:50] Attempt 1/3 started for issue-1
+[2026-04-09 10:10:50] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 10:10:50] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-213\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-213\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 10:10:50] Workspace restored to issue baseline
+[2026-04-09 10:10:50] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 10:10:50] Attempt 2/3 started for issue-1
+[2026-04-09 10:10:50] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 10:10:50] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-213\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-213\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 10:10:50] Workspace restored to issue baseline
+[2026-04-09 10:10:50] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 10:10:50] Attempt 3/3 started for issue-1
+[2026-04-09 10:10:50] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 10:10:50] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-213\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-213\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 10:10:50] Workspace restored to issue baseline
+[2026-04-09 10:10:50] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 11:53:30] Attempt 1/3 started for issue-1
+[2026-04-09 11:53:30] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 11:53:30] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-214\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-214\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:53:30] Workspace restored to issue baseline
+[2026-04-09 11:53:30] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 11:53:30] Attempt 2/3 started for issue-1
+[2026-04-09 11:53:30] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 11:53:30] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-214\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-214\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:53:30] Workspace restored to issue baseline
+[2026-04-09 11:53:30] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 11:53:30] Attempt 3/3 started for issue-1
+[2026-04-09 11:53:30] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 11:53:30] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-214\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-214\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:53:30] Workspace restored to issue baseline
+[2026-04-09 11:53:30] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 11:54:06] Attempt 1/3 started for issue-1
+[2026-04-09 11:54:06] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 11:54:06] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-215\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-215\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:54:06] Workspace restored to issue baseline
+[2026-04-09 11:54:06] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 11:54:06] Attempt 2/3 started for issue-1
+[2026-04-09 11:54:06] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 11:54:06] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-215\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-215\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:54:06] Workspace restored to issue baseline
+[2026-04-09 11:54:06] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 11:54:06] Attempt 3/3 started for issue-1
+[2026-04-09 11:54:06] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 11:54:06] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-215\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-215\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:54:06] Workspace restored to issue baseline
+[2026-04-09 11:54:06] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 11:56:12] Attempt 1/3 started for issue-1
+[2026-04-09 11:56:12] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 11:56:12] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-216\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-216\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:56:13] Workspace restored to issue baseline
+[2026-04-09 11:56:13] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 11:56:13] Attempt 2/3 started for issue-1
+[2026-04-09 11:56:13] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 11:56:13] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-216\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-216\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:56:13] Workspace restored to issue baseline
+[2026-04-09 11:56:13] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 11:56:13] Attempt 3/3 started for issue-1
+[2026-04-09 11:56:13] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 11:56:13] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-216\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-216\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:56:13] Workspace restored to issue baseline
+[2026-04-09 11:56:13] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 11:56:32] Attempt 1/3 started for issue-1
+[2026-04-09 11:56:32] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 11:56:32] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-217\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-217\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:56:32] Workspace restored to issue baseline
+[2026-04-09 11:56:32] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 11:56:32] Attempt 2/3 started for issue-1
+[2026-04-09 11:56:32] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 11:56:32] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-217\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-217\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:56:32] Workspace restored to issue baseline
+[2026-04-09 11:56:32] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 11:56:32] Attempt 3/3 started for issue-1
+[2026-04-09 11:56:32] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 11:56:32] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-217\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-217\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 11:56:33] Workspace restored to issue baseline
+[2026-04-09 11:56:33] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 13:04:56] Attempt 1/3 started for issue-1
+[2026-04-09 13:04:56] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 13:04:56] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-218\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-218\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 13:04:56] Workspace restored to issue baseline
+[2026-04-09 13:04:56] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 13:04:56] Attempt 2/3 started for issue-1
+[2026-04-09 13:04:56] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 13:04:56] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-218\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-218\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 13:04:57] Workspace restored to issue baseline
+[2026-04-09 13:04:57] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 13:04:57] Attempt 3/3 started for issue-1
+[2026-04-09 13:04:57] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 13:04:57] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-218\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-218\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 13:04:57] Workspace restored to issue baseline
+[2026-04-09 13:04:57] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 13:05:17] Attempt 1/3 started for issue-1
+[2026-04-09 13:05:17] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 13:05:17] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-219\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-219\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 13:05:17] Workspace restored to issue baseline
+[2026-04-09 13:05:17] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 13:05:17] Attempt 2/3 started for issue-1
+[2026-04-09 13:05:17] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 13:05:17] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-219\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-219\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 13:05:17] Workspace restored to issue baseline
+[2026-04-09 13:05:17] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 13:05:17] Attempt 3/3 started for issue-1
+[2026-04-09 13:05:17] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 13:05:17] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-219\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-219\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 13:05:18] Workspace restored to issue baseline
+[2026-04-09 13:05:18] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 13:52:22] Attempt 1/3 started for issue-1
+[2026-04-09 13:52:22] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 13:52:22] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-224\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-224\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 13:52:23] Workspace restored to issue baseline
+[2026-04-09 13:52:23] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 13:52:23] Attempt 2/3 started for issue-1
+[2026-04-09 13:52:23] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 13:52:23] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-224\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-224\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 13:52:23] Workspace restored to issue baseline
+[2026-04-09 13:52:23] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 13:52:23] Attempt 3/3 started for issue-1
+[2026-04-09 13:52:23] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 13:52:23] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-224\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-224\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 13:52:23] Workspace restored to issue baseline
+[2026-04-09 13:52:23] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 14:45:29] Attempt 1/3 started for issue-1
+[2026-04-09 14:45:29] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 14:45:29] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-225\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-225\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 14:45:29] Workspace restored to issue baseline
+[2026-04-09 14:45:29] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 14:45:29] Attempt 2/3 started for issue-1
+[2026-04-09 14:45:29] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 14:45:29] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-225\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-225\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 14:45:30] Workspace restored to issue baseline
+[2026-04-09 14:45:30] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 14:45:30] Attempt 3/3 started for issue-1
+[2026-04-09 14:45:30] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 14:45:30] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-225\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-225\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 14:45:30] Workspace restored to issue baseline
+[2026-04-09 14:45:30] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 14:47:26] Attempt 1/3 started for issue-1
+[2026-04-09 14:47:26] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 14:47:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-226\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-226\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 14:47:26] Workspace restored to issue baseline
+[2026-04-09 14:47:26] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 14:47:26] Attempt 2/3 started for issue-1
+[2026-04-09 14:47:26] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 14:47:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-226\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-226\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 14:47:26] Workspace restored to issue baseline
+[2026-04-09 14:47:26] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 14:47:26] Attempt 3/3 started for issue-1
+[2026-04-09 14:47:26] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 14:47:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-226\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-226\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 14:47:26] Workspace restored to issue baseline
+[2026-04-09 14:47:26] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 14:47:54] Attempt 1/3 started for issue-1
+[2026-04-09 14:47:54] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 14:47:54] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-227\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-227\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 14:47:54] Workspace restored to issue baseline
+[2026-04-09 14:47:54] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 14:47:54] Attempt 2/3 started for issue-1
+[2026-04-09 14:47:54] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 14:47:54] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-227\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-227\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 14:47:54] Workspace restored to issue baseline
+[2026-04-09 14:47:54] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 14:47:54] Attempt 3/3 started for issue-1
+[2026-04-09 14:47:54] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 14:47:54] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-227\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-227\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 14:47:54] Workspace restored to issue baseline
+[2026-04-09 14:47:54] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 15:36:12] Attempt 1/3 started for issue-1
+[2026-04-09 15:36:12] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 15:36:12] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-230\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-230\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:36:12] Workspace restored to issue baseline
+[2026-04-09 15:36:12] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 15:36:12] Attempt 2/3 started for issue-1
+[2026-04-09 15:36:12] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 15:36:12] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-230\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-230\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:36:12] Workspace restored to issue baseline
+[2026-04-09 15:36:12] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 15:36:12] Attempt 3/3 started for issue-1
+[2026-04-09 15:36:12] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 15:36:12] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-230\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-230\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:36:12] Workspace restored to issue baseline
+[2026-04-09 15:36:12] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 15:40:40] Attempt 1/3 started for issue-1
+[2026-04-09 15:40:40] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 15:40:40] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-231\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-231\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:40:40] Workspace restored to issue baseline
+[2026-04-09 15:40:40] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 15:40:40] Attempt 2/3 started for issue-1
+[2026-04-09 15:40:40] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 15:40:40] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-231\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-231\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:40:41] Workspace restored to issue baseline
+[2026-04-09 15:40:41] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 15:40:41] Attempt 3/3 started for issue-1
+[2026-04-09 15:40:41] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 15:40:41] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-231\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-231\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:40:41] Workspace restored to issue baseline
+[2026-04-09 15:40:41] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 15:43:56] Attempt 1/3 started for issue-1
+[2026-04-09 15:43:56] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 15:43:56] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-232\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-232\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:43:56] Workspace restored to issue baseline
+[2026-04-09 15:43:56] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 15:43:56] Attempt 2/3 started for issue-1
+[2026-04-09 15:43:56] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 15:43:56] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-232\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-232\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:43:56] Workspace restored to issue baseline
+[2026-04-09 15:43:56] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 15:43:56] Attempt 3/3 started for issue-1
+[2026-04-09 15:43:56] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 15:43:56] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-232\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-232\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:43:56] Workspace restored to issue baseline
+[2026-04-09 15:43:56] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 15:48:44] Attempt 1/3 started for issue-1
+[2026-04-09 15:48:44] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 15:48:44] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-234\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-234\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:48:44] Workspace restored to issue baseline
+[2026-04-09 15:48:44] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 15:48:44] Attempt 2/3 started for issue-1
+[2026-04-09 15:48:44] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 15:48:44] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-234\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-234\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:48:44] Workspace restored to issue baseline
+[2026-04-09 15:48:44] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 15:48:44] Attempt 3/3 started for issue-1
+[2026-04-09 15:48:44] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 15:48:44] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-234\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-234\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 15:48:44] Workspace restored to issue baseline
+[2026-04-09 15:48:44] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 17:08:26] Attempt 1/3 started for issue-1
+[2026-04-09 17:08:26] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 17:08:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-237\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-237\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 17:08:26] Workspace restored to issue baseline
+[2026-04-09 17:08:26] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 17:08:26] Attempt 2/3 started for issue-1
+[2026-04-09 17:08:26] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 17:08:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-237\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-237\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 17:08:26] Workspace restored to issue baseline
+[2026-04-09 17:08:26] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 17:08:26] Attempt 3/3 started for issue-1
+[2026-04-09 17:08:26] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 17:08:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-237\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-237\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 17:08:26] Workspace restored to issue baseline
+[2026-04-09 17:08:26] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 17:09:54] Attempt 1/3 started for issue-1
+[2026-04-09 17:09:54] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 17:09:54] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-238\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-238\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 17:09:54] Workspace restored to issue baseline
+[2026-04-09 17:09:54] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 17:09:54] Attempt 2/3 started for issue-1
+[2026-04-09 17:09:54] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 17:09:54] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-238\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-238\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 17:09:54] Workspace restored to issue baseline
+[2026-04-09 17:09:54] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 17:09:54] Attempt 3/3 started for issue-1
+[2026-04-09 17:09:54] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 17:09:54] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-238\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-238\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 17:09:55] Workspace restored to issue baseline
+[2026-04-09 17:09:55] Issue skipped: Build verification failed after 3 attempt(s)
+[2026-04-09 23:50:34] Attempt 1/3 started for issue-1
+[2026-04-09 23:50:35] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-09 23:50:35] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-248\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-248\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 23:50:35] Workspace restored to issue baseline
+[2026-04-09 23:50:35] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-09 23:50:35] Attempt 2/3 started for issue-1
+[2026-04-09 23:50:35] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-09 23:50:35] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-248\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-248\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 23:50:35] Workspace restored to issue baseline
+[2026-04-09 23:50:35] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-09 23:50:35] Attempt 3/3 started for issue-1
+[2026-04-09 23:50:35] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-09 23:50:35] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-248\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-248\test_process_issue_with_retrie0\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-09 23:50:35] Workspace restored to issue baseline
+[2026-04-09 23:50:35] Issue skipped: Build verification failed after 3 attempt(s)

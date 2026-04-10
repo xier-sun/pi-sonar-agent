@@ -1,0 +1,74 @@
+{
+  "attempt_number": 1,
+  "status": "retrying",
+  "started_at": "2026-04-09T05:15:49.763028+00:00",
+  "finished_at": "2026-04-09T05:20:56.452492+00:00",
+  "duration_seconds": 306.683,
+  "failure_kind": "scope",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "error": "Issue changes exceeded allowed scope",
+  "skip_reason": "",
+  "summary": "Fixed 1 file(s)",
+  "changed_files": [
+    "OpenAuth.Core/OpenAuth.App/Finance/FinanceHomeApp.cs"
+  ],
+  "boundary_failure_code": "method_cluster_not_declared",
+  "secondary_boundary_failure_codes": [],
+  "issue_log_path": "logs\\issue_attempts\\BI_1e604e34-4ff3-456f-a21b-cd9e5ebb556c_20260409130720-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260409130720-01/1e604e34-4ff3-456f-a21b-cd9e5ebb556c/attempt-01",
+  "performance_metrics": {
+    "runtime_total_duration_seconds": 306.294,
+    "time_to_first_model_content_seconds": 0.601,
+    "time_after_first_edit_to_finalize_seconds": 45.486,
+    "tool_call_count": 6,
+    "read_call_count": 3,
+    "edit_call_count": 1,
+    "assistant_text_events": 2,
+    "assistant_text_chars": 692,
+    "model_timeout_stage": "",
+    "last_progress_stage": "result_message",
+    "saw_result_event": true,
+    "continuation_retry_count": 0,
+    "continuation_recovered": false,
+    "continuation_timeout_stages": [],
+    "execution_profile": "full_path",
+    "fast_path_enabled": false,
+    "effective_max_turns": 10,
+    "patch_salvaged": false,
+    "build_duration_seconds": 0.0,
+    "build_invoked": false,
+    "validation_pipeline": [
+      "build",
+      "scope_review",
+      "diff_review"
+    ],
+    "verification_schedule": {
+      "run_boundary_first": true,
+      "run_quality_gate_before_build": true,
+      "run_rule_validation_before_build": true,
+      "skip_build_on_precheck_failure": true,
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.layered_verification",
+        "perf.patch_salvage",
+        "perf.continuation_retry",
+        "perf.fast_path_max_turns=6",
+        "perf.continuation_retry_limit=2"
+      ]
+    },
+    "attempt_total_duration_seconds": 306.683
+  },
+  "rollout_flags": [
+    "perf.short_form_prompt",
+    "perf.fast_path",
+    "perf.layered_verification",
+    "perf.patch_salvage",
+    "perf.continuation_retry",
+    "perf.fast_path_max_turns=6",
+    "perf.continuation_retry_limit=2"
+  ]
+}

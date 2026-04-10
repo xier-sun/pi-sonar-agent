@@ -1,0 +1,102 @@
+[2026-04-08 19:22:31] Attempt 1/3 started for 0fb3e377-0955-41cb-8cae-729a28012d3c
+[2026-04-08 19:31:57] Attempt 1 failed: Quality gate verification failed
+[2026-04-08 19:31:57] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_signature] 异步签名规范: 异步方法 AutoPlugin 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs:171
+   Evidence: public async Task AutoPlugin(IEnumerable<int> orderIds) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+2. [async_signature] 异步签名规范: 异步方法 ProcessSingleOrderAutoPlugin 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs:190
+   Evidence: private async Task ProcessSingleOrderAutoPlugin(int orderId) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+3. [async_signature] 异步签名规范: 异步方法 ProcessPluginStatus 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs:289
+   Evidence: return true; } /// <summary> /// 处理可清单状态更新 /// </summary> private async Task ProcessPluginStatus(int orderId) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+4. [async_signature] 异步签名规范: 异步方法 ProcessPluginStatus 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs:290
+   Evidence: } /// <summary> /// 处理可清单状态更新 /// </summary> private async Task ProcessPluginStatus(int orderId) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+5. [async_signature] 异步签名规范: 异步方法 ProcessPluginStatus 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs:295
+   Evidence: private async Task ProcessPluginStatus(int orderId) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+[2026-04-08 19:31:58] Workspace restored to issue baseline
+[2026-04-08 19:31:58] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-08 19:31:58] Attempt 2/3 started for 0fb3e377-0955-41cb-8cae-729a28012d3c
+[2026-04-08 19:41:38] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-08 19:41:38] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+关键错误:
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(202,51): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“ShouldPlugin”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“ShouldPlugin”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(206,37): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“DocTotalRMB”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“DocTotalRMB”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(206,61): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“BalanceRMB”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“BalanceRMB”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(206,84): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“PaymentRate”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“PaymentRate”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(256,20): error CS8957: 语言版本 8.0 中的条件表达式无效，因为在“(decimal, decimal, decimal, bool)”和“<null>”之间未找到通用类型。如需使用目标类型转换，请升级到语言版本 9.0 或更高版本。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(202,51): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“ShouldPlugin”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“ShouldPlugin”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(206,37): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“DocTotalRMB”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“DocTotalRMB”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(206,61): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“BalanceRMB”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“BalanceRMB”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(206,84): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“PaymentRate”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“PaymentRate”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(256,20): error CS8957: 语言版本 8.0 中的条件表达式无效，因为在“(decimal, decimal, decimal, bool)”和“<null>”之间未找到通用类型。如需使用目标类型转换，请升级到语言版本 9.0 或更高版本。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+
+构建日志:
+... (省略前 253 行)
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Core 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Word 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Npoi.Mapper 6.2.2”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Spire.Doc 13.3.7”。此包可能与项目不完全兼容。
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\HumanResource\UserRegister\UserRegisterDetail.cs(565,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(168,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(197,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(228,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AccraditationBeforeSaleDemandReq.cs(44,23): warning CS0108: “AccraditationBeforeSaleDemandReq.FlowInstanceId”隐藏继承的成员“VerificationReq.FlowInstanceId”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Engineering\ECR\Dto\EcrProductionDto.cs(21,23): warning CS0108: “EcrProductionDto.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryDetectionItemResp.cs(21,21): warning CS0108: “FatCategoryDetectionItemResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryResp.cs(22,21): warning CS0108: “FatCategoryResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Serve\CompletionReportApp.cs(615,13): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(173,31): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(274,27): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(284,32): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\MD\Implement\BusinessLabelApiApp.cs(1353,17): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(202,51): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“ShouldPlugin”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“ShouldPlugin”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(206,37): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“DocTotalRMB”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“DocTotalRMB”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(206,61): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“BalanceRMB”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“BalanceRMB”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(206,84): error CS1061: “(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”未包含“PaymentRate”的定义，并且找不到可接受第一个“(decimal DocTotalRMB, decimal BalanceRMB, decimal PaymentRate, bool ShouldPlugin)?”类型参数的可访问扩展方法“PaymentRate”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\Finance\FinanceHanlerApp.cs(256,20): error CS8957: 语言版本 8.0 中的条件表达式无效，因为在“(decimal, decimal, decimal, bool)”和“<null>”之间未找到通用类型。如需使用目标类型转换，请升级到语言版本 9.0 或更高版本。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260408184952-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+    133 个警告
+    5 个错误
+
+已用时间 00:00:57.58
+
+Issue changes exceeded the allowed Sonar edit scope.
+Allowed lines: 171-399
+Changed lines outside scope: 80
+只允许修复 Sonar 指向的这一处代码，不要顺手修改本文件其他同类位置。
+[2026-04-08 19:41:38] Workspace restored to issue baseline
+[2026-04-08 19:41:38] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-08 19:41:38] Attempt 3/3 started for 0fb3e377-0955-41cb-8cae-729a28012d3c
+[2026-04-08 19:50:48] Attempt 3 failed: Model response timed out
+[2026-04-08 19:50:48] Build failure report:
+错误: Model response timed out
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+模型在 180 秒内没有返回后续响应
+取消原因: follow_up_response_timeout
+清理动作: interrupt, close_response_stream, disconnect
+[2026-04-08 19:50:48] Workspace restored to issue baseline
+[2026-04-08 19:50:48] Issue skipped: Model response timed out after 3 attempt(s)

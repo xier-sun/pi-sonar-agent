@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from pi_sonar_agent.core.git_gateway import resolve_base_branch
+from pi_sonar_agent.core.project_env import resolve_project_env
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ def resolve_cli_target_config(
 ) -> TargetConfig:
     """Resolve target config for the single-target CLI entrypoint."""
 
-    env = os.environ if environ is None else environ
+    env = resolve_project_env(environ)
     base_branch_selection = resolve_base_branch(
         cli_branch=_arg_value(args, "base_branch"),
         configured_branch=_text_value(target_defaults.get("base_branch")),

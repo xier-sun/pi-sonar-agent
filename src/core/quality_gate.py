@@ -183,3 +183,187 @@ class QualityGateResult:
             if violation.retry_hint:
                 lines.append(f"   Retry Hint: {violation.retry_hint}")
         return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class ComplianceCheck:
+    """Normalized outcome for one active quality-gate rule."""
+
+    rule_id: str
+    title: str
+    enforcement: str
+    status: str
+    summary: str = ""
+    message: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
+
+
+@dataclass(frozen=True)
+class ComplianceSummary:
+    """Structured compliance summary for one issue attempt."""
+
+    status: str
+    summary: str
+    source_path: str = ""
+    hard_rule_count: int = 0
+    soft_rule_count: int = 0
+    passed_rule_count: int = 0
+    failed_rule_count: int = 0
+    soft_finding_count: int = 0
+    not_applicable_count: int = 0
+    checks: tuple[ComplianceCheck, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
+
+
+def render_quality_gate_prompt(
+    rules: tuple[QualityGateRule, ...] | list[QualityGateRule],
+    *,
+    source_path: str = "",
+) -> str:
+    """Render a compact prompt section for the active quality-gate rules only."""
+
+    active_rules = tuple(rules)
+    if not active_rules:
+        return ""
+
+    lines = ["本次修复只需遵守下面这些已启用的质量门禁规则："]
+    for rule in active_rules:
+        label = "强制" if rule.enforcement == "hard" else "提示"
+        detail = f"- [{label}] {rule.rule_id} {rule.title}: {rule.summary}"
+        if rule.prompt_hint:
+            detail += f" | 当前要求: {rule.prompt_hint}"
+        lines.append(detail)
+    if source_path:
+        lines.append(f"- 规则来源: {source_path}")
+    return "\n".join(lines)
+
+
+def build_compliance_summary(
+    rules: tuple[QualityGateRule, ...] | list[QualityGateRule],
+    quality_gate_result: QualityGateResult | dict[str, Any] | None,
+    *,
+    source_path: str = "",
+) -> ComplianceSummary:
+    """Build a normalized compliance summary from active rules and verifier output."""
+
+    active_rules = tuple(rules)
+    if not active_rules:
+        return ComplianceSummary(
+            status="not_applicable",
+            summary="No active quality gates were declared for this attempt.",
+            source_path=source_path,
+        )
+
+    payload: dict[str, Any]
+    if isinstance(quality_gate_result, QualityGateResult):
+        payload = quality_gate_result.to_dict()
+    elif isinstance(quality_gate_result, dict):
+        payload = quality_gate_result
+    else:
+        payload = {}
+
+    applied_rule_ids = {
+        str(item).strip()
+        for item in payload.get("applied_rule_ids", [])
+        if str(item).strip()
+    }
+    violations_by_id = {
+        str(item.get("rule_id", "")).strip(): item
+        for item in payload.get("violations", [])
+        if isinstance(item, dict) and str(item.get("rule_id", "")).strip()
+    }
+    soft_findings_by_id: dict[str, list[dict[str, Any]]] = {}
+    for item in payload.get("soft_findings", []):
+        if not isinstance(item, dict):
+            continue
+        rule_id = str(item.get("rule_id", "")).strip()
+        if not rule_id:
+            continue
+        soft_findings_by_id.setdefault(rule_id, []).append(item)
+
+    checks: list[ComplianceCheck] = []
+    passed_rule_count = 0
+    failed_rule_count = 0
+    soft_finding_count = 0
+    not_applicable_count = 0
+
+    for rule in active_rules:
+        if applied_rule_ids and rule.rule_id not in applied_rule_ids:
+            not_applicable_count += 1
+            checks.append(
+                ComplianceCheck(
+                    rule_id=rule.rule_id,
+                    title=rule.title,
+                    enforcement=rule.enforcement,
+                    status="not_applicable",
+                    summary=rule.summary,
+                    message="This rule was declared but not applied to the final verification context.",
+                )
+            )
+            continue
+
+        violation = violations_by_id.get(rule.rule_id)
+        if violation is not None:
+            failed_rule_count += 1
+            checks.append(
+                ComplianceCheck(
+                    rule_id=rule.rule_id,
+                    title=rule.title,
+                    enforcement=rule.enforcement,
+                    status="failed",
+                    summary=rule.summary,
+                    message=str(violation.get("message", "")).strip(),
+                )
+            )
+            continue
+
+        soft_items = soft_findings_by_id.get(rule.rule_id, [])
+        if soft_items:
+            soft_finding_count += len(soft_items)
+            checks.append(
+                ComplianceCheck(
+                    rule_id=rule.rule_id,
+                    title=rule.title,
+                    enforcement=rule.enforcement,
+                    status="soft_finding",
+                    summary=rule.summary,
+                    message=str(soft_items[0].get("message", "")).strip(),
+                )
+            )
+            continue
+
+        passed_rule_count += 1
+        checks.append(
+            ComplianceCheck(
+                rule_id=rule.rule_id,
+                title=rule.title,
+                enforcement=rule.enforcement,
+                status="passed",
+                summary=rule.summary,
+            )
+        )
+
+    overall_status = "retry" if failed_rule_count > 0 else "pass"
+    result_summary = str(payload.get("summary", "")).strip()
+    if not result_summary:
+        if overall_status == "retry":
+            result_summary = f"Compliance failed with {failed_rule_count} hard rule violation(s)."
+        else:
+            result_summary = "All active quality gates passed for this attempt."
+
+    return ComplianceSummary(
+        status=overall_status,
+        summary=result_summary,
+        source_path=source_path,
+        hard_rule_count=sum(1 for rule in active_rules if rule.enforcement == "hard"),
+        soft_rule_count=sum(1 for rule in active_rules if rule.enforcement != "hard"),
+        passed_rule_count=passed_rule_count,
+        failed_rule_count=failed_rule_count,
+        soft_finding_count=soft_finding_count,
+        not_applicable_count=not_applicable_count,
+        checks=tuple(checks),
+    )

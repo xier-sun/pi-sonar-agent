@@ -1,0 +1,134 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs
+@@ -843,26 +843,49 @@
+ 
+
+             if (financeLoan.CurrentProcess != "结束")
+
+             {
+
+-                return financeLoan.CurrentProcess switch
+
+-                {
+
+-                    _ when financeLoan.CurrentProcess == assistantProcessName => (int)EnumRemburseStatus.AssistantApproval,
+
+-                    _ when financeLoan.CurrentProcess == managerProcessName => (int)EnumRemburseStatus.GeneralManagerApproval,
+
+-                    _ when financeLoan.CurrentProcess == endProcessName => (int)EnumRemburseStatus.EndApproval,
+
+-                    _ => 0,
+
+-                };
+
++                return GetStatusFromProcess(financeLoan.CurrentProcess, assistantProcessName, managerProcessName, endProcessName);
+
+             }
+
+             else
+
+             {
+
+-                return financeLoan.Status.Value switch
+
+-                {
+
+-                    FinanceLoanStatus.Reject => (int)EnumRemburseStatus.RejectApproval,
+
+-                    FinanceLoanStatus.Paying => (int)EnumRemburseStatus.ToBePaid,
+
+-                    FinanceLoanStatus.UnPay => (int)EnumRemburseStatus.ToBePaid,
+
+-                    FinanceLoanStatus.Payed => (int)EnumRemburseStatus.Paid,
+
+-                    FinanceLoanStatus.Returned => (int)EnumRemburseStatus.Paid,
+
+-                    _ => 0,
+
+-                };
+
+-            }
+
++                return GetStatusFromLoanStatus(financeLoan.Status.Value);
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 根据流程名称获取报销状态
+
++        /// </summary>
+
++        /// <param name="currentProcess">当前流程名称</param>
+
++        /// <param name="assistantProcessName">助理流程名称</param>
+
++        /// <param name="managerProcessName">经理流程名称</param>
+
++        /// <param name="endProcessName">结束流程名称</param>
+
++        /// <returns>报销单状态</returns>
+
++        private static int GetStatusFromProcess(string currentProcess, string assistantProcessName, string managerProcessName, string endProcessName)
+
++        {
+
++            return currentProcess switch
+
++            {
+
++                _ when currentProcess == assistantProcessName => (int)EnumRemburseStatus.AssistantApproval,
+
++                _ when currentProcess == managerProcessName => (int)EnumRemburseStatus.GeneralManagerApproval,
+
++                _ when currentProcess == endProcessName => (int)EnumRemburseStatus.EndApproval,
+
++                _ => 0,
+
++            };
+
++        }
+
++
+
++        /// <summary>
+
++        /// 根据借款状态获取报销状态
+
++        /// </summary>
+
++        /// <param name="status">借款状态</param>
+
++        /// <returns>报销单状态</returns>
+
++        private static int GetStatusFromLoanStatus(FinanceLoanStatus status)
+
++        {
+
++            return status switch
+
++            {
+
++                FinanceLoanStatus.Reject => (int)EnumRemburseStatus.RejectApproval,
+
++                FinanceLoanStatus.Paying => (int)EnumRemburseStatus.ToBePaid,
+
++                FinanceLoanStatus.UnPay => (int)EnumRemburseStatus.ToBePaid,
+
++                FinanceLoanStatus.Payed => (int)EnumRemburseStatus.Paid,
+
++                FinanceLoanStatus.Returned => (int)EnumRemburseStatus.Paid,
+
++                _ => 0,
+
++            };
+
+         }
+
+ 
+
+         #endregion
