@@ -235,3 +235,58 @@ def test_run_state_store_disables_db_but_keeps_event_artifacts(tmp_path: Path) -
 
     assert event_log_path.exists()
     assert store.last_db_error == "db offline"
+
+
+def test_run_state_store_logs_when_db_is_disabled(tmp_path: Path, capsys) -> None:
+    recorder = EventRecorder(root=tmp_path / "run-artifacts")
+    store = RunStateStore(db_client=_FailingDbClient(), event_recorder=recorder)
+
+    store.record_event(
+        StateEvent(
+            kind=EventKind.RUN_STARTED,
+            run_label="run-db-warning",
+            entity_type="run",
+            entity_key="run-db-warning",
+            status="running",
+            payload={"mode": "single"},
+        )
+    )
+
+    captured = capsys.readouterr()
+    assert "StateStore DB sync disabled: db offline" in captured.out
+
+
+def test_run_state_store_records_abort_events(tmp_path: Path) -> None:
+    recorder = EventRecorder(root=tmp_path / "run-artifacts")
+    store = RunStateStore(event_recorder=recorder)
+
+    store.record_run_aborted(
+        run_label="run-abort",
+        status="failed",
+        repository="repo-a",
+        author="alice@example.com",
+        project_key="project-a",
+        error="startup exploded",
+        startup_failure=True,
+        payload={"mode": "single"},
+    )
+    store.record_target_aborted(
+        run_label="run-abort",
+        project_key="project-a",
+        repository="repo-a",
+        author="alice@example.com",
+        base_branch="main",
+        total_issues=3,
+        error="clone failed",
+        before_first_issue=True,
+        startup_failure=True,
+        payload={"scope_audit_mode": "scope_soft_audit"},
+    )
+
+    event_log_path = tmp_path / "run-artifacts" / "run-abort" / "events.jsonl"
+    lines = [json.loads(line) for line in event_log_path.read_text(encoding="utf-8").splitlines()]
+
+    assert [item["kind"] for item in lines] == ["startup_failure", "target_aborted"]
+    assert lines[0]["payload"]["error"] == "startup exploded"
+    assert lines[1]["payload"]["before_first_issue"] is True
+    assert lines[1]["payload"]["scope_audit_mode"] == "scope_soft_audit"

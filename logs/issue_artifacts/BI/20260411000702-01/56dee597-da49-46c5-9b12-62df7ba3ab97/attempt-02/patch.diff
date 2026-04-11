@@ -1,0 +1,42 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -1492,7 +1492,19 @@
+                 })
+
+                 .ToListAsync();
+
+ 
+
+-            // 按订单ID分组
+
++            return GroupClearReconsByOrderId(clearRecons);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 按订单ID分组清账记录
+
++        /// </summary>
+
++        /// <param name="clearRecons">清账记录列表</param>
+
++        /// <returns>按订单ID分组的清账记录字典</returns>
+
++        private static Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>> GroupClearReconsByOrderId(
+
++            List<(int OrderId, HistoricalOverdueCalculationService.ClearReconForOverDue ClearRecon)> clearRecons)
+
++        {
+
++            var result = new Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>>();
+
++
+
+             foreach (var group in clearRecons.GroupBy(r => r.OrderId))
+
+             {
+
+                 result[group.Key] = group.Select(r => r.ClearRecon)

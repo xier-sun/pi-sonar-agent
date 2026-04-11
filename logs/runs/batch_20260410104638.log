@@ -1,0 +1,18 @@
+[INFO] 运行日志: logs/runs/batch_20260410104638.log
+加载 1 个目标
+
+============================================================
+处理: liyinglin@neware.com.cn | Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0 | BI
+============================================================
+Base Branch: develop (source: default)
+[INFO] 运行启动前校验...
+[INFO] 启动前校验通过: workspace=.agent_workspaces, base_branch=develop
+正在解析收件人...
+Reviewer: pengxiru@neware.com.cn (source: targets.json.reviewer_email)
+DingTalk UserId: 17556530801301497 (source: targets.json.dingtalk_userid)
+正在获取 SonarQube issues...
+发现 43 个 issues
+限制处理 40 个
+[INFO] 准备仓库...
+已清理 1 个旧工作区
+  - .agent_workspaces/fix_BI_20260409235656-01

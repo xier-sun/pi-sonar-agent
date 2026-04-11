@@ -1,0 +1,120 @@
+[2026-04-11 03:20:34] Attempt 1/5 started for 052c0359-2d63-4dc6-993e-fefa2c4faa83
+[2026-04-11 03:22:15] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-11 03:22:15] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+关键错误:
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2389,30): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2390,25): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2454,30): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2455,25): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2487,30): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2488,25): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2389,30): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2390,25): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2454,30): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2455,25): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2487,30): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2488,25): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+
+构建日志:
+... (省略前 151 行)
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Spire.Doc 13.3.7”。此包可能与项目不完全兼容。
+C:\Users\neware\.nuget\packages\microsoft.bcl.hashcode\6.0.0\buildTransitive\netcoreapp2.0\Microsoft.Bcl.HashCode.targets(4,5): warning : Microsoft.Bcl.HashCode 6.0.0 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\system.formats.asn1\8.0.1\buildTransitive\netcoreapp2.0\System.Formats.Asn1.targets(4,5): warning : System.Formats.Asn1 8.0.1 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\system.security.cryptography.pkcs\8.0.1\buildTransitive\netcoreapp2.0\System.Security.Cryptography.Pkcs.targets(4,5): warning : System.Security.Cryptography.Pkcs 8.0.1 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\system.security.cryptography.xml\8.0.2\buildTransitive\netcoreapp2.0\System.Security.Cryptography.Xml.targets(4,5): warning : System.Security.Cryptography.Xml 8.0.2 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\microsoft.bcl.timeprovider\8.0.0\buildTransitive\netcoreapp2.0\Microsoft.Bcl.TimeProvider.targets(4,5): warning : Microsoft.Bcl.TimeProvider 8.0.0 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: 目标框架“netcoreapp3.1”不受支持，将来不会收到安全更新。有关支持策略的详细信息，请参阅 https://aka.ms/dotnet-core-support。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1603: Infrastructure 依赖于 Serilog.Sinks.Elasticsearch (>= 7.0.0)，但没有找到 Serilog.Sinks.Elasticsearch 7.0.0。已改为解析 Serilog.Sinks.Elasticsearch 7.1.0。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1603: Infrastructure 依赖于 System.Net.Http.Json (>= 3.0.0)，但没有找到 System.Net.Http.Json 3.0.0。已改为解析 System.Net.Http.Json 3.2.0。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Core 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Word 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Npoi.Mapper 6.2.2”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Spire.Doc 13.3.7”。此包可能与项目不完全兼容。
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\HumanResource\UserRegister\UserRegisterDetail.cs(575,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(168,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(197,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(228,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AccraditationBeforeSaleDemandReq.cs(44,23): warning CS0108: “AccraditationBeforeSaleDemandReq.FlowInstanceId”隐藏继承的成员“VerificationReq.FlowInstanceId”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECR\Dto\EcrProductionDto.cs(21,23): warning CS0108: “EcrProductionDto.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryDetectionItemResp.cs(21,21): warning CS0108: “FatCategoryDetectionItemResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryResp.cs(22,21): warning CS0108: “FatCategoryResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2389,30): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2390,25): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2454,30): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2455,25): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2487,30): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(2488,25): error CS1988: 异步方法不能使用 ref、in 或 out 参数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+    85 个警告
+    6 个错误
+
+已用时间 00:00:04.89
+[2026-04-11 03:22:15] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS1988 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:2389:30
+   错误信息: 异步方法不能使用 ref、in 或 out 参数
+   出错代码片段:
+2387 |             PenaltyRuleDefinition rule,
+2388 |             OSLP slp,
+2389 |             ref PenaltyEvent currentEvent,
+2390 |             ref decimal previousOverdueAmount,
+2391 |             List<PenaltyLedger> penaltyLedgers,
+2. CS1988 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:2390:25
+   错误信息: 异步方法不能使用 ref、in 或 out 参数
+   出错代码片段:
+2388 |             OSLP slp,
+2389 |             ref PenaltyEvent currentEvent,
+2390 |             ref decimal previousOverdueAmount,
+2391 |             List<PenaltyLedger> penaltyLedgers,
+2392 |             List<(int EventId, DateTime ResolvedDate, string Description)> pendingEventUpdates,
+3. CS1988 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:2454:30
+   错误信息: 异步方法不能使用 ref、in 或 out 参数
+   出错代码片段:
+2452 |             PenaltyRuleDefinition rule,
+2453 |             OSLP slp,
+2454 |             ref PenaltyEvent currentEvent,
+2455 |             ref decimal previousOverdueAmount,
+2456 |             List<PenaltyLedger> penaltyLedgers,
+4. CS1988 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:2455:25
+   错误信息: 异步方法不能使用 ref、in 或 out 参数
+   出错代码片段:
+2453 |             OSLP slp,
+2454 |             ref PenaltyEvent currentEvent,
+2455 |             ref decimal previousOverdueAmount,
+2456 |             List<PenaltyLedger> penaltyLedgers,
+2457 |             List<(int EventId, DateTime ResolvedDate, string Description)> pendingEventUpdates,
+5. CS1988 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:2487:30
+   错误信息: 异步方法不能使用 ref、in 或 out 参数
+   出错代码片段:
+2485 |             PenaltyRuleDefinition rule,
+2486 |             OSLP slp,
+2487 |             ref PenaltyEvent currentEvent,
+2488 |             ref decimal previousOverdueAmount,
+2489 |             List<PenaltyLedger> penaltyLedgers,
+6. CS1988 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:2488:25
+   错误信息: 异步方法不能使用 ref、in 或 out 参数
+   出错代码片段:
+2486 |             OSLP slp,
+2487 |             ref PenaltyEvent currentEvent,
+2488 |             ref decimal previousOverdueAmount,
+2489 |             List<PenaltyLedger> penaltyLedgers,
+2490 |             List<(int EventId, DateTime ResolvedDate, string Description)> pendingEventUpdates,
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+[2026-04-11 03:22:16] Workspace restored to issue baseline
+[2026-04-11 03:22:16] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 03:22:16] Attempt 2/5 started for 052c0359-2d63-4dc6-993e-fefa2c4faa83
+[2026-04-11 03:25:04] Attempt 2 succeeded: Fixed 1 file(s)

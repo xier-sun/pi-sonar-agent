@@ -130,6 +130,9 @@ class RetryContext:
 
     source_attempt_number: int = 0
     failure_kind: str = ""
+    failure_detail_key: str = ""
+    strategy_fingerprint: str = ""
+    diff_fingerprint: str = ""
     error: str = ""
     summary: str = ""
     build_command: str = ""
@@ -182,15 +185,18 @@ def _build_quality_gate_guidance(
 
         if item.rule_id == "public_xml_docs":
             guidance.append("只为当前触达的公开成员补齐 XML 文档，包括 <summary>/<param>/<returns>；不要顺手补无关公开成员。")
+            guidance.append("如果这次修复只是为了降低复杂度或删除无用代码，不要新增 public/protected helper、DTO、property 来制造更多 XML 文档负担。")
         elif item.rule_id == "async_signature":
             if "没有以 Async 结尾" in item.message:
                 guidance.append("把当前触达的异步方法改成 *Async 结尾；如果这是公开 API 或接口实现，同步接口声明、调用点和 nameof(...)。")
+                guidance.append("不要为了凑 *Async 命名去新建或重命名并不真正异步的 helper；优先把新 helper 保持为同步方法。")
             if "返回类型不是 Task/Task<T>" in item.message:
                 guidance.append("异步方法返回类型改为 Task 或 Task<T>；纯同步 helper 去掉 async 并改成同步返回。")
             if "async void" in item.message:
                 guidance.append("不要保留 async void；除事件处理器外改成 Task/Task<T> 或同步方法。")
         elif item.rule_id == "async_requires_await":
             guidance.append("如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。")
+            guidance.append("新提取的 helper 默认保持同步；只有 helper 体内真实含有 await 时才允许 async。")
 
     guidance.append("只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。")
     return tuple(_dedupe_ordered(guidance))
@@ -241,6 +247,18 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
     compiler_errors = list(retry_context.compiler_errors)
 
     if not compiler_errors:
+        if retry_context.failure_kind == "tool_input_invalid":
+            return "\n".join(
+                [
+                    "上次尝试发出了无效的 Edit/MultiEdit 工具调用，导致没有真正落盘修改。",
+                    raw_output or "Edit/MultiEdit 缺少必要参数。",
+                    "重试约束:",
+                    "- Edit 必须提供完整的 file_path、old_string、new_string。",
+                    "- MultiEdit 必须提供 file_path 和至少一个有效 edits 项。",
+                    "- 如果替换字符串不确定，先 Read 更小范围的代码窗口，再提交精确编辑。",
+                    "- 不要发送空工具调用，也不要只输出“Using tool: Edit”而不附带参数。",
+                ]
+            )
         if raw_output:
             if has_plan_failure:
                 lines = [

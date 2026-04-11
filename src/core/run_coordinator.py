@@ -108,6 +108,10 @@ class RunCoordinator:
         target_started_at = utc_now_iso()
         issue_states: list[IssueState] = []
         total_issues = 0
+        successful = 0
+        failed = 0
+        skipped = 0
+        issue_processing_started = False
 
         def finalize_target_result(result: TargetRunResult) -> TargetRunResult:
             rollout_flags = load_performance_flags().enabled_flags()
@@ -152,6 +156,36 @@ class RunCoordinator:
                 target_state=target_state,
             )
 
+        def abort_target(*, error: str, startup_failure: bool) -> TargetRunResult:
+            normalized_error = str(error).strip() or "target aborted"
+            self.state_store.record_target_aborted(
+                run_label=options.run_label,
+                project_key=target_config.project_key,
+                repository=target_config.repository,
+                author=target_config.author,
+                base_branch=target_config.base_branch,
+                total_issues=total_issues,
+                error=normalized_error,
+                before_first_issue=not issue_processing_started,
+                startup_failure=startup_failure,
+                payload={
+                    "scope_audit_mode": "scope_soft_audit",
+                    "completed_issue_count": len(issue_states),
+                },
+            )
+            print(f"[ERR] target aborted: {normalized_error}")
+            return finalize_target_result(
+                TargetRunResult(
+                    ok=False,
+                    issues=total_issues,
+                    successful=successful,
+                    skipped=skipped,
+                    failed=failed,
+                    build_passed=False,
+                    pr_error=normalized_error,
+                )
+            )
+
         def extract_boundary_audit(result) -> tuple[str, tuple[str, ...], int]:
             reviewer_result = getattr(result, "reviewer_result", None)
             if hasattr(reviewer_result, "to_dict"):
@@ -192,91 +226,94 @@ class RunCoordinator:
                     continue
             return summary, tuple(dict.fromkeys(item for item in findings if item)), drift_score
 
-        ado_client = AzureDevOpsClient(
-            self.runtime_env.ado_base_url,
-            self.runtime_env.ado_project,
-            self.runtime_env.ado_pat,
-            organization=self.runtime_env.ado_org,
-        )
-        print("[INFO] 运行启动前校验...")
-        ensure_workspace_writable(self.runtime_env.workspace_root)
-        repo_url = ado_client.get_remote_url(target_config.repository)
-        git_gateway = GitRepositoryGateway(remote_url=repo_url, pat=self.runtime_env.ado_pat)
-        ensure_remote_branch_exists(
-            remote_url=repo_url,
-            branch=target_config.base_branch,
-            pat=self.runtime_env.ado_pat,
-            git_gateway=git_gateway,
-        )
-        print(
-            "[INFO] 启动前校验通过: "
-            f"workspace={self.runtime_env.workspace_root}, "
-            f"base_branch={target_config.base_branch}"
-        )
-
-        print("正在解析收件人...")
-        mysql_client = create_mysql_client_from_env()
         try:
-            recipients = resolve_recipients(
+            ado_client = AzureDevOpsClient(
+                self.runtime_env.ado_base_url,
+                self.runtime_env.ado_project,
+                self.runtime_env.ado_pat,
+                organization=self.runtime_env.ado_org,
+            )
+            print("[INFO] 运行启动前校验...")
+            ensure_workspace_writable(self.runtime_env.workspace_root)
+            repo_url = ado_client.get_remote_url(target_config.repository)
+            git_gateway = GitRepositoryGateway(remote_url=repo_url, pat=self.runtime_env.ado_pat)
+            ensure_remote_branch_exists(
+                remote_url=repo_url,
+                branch=target_config.base_branch,
+                pat=self.runtime_env.ado_pat,
+                git_gateway=git_gateway,
+            )
+            print(
+                "[INFO] 启动前校验通过: "
+                f"workspace={self.runtime_env.workspace_root}, "
+                f"base_branch={target_config.base_branch}"
+            )
+
+            print("正在解析收件人...")
+            mysql_client = create_mysql_client_from_env()
+            try:
+                recipients = resolve_recipients(
+                    author=target_config.author,
+                    configured_reviewer_email=target_config.reviewer_email,
+                    configured_dingtalk_userid=target_config.dingtalk_userid,
+                    mysql_client=mysql_client,
+                )
+            except Exception as exc:
+                print(f"[WARN] 收件人解析失败: {exc}")
+                recipients = resolve_recipients(
+                    author=target_config.author,
+                    configured_reviewer_email=target_config.reviewer_email,
+                    configured_dingtalk_userid=target_config.dingtalk_userid,
+                    mysql_client=None,
+                )
+            finally:
+                if mysql_client:
+                    mysql_client.disconnect()
+
+            print(
+                f"Reviewer: {recipients.reviewer_email or '(none)'} "
+                f"(source: {recipients.reviewer_source})"
+            )
+            print(
+                f"DingTalk UserId: {recipients.dingtalk_userid or '(unresolved)'} "
+                f"(source: {recipients.dingtalk_source})"
+            )
+
+            sonar_client = SonarQubeClient(
+                self.runtime_env.sonar_host,
+                self.runtime_env.sonar_token,
+                self.runtime_env.sonar_org,
+            )
+            agent = ClaudeFixAgent(
+                self.runtime_env.sonar_host,
+                self.runtime_env.sonar_token,
+                self.runtime_env.sonar_org,
+                agent_env=build_agent_env(),
+                model=resolve_agent_model(),
+            )
+            dingtalk_client = create_dingtalk_client_from_env()
+
+            print("正在获取 SonarQube issues...")
+            issues = sonar_client.get_open_issues(
+                project_key=target_config.project_key,
                 author=target_config.author,
-                configured_reviewer_email=target_config.reviewer_email,
-                configured_dingtalk_userid=target_config.dingtalk_userid,
-                mysql_client=mysql_client,
+            )
+            print(f"发现 {len(issues)} 个 issues")
+
+            if target_config.max_issues > 0:
+                issues = issues[:target_config.max_issues]
+                print(f"限制处理 {len(issues)} 个")
+            total_issues = len(issues)
+            self.state_store.record_target_started(
+                run_label=options.run_label,
+                project_key=target_config.project_key,
+                repository=target_config.repository,
+                author=target_config.author,
+                base_branch=target_config.base_branch,
+                total_issues=total_issues,
             )
         except Exception as exc:
-            print(f"[WARN] 收件人解析失败: {exc}")
-            recipients = resolve_recipients(
-                author=target_config.author,
-                configured_reviewer_email=target_config.reviewer_email,
-                configured_dingtalk_userid=target_config.dingtalk_userid,
-                mysql_client=None,
-            )
-        finally:
-            if mysql_client:
-                mysql_client.disconnect()
-
-        print(
-            f"Reviewer: {recipients.reviewer_email or '(none)'} "
-            f"(source: {recipients.reviewer_source})"
-        )
-        print(
-            f"DingTalk UserId: {recipients.dingtalk_userid or '(unresolved)'} "
-            f"(source: {recipients.dingtalk_source})"
-        )
-
-        sonar_client = SonarQubeClient(
-            self.runtime_env.sonar_host,
-            self.runtime_env.sonar_token,
-            self.runtime_env.sonar_org,
-        )
-        agent = ClaudeFixAgent(
-            self.runtime_env.sonar_host,
-            self.runtime_env.sonar_token,
-            self.runtime_env.sonar_org,
-            agent_env=build_agent_env(),
-            model=resolve_agent_model(),
-        )
-        dingtalk_client = create_dingtalk_client_from_env()
-
-        print("正在获取 SonarQube issues...")
-        issues = sonar_client.get_open_issues(
-            project_key=target_config.project_key,
-            author=target_config.author,
-        )
-        print(f"发现 {len(issues)} 个 issues")
-
-        if target_config.max_issues > 0:
-            issues = issues[:target_config.max_issues]
-            print(f"限制处理 {len(issues)} 个")
-        total_issues = len(issues)
-        self.state_store.record_target_started(
-            run_label=options.run_label,
-            project_key=target_config.project_key,
-            repository=target_config.repository,
-            author=target_config.author,
-            base_branch=target_config.base_branch,
-            total_issues=total_issues,
-        )
+            return abort_target(error=str(exc), startup_failure=True)
 
         if not issues:
             return finalize_target_result(
@@ -309,32 +346,21 @@ class RunCoordinator:
         try:
             git_gateway.clone_branch(workspace, target_config.base_branch)
         except Exception as exc:
-            raise RuntimeError(f"仓库克隆失败: {exc}") from exc
+            return abort_target(error=f"仓库克隆失败: {exc}", startup_failure=True)
 
-        successful = 0
-        failed = 0
-        skipped = 0
         issue_summaries: list[PullRequestIssueSummary] = []
         build_command = target_config.build_command or "dotnet build"
         test_command = target_config.test_command
         solution_path = target_config.solution_path
 
         for index, issue in enumerate(issues, 1):
-            rule_id = issue.get("rule", "")
-            component = issue.get("component", "")
-            file_path = component.split(":", 1)[-1].replace("\\", "/")
-            line = issue.get("line", 0)
-
-            print(f"\n[{index}/{len(issues)}] 修复: {rule_id} → {file_path}:{line}")
-
-            sonar_issue = SonarIssue(
-                key=issue.get("key", ""),
-                rule=rule_id,
-                message=issue.get("message", ""),
-                line=line,
-                component=component,
-                severity=issue.get("severity", ""),
-                issue_type=issue.get("type", ""),
+            sonar_issue = SonarIssue.from_api_payload(issue)
+            issue_rule = sonar_issue.rule
+            issue_line = sonar_issue.start_line or sonar_issue.line
+            file_path = sonar_issue.file_path.lstrip("/")
+            print(
+                f"\n[{index}/{len(issues)}] 修复: "
+                f"{issue_rule} → {file_path}:{issue_line}"
             )
 
             issue_build_command = resolve_build_command(build_command, solution_path)
@@ -346,19 +372,23 @@ class RunCoordinator:
                 issue_key=sonar_issue.key,
                 rule_id=sonar_issue.rule,
                 file_path=sonar_issue.file_path,
-                line_number=sonar_issue.line,
+                line_number=issue_line,
             )
-            result = process_issue_with_retries(
-                agent=agent,
-                issue=sonar_issue,
-                workspace_path=workspace,
-                build_command=issue_build_command,
-                repository=target_config.repository,
-                run_label=options.run_label,
-                author=target_config.author,
-                project_key=target_config.project_key,
-                state_store=self.state_store,
-            )
+            issue_processing_started = True
+            try:
+                result = process_issue_with_retries(
+                    agent=agent,
+                    issue=sonar_issue,
+                    workspace_path=workspace,
+                    build_command=issue_build_command,
+                    repository=target_config.repository,
+                    run_label=options.run_label,
+                    author=target_config.author,
+                    project_key=target_config.project_key,
+                    state_store=self.state_store,
+                )
+            except Exception as exc:
+                return abort_target(error=f"issue pipeline failed: {exc}", startup_failure=False)
             if isinstance(result.issue_state, IssueState):
                 issue_states.append(result.issue_state)
             compliance_summary = build_compliance_summary(
@@ -379,9 +409,9 @@ class RunCoordinator:
                 issue_summaries.append(
                     PullRequestIssueSummary(
                         status="FIXED",
-                        rule=rule_id,
+                        rule=issue_rule,
                         file_path=file_path,
-                        line=line,
+                        line=issue_line,
                         message=issue.get("message", ""),
                         issue_key=issue.get("key", ""),
                         attempts=result.attempts,
@@ -428,9 +458,9 @@ class RunCoordinator:
                     issue_summaries.append(
                         PullRequestIssueSummary(
                             status="SKIPPED",
-                            rule=rule_id,
+                            rule=issue_rule,
                             file_path=file_path,
-                            line=line,
+                            line=issue_line,
                             message=issue.get("message", ""),
                             issue_key=issue.get("key", ""),
                             attempts=result.attempts,
@@ -455,9 +485,9 @@ class RunCoordinator:
                     issue_summaries.append(
                         PullRequestIssueSummary(
                             status="FAILED",
-                            rule=rule_id,
+                            rule=issue_rule,
                             file_path=file_path,
-                            line=line,
+                            line=issue_line,
                             message=issue.get("message", ""),
                             issue_key=issue.get("key", ""),
                             attempts=result.attempts,

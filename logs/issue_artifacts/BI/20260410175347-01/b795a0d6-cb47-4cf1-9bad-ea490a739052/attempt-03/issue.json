@@ -1,0 +1,11 @@
+{
+  "issue_key": "b795a0d6-cb47-4cf1-9bad-ea490a739052",
+  "rule_id": "csharpsquid:S125",
+  "message": "Remove this commented out code.",
+  "line": 62,
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

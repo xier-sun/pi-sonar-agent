@@ -1,0 +1,26 @@
+{
+  "attempt_number": 4,
+  "status": "retrying",
+  "started_at": "2026-04-11T06:56:43.356963+00:00",
+  "finished_at": "2026-04-11T06:56:43.357164+00:00",
+  "duration_seconds": 0.0,
+  "failure_kind": "build",
+  "retry_reason": "build_verification_failed",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": true,
+  "error": "Issue changes failed local build verification",
+  "skip_reason": "",
+  "summary": "",
+  "changed_files": [
+    "tracked.cs"
+  ],
+  "boundary_failure_code": "",
+  "secondary_boundary_failure_codes": [],
+  "issue_log_path": "logs\\issue_attempts\\repo_issue-default-five_run-default-five.log",
+  "artifact_dir": "logs/issue_artifacts/repo/run-default-five/issue-default-five/attempt-04",
+  "performance_metrics": {
+    "attempt_total_duration_seconds": 0.0
+  },
+  "rollout_flags": []
+}

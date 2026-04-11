@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import threading
 import time
@@ -25,7 +26,8 @@ from pi_sonar_agent.core.model_gateway import (
     format_abort_result,
     format_timeout_abort_suffix,
 )
-from pi_sonar_agent.core.policy import ToolPolicy, ToolPolicyHook, ToolUsageTracker
+from pi_sonar_agent.core.perf_flags import load_performance_flags
+from pi_sonar_agent.core.policy import ToolPolicy, ToolPolicyHook, ToolUsageTracker, normalize_tool_name
 
 
 @dataclass(frozen=True)
@@ -74,6 +76,138 @@ class AgentRuntimeError(RuntimeError):
         self.partial_result = partial_result
 
 
+def _normalize_match_text(value: str) -> str:
+    return " ".join(str(value or "").replace("\r\n", "\n").split())
+
+
+def _extract_edit_search_requests(
+    tool_name: str,
+    raw_payload: dict[str, Any] | None,
+) -> tuple[tuple[str, str], ...]:
+    payload = dict(raw_payload or {})
+    file_path = str(payload.get("file_path") or payload.get("path") or "").strip()
+    if not file_path:
+        return ()
+    if tool_name == "Edit":
+        old_string = str(payload.get("old_string") or "")
+        if old_string.strip():
+            return ((file_path, old_string),)
+        return ()
+    if tool_name == "MultiEdit":
+        requests: list[tuple[str, str]] = []
+        for item in payload.get("edits", []) or []:
+            if not isinstance(item, dict):
+                continue
+            old_string = str(item.get("old_string") or "")
+            if old_string.strip():
+                requests.append((file_path, old_string))
+        return tuple(requests)
+    return ()
+
+
+def _find_closest_edit_snippet(
+    *,
+    cwd: str,
+    file_path: str,
+    old_string: str,
+) -> tuple[int, int, str, float] | None:
+    candidate = Path(cwd) / str(file_path or "").replace("/", "\\")
+    if not candidate.exists() or not candidate.is_file():
+        return None
+    try:
+        file_lines = candidate.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        return None
+    old_lines = str(old_string or "").splitlines()
+    if not file_lines or not old_lines:
+        return None
+
+    comparison_old_lines = old_lines[:80]
+    comparison_old_text = "\n".join(comparison_old_lines)
+    normalized_old = _normalize_match_text(comparison_old_text)
+    if not normalized_old:
+        return None
+
+    anchor = next(
+        (
+            _normalize_match_text(line)
+            for line in comparison_old_lines
+            if len(_normalize_match_text(line)) >= 8
+        ),
+        "",
+    )
+    candidate_starts = [
+        index
+        for index, line in enumerate(file_lines)
+        if anchor and anchor in _normalize_match_text(line)
+    ]
+    if not candidate_starts:
+        candidate_starts = list(range(len(file_lines)))
+
+    base_window = max(1, len(comparison_old_lines))
+    window_sizes = tuple(
+        sorted(
+            {
+                max(1, base_window - 1),
+                base_window,
+                min(len(file_lines), base_window + 1),
+            }
+        )
+    )
+    best_match: tuple[int, int, str, float] | None = None
+    for start_index in candidate_starts[:200]:
+        for window_size in window_sizes:
+            end_index = min(len(file_lines), start_index + window_size)
+            if end_index <= start_index:
+                continue
+            snippet = "\n".join(file_lines[start_index:end_index])
+            score = difflib.SequenceMatcher(
+                None,
+                normalized_old,
+                _normalize_match_text(snippet),
+            ).ratio()
+            if best_match is None or score > best_match[3]:
+                best_match = (start_index + 1, end_index, snippet, score)
+    return best_match
+
+
+def _maybe_enrich_edit_failure(
+    *,
+    agent_error: str | None,
+    cwd: str,
+    last_edit_tool_name: str,
+    last_edit_raw_payload: dict[str, Any] | None,
+) -> str | None:
+    error_text = str(agent_error or "").strip()
+    if "String to replace not found" not in error_text:
+        return agent_error
+
+    match_sections: list[str] = []
+    for file_path, old_string in _extract_edit_search_requests(last_edit_tool_name, last_edit_raw_payload):
+        closest = _find_closest_edit_snippet(cwd=cwd, file_path=file_path, old_string=old_string)
+        if closest is None:
+            continue
+        start_line, end_line, snippet, score = closest
+        numbered = "\n".join(
+            f"{start_line + index:4d} | {line}"
+            for index, line in enumerate(snippet.splitlines())
+        )
+        match_sections.append(
+            "\n".join(
+                (
+                    f"Closest snippet for retry: {file_path}:{start_line}-{end_line} (match={score:.2f})",
+                    numbered,
+                    "Retry hint: reuse the exact snippet above as old_string before applying the next edit.",
+                )
+            )
+        )
+        if len(match_sections) >= 2:
+            break
+    if not match_sections:
+        return agent_error
+    return f"{error_text}\n\n" + "\n\n".join(match_sections)
+
+
 class AgentRuntime:
     """Run a single issue attempt against a model gateway."""
 
@@ -107,6 +241,10 @@ class AgentRuntime:
         tracker = ToolUsageTracker()
         hook_pipeline = HookPipeline((ToolPolicyHook(self.tool_policy, tracker), *self.hooks._hooks))
         session = self.gateway.create_session(request)
+        performance_flags = load_performance_flags()
+        edit_failure_feedback_enabled = bool(
+            getattr(performance_flags, "edit_failure_context_feedback", True)
+        )
         last_abort_result: GatewayAbortResult | None = None
         agent_error: str | None = None
         run_started_at = time.monotonic()
@@ -131,6 +269,8 @@ class AgentRuntime:
             attempt_number=int(request.metadata.get("attempt_number", 0) or 0),
         )
         pending_tool_result_name: str | None = None
+        last_edit_tool_name = ""
+        last_edit_raw_payload: dict[str, Any] = {}
 
         def format_preview(value: str, *, max_chars: int = 1200) -> str:
             text = str(value or "").replace("\r\n", "\n").strip()
@@ -313,7 +453,7 @@ class AgentRuntime:
         )
 
         async def run_once() -> AgentRuntimeResult:
-            nonlocal agent_error, assistant_text_chars, assistant_text_events, captured_exception, first_edit_at, saw_result_event, timeout_stage, pending_tool_result_name
+            nonlocal agent_error, assistant_text_chars, assistant_text_events, captured_exception, first_edit_at, saw_result_event, timeout_stage, pending_tool_result_name, last_edit_tool_name, last_edit_raw_payload
 
             print("  [TRACE] 正在初始化 Claude SDK Client...", flush=True)
             update_status("client_connecting")
@@ -397,31 +537,36 @@ class AgentRuntime:
                         ) from exc
 
                     if isinstance(event, ToolCallEvent):
-                        update_status(f"tool:{event.name}", first_response=True)
-                        if event.name in {"Edit", "MultiEdit", "Write"} and first_edit_at is None:
+                        tool_name = normalize_tool_name(event.name)
+                        update_status(f"tool:{tool_name}", first_response=True)
+                        if tool_name in {"Edit", "MultiEdit", "Write"} and first_edit_at is None:
                             first_edit_at = time.monotonic()
-                        pending_tool_result_name = event.name
-                        decision = self.tool_policy.classify(event.name, event.payload)
+                        if tool_name in {"Edit", "MultiEdit"}:
+                            last_edit_tool_name = tool_name
+                            last_edit_raw_payload = dict(event.raw_payload or {})
+                        pending_tool_result_name = tool_name
+                        decision = self.tool_policy.classify(tool_name, event.payload)
                         context = ToolCallContext(
-                            tool_name=event.name,
+                            tool_name=tool_name,
                             decision=decision,
                             payload=event.payload,
                             preview=event.preview,
                         )
                         hook_pipeline.before_tool_call(context)
-                        print(f"  Using tool: {event.name}", flush=True)
+                        print(f"  Using tool: {tool_name}", flush=True)
                         if event.preview:
-                            print(f"  [TOOL INPUT] {event.name}", flush=True)
+                            print(f"  [TOOL INPUT] {tool_name}", flush=True)
                             print(event.preview, flush=True)
-                        read_preview = render_read_preview(event.name, event.payload)
+                        read_preview = render_read_preview(tool_name, event.payload)
                         if read_preview:
-                            print(f"  [READ PREVIEW] {event.name}", flush=True)
+                            print(f"  [READ PREVIEW] {tool_name}", flush=True)
                             print(read_preview, flush=True)
                         event_stream.emit(
                             AttemptRuntimeEventKind.TOOL_CALLED,
-                            stage=f"tool:{event.name}",
+                            stage=f"tool:{tool_name}",
                             payload={
-                                "tool_name": event.name,
+                                "tool_name": tool_name,
+                                "raw_tool_name": event.name,
                                 "allowed": decision.allowed,
                                 "tool_kind": decision.kind.value,
                                 "matched_rule": decision.matched_rule,
@@ -465,6 +610,13 @@ class AgentRuntime:
                         saw_result_event = True
                         print(f"  Done. Cost: ${event.total_cost_usd:.4f}", flush=True)
                         agent_error = event.agent_error
+                        if edit_failure_feedback_enabled:
+                            agent_error = _maybe_enrich_edit_failure(
+                                agent_error=agent_error,
+                                cwd=request.cwd,
+                                last_edit_tool_name=last_edit_tool_name,
+                                last_edit_raw_payload=last_edit_raw_payload,
+                            )
                     elif isinstance(event, TraceEvent):
                         update_status(f"sdk_message:{event.message_type}", first_response=True)
                         if pending_tool_result_name:

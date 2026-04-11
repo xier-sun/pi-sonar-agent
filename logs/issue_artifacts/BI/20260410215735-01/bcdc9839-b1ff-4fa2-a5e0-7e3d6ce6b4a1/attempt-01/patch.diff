@@ -1,0 +1,22 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -106,9 +106,7 @@
+                         x.DocEntry, x.U_New_ORDRID, x.ItemCode, x.Price, x.Quantity, x.StockValue, x.LastPurPrc, x.CreateDate,
+
+                         ResolvedDevEntry = resolvedDevEntry
+
+                     };
+
+-                }).Where(x => x.ResolvedDevEntry > 0
+
+-                //&& !csOrders.Contains(x.ResolvedDevEntry)
+
+-                ).ToList();
+
++                }).Where(x => x.ResolvedDevEntry > 0).ToList();
+
+ 
+
+                 var returnProducts = returnItemsWithDevEntry.Where(m => m.Price > 0).ToList();
+
+                 var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)

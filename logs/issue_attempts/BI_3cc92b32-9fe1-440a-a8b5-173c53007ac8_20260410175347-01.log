@@ -1,0 +1,29 @@
+[2026-04-10 17:59:28] Attempt 1/3 started for 3cc92b32-9fe1-440a-a8b5-173c53007ac8
+[2026-04-10 18:03:03] Attempt 1 failed: Model response timed out
+[2026-04-10 18:03:03] Build failure report:
+错误: Model response timed out
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Claude SDK Client 在 60 秒内未完成初始化
+连接诊断：Failed to authenticate. API Error: 403 不支持的模型类型，仅支持Claude Haiku、Sonnet和Opus系列模型
+取消原因: client_connect_timeout
+清理动作: disconnect
+[2026-04-10 18:03:03] Workspace restored to issue baseline
+[2026-04-10 18:03:03] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-10 18:03:03] Attempt 2/3 started for 3cc92b32-9fe1-440a-a8b5-173c53007ac8
+[2026-04-10 18:04:14] Attempt 2 failed: Model response timed out
+[2026-04-10 18:04:14] Build failure report:
+错误: Model response timed out
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Claude SDK Client 在 60 秒内未完成初始化
+连接诊断：Failed to authenticate. API Error: 403 不支持的模型类型，仅支持Claude Haiku、Sonnet和Opus系列模型
+取消原因: client_connect_timeout
+清理动作: disconnect
+[2026-04-10 18:04:15] Workspace restored to issue baseline
+[2026-04-10 18:04:15] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-10 18:04:15] Issue skipped: Retry stopped early after 2 attempt(s): repeated `timeout:client_connect_timeout` with unchanged strategy and diff.

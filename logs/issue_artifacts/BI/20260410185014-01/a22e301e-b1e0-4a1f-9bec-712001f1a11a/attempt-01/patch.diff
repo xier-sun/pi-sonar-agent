@@ -1,0 +1,312 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -88,12 +88,8 @@
+                 var returnItemsWithDevEntry = returnItems.Select(x => new
+
+                 {
+
+                     x.DocEntry, x.U_New_ORDRID, x.ItemCode, x.Price, x.Quantity, x.StockValue, x.LastPurPrc, x.CreateDate,
+
+-                    ResolvedDevEntry = !string.IsNullOrEmpty(x.U_DevEntry)
+
+-                        ? (int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0)
+
+-                        : (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved) ? resolved : 0)
+
+-                }).Where(x => x.ResolvedDevEntry > 0 
+
+-                //&& !csOrders.Contains(x.ResolvedDevEntry)
+
+-                ).ToList();
+
++                    ResolvedDevEntry = GetResolvedDevEntry(x.U_DevEntry, x.DocEntry, resolvedDevEntryMap)
+
++                }).Where(x => x.ResolvedDevEntry > 0).ToList();
+
+ 
+
+                 var returnProducts = returnItemsWithDevEntry.Where(m => m.Price > 0).ToList();
+
+                 var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)
+
+@@ -126,39 +122,11 @@
+                     //遍历订单中所有有价物料，检查每个物料是否都已退完
+
+                     if( delivrdItemsInThisOrdr.All(x=> x.Value == (thisOrdrReturnItems.TryGetValue(x.Key,out var returnedQty) ? returnedQty : 0 )))
+
+                     {
+
+-                        // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+
+-                        var returnedZeroPriceQtyByItem = returnItemsWithDevEntry
+
+-                            .Where(x => x.Price == 0 && x.ResolvedDevEntry == group.Key)
+
+-                            .GroupBy(x => x.ItemCode)
+
+-                            .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+
+-                        // 未退的 Price=0 物料成本 = sum(未退数量 * LastPurPrc)
+
+-                        var fixedPenaltyAmount = delivrdItems
+
+-                            .Where(x => x.Price == 0 && x.DocEntry == group.Key)
+
+-                            .GroupBy(x => x.ItemCode)
+
+-                            .Sum(g =>
+
+-                            {
+
+-                                var totalDelivrdQty = g.Sum(s => s.DelivrdQty);
+
+-                                returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+
+-                                var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+
+-                                return unreturnedQty > 0 ? unreturnedQty * g.First().LastPurPrc : (decimal?)0;
+
+-                            });
+
+-                        var slpCode = delivrdItems.FirstOrDefault(x => x.Price == 0 && x.DocEntry == group.Key)?.SlpCode;
+
+-                        
+
+-                        if(fixedPenaltyAmount.HasValue && fixedPenaltyAmount != 0)
+
++                        var penaltyEvent = CalculatePenaltyForOrderGroup(
+
++                            group, rule.Id, group.Key, delivrdItems, returnItemsWithDevEntry, slpCodeToNameMap);
+
++                        if(penaltyEvent != null)
+
+                         {
+
+-                            var PenaltyEvent = new PenaltyEventData
+
+-                            {
+
+-                                RuleDefinitionId = rule.Id,
+
+-                                SlpCode = slpCode,
+
+-                                SlpName = slpCodeToNameMap[slpCode.Value],
+
+-                                TriggerDocType = "ORDR",
+
+-                                TriggerDocEntry = group.Key.ToString(),
+
+-                                SEDocEntry = group.Key, 
+
+-                                PenaltyBaseAmount = fixedPenaltyAmount.Value,
+
+-                                TriggerEventDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
+-                                PenaltyStartDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
+-                            };
+
+-                            newEvents.Add(PenaltyEvent);
+
++                            newEvents.Add(penaltyEvent);
+
+                         }
+
+                     }
+
+                 }
+
+@@ -246,5 +214,97 @@
+ 
+
+             return result;
+
+         }
+
++
+
++        /// <summary>
+
++        /// 解析退货物料的原始订单号
+
++        /// </summary>
+
++        private List<dynamic> ResolveDevEntryFromItems(List<dynamic> returnItems, Dictionary<int, int> resolvedDevEntryMap)
+
++        {
+
++            return returnItems.Select(x => new
+
++            {
+
++                x.DocEntry,
+
++                x.U_New_ORDRID,
+
++                x.ItemCode,
+
++                x.Price,
+
++                x.Quantity,
+
++                x.StockValue,
+
++                x.LastPurPrc,
+
++                x.CreateDate,
+
++                ResolvedDevEntry = GetResolvedDevEntry(x, resolvedDevEntryMap)
+
++            }).Where(x => x.ResolvedDevEntry > 0).ToList();
+
++        }
+
++
+
++        /// <summary>
+
++        /// 获取解析后的原始订单号
+
++        /// </summary>
+
++        private int GetResolvedDevEntry(dynamic x, Dictionary<int, int> resolvedDevEntryMap)
+
++        {
+
++            if (!string.IsNullOrEmpty(x.U_DevEntry))
+
++            {
+
++                if (int.TryParse(x.U_DevEntry, out var parsed))
+
++                {
+
++                    return parsed;
+
++                }
+
++                return 0;
+
++            }
+
++
+
++            if (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved))
+
++            {
+
++                return resolved;
+
++            }
+
++
+
++            return 0;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 计算单个订单组的罚息事件
+
++        /// </summary>
+
++        private PenaltyEventData CalculatePenaltyForOrderGroup(
+
++            IGrouping<int, dynamic> group,
+
++            string ruleId,
+
++            int docEntry,
+
++            List<dynamic> delivrdItems,
+
++            List<dynamic> returnItemsWithDevEntry,
+
++            Dictionary<string, string> slpCodeToNameMap)
+
++        {
+
++            // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+
++            var returnedZeroPriceQtyByItem = returnItemsWithDevEntry
+
++                .Where(x => x.Price == 0 && x.ResolvedDevEntry == docEntry)
+
++                .GroupBy(x => x.ItemCode)
+
++                .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+
++
+
++            // 未退的 Price=0 物料成本 = sum(未退数量 * LastPurPrc)
+
++            var fixedPenaltyAmount = delivrdItems
+
++                .Where(x => x.Price == 0 && x.DocEntry == docEntry)
+
++                .GroupBy(x => x.ItemCode)
+
++                .Sum(g =>
+
++                {
+
++                    var totalDelivrdQty = g.Sum(s => s.DelivrdQty);
+
++                    returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+
++                    var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+
++                    return unreturnedQty > 0 ? unreturnedQty * g.First().LastPurPrc : (decimal?)0;
+
++                });
+
++
+
++            var slpCode = delivrdItems.FirstOrDefault(x => x.Price == 0 && x.DocEntry == docEntry)?.SlpCode;
+
++
+
++            if (fixedPenaltyAmount.HasValue && fixedPenaltyAmount != 0 && slpCode != null)
+
++            {
+
++                var latestDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate;
+
++                return new PenaltyEventData
+
++                {
+
++                    RuleDefinitionId = ruleId,
+
++                    SlpCode = slpCode,
+
++                    SlpName = slpCodeToNameMap[slpCode.Value],
+
++                    TriggerDocType = "ORDR",
+
++                    TriggerDocEntry = docEntry.ToString(),
+
++                    SEDocEntry = docEntry,
+
++                    PenaltyBaseAmount = fixedPenaltyAmount.Value,
+
++                    TriggerEventDate = latestDate,
+
++                    PenaltyStartDate = latestDate
+
++                };
+
++            }
+
++
+
++            return null;
+
++        }
+
+     }
+
+ }

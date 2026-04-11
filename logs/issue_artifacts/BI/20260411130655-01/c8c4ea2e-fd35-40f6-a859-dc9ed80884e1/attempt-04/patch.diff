@@ -1,0 +1,94 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
+@@ -201,23 +201,39 @@
+             var moduleElements = await GetSnapshotModuleElements(roles);
+
+ 
+
+             var domId = GetSnapshotModuleElementDomId(moduleElements);
+
++            var viewPermissionResult = await HandleViewPermissionAsync(domId, loginUser.User_Id, req);
+
++            if (viewPermissionResult.HasValue) return viewPermissionResult.Value;
+
++
+
++            return await HandleCompanyIndicatorPermissionAsync(moduleElements, req);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理视图权限
+
++        /// </summary>
+
++        private async Task<(bool, int, string)?> HandleViewPermissionAsync(string domId, int? userId, OverdueAgingSnapshotReq req)
+
++        {
+
+             switch (domId)
+
+             {
+
+                 case view_all:
+
+-                    break;
+
++                    return null;
+
+                 case view_dept:
+
+-                    var deptResult = await HandleSnapshotDeptView(loginUser.User_Id, req);
+
++                    var deptResult = await HandleSnapshotDeptView(userId, req);
+
+                     if (deptResult.HasError) return deptResult.Result;
+
+-                    break;
+
++                    return null;
+
+                 case view_self:
+
+-                    var selfResult = await HandleSnapshotSelfView(loginUser.User_Id, req);
+
++                    var selfResult = await HandleSnapshotSelfView(userId, req);
+
+                     if (selfResult.HasError) return selfResult.Result;
+
+-                    break;
+
++                    return null;
+
+                 default:
+
+                     return (true, 500, "用户角色未配置模块权限");
+
+             }
+
+-
+
+-            // 处理公司主体标识权限
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理公司主体标识权限
+
++        /// </summary>
+
++        private async Task<(bool, int, string)> HandleCompanyIndicatorPermissionAsync(List<ModuleElement> moduleElements, OverdueAgingSnapshotReq req)
+
++        {
+
+             var customQryCategory = await UnitWork.Find<Category>(x => x.TypeId == FinanceConsts.FICO_Custom_Query_Filter).ToListAsync();
+
+             var haveCustomQueryRight = customQryCategory.Select(x => x.DtCode).Intersect(moduleElements.Select(x => x.DomId)).Distinct().ToList();
+
+             if (haveCustomQueryRight.Count > 0)

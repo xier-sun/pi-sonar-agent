@@ -104,6 +104,53 @@ def test_build_user_prompt_renders_structured_retry_context() -> None:
     assert "请基于这些失败原因重新修复" in prompt
 
 
+def test_build_user_prompt_includes_precise_sonar_location_guidance() -> None:
+    issue = SonarIssue(
+        key="issue-location",
+        rule="csharpsquid:S3358",
+        message="Extract this nested ternary operation into an independent statement.",
+        line=92,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+        text_range={
+            "startLine": 92,
+            "endLine": 93,
+            "startOffset": 8,
+            "endOffset": 24,
+        },
+        flows=(
+            {
+                "locations": (
+                    {
+                        "component": "BI:src/Bar.cs",
+                        "msg": "Related branch condition.",
+                        "textRange": {"startLine": 16, "endLine": 16, "startOffset": 12, "endOffset": 28},
+                    },
+                ),
+            },
+        ),
+    )
+
+    prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  92 | value = condition ? a : b;",
+        "",
+        "- 只允许修改当前表达式。",
+        {
+            "name": "Ternary operators should not be nested",
+            "description": "嵌套三元表达式会降低可读性。",
+            "how_to_fix": "将内层条件提取为独立语句。",
+        },
+        'dotnet build "src/Foo.sln"',
+    )
+
+    assert "【SonarQube 精确定位】" in prompt
+    assert "- 主定位: src/Foo.cs:92:9-93:25" in prompt
+    assert "- 关联位置 1: src/Bar.cs:16:13-29 | Related branch condition." in prompt
+    assert "- 报错行号: 92" in prompt
+
+
 def test_load_csharp_quality_gate_only_for_csharp_files() -> None:
     csharp_issue = SonarIssue(
         key="issue-cs",
@@ -365,6 +412,84 @@ def test_fix_issue_fails_when_agent_makes_no_changes(monkeypatch, tmp_path) -> N
     assert result.failure_kind == "no_change"
 
 
+def test_fix_issue_classifies_empty_edit_payload_as_tool_input_invalid(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-invalid-edit",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=3,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: []),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    def fake_runtime_run(self, request):
+        return AgentRuntimeResult(
+            tool_uses=("Read", "Edit"),
+            last_tool_name="Edit",
+            tool_call_count=2,
+            read_call_count=1,
+            edit_call_count=1,
+            runtime_events=(
+                AttemptRuntimeEvent(
+                    kind=AttemptRuntimeEventKind.TOOL_CALLED,
+                    sequence=1,
+                    stage="tool:Edit",
+                    payload={"tool_name": "Edit", "tool_payload": {}},
+                ),
+                AttemptRuntimeEvent(
+                    kind=AttemptRuntimeEventKind.SDK_TRACE,
+                    sequence=2,
+                    stage="sdk_message:UserMessage",
+                    payload={
+                        "preview": (
+                            "{\"content\": [{\"content_preview\": "
+                            "\"<tool_use_error>InputValidationError: Edit failed due to the following issues:\\n"
+                            "The required parameter `file_path` is missing\\n"
+                            "The required parameter `old_string` is missing\\n"
+                            "The required parameter `new_string` is missing</tool_use_error>\"}]}"
+                        )
+                    },
+                ),
+                AttemptRuntimeEvent(
+                    kind=AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    sequence=3,
+                    stage="completed",
+                    payload={"success": False},
+                ),
+            ),
+            saw_result_event=True,
+        )
+
+    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fake_runtime_run)
+
+    result = agent.fix_issue(issue, tmp_path)
+
+    assert result.success is False
+    assert result.retryable_failure is True
+    assert result.failure_kind == "tool_input_invalid"
+    assert result.error == "Model emitted an invalid Edit/MultiEdit call"
+    assert "InputValidationError" in result.build_output
+
+
 def test_fix_issue_skips_policy_managed_rule_before_running_agent(monkeypatch, tmp_path) -> None:
     agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
     issue = SonarIssue(
@@ -391,7 +516,7 @@ def test_fix_issue_skips_policy_managed_rule_before_running_agent(monkeypatch, t
     assert "默认跳过" in result.skip_reason
 
 
-def test_fix_issue_fails_fast_when_plan_precheck_blocks_complex_rule(monkeypatch, tmp_path) -> None:
+def test_fix_issue_downgrades_complex_plan_instead_of_hard_blocking(monkeypatch, tmp_path) -> None:
     agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
     issue = SonarIssue(
         key="issue-plan-conflict",
@@ -429,24 +554,33 @@ def test_fix_issue_fails_fast_when_plan_precheck_blocks_complex_rule(monkeypatch
 
     import pi_sonar_agent.agent.claude_agent as claude_agent_module
 
-    def fail_if_runtime_runs(self, request):
-        raise AssertionError("plan conflict should block before runtime execution")
+    runtime_requests: list[object] = []
 
-    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fail_if_runtime_runs)
+    def fake_runtime_run(self, request):
+        runtime_requests.append(request)
+        return AgentRuntimeResult(
+            agent_error=None,
+            tool_uses=("Read",),
+            last_tool_name="Read",
+            saw_result_event=True,
+        )
+
+    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fake_runtime_run)
 
     result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
 
     assert result.success is False
-    assert result.failure_kind == "plan_conflict"
-    assert result.retryable_failure is False
+    assert result.failure_kind == "no_change"
     assert result.repair_plan is not None
     assert result.plan_precheck is not None
-    assert result.plan_precheck.code == "signature_change_not_allowed"
-    assert "signature_change" in result.build_output
+    assert result.plan_precheck.status == "pass"
+    assert result.repair_plan.requires_signature_change is False
+    assert result.repair_plan.selected_archetype == "signature_preserving_refactor"
+    assert runtime_requests
 
 
 def test_builtin_tool_policy_allows_editing_tools_without_bash() -> None:
-    assert BUILTIN_FIX_TOOLS == ["Read", "Edit"]
+    assert BUILTIN_FIX_TOOLS == ["Read", "Edit", "MultiEdit"]
     assert "Bash" not in BUILTIN_FIX_TOOLS
     assert MCP_FIX_TOOLS == []
     assert "mcp__sonar-fix__git_add" not in MCP_FIX_TOOLS
@@ -523,7 +657,7 @@ def test_fix_issue_fails_when_local_build_verification_fails(monkeypatch, tmp_pa
     assert result.success is False
     assert result.error == "Issue changes failed local build verification"
     assert result.build_command == 'dotnet build "src/Foo.sln"'
-    assert result.build_output == "compile failed"
+    assert "compile failed" in result.build_output
     assert result.build_verification_failed is True
     assert result.retryable_failure is True
     assert result.failure_kind == "build"

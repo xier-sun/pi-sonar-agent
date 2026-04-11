@@ -37,6 +37,8 @@ def test_attempt_scheduler_builds_layered_verification_schedule() -> None:
     )
 
     assert schedule.run_boundary_first is True
+    assert schedule.run_propagation_check_before_build is True
     assert schedule.run_quality_gate_before_build is True
     assert schedule.run_rule_validation_before_build is True
+    assert schedule.run_fast_compile_before_build is True
     assert schedule.skip_build_on_precheck_failure is True

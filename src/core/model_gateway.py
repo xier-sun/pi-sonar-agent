@@ -65,6 +65,7 @@ class ToolCallEvent:
 
     name: str
     payload: dict[str, Any] = field(default_factory=dict)
+    raw_payload: dict[str, Any] = field(default_factory=dict)
     preview: str = ""
 
 

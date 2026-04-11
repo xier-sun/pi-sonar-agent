@@ -1,0 +1,265 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -50,7 +50,7 @@
+ 
+
+ 
+
+             try
+
+-            {         
+
++            {
+
+                 var allOslps = await UnitWork.Find<OSLP>(null)
+
+                                        .ToListAsync();
+
+                 var slpCodeToNameMap = allOslps
+
+@@ -91,7 +91,7 @@
+                     ResolvedDevEntry = !string.IsNullOrEmpty(x.U_DevEntry)
+
+                         ? (int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0)
+
+                         : (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved) ? resolved : 0)
+
+-                }).Where(x => x.ResolvedDevEntry > 0 
+
++                }).Where(x => x.ResolvedDevEntry > 0
+
+                 //&& !csOrders.Contains(x.ResolvedDevEntry)
+
+                 ).ToList();
+
+ 
+
+@@ -111,7 +111,7 @@
+                                              join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry
+
+                                              join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+
+                                              where
+
+-                                                r.CANCELED == "N" && r.DocStatus == "C" && r1.DelivrdQty > 0 && r1.LineStatus == "C" && r1.OpenQty == 0 && m.InvntItem == "Y"
+
++                                                r.CANCELED == "N" && r.DocStatus == "C" && r1.DelivrdQty > 0 && r1.LineStatus == "C" && r1.OpenQty == 0 && m.MatInvType == "N"
+
+                                                 &&  returnOrdrDocEntrys.Contains(r.DocEntry)
+
+                                              select new { r.DocEntry, r1.LineNum, r1.ItemCode, r1.DelivrdQty, r1.Price,m.ManSerNum, m.ManBtchNum ,m.LastPurPrc,r.SlpCode}
+
+                 ).ToListAsync();
+
+@@ -124,26 +124,12 @@
+                     var thisOrdrReturnItems = group.GroupBy(x => x.ItemCode).Select(x => new { ItemCode = x.Key, TotalQty = x.Sum(s => s.Quantity) }).ToDictionary(k => k.ItemCode, v => v.TotalQty);
+
+                     var delivrdItemsInThisOrdr = delivrdProductsLookUp[group.Key].GroupBy(x=>x.ItemCode).Select(x=> new { ItemCode = x.Key, TotalQty = x.Sum(s=>s.DelivrdQty) }).ToDictionary(k=>k.ItemCode,v=>v.TotalQty);
+
+                     //遍历订单中所有有价物料，检查每个物料是否都已退完
+
+-                    if( delivrdItemsInThisOrdr.All(x=> x.Value == (thisOrdrReturnItems.TryGetValue(x.Key,out var returnedQty) ? returnedQty : 0 )))
+
++                    var allPriceItemsReturned = AreAllPriceItemsReturned(delivrdItemsInThisOrdr, thisOrdrReturnItems);
+
++                    if(allPriceItemsReturned)
+
+                     {
+
+-                        // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+
+-                        var returnedZeroPriceQtyByItem = returnItemsWithDevEntry
+
+-                            .Where(x => x.Price == 0 && x.ResolvedDevEntry == group.Key)
+
+-                            .GroupBy(x => x.ItemCode)
+
+-                            .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+
+-                        // 未退的 Price=0 物料成本 = sum(未退数量 * LastPurPrc)
+
+-                        var fixedPenaltyAmount = delivrdItems
+
+-                            .Where(x => x.Price == 0 && x.DocEntry == group.Key)
+
+-                            .GroupBy(x => x.ItemCode)
+
+-                            .Sum(g =>
+
+-                            {
+
+-                                var totalDelivrdQty = g.Sum(s => s.DelivrdQty);
+
+-                                returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+
+-                                var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+
+-                                return unreturnedQty > 0 ? unreturnedQty * g.First().LastPurPrc : (decimal?)0;
+
+-                            });
+
++                        var fixedPenaltyAmount = CalculateZeroPricePenalty(delivrdItems, returnItemsWithDevEntry, group.Key);
+
+                         var slpCode = delivrdItems.FirstOrDefault(x => x.Price == 0 && x.DocEntry == group.Key)?.SlpCode;
+
+-                        
+
++
+
+                         if(fixedPenaltyAmount.HasValue && fixedPenaltyAmount != 0)
+
+                         {
+
+                             var PenaltyEvent = new PenaltyEventData
+
+@@ -153,8 +139,9 @@
+                                 SlpName = slpCodeToNameMap[slpCode.Value],
+
+                                 TriggerDocType = "ORDR",
+
+                                 TriggerDocEntry = group.Key.ToString(),
+
+-                                SEDocEntry = group.Key, 
+
++                                SEDocEntry = group.Key,
+
+                                 PenaltyBaseAmount = fixedPenaltyAmount.Value,
+
++                                TriggeredQty = (int)fixedPenaltyAmount.Value,
+
+                                 TriggerEventDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
+                                 PenaltyStartDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
+                             };
+
+@@ -168,6 +155,65 @@
+                 LogHelper.Error(ex, "处理退货未关联新单据处理器失败",nameof(ReturnUnRelNewOrderProcessor),nameof(ProcessAsync));
+
+             }
+
+             return (newEvents, new List<ResolvedEventData>(), new List<CanceledEventData>());
+
++        }
+
++
+
++        /// <summary>
+
++        /// 检查订单中所有有价物料是否已全部退完
+
++        /// </summary>
+
++        private static bool AreAllPriceItemsReturned(Dictionary<string, decimal> delivrdItemsInThisOrdr, Dictionary<string, decimal> thisOrdrReturnItems)
+
++        {
+
++            foreach (var item in delivrdItemsInThisOrdr)
+
++            {
+
++                decimal returnedQty = 0;
+
++                if (thisOrdrReturnItems.TryGetValue(item.Key, out returnedQty))
+
++                {
+
++                    if (item.Value != returnedQty)
+
++                    {
+
++                        return false;
+
++                    }
+
++                }
+
++                else
+
++                {
+
++                    return false;
+
++                }
+
++            }
+
++            return true;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 计算零价格物料的罚息金额
+
++        /// </summary>
+
++        private static decimal? CalculateZeroPricePenalty(
+
++            List<dynamic> delivrdItems,
+
++            List<dynamic> returnItemsWithDevEntry,
+
++            int orderDocEntry)
+
++        {
+
++            var penaltyAmount = 0m;
+
++            var returnedZeroPriceQtyByItem = returnItemsWithDevEntry
+
++                .Where(x => (decimal)x.Price == 0 && (int)x.ResolvedDevEntry == orderDocEntry)
+
++                .GroupBy(x => x.ItemCode)
+
++                .ToDictionary(g => g.Key, g => g.Sum(s => (decimal)s.Quantity));
+
++
+
++            var zeroPriceDelivrdItems = delivrdItems
+
++                .Where(x => (decimal)x.Price == 0 && (int)x.DocEntry == orderDocEntry)
+
++                .GroupBy(x => x.ItemCode);
+
++
+
++            foreach (var group in zeroPriceDelivrdItems)
+
++            {
+
++                var totalDelivrdQty = group.Sum(s => (decimal)s.DelivrdQty);
+
++                decimal? returnedQty = null;
+
++                if (returnedZeroPriceQtyByItem.TryGetValue(group.Key, out var qty))
+
++                {
+
++                    returnedQty = qty;
+
++                }
+
++                var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+
++                if (unreturnedQty > 0)
+
++                {
+
++                    penaltyAmount += unreturnedQty * (decimal)group.First().LastPurPrc;
+
++                }
+
++            }
+
++
+
++            return penaltyAmount > 0 ? penaltyAmount : (decimal?)null;
+
+         }
+
+ 
+
+         /// <summary>

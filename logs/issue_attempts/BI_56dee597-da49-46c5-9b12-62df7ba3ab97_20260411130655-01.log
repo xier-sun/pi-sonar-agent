@@ -1,0 +1,267 @@
+[2026-04-11 17:55:20] Attempt 1/5 started for 56dee597-da49-46c5-9b12-62df7ba3ab97
+[2026-04-11 18:02:41] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-11 18:02:41] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+关键错误:
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1594,30): error CS0103: 当前上下文中不存在名称“BuildOrderEvents” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1597,17): error CS0103: 当前上下文中不存在名称“ApplyCanClearReconEventProcessing” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1594,30): error CS0103: 当前上下文中不存在名称“BuildOrderEvents” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1597,17): error CS0103: 当前上下文中不存在名称“ApplyCanClearReconEventProcessing” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+
+构建日志:
+... (省略前 153 行)
+C:\Users\neware\.nuget\packages\microsoft.bcl.hashcode\6.0.0\buildTransitive\netcoreapp2.0\Microsoft.Bcl.HashCode.targets(4,5): warning : Microsoft.Bcl.HashCode 6.0.0 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\system.formats.asn1\8.0.1\buildTransitive\netcoreapp2.0\System.Formats.Asn1.targets(4,5): warning : System.Formats.Asn1 8.0.1 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\system.security.cryptography.pkcs\8.0.1\buildTransitive\netcoreapp2.0\System.Security.Cryptography.Pkcs.targets(4,5): warning : System.Security.Cryptography.Pkcs 8.0.1 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\system.security.cryptography.xml\8.0.2\buildTransitive\netcoreapp2.0\System.Security.Cryptography.Xml.targets(4,5): warning : System.Security.Cryptography.Xml 8.0.2 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\microsoft.bcl.timeprovider\8.0.0\buildTransitive\netcoreapp2.0\Microsoft.Bcl.TimeProvider.targets(4,5): warning : Microsoft.Bcl.TimeProvider 8.0.0 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: 目标框架“netcoreapp3.1”不受支持，将来不会收到安全更新。有关支持策略的详细信息，请参阅 https://aka.ms/dotnet-core-support。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1603: Infrastructure 依赖于 Serilog.Sinks.Elasticsearch (>= 7.0.0)，但没有找到 Serilog.Sinks.Elasticsearch 7.0.0。已改为解析 Serilog.Sinks.Elasticsearch 7.1.0。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1603: Infrastructure 依赖于 System.Net.Http.Json (>= 3.0.0)，但没有找到 System.Net.Http.Json 3.0.0。已改为解析 System.Net.Http.Json 3.2.0。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Core 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Word 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Npoi.Mapper 6.2.2”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Spire.Doc 13.3.7”。此包可能与项目不完全兼容。
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\HumanResource\UserRegister\UserRegisterDetail.cs(575,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(168,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(197,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(228,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AccraditationBeforeSaleDemandReq.cs(44,23): warning CS0108: “AccraditationBeforeSaleDemandReq.FlowInstanceId”隐藏继承的成员“VerificationReq.FlowInstanceId”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Engineering\ECR\Dto\EcrProductionDto.cs(21,23): warning CS0108: “EcrProductionDto.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryDetectionItemResp.cs(21,21): warning CS0108: “FatCategoryDetectionItemResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryResp.cs(22,21): warning CS0108: “FatCategoryResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(173,31): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(274,27): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(284,32): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Serve\CompletionReportApp.cs(615,13): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\MD\Implement\BusinessLabelApiApp.cs(1354,17): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1594,30): error CS0103: 当前上下文中不存在名称“BuildOrderEvents” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1597,17): error CS0103: 当前上下文中不存在名称“ApplyCanClearReconEventProcessing” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+    90 个警告
+    2 个错误
+
+已用时间 00:00:49.71
+[2026-04-11 18:02:41] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:1594:30
+   错误信息: 当前上下文中不存在名称“BuildOrderEvents”
+   出错代码片段:
+1592 |                 // ====================================================================
+1593 |                 // 创建事件列表
+1594 |                 var events = BuildOrderEvents(order, calculationDate, remarkDic, allReceipts, deliveryForCalcList, allReturns, allRefunds);
+1595 | 
+1596 |                 // 应用可清账事件处理
+2. CS0103 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:1597:17
+   错误信息: 当前上下文中不存在名称“ApplyCanClearReconEventProcessing”
+   出错代码片段:
+1595 | 
+1596 |                 // 应用可清账事件处理
+1597 |                 ApplyCanClearReconEventProcessing(ref events);
+1598 | 
+1599 | 
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 18:02:41] Workspace restored to issue baseline
+[2026-04-11 18:02:41] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 18:02:41] Attempt 2/5 started for 56dee597-da49-46c5-9b12-62df7ba3ab97
+[2026-04-11 18:08:20] Attempt 2 failed: Agent completed without modifying any files
+[2026-04-11 18:08:20] Next retry feedback for model:
+上次尝试没有实际修改任何文件。
+这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。
+重试约束:
+- 不要只做分析或解释，必须提交实际代码修改。
+- 修改后立即使用推荐构建命令验证。
+- 如果这是行级问题，只修改 Sonar 指向的那条语句。
+[2026-04-11 18:08:20] Workspace restored to issue baseline
+[2026-04-11 18:08:20] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-11 18:08:20] Attempt 3/5 started for 56dee597-da49-46c5-9b12-62df7ba3ab97
+[2026-04-11 18:13:13] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-11 18:13:13] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+关键错误:
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1573,17): error CS0103: 当前上下文中不存在名称“allReturns” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1573,30): error CS0103: 当前上下文中不存在名称“GetBatchReturnsOrDefault” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1576,17): error CS0103: 当前上下文中不存在名称“allRefunds” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1576,30): error CS0103: 当前上下文中不存在名称“GetBatchRefundsOrDefault” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1616,45): error CS0103: 当前上下文中不存在名称“allReturns” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1627,40): error CS0103: 当前上下文中不存在名称“allRefunds” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1762,25): error CS0103: 当前上下文中不存在名称“allReturns” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1764,25): error CS0103: 当前上下文中不存在名称“allRefunds” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1573,17): error CS0103: 当前上下文中不存在名称“allReturns” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1573,30): error CS0103: 当前上下文中不存在名称“GetBatchReturnsOrDefault” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1576,17): error CS0103: 当前上下文中不存在名称“allRefunds” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1576,30): error CS0103: 当前上下文中不存在名称“GetBatchRefundsOrDefault” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1616,45): error CS0103: 当前上下文中不存在名称“allReturns” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1627,40): error CS0103: 当前上下文中不存在名称“allRefunds” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1762,25): error CS0103: 当前上下文中不存在名称“allReturns” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1764,25): error CS0103: 当前上下文中不存在名称“allRefunds” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+
+构建日志:
+... (省略前 165 行)
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1603: Infrastructure 依赖于 Serilog.Sinks.Elasticsearch (>= 7.0.0)，但没有找到 Serilog.Sinks.Elasticsearch 7.0.0。已改为解析 Serilog.Sinks.Elasticsearch 7.1.0。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1603: Infrastructure 依赖于 System.Net.Http.Json (>= 3.0.0)，但没有找到 System.Net.Http.Json 3.0.0。已改为解析 System.Net.Http.Json 3.2.0。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Core 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Word 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Npoi.Mapper 6.2.2”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Spire.Doc 13.3.7”。此包可能与项目不完全兼容。
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\HumanResource\UserRegister\UserRegisterDetail.cs(575,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(168,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(197,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(228,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AccraditationBeforeSaleDemandReq.cs(44,23): warning CS0108: “AccraditationBeforeSaleDemandReq.FlowInstanceId”隐藏继承的成员“VerificationReq.FlowInstanceId”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Engineering\ECR\Dto\EcrProductionDto.cs(21,23): warning CS0108: “EcrProductionDto.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryDetectionItemResp.cs(21,21): warning CS0108: “FatCategoryDetectionItemResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryResp.cs(22,21): warning CS0108: “FatCategoryResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Serve\CompletionReportApp.cs(615,13): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(173,31): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(274,27): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(284,32): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\MD\Implement\BusinessLabelApiApp.cs(1354,17): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1573,17): error CS0103: 当前上下文中不存在名称“allReturns” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1573,30): error CS0103: 当前上下文中不存在名称“GetBatchReturnsOrDefault” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1576,17): error CS0103: 当前上下文中不存在名称“allRefunds” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1576,30): error CS0103: 当前上下文中不存在名称“GetBatchRefundsOrDefault” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1616,45): error CS0103: 当前上下文中不存在名称“allReturns” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1627,40): error CS0103: 当前上下文中不存在名称“allRefunds” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1762,25): error CS0103: 当前上下文中不存在名称“allReturns” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs(1764,25): error CS0103: 当前上下文中不存在名称“allRefunds” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+    90 个警告
+    8 个错误
+
+已用时间 00:00:51.29
+[2026-04-11 18:13:13] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:1573:17
+   错误信息: 当前上下文中不存在名称“allReturns”
+   出错代码片段:
+1571 | 
+1572 |                 // 5. 获取退货记录
+1573 |                 allReturns = GetBatchReturnsOrDefault(batchReturns, order.DocEntry);
+1574 | 
+1575 |                 // 6. 获取退款记录
+2. CS0103 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:1573:30
+   错误信息: 当前上下文中不存在名称“GetBatchReturnsOrDefault”
+   出错代码片段:
+1571 | 
+1572 |                 // 5. 获取退货记录
+1573 |                 allReturns = GetBatchReturnsOrDefault(batchReturns, order.DocEntry);
+1574 | 
+1575 |                 // 6. 获取退款记录
+3. CS0103 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:1576:17
+   错误信息: 当前上下文中不存在名称“allRefunds”
+   出错代码片段:
+1574 | 
+1575 |                 // 6. 获取退款记录
+1576 |                 allRefunds = GetBatchRefundsOrDefault(batchRefunds, order.DocEntry);
+1577 | 
+1578 |                 // 6. 获取清账记录
+4. CS0103 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:1576:30
+   错误信息: 当前上下文中不存在名称“GetBatchRefundsOrDefault”
+   出错代码片段:
+1574 | 
+1575 |                 // 6. 获取退款记录
+1576 |                 allRefunds = GetBatchRefundsOrDefault(batchRefunds, order.DocEntry);
+1577 | 
+1578 |                 // 6. 获取清账记录
+5. CS0103 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:1616:45
+   错误信息: 当前上下文中不存在名称“allReturns”
+   出错代码片段:
+1614 |                 
+1615 |                 // 添加退货事件 (使用预加载的 returns)
+1616 |                 foreach (var returnOrder in allReturns)
+1617 |                 {
+1618 |                     events.Add(new OrderEvent
+6. CS0103 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:1627:40
+   错误信息: 当前上下文中不存在名称“allRefunds”
+   出错代码片段:
+1625 |                 }
+1626 | 
+1627 |                 foreach (var refund in allRefunds)
+1628 |                 {
+1629 |                     events.Add(new OrderEvent
+7. CS0103 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:1762:25
+   错误信息: 当前上下文中不存在名称“allReturns”
+   出错代码片段:
+1760 |                         payTerm,
+1761 |                         deliveryForCalcList,
+1762 |                         allReturns,
+1763 |                         allReceipts,
+1764 |                         allRefunds,
+8. CS0103 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411130655-01\OpenAuth.Core\OpenAuth.App\Finance\HistoricalOverdueImportService.cs:1764:25
+   错误信息: 当前上下文中不存在名称“allRefunds”
+   出错代码片段:
+1762 |                         allReturns,
+1763 |                         allReceipts,
+1764 |                         allRefunds,
+1765 |                         allClearRecons,
+1766 |                         saleOrderPlugin,
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 18:13:13] Workspace restored to issue baseline
+[2026-04-11 18:13:13] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-11 18:13:13] Attempt 4/5 started for 56dee597-da49-46c5-9b12-62df7ba3ab97
+[2026-04-11 18:19:38] Attempt 4 failed: Quality gate verification failed
+[2026-04-11 18:19:38] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_signature] 异步签名规范: 异步方法 GetBatchHistoricalClearReconsInternal 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1500
+   Evidence: public static async Task<Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>>> GetBatchHistoricalClearReconsInternal(IUnitWork unitWork, List<int> orderIds) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+[2026-04-11 18:19:38] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate rejected the patch with 1 hard violation(s).
+1. [async_signature] 异步签名规范: 异步方法 GetBatchHistoricalClearReconsInternal 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1500
+   证据: public static async Task<Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>>> GetBatchHistoricalClearReconsInternal(IUnitWork unitWork, List<int> orderIds) {
+   原始提示: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+本次重改要求:
+- 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+- 把当前触达的异步方法改成 *Async 结尾；如果这是公开 API 或接口实现，同步接口声明、调用点和 nameof(...)。
+- 不要为了凑 *Async 命名去新建或重命名并不真正异步的 helper；优先把新 helper 保持为同步方法。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-11 18:19:38] Workspace restored to issue baseline
+[2026-04-11 18:19:38] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-11 18:19:38] Attempt 5/5 started for 56dee597-da49-46c5-9b12-62df7ba3ab97
+[2026-04-11 18:24:04] Attempt 5 failed: Agent completed without modifying any files
+[2026-04-11 18:24:04] Next retry feedback for model:
+上次尝试没有实际修改任何文件。
+这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。
+重试约束:
+- 不要只做分析或解释，必须提交实际代码修改。
+- 修改后立即使用推荐构建命令验证。
+- 如果这是行级问题，只修改 Sonar 指向的那条语句。
+[2026-04-11 18:24:05] Workspace restored to issue baseline
+[2026-04-11 18:24:05] Issue skipped: Agent completed without modifying any files after 5 attempt(s)

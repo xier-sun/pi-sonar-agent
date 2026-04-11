@@ -108,8 +108,16 @@ def test_boundary_runtime_records_soft_drift_without_hard_failure(tmp_path) -> N
     assert outcome.reviewer_result.status == "pass"
     assert outcome.scope_violation is None
     assert hook_spy.after_scope is None
+    assert outcome.scope_audit_mode == "scope_soft_audit"
+    assert outcome.scope_audit_active is True
+    assert outcome.scope_expansion_count == 1
+    assert outcome.scope_expansion_reasons == ("outside_primary_region",)
+    assert outcome.extra_file_touch_count == 0
+    assert outcome.high_drift_warning is False
     assert outcome.primary_failure_code == ""
     assert any(item.type == "outside_primary_region" for item in outcome.reviewer_result.violations)
+    assert outcome.reviewer_result.metrics["scope_audit_mode"] == "scope_soft_audit"
+    assert outcome.reviewer_result.metrics["scope_expansion_count"] == 1
 
 
 def test_boundary_runtime_allows_declaration_anchor_drift_as_soft_audit(tmp_path) -> None:
@@ -247,3 +255,54 @@ def test_boundary_runtime_relaxes_same_file_member_cluster_deletes(tmp_path) -> 
     assert outcome.reviewer_result.status == "pass"
     assert outcome.scope_violation is None
     assert outcome.primary_failure_code == ""
+
+
+def test_boundary_runtime_counts_extra_touched_files_as_soft_scope_audit(tmp_path) -> None:
+    contract = EditContract(
+        issue_key="ISSUE-4",
+        rule_id="csharpsquid:S1481",
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "scope_review", "diff_review"),
+        scope_mode="statement",
+        validation_line_range=(10, 10),
+        allowed_line_ranges=((10, 10),),
+    )
+    issue = SonarIssue(
+        key="ISSUE-4",
+        rule="csharpsquid:S1481",
+        message="Remove unused local variable",
+        line=10,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    outcome = BoundaryRuntime.review(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="scope",
+        edit_contract=contract,
+        reviewed_changes=(
+            ReviewedFileChange(
+                file="src/Bar.cs",
+                changed_lines=(3,),
+                before_changed_lines=(3,),
+                after_changed_lines=(3,),
+                diff_text="@@ -3,1 +3,1 @@\n-var x = 1;\n+var x = 2;\n",
+                hunk_count=1,
+            ),
+        ),
+        workspace_path=tmp_path,
+        issue=issue,
+        scope=None,
+        original_issue_file_content="class Foo {}\n",
+        current_issue_file_content="class Foo {}\n",
+    )
+
+    assert outcome.reviewer_result.status == "pass"
+    assert outcome.scope_audit_mode == "scope_soft_audit"
+    assert outcome.scope_expansion_count == 1
+    assert outcome.scope_expansion_reasons == ("extra_touched_file",)
+    assert outcome.extra_file_touch_count == 1
+    assert outcome.high_drift_warning is True
+    assert any(item.type == "extra_touched_file" for item in outcome.reviewer_result.violations)

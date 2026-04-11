@@ -22,6 +22,7 @@ from pi_sonar_agent.core.model_gateway import (
     ToolCallEvent,
     TraceEvent,
 )
+from pi_sonar_agent.core.policy import normalize_tool_name
 from pi_sonar_agent.core.project_env import MODEL_ENV_KEYS
 
 THIRD_PARTY_MODEL_ENV_KEYS = (
@@ -160,9 +161,12 @@ class ClaudeGatewaySession(ModelGatewaySession):
                     for block in message.content:
                         if isinstance(block, self._dependencies.tool_use_block_cls):
                             payload = _extract_tool_payload(block)
+                            raw_payload = _extract_raw_tool_payload(block)
+                            normalized_tool_name = normalize_tool_name(getattr(block, "name", ""))
                             yield ToolCallEvent(
-                                name=block.name,
+                                name=normalized_tool_name or str(getattr(block, "name", "")),
                                 payload=payload,
+                                raw_payload=raw_payload,
                                 preview=_build_preview_from_payload(payload),
                             )
                         elif isinstance(block, self._dependencies.text_block_cls) and block.text.strip():
@@ -198,20 +202,21 @@ class ClaudeGatewaySession(ModelGatewaySession):
     async def diagnose_connect_timeout(self) -> str:
         cli_path = _resolve_sdk_cli_path()
         endpoint = str(self._request.env.get("ANTHROPIC_BASE_URL", "")).strip()
-        model = str(
+        cache_model = str(
             self._request.model
             or self._request.env.get("CLAUDE_MODEL")
             or self._request.env.get("OPENAI_MODEL")
             or self._request.metadata.get("model_display", "")
         ).strip()
-        cache_key = (cli_path, endpoint, model)
+        cache_key = (cli_path, endpoint, cache_model)
         cached = _CONNECT_DIAGNOSTIC_CACHE.get(cache_key)
         if cached is not None:
             return cached
 
         command = [cli_path, "--print"]
-        if model:
-            command.extend(["--model", model])
+        explicit_model = str(self._request.model or "").strip()
+        if explicit_model:
+            command.extend(["--model", explicit_model])
         for flag, value in self._request.extra_args.items():
             if value is None:
                 command.append(f"--{flag}")
@@ -500,12 +505,41 @@ def _summarize_value(value: Any) -> Any:
     return _truncate_text(repr(value))
 
 
+def _copy_tool_value(value: Any) -> Any:
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _copy_tool_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_copy_tool_value(item) for item in value]
+    if isinstance(value, set):
+        return [_copy_tool_value(item) for item in sorted(value, key=repr)]
+    if hasattr(value, "__dict__"):
+        raw = {
+            str(key): _copy_tool_value(item)
+            for key, item in vars(value).items()
+            if not str(key).startswith("_")
+        }
+        if raw:
+            return raw
+    return repr(value)
+
+
 def _extract_tool_payload(block: Any) -> dict[str, Any]:
     raw_input = getattr(block, "input", None)
     if isinstance(raw_input, dict):
         return {str(key): _summarize_value(value) for key, value in raw_input.items()}
     if raw_input is not None:
         return {"input": _summarize_value(raw_input)}
+    return {}
+
+
+def _extract_raw_tool_payload(block: Any) -> dict[str, Any]:
+    raw_input = getattr(block, "input", None)
+    if isinstance(raw_input, dict):
+        return {str(key): _copy_tool_value(value) for key, value in raw_input.items()}
+    if raw_input is not None:
+        return {"input": _copy_tool_value(raw_input)}
     return {}
 
 

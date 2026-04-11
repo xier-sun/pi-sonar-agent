@@ -1,0 +1,42 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -461,10 +461,16 @@
+ 
+
+         private async Task<Dictionary<int, List<SaleRefund>>> GetBatchRefundHistoryAsync(List<int> orderIds)
+
+         {
+
+-            return await GetBatchRefundHistoryInternal(UnitWork, orderIds);
+
+-        }
+
+-
+
+-        public static async Task<Dictionary<int, List<SaleRefund>>> GetBatchRefundHistoryInternal(IUnitWork unitWork, List<int> orderIds)
+
++            return await GetBatchRefundHistoryInternalAsync(UnitWork, orderIds);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 批量获取订单退货历史
+
++        /// </summary>
+
++        /// <param name="unitWork">工作单元</param>
+
++        /// <param name="orderIds">订单ID列表</param>
+
++        /// <returns>订单ID到退货记录列表的映射字典</returns>
+
++        public static async Task<Dictionary<int, List<SaleRefund>>> GetBatchRefundHistoryInternalAsync(IUnitWork unitWork, List<int> orderIds)
+
+         {
+
+             var result = new Dictionary<int, List<SaleRefund>>();
+
+             if (orderIds == null || orderIds.Count == 0)

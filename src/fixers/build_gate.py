@@ -141,6 +141,72 @@ def _extract_error_lines(text: str, max_lines: int) -> str:
     return f"... (省略前 {omitted} 条错误)\n{tail}"
 
 
+_RESTORE_FAILURE_MARKERS = (
+    "NU1301",
+    "Unable to load the service index for source",
+    "api.nuget.org",
+    "No such host is known",
+    "Temporary failure in name resolution",
+    "Name or service not known",
+)
+
+
+def _looks_like_restore_source_failure(text: str) -> bool:
+    normalized = _normalize_process_text(text)
+    return any(marker in normalized for marker in _RESTORE_FAILURE_MARKERS)
+
+
+def _derive_offline_verification_command(command: str) -> str:
+    normalized = _normalize_process_text(command).strip()
+    lowered = normalized.lower()
+    if not (lowered.startswith("dotnet build") or lowered.startswith("dotnet test")):
+        return ""
+    if "--no-restore" not in lowered:
+        normalized += " --no-restore"
+    return normalized
+
+
+def _run_command_with_restore_retry(
+    command: str,
+    *,
+    cwd: Path,
+    timeout: int,
+) -> tuple[subprocess.CompletedProcess[str], list[tuple[str, subprocess.CompletedProcess[str]]]]:
+    primary_result = _run_shell_command(command, cwd=cwd, timeout=timeout)
+    attempts: list[tuple[str, subprocess.CompletedProcess[str]]] = [(command, primary_result)]
+    if primary_result.returncode == 0:
+        return primary_result, attempts
+
+    primary_output = _combined_process_output(primary_result)
+    offline_command = _derive_offline_verification_command(command)
+    if (
+        offline_command
+        and offline_command != _normalize_process_text(command).strip()
+        and _looks_like_restore_source_failure(primary_output)
+    ):
+        retry_result = _run_shell_command(offline_command, cwd=cwd, timeout=timeout)
+        attempts.append((offline_command, retry_result))
+        return retry_result, attempts
+
+    return primary_result, attempts
+
+
+def _combine_attempt_outputs(attempts: list[tuple[str, subprocess.CompletedProcess[str]]]) -> str:
+    if not attempts:
+        return ""
+    if len(attempts) == 1:
+        return _combined_process_output(attempts[0][1])
+
+    sections = [
+        "检测到 NuGet restore/source 故障，已自动改用离线命令重试。",
+    ]
+    for index, (command, result) in enumerate(attempts, start=1):
+        body = _combined_process_output(result).strip()
+        header = f"[attempt {index}] {command} (exit={result.returncode})"
+        sections.append(f"{header}\n{body}".strip())
+    return "\n\n".join(part for part in sections if str(part).strip())
+
+
 def _command_has_explicit_target(command: str, solution_path: str | None = None) -> bool:
     """Check whether a command already points at a solution/project target."""
 
@@ -566,13 +632,17 @@ def run_local_build(
     resolved_test_command = resolve_test_command(test_command, solution_path)
 
     # Run build
-    build_result = _run_shell_command(
+    build_result, build_attempts = _run_command_with_restore_retry(
         resolved_build_command,
         cwd=workspace_path,
         timeout=timeout_seconds,
     )
-    build_stdout = _normalize_process_text(build_result.stdout)
-    build_stderr = _normalize_process_text(build_result.stderr)
+    build_stdout = _combine_attempt_outputs(build_attempts)
+    if len(build_attempts) == 1:
+        build_stdout = _normalize_process_text(build_result.stdout)
+    build_stderr = ""
+    if len(build_attempts) == 1:
+        build_stderr = _normalize_process_text(build_result.stderr)
 
     if build_result.returncode != 0:
         return {
@@ -581,21 +651,25 @@ def run_local_build(
             "test_passed": False,
             "build_command": resolved_build_command,
             "test_command": resolved_test_command,
-            "error": f"Build failed: {build_stderr}",
-            "build_output": f"{build_stdout}{build_stderr}",
+            "error": f"Build failed: {build_stderr or _normalize_process_text(build_result.stderr)}",
+            "build_output": build_stdout or f"{_normalize_process_text(build_result.stdout)}{_normalize_process_text(build_result.stderr)}",
         }
 
     # Run tests if provided
     test_passed = True
     if resolved_test_command:
-        test_result = _run_shell_command(
+        test_result, test_attempts = _run_command_with_restore_retry(
             resolved_test_command,
             cwd=workspace_path,
             timeout=timeout_seconds,
         )
         test_passed = test_result.returncode == 0
-        test_stdout = _normalize_process_text(test_result.stdout)
-        test_stderr = _normalize_process_text(test_result.stderr)
+        test_stdout = _combine_attempt_outputs(test_attempts)
+        if len(test_attempts) == 1:
+            test_stdout = _normalize_process_text(test_result.stdout)
+        test_stderr = ""
+        if len(test_attempts) == 1:
+            test_stderr = _normalize_process_text(test_result.stderr)
 
         if not test_passed:
             return {

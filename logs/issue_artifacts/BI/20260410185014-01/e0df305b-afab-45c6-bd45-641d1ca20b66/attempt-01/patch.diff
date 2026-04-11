@@ -1,0 +1,98 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
+@@ -55,7 +55,7 @@
+                 LogHelper.Info($"共查询到{completedOrders.Count}个符合条件的订单", nameof(HistoricalAfterBillOverdueImportService), nameof(ImportHistoricalAfterBillOverdueDataByRange));
+
+         
+
+                 // 批量预加载所有需要的数据
+
+-                var sharedData = await PreloadSharedData(completedOrders);
+
++                var sharedData = await PreloadSharedDataAsync(completedOrders);
+
+                 LogHelper.Info($"预加载共享数据完成", nameof(HistoricalAfterBillOverdueImportService), nameof(ImportHistoricalAfterBillOverdueDataByRange));
+
+         
+
+                 for (int i = 0; i < completedOrders.Count; i += batchSize)
+
+@@ -454,7 +454,7 @@
+         /// <summary>
+
+         /// 批量预加载所有需要的共享数据
+
+         /// </summary>
+
+-        private async Task<SharedDataCache> PreloadSharedData(List<ORDR> orders)
+
++        private async Task<SharedDataCache> PreloadSharedDataAsync(List<ORDR> orders)
+
+         {
+
+             var orderIds = orders.Select(o => o.DocEntry).ToList();
+
+ 
+
+@@ -468,30 +468,7 @@
+             cache.CustomerTypes = customerTypesList.ToDictionary(ct => ct.CardCode, ct => ct);
+
+ 
+
+             // 3. 批量加载开票信息
+
+-            var invoiceDict = new Dictionary<int, List<InvoiceHistoryItem>>();
+
+-            var mastersList = await UnitWork.Find<FinancebillapplicationMaster>(m => orderIds.Contains(m.DocEntry) && !string.IsNullOrEmpty(m.CardCode))
+
+-                .Select(m => new { m.Id, m.DocEntry })
+
+-                .ToListAsync();
+
+-            var masterIds = mastersList.Select(m => m.Id).ToList();
+
+-            var taxDetailsList = await UnitWork.Find<FinancebillapplicationTaxdetails>(t => masterIds.Contains(t.BillId) && t.TaxDate != null && t.TaxAmount > 0m)
+
+-                .ToListAsync();
+
+-            
+
+-            foreach (var master in mastersList)
+
+-            {
+
+-                var details = taxDetailsList.Where(td => td.BillId == master.Id)
+
+-                    .Select(td => new InvoiceHistoryItem
+
+-                    {
+
+-                        InvoiceDate = td.TaxDate.Value,
+
+-                        InvoiceAmount = td.TaxAmount.Value,
+
+-                        BillId = master.Id,
+
+-                        TaxNo = td.TaxNo
+
+-                    }).OrderBy(item => item.InvoiceDate).ToList();
+
+-                
+
+-                if (!invoiceDict.ContainsKey(master.DocEntry))
+
+-                    invoiceDict[master.DocEntry] = new List<InvoiceHistoryItem>();
+
+-                invoiceDict[master.DocEntry].AddRange(details);
+
+-            }
+
+-            cache.OrderInvoices = invoiceDict;
+
++            cache.OrderInvoices = await LoadInvoiceDataAsync(orderIds);
+
+ 
+
+             // 4. 批量加载收款信息
+
+             var receiptDict = new Dictionary<int, List<ReceiptForOrder>>();

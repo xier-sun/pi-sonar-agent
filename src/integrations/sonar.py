@@ -4,6 +4,10 @@ Simplified client for interacting with SonarQube REST API.
 Compatible with Windows and Unix systems.
 """
 
+from __future__ import annotations
+
+import html
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,6 +24,97 @@ class SonarRuleDetails:
     rule_type: str = ""
     description: str = ""
     how_to_fix: str = ""
+
+
+_FIX_SECTION_KEYS = {
+    "how_to_fix",
+    "code_fix",
+    "fix",
+    "fix_the_issue",
+    "compliant_solution",
+}
+_DESCRIPTION_SECTION_KEYS = {
+    "introduction",
+    "root_cause",
+    "why_is_this_an_issue",
+    "assessment",
+    "default",
+}
+_SKIPPED_SECTION_KEYS = {"resources", "references"}
+
+
+def _html_to_text(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+
+    replacements = (
+        (r"(?i)<br\s*/?>", "\n"),
+        (r"(?i)</p>", "\n"),
+        (r"(?i)</div>", "\n"),
+        (r"(?i)</h[1-6]>", "\n"),
+        (r"(?i)<li[^>]*>", "- "),
+        (r"(?i)</li>", "\n"),
+        (r"(?i)<p[^>]*>", ""),
+        (r"(?i)<div[^>]*>", ""),
+        (r"(?i)<h[1-6][^>]*>", ""),
+    )
+    for pattern, replacement in replacements:
+        text = re.sub(pattern, replacement, text)
+
+    text = re.sub(r"(?is)<a [^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>", r"\2 (\1)", text)
+    text = re.sub(r"(?s)<[^>]+>", "", text)
+    text = html.unescape(text)
+    text = text.replace("\r\n", "\n")
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return "\n".join(line.rstrip() for line in text.splitlines()).strip()
+
+
+def extract_rule_detail_texts(raw_rule: dict[str, Any]) -> tuple[str, str]:
+    """Extract prompt-ready description and fix guidance from Sonar rule payloads."""
+
+    if not isinstance(raw_rule, dict):
+        return "", ""
+
+    description = _html_to_text(raw_rule.get("mdDesc", "") or raw_rule.get("htmlDesc", ""))
+    how_to_fix = _html_to_text(raw_rule.get("mdNote", "") or raw_rule.get("htmlNote", ""))
+    if description and how_to_fix:
+        return description, how_to_fix
+
+    description_sections = raw_rule.get("descriptionSections", [])
+    if not isinstance(description_sections, list):
+        return description, how_to_fix
+
+    description_parts: list[str] = []
+    fix_parts: list[str] = []
+    fallback_parts: list[str] = []
+    for section in description_sections:
+        if not isinstance(section, dict):
+            continue
+        section_key = str(section.get("key", "")).strip().lower()
+        content = _html_to_text(section.get("content", ""))
+        if not content or section_key in _SKIPPED_SECTION_KEYS:
+            continue
+        if section_key in _FIX_SECTION_KEYS:
+            fix_parts.append(content)
+            continue
+        fallback_parts.append(content)
+        if section_key in _DESCRIPTION_SECTION_KEYS:
+            description_parts.append(content)
+
+    if not description:
+        selected_description_parts = description_parts or fallback_parts
+        description = "\n\n".join(
+            part for part in selected_description_parts if str(part).strip()
+        ).strip()
+    if not how_to_fix:
+        selected_fix_parts = fix_parts or description_parts or fallback_parts
+        how_to_fix = "\n\n".join(
+            part for part in selected_fix_parts if str(part).strip()
+        ).strip()
+
+    return description, how_to_fix
 
 
 class SonarQubeClient:
@@ -106,14 +201,15 @@ class SonarQubeClient:
 
         data = self._request("GET", "/api/rules/show", params=params)
         raw_rule = data.get("rule", {})
+        description, how_to_fix = extract_rule_detail_texts(raw_rule)
 
         rule = SonarRuleDetails(
             key=rule_key,
             name=raw_rule.get("name", ""),
             severity=raw_rule.get("severity", ""),
             rule_type=raw_rule.get("type", ""),
-            description=raw_rule.get("mdDesc", "") or raw_rule.get("htmlDesc", ""),
-            how_to_fix=raw_rule.get("mdNote", "") or raw_rule.get("htmlNote", ""),
+            description=description,
+            how_to_fix=how_to_fix,
         )
 
         self._rule_cache[rule_key] = rule

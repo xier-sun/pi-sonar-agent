@@ -13,9 +13,11 @@ from pi_sonar_agent.core.boundary_capabilities import (
 )
 from pi_sonar_agent.core.issue_planner import IssuePlanner
 from pi_sonar_agent.core.lessons_store import LessonsStore
-from pi_sonar_agent.core.repair_plan import PlanPrecheckResult
 from pi_sonar_agent.core.retry_context import (
     BoundaryFailureContext,
+    CompilerErrorContext,
+    QualityGateFailureContext,
+    QualityGateViolationContext,
     RetryContext,
     ScopeViolationContext,
 )
@@ -250,6 +252,11 @@ def test_issue_planner_enables_fast_path_for_low_risk_first_attempt() -> None:
     assert plan.edit_contract.fast_path_enabled is True
     assert plan.edit_contract.execution_profile == "fast_path_short_form"
     assert "perf.fast_path" in plan.edit_contract.rollout_flags
+    assert "planner.repair_archetypes.constraint_injection" in plan.edit_contract.rollout_flags
+    assert "planner.repair_archetypes.strategy_selection" in plan.edit_contract.rollout_flags
+    assert "verifier.propagation_lifecycle" in plan.edit_contract.rollout_flags
+    assert "verifier.fast_compile" in plan.edit_contract.rollout_flags
+    assert "runtime.edit_failure_context_feedback" in plan.edit_contract.rollout_flags
     assert "short-form fast path" in plan.strategy
 
 
@@ -330,7 +337,7 @@ def test_issue_planner_uses_boundary_lessons_to_add_fallback_ranges(tmp_path) ->
     assert (9, 9) in plan.edit_contract.allowed_line_ranges
 
 
-def test_issue_planner_enables_plan_first_for_complex_rule_and_detects_signature_conflict() -> None:
+def test_issue_planner_downgrades_unverified_signature_change_to_signature_preserving() -> None:
     plan = IssuePlanner.plan_issue(
         issue_key="ISSUE-PLAN",
         rule_id="csharpsquid:S3776",
@@ -356,23 +363,31 @@ def test_issue_planner_enables_plan_first_for_complex_rule_and_detects_signature
     assert plan.edit_contract.plan_first_enabled is True
     assert plan.edit_contract.execution_profile == "plan_first_full_path"
     assert plan.edit_contract.repair_plan is not None
-    assert plan.edit_contract.repair_plan.requires_signature_change is True
-    assert plan.edit_contract.plan_precheck is not None
-    assert plan.edit_contract.plan_precheck == PlanPrecheckResult(
-        status="conflict",
-        blocking=True,
-        code="signature_change_not_allowed",
-        summary="Plan 预检发现本次修复需要 signature_change，但当前 contract 不允许该能力。",
-        details=(
-            "当前结构化 plan 预计需要修改方法签名/名称，但 EditContract 未声明 signature_change capability。",
-        ),
-        guidance=(
-            "如果该规则必须修改方法名或方法签名，请先让 planner/contract 显式放开 signature_change。",
-            "如果不允许改签名，则应在 edit 前调整计划，避免进入必然失败的 attempt。",
-        ),
+    assert plan.edit_contract.repair_plan.requires_signature_change is False
+    assert plan.edit_contract.repair_plan.selected_archetype == "signature_preserving_refactor"
+    assert plan.edit_contract.repair_plan.fallback_archetype == "expression_simplification"
+    assert plan.edit_contract.repair_plan.archetype_chain == (
+        "signature_preserving_refactor",
+        "expression_simplification",
     )
+    assert plan.edit_contract.repair_plan.propagation_budget == 0
+    assert "Keep `AutoPlugin` stable" in plan.edit_contract.repair_plan.impact_summary
+    assert "avoid_signature_change_without_verified_targets" in plan.edit_contract.repair_plan.strategy_preferences
+    assert any(
+        "Avoid introducing new public or protected surface area" in hint
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+    assert any(
+        "verified propagation targets" in hint
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+    assert plan.edit_contract.plan_precheck is not None
+    assert plan.edit_contract.plan_precheck.status == "pass"
     assert "【Repair Plan】" in plan.prompt_guidance
-    assert "Requires Signature Change: yes" in plan.prompt_guidance
+    assert "Requires Signature Change: no" in plan.prompt_guidance
+    assert "Selected Archetype: signature_preserving_refactor" in plan.prompt_guidance
+    assert "Fallback Archetype: expression_simplification" in plan.prompt_guidance
+    assert "Archetype Chain: signature_preserving_refactor -> expression_simplification" in plan.prompt_guidance
 
 
 def test_issue_planner_allows_controlled_signature_propagation_for_s3776(tmp_path) -> None:
@@ -450,6 +465,24 @@ def test_issue_planner_allows_controlled_signature_propagation_for_s3776(tmp_pat
     assert plan.edit_contract.repair_plan.requires_signature_change is True
     assert plan.edit_contract.repair_plan.requires_propagation is True
     assert plan.edit_contract.repair_plan.proposed_method_name == "AutoPluginAsync"
+    assert plan.edit_contract.repair_plan.selected_archetype == "bounded_signature_propagation"
+    assert plan.edit_contract.repair_plan.fallback_archetype == "signature_preserving_refactor"
+    assert plan.edit_contract.repair_plan.archetype_chain == (
+        "bounded_signature_propagation",
+        "signature_preserving_refactor",
+        "expression_simplification",
+    )
+    assert plan.edit_contract.repair_plan.auto_upgraded_capabilities == (
+        SIGNATURE_CHANGE_CAPABILITY,
+        MULTI_FILE_REFACTOR_CAPABILITY,
+    )
+    assert plan.edit_contract.repair_plan.propagation_budget >= 4
+    assert "complete_propagation_before_finish" in plan.edit_contract.repair_plan.strategy_preferences
+    assert any(
+        target.kind == "definition"
+        and target.file.endswith("FinanceHanlerApp.cs")
+        for target in plan.edit_contract.repair_plan.verification_targets
+    )
     assert any(
         target.kind == "signature_declaration"
         and target.file.endswith("IFinanceHanlerApp.cs")
@@ -463,12 +496,216 @@ def test_issue_planner_allows_controlled_signature_propagation_for_s3776(tmp_pat
         target.kind == "nameof_ref" and target.file.endswith("FinanceHanlerApp.cs")
         for target in plan.edit_contract.repair_plan.propagation_targets
     )
+    assert any(
+        "declaration first" in hint.lower() or "synchronize declared interfaces" in hint
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
     assert plan.edit_contract.plan_precheck is not None
     assert plan.edit_contract.plan_precheck.status == "pass"
     assert any(
         symbol.file.endswith("IFinanceHanlerApp.cs")
         for symbol in plan.edit_contract.allowed_related_symbols
     )
+    assert "Selected Archetype: bounded_signature_propagation" in plan.prompt_guidance
+    assert "Constraint Hints:" in plan.prompt_guidance
+
+
+def test_issue_planner_downgrades_s3776_after_async_quality_gate_retry() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=2,
+        failure_kind="quality_gate",
+        quality_gate_failure=QualityGateFailureContext(
+            violations=(
+                QualityGateViolationContext(
+                    rule_id="async_requires_await",
+                    title="异步方法必须真正 await",
+                    message="helper has no await",
+                ),
+            )
+        ),
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-ASYNC-RETRY",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=5,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=18,
+        validation_start_line=2,
+        validation_end_line=18,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private async Task DemoAsync()",
+            "    {",
+            "        await SaveAsync();",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert plan.edit_contract.repair_plan is not None
+    assert plan.edit_contract.repair_plan.selected_archetype == "signature_preserving_refactor"
+    assert "retry_sync_first" in plan.edit_contract.repair_plan.strategy_preferences
+    assert any(
+        "must stay synchronous" in hint
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+
+
+def test_issue_planner_keeps_async_gate_downgrade_from_lessons_across_build_retry(tmp_path) -> None:
+    store = LessonsStore(tmp_path / "lessons")
+    store.record_failure(
+        repository="repo",
+        run_label="run1",
+        issue_key="ISSUE-ASYNC-LESSON",
+        issue_rule_id="csharpsquid:S3776",
+        retry_context=RetryContext(
+            source_attempt_number=1,
+            failure_kind="quality_gate",
+            quality_gate_failure=QualityGateFailureContext(
+                violations=(
+                    QualityGateViolationContext(
+                        rule_id="async_requires_await",
+                        title="异步方法必须真正 await",
+                        message="helper has no await",
+                    ),
+                )
+            ),
+        ),
+        scope_mode="method",
+        guardrail_mode="scope",
+        quality_gate_rule_ids=("async_requires_await",),
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-ASYNC-LESSON-BUILD",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=5,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=18,
+        validation_start_line=2,
+        validation_end_line=18,
+        retry_context=RetryContext(
+            source_attempt_number=2,
+            failure_kind="build",
+            compiler_errors=(
+                CompilerErrorContext(
+                    file_path="src/Foo.cs",
+                    line=9,
+                    column=1,
+                    code="CS1977",
+                    message="lambda on dynamic dispatch",
+                ),
+            ),
+        ),
+        lessons_store=store,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private async Task DemoAsync()",
+            "    {",
+            "        await SaveAsync();",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert any(lesson.source == "quality_gate_lesson" for lesson in plan.edit_contract.planner_lessons)
+    assert plan.edit_contract.repair_plan is not None
+    assert plan.edit_contract.repair_plan.selected_archetype == "signature_preserving_refactor"
+    assert "prefer_private_sync_helpers" in plan.edit_contract.repair_plan.strategy_preferences
+    assert any(
+        "must stay synchronous" in hint
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+
+
+def test_issue_planner_downgrades_s3776_after_symbol_closure_failure() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=2,
+        failure_kind="build",
+        compiler_errors=(
+            CompilerErrorContext(
+                file_path="src/Foo.cs",
+                line=8,
+                column=1,
+                code="CS0103",
+                message="name does not exist",
+            ),
+        ),
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-CS0103",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=8,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=30,
+        validation_start_line=2,
+        validation_end_line=30,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private void Demo()",
+            "    {",
+            "        if (true) { }",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert plan.edit_contract.repair_plan is not None
+    assert plan.edit_contract.repair_plan.selected_archetype == "signature_preserving_refactor"
+    assert "avoid_helper_fanout_after_symbol_errors" in plan.edit_contract.repair_plan.strategy_preferences
+    assert any(
+        "avoid helper fan-out" in hint
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+
+
+def test_issue_planner_keeps_s1144_on_minimal_deletion_strategy_after_no_change() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=1,
+        failure_kind="no_change",
+        error="Agent completed without modifying any files",
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-S1144-RETRY",
+        rule_id="csharpsquid:S1144",
+        file_path="src/Foo.cs",
+        issue_line=2,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=4,
+        validation_start_line=2,
+        validation_end_line=4,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "    private int _unused = 1;",
+            "",
+            "    public void KeepMe() { }",
+        ),
+    )
+
+    assert plan.edit_contract.repair_plan is not None
+    assert plan.edit_contract.repair_plan.selected_archetype == "declaration_hygiene"
+    assert "prefer_minimal_deletion_patch" in plan.edit_contract.repair_plan.strategy_preferences
+    assert "force_direct_local_edit" in plan.edit_contract.repair_plan.strategy_preferences
 
 
 def test_issue_planner_signature_propagation_scans_real_agent_workspace_layout(tmp_path) -> None:
@@ -558,4 +795,111 @@ def test_issue_planner_signature_propagation_scans_real_agent_workspace_layout(t
     assert any(
         target.kind == "nameof_ref" and target.file.endswith("FinanceHanlerApp.cs")
         for target in plan.edit_contract.repair_plan.propagation_targets
+    )
+
+
+def test_issue_planner_ignores_controller_wrapper_declarations_in_signature_propagation(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    app_file = (
+        workspace
+        / "OpenAuth.Core"
+        / "OpenAuth.App"
+        / "HumanResource"
+        / "Employees"
+        / "JobAbilityApp.cs"
+    )
+    interface_file = (
+        workspace
+        / "OpenAuth.Core"
+        / "OpenAuth.App"
+        / "HumanResource"
+        / "Interfaces"
+        / "IJobAbilityApp.cs"
+    )
+    controller_file = (
+        workspace
+        / "OpenAuth.Core"
+        / "OpenAuth.WebApi"
+        / "Controllers"
+        / "HumanResource"
+        / "Employee"
+        / "JobAbilityController.cs"
+    )
+    app_file.parent.mkdir(parents=True, exist_ok=True)
+    interface_file.parent.mkdir(parents=True, exist_ok=True)
+    controller_file.parent.mkdir(parents=True, exist_ok=True)
+
+    app_file.write_text(
+        "\n".join(
+            [
+                "public class JobAbilityApp : IJobAbilityApp",
+                "{",
+                "    public async Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistory(string userId, JobPosition jobPosition)",
+                "    {",
+                "        await Task.Delay(1);",
+                "        return new Response<List<AbilityChangeHistoryResp>>();",
+                "    }",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    interface_file.write_text(
+        "\n".join(
+            [
+                "public interface IJobAbilityApp",
+                "{",
+                "    Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistory(string userId, JobPosition jobPosition);",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    controller_file.write_text(
+        "\n".join(
+            [
+                "public class JobAbilityController",
+                "{",
+                "    private readonly IJobAbilityApp _jobAbilityApp;",
+                "",
+                "    [HttpGet]",
+                "    public async Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistory([FromQuery] string userId, [FromQuery] JobPosition jobPosition)",
+                "    {",
+                "        return await _jobAbilityApp.GetAbilityChangeHistory(userId, jobPosition);",
+                "    }",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    propagation_targets = IssuePlanner._scan_signature_propagation_targets(
+        workspace_path=workspace,
+        normalized_path="OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+        method_descriptor={
+            "name": "GetAbilityChangeHistory",
+            "proposed_name": "GetAbilityChangeHistoryAsync",
+        },
+        scope_start_line=3,
+        scope_end_line=7,
+    )
+
+    assert any(
+        target.kind == "signature_declaration"
+        and target.file.endswith("IJobAbilityApp.cs")
+        for target in propagation_targets
+    )
+    assert any(
+        target.kind == "callsite"
+        and target.file.endswith("JobAbilityController.cs")
+        and target.start_line == 8
+        for target in propagation_targets
+    )
+    assert not any(
+        target.kind == "signature_declaration"
+        and target.file.endswith("JobAbilityController.cs")
+        for target in propagation_targets
     )

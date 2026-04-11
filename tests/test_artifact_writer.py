@@ -72,6 +72,18 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
             component="BI:tracked.cs",
             severity="MAJOR",
             issue_type="CODE_SMELL",
+            text_range={"startLine": 1, "endLine": 1, "startOffset": 6, "endOffset": 8},
+            flows=(
+                {
+                    "locations": (
+                        {
+                            "component": "BI:tracked.cs",
+                            "msg": "Unused assignment.",
+                            "textRange": {"startLine": 1, "endLine": 1, "startOffset": 6, "endOffset": 8},
+                        },
+                    ),
+                },
+            ),
         )
         result = FixResult(
             success=False,
@@ -253,6 +265,9 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
         assert bundle.attempt_summary_json.exists()
         assert summary_path.exists()
         assert (bundle.issue_root / "compliance_summary.json").exists()
+        issue_json = bundle.issue_json.read_text(encoding="utf-8")
+        assert '"text_range": {' in issue_json
+        assert '"flows": [' in issue_json
         prompt_context = bundle.prompt_context_json.read_text(encoding="utf-8")
         assert '"failure_kind": "build"' in prompt_context
         assert '"source_attempt_number": 1' in prompt_context

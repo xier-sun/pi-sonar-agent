@@ -1,0 +1,13 @@
+{
+  "issue_key": "issue-connect-timeout",
+  "rule_id": "csharpsquid:S3776",
+  "message": "认知复杂度过高",
+  "line": 1,
+  "text_range": {},
+  "flows": [],
+  "component": "BI:tracked.cs",
+  "file_path": "/tracked.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

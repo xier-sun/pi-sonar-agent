@@ -345,6 +345,8 @@ def _issue_payload(issue: SonarIssue) -> dict[str, Any]:
         "rule_id": issue.rule,
         "message": issue.message,
         "line": issue.line,
+        "text_range": issue.text_range,
+        "flows": issue.flows,
         "component": issue.component,
         "file_path": issue.file_path,
         "severity": issue.severity,

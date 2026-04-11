@@ -1,0 +1,47 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IPenaltyCalculationService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IPenaltyCalculationService.cs
+@@ -10,11 +10,11 @@
+     public interface IPenaltyCalculationService : IDependency
+
+     {
+
+         /// <summary>
+
+-        /// 
+
++        /// 后台服务处理罚款计算
+
+         /// </summary>
+
+         /// <param name="jobRunId"></param>
+
+         /// <returns></returns>
+
+-        Task BackgroundService(string jobRunId);
+
++        Task BackgroundServiceAsync(string jobRunId);
+
+         /// <summary>
+
+         ///
+
+         /// </summary>
+
+--- a/OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs
+@@ -48,7 +48,7 @@
+         /// </summary>
+
+         /// <param name="jobRunId"></param>
+
+         /// <returns></returns>
+
+-        public async Task BackgroundService(string jobRunId)
+
++        public async Task BackgroundServiceAsync(string jobRunId)
+
+         {
+
+             // 获取所有活跃的罚款事件
+
+             var allActive = await UnitWork.Find<PenaltyRuleDefinition>(r => r.IsActive).ToListAsync();

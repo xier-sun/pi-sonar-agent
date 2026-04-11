@@ -1,0 +1,33 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
+@@ -55,7 +55,7 @@
+                 LogHelper.Info($"共查询到{completedOrders.Count}个符合条件的订单", nameof(HistoricalAfterBillOverdueImportService), nameof(ImportHistoricalAfterBillOverdueDataByRange));
+
+         
+
+                 // 批量预加载所有需要的数据
+
+-                var sharedData = await PreloadSharedData(completedOrders);
+
++                var sharedData = await PreloadSharedDataAsync(completedOrders);
+
+                 LogHelper.Info($"预加载共享数据完成", nameof(HistoricalAfterBillOverdueImportService), nameof(ImportHistoricalAfterBillOverdueDataByRange));
+
+         
+
+                 for (int i = 0; i < completedOrders.Count; i += batchSize)
+
+@@ -454,7 +454,7 @@
+         /// <summary>
+
+         /// 批量预加载所有需要的共享数据
+
+         /// </summary>
+
+-        private async Task<SharedDataCache> PreloadSharedData(List<ORDR> orders)
+
++        private async Task<SharedDataCache> PreloadSharedDataAsync(List<ORDR> orders)
+
+         {
+
+             var orderIds = orders.Select(o => o.DocEntry).ToList();

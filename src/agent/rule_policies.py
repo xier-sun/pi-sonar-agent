@@ -44,6 +44,12 @@ RULE_HANDLING_POLICIES: dict[str, RuleHandlingPolicy] = {
     "csharpsquid:S3776": RuleHandlingPolicy(
         scope_mode=METHOD_SCOPE_MODE,
         validation_trailing_lines=120,
+        prompt_guards=(
+            "默认优先在原方法体内重构；只有确实需要时才提取少量 private helper。",
+            "新提取的 helper 默认保持 private 且同步；只有 helper 体内真实包含 await 时才允许 async。",
+            "不要为了降低复杂度新增 public/protected helper、DTO、property 或其他公开面。",
+            "如果必须联动改名公开 async 方法，必须一次性同步接口声明、调用点和 nameof(...)；否则保持现有签名不变。",
+        ),
     ),
     "csharpsquid:S3358": RuleHandlingPolicy(
         scope_mode=EXPRESSION_REWRITE_SCOPE_MODE,
@@ -123,6 +129,7 @@ RULE_HANDLING_POLICIES: dict[str, RuleHandlingPolicy] = {
         boundary_capabilities=(DECLARATION_DELETE_CAPABILITY,),
         prompt_guards=(
             "只删除当前 issue 对应的未使用局部变量，不要顺手改同一方法里的其他清理项。",
+            "这是删除型最小补丁，不要顺手改 async 命名、XML 文档或周边公开成员。",
         ),
     ),
     "csharpsquid:S1144": RuleHandlingPolicy(
@@ -135,6 +142,7 @@ RULE_HANDLING_POLICIES: dict[str, RuleHandlingPolicy] = {
         prompt_guards=(
             "优先删除当前未使用的 private 成员本身；只有当紧邻 private helper 也因此变成未使用时，才允许一并删除。",
             "不要顺手删除同文件中更远位置的其他 private 成员。",
+            "这是删除/收紧访问器型修复，不要顺手补 XML 文档、改 async 命名或做复杂重构。",
         ),
     ),
     "csharpsquid:S107": RuleHandlingPolicy(

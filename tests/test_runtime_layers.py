@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 
+import pi_sonar_agent.core.claude_adapter as claude_adapter_module
 from pi_sonar_agent.core.agent_runtime import AgentRuntime, AgentRuntimeError, RuntimeTimeouts
 from pi_sonar_agent.core.claude_adapter import ClaudeAdapter, ClaudeSDKDependencies
 from pi_sonar_agent.core.events import AttemptRuntimeEventKind
@@ -120,6 +121,30 @@ def test_tool_policy_allows_bash_commands_but_rejects_filesystem_mutation() -> N
     assert blocked_write.policy_violation is True
     assert finish_allowed.allowed is True
     assert policy.is_forbidden_tool("Bash", {"command": "Remove-Item Foo.cs"}) is True
+
+
+def test_tool_policy_normalizes_wrapped_tool_names() -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit", "MultiEdit", "Bash", "Finish"],
+        mcp_tools=[],
+        forbidden_tools={"mcp__sonar-fix__git_push"},
+    )
+    policy = ToolPolicy(
+        registry,
+        build_allowed_fix_tool_rules(["Read", "Edit", "MultiEdit", "Finish"], include_controlled_bash=True),
+    )
+
+    bash_decision = policy.classify("<tool_call>Bash</tool_call>", {"command": "pwd"})
+    edit_decision = policy.classify("<tool_call>EditAsync</tool_call>", {"file_path": "Foo.cs"})
+    multiedit_decision = policy.classify("MultiEditAsync", {"file_path": "Foo.cs", "edits": []})
+
+    assert bash_decision.tool_name == "Bash"
+    assert bash_decision.allowed is True
+    assert bash_decision.policy_violation is False
+    assert edit_decision.tool_name == "Edit"
+    assert edit_decision.allowed is True
+    assert multiedit_decision.tool_name == "MultiEdit"
+    assert multiedit_decision.allowed is True
 
 
 def test_agent_runtime_runs_hooks_and_collects_tool_usage() -> None:
@@ -329,10 +354,142 @@ def test_claude_adapter_session_translates_sdk_messages() -> None:
     assert isinstance(events[1], ToolCallEvent)
     assert events[1].name == "Read"
     assert events[1].payload["file_path"] == "Foo.cs"
+    assert events[1].raw_payload["file_path"] == "Foo.cs"
     assert isinstance(events[2], TextEvent)
     assert events[2].text == "hello"
     assert isinstance(events[3], ResultEvent)
     assert events[3].total_cost_usd == 0.1
+
+
+def test_claude_adapter_session_normalizes_wrapped_tool_name() -> None:
+    class FakeToolUseBlock:
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.input = {"command": "pwd"}
+
+    class FakeAssistantMessage:
+        def __init__(self) -> None:
+            self.content = [FakeToolUseBlock("<tool_call>Bash</tool_call>")]
+
+    class FakeResultMessage:
+        def __init__(self) -> None:
+            self.total_cost_usd = 0.1
+            self.is_error = False
+            self.result = ""
+            self.errors = []
+
+    async def fake_receive_response():
+        yield FakeAssistantMessage()
+        yield FakeResultMessage()
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def query(self, prompt: str) -> None:
+            return None
+
+        def receive_response(self):
+            return fake_receive_response()
+
+    adapter = ClaudeAdapter(
+        ClaudeSDKDependencies(
+            client_cls=lambda options: FakeClient(),
+            options_cls=lambda **kwargs: kwargs,
+            assistant_message_cls=FakeAssistantMessage,
+            result_message_cls=FakeResultMessage,
+            text_block_cls=object,
+            tool_use_block_cls=FakeToolUseBlock,
+        )
+    )
+
+    session = adapter.create_session(
+        GatewayRequest(
+            system_prompt="system",
+            user_prompt="user",
+            cwd="workspace",
+            tools=("Read", "Bash"),
+            allowed_tools=("Read", "Bash"),
+            max_turns=4,
+            max_budget_usd=1.0,
+            env={},
+        )
+    )
+
+    async def collect_events():
+        await session.connect(1)
+        await session.send("user")
+        events = [event async for event in session.stream_events()]
+        await session.close()
+        return events
+
+    events = asyncio.run(collect_events())
+
+    assert isinstance(events[0], ToolCallEvent)
+    assert events[0].name == "Bash"
+    assert events[0].payload["command"] == "pwd"
+
+
+def test_claude_gateway_timeout_probe_keeps_env_driven_model_for_third_party_provider(
+    monkeypatch,
+) -> None:
+    adapter = ClaudeAdapter(
+        ClaudeSDKDependencies(
+            client_cls=lambda options: None,
+            options_cls=lambda **kwargs: kwargs,
+            assistant_message_cls=object,
+            result_message_cls=object,
+            text_block_cls=object,
+            tool_use_block_cls=object,
+        )
+    )
+    request = ClaudeAdapter.build_request(
+        agent_env={
+            "ANTHROPIC_BASE_URL": "https://ark.cn-beijing.volces.com/api/coding",
+            "ANTHROPIC_API_KEY": "token",
+            "ANTHROPIC_CUSTOM_MODEL_OPTION": "glm-4.7",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.7",
+        },
+        explicit_model="glm-4.7",
+        cwd="workspace",
+        system_prompt="system",
+        user_prompt="user",
+        tools=("Read", "Edit"),
+        allowed_tools=("Read", "Edit"),
+        max_turns=6,
+        max_budget_usd=2.5,
+        stderr_handler=None,
+        build_command="dotnet build",
+    )
+    session = adapter.create_session(request)
+    recorded: dict[str, object] = {}
+
+    class FakeProcess:
+        returncode = 0
+
+        async def communicate(self):
+            return (b"OK", b"")
+
+    async def fake_create_subprocess_exec(*command, **kwargs):
+        recorded["command"] = command
+        recorded["env"] = kwargs.get("env", {})
+        return FakeProcess()
+
+    monkeypatch.setattr(claude_adapter_module, "_resolve_sdk_cli_path", lambda: "claude")
+    monkeypatch.setattr(
+        claude_adapter_module.asyncio,
+        "create_subprocess_exec",
+        fake_create_subprocess_exec,
+    )
+
+    diagnostic = asyncio.run(session.diagnose_connect_timeout())
+
+    assert diagnostic == "连接诊断：Claude CLI 最小请求可用，返回：OK"
+    assert recorded["command"] == ("claude", "--print", "--bare", "Reply with OK only.")
+    assert recorded["env"]["CLAUDE_MODEL"] == "glm-4.7"
 
 
 def test_agent_runtime_classifies_follow_up_timeout_after_edit() -> None:
@@ -481,3 +638,98 @@ def test_agent_runtime_reports_connect_timeout_diagnostic() -> None:
 
     assert "未完成初始化" in str(exc_info.value)
     assert "Failed to authenticate" in str(exc_info.value)
+
+
+def test_agent_runtime_appends_closest_edit_snippet_for_string_not_found(tmp_path) -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit"],
+        mcp_tools=[],
+        forbidden_tools={"Bash"},
+    )
+    policy = ToolPolicy(registry, ["Read", "Edit"])
+    target_file = tmp_path / "Foo.cs"
+    target_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    void Demo()",
+                "    {",
+                "        return value;",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    class FakeSession:
+        async def connect(self, timeout_seconds: float) -> None:
+            return None
+
+        async def send(self, user_prompt: str) -> None:
+            return None
+
+        def stream_events(self):
+            async def iterate():
+                yield ToolCallEvent(
+                    "Edit",
+                    payload={
+                        "file_path": "Foo.cs",
+                        "old_string_preview": "return val;",
+                        "old_string_length": 11,
+                    },
+                    raw_payload={
+                        "file_path": "Foo.cs",
+                        "old_string": "return val;",
+                        "new_string": "return value;",
+                    },
+                )
+                yield ResultEvent(total_cost_usd=0.1, agent_error="String to replace not found")
+
+            return iterate()
+
+        async def abort(self, reason: str):
+            raise AssertionError("abort should not be called")
+
+        async def close(self):
+            class Result:
+                reason = "normal_shutdown"
+                actions = ("disconnect",)
+                errors = ()
+
+            return Result()
+
+    class FakeGateway:
+        def create_session(self, request: GatewayRequest):
+            return FakeSession()
+
+    runtime = AgentRuntime(
+        gateway=FakeGateway(),
+        tool_policy=policy,
+        timeouts=RuntimeTimeouts(
+            client_connect_seconds=1,
+            first_response_seconds=1,
+            follow_up_seconds=1,
+            issue_hard_timeout_seconds=5,
+            heartbeat_interval_seconds=10,
+        ),
+    )
+
+    result = runtime.run(
+        GatewayRequest(
+            system_prompt="system",
+            user_prompt="user",
+            cwd=str(tmp_path),
+            tools=("Read", "Edit"),
+            allowed_tools=("Read", "Edit"),
+            max_turns=4,
+            max_budget_usd=1.0,
+            env={},
+        )
+    )
+
+    assert "String to replace not found" in (result.agent_error or "")
+    assert "Closest snippet for retry: Foo.cs:5-5" in (result.agent_error or "")
+    assert "return value;" in (result.agent_error or "")

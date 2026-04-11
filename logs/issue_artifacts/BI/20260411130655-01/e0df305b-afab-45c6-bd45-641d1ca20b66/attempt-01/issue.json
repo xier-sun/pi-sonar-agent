@@ -1,0 +1,621 @@
+{
+  "issue_key": "e0df305b-afab-45c6-bd45-641d1ca20b66",
+  "rule_id": "csharpsquid:S3776",
+  "message": "Refactor this method to reduce its Cognitive Complexity from 67 to the 30 allowed.",
+  "line": 457,
+  "text_range": {
+    "startLine": 457,
+    "endLine": 457,
+    "startOffset": 44,
+    "endOffset": 61
+  },
+  "flows": [
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 472,
+            "endLine": 472,
+            "startOffset": 115,
+            "endOffset": 117
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 476,
+            "endLine": 476,
+            "startOffset": 121,
+            "endOffset": 123
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 479,
+            "endLine": 479,
+            "startOffset": 12,
+            "endOffset": 19
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 490,
+            "endLine": 490,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 503,
+            "endLine": 503,
+            "startOffset": 12,
+            "endOffset": 15
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 506,
+            "endLine": 506,
+            "startOffset": 83,
+            "endOffset": 85
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 518,
+            "endLine": 518,
+            "startOffset": 12,
+            "endOffset": 15
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 521,
+            "endLine": 521,
+            "startOffset": 82,
+            "endOffset": 84
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 536,
+            "endLine": 536,
+            "startOffset": 12,
+            "endOffset": 14
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 540,
+            "endLine": 540,
+            "startOffset": 16,
+            "endOffset": 19
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 543,
+            "endLine": 543,
+            "startOffset": 86,
+            "endOffset": 88
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 553,
+            "endLine": 553,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 557,
+            "endLine": 557,
+            "startOffset": 20,
+            "endOffset": 23
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 560,
+            "endLine": 560,
+            "startOffset": 89,
+            "endOffset": 91
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 573,
+            "endLine": 573,
+            "startOffset": 12,
+            "endOffset": 19
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 575,
+            "endLine": 575,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 578,
+            "endLine": 578,
+            "startOffset": 20,
+            "endOffset": 27
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 580,
+            "endLine": 580,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 583,
+            "endLine": 583,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 593,
+            "endLine": 593,
+            "startOffset": 12,
+            "endOffset": 15
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 596,
+            "endLine": 596,
+            "startOffset": 88,
+            "endOffset": 90
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 601,
+            "endLine": 601,
+            "startOffset": 12,
+            "endOffset": 19
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 603,
+            "endLine": 603,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 609,
+            "endLine": 609,
+            "startOffset": 16,
+            "endOffset": 23
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 611,
+            "endLine": 611,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 618,
+            "endLine": 618,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 634,
+            "endLine": 634,
+            "startOffset": 12,
+            "endOffset": 19
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 636,
+            "endLine": 636,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 639,
+            "endLine": 639,
+            "startOffset": 16,
+            "endOffset": 23
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 641,
+            "endLine": 641,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 657,
+            "endLine": 657,
+            "startOffset": 12,
+            "endOffset": 19
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 676,
+            "endLine": 676,
+            "startOffset": 111,
+            "endOffset": 113
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 681,
+            "endLine": 681,
+            "startOffset": 117,
+            "endOffset": 119
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 681,
+            "endLine": 681,
+            "startOffset": 177,
+            "endOffset": 179
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 688,
+            "endLine": 688,
+            "startOffset": 129,
+            "endOffset": 131
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 689,
+            "endLine": 689,
+            "startOffset": 128,
+            "endOffset": 130
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 693,
+            "endLine": 693,
+            "startOffset": 46,
+            "endOffset": 48
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 699,
+            "endLine": 699,
+            "startOffset": 46,
+            "endOffset": 48
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 709,
+            "endLine": 709,
+            "startOffset": 12,
+            "endOffset": 19
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 714,
+            "endLine": 714,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 714,
+            "endLine": 714,
+            "startOffset": 53,
+            "endOffset": 55
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 714,
+            "endLine": 714,
+            "startOffset": 33,
+            "endOffset": 35
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 714,
+            "endLine": 714,
+            "startOffset": 69,
+            "endOffset": 71
+          }
+        }
+      ]
+    }
+  ],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs",
+  "severity": "CRITICAL",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

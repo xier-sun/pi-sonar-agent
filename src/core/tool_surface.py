@@ -6,7 +6,7 @@ from collections.abc import Iterable
 
 from pi_sonar_agent.core.project_env import read_project_env
 
-BASE_BUILTIN_FIX_TOOLS = ("Read", "Edit")
+BASE_BUILTIN_FIX_TOOLS = ("Read", "Edit", "MultiEdit")
 CONTROLLED_BASH_TOOL = "Bash"
 CONTROLLED_SHELL_DISPLAY_NAME = "Bash"
 FINISH_TOOL = "Finish"

@@ -1,0 +1,47 @@
+{
+  "status": "pass",
+  "guardrail_mode": "scope",
+  "summary": "Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit.",
+  "violations": [
+    {
+      "type": "outside_primary_region",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "reason": "This hunk changes lines outside the primary issue window 91-109; recorded as drift only.",
+      "symbol": "expression_region@93-93",
+      "changed_lines": [
+        144,
+        145
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n@@ -144 +144,11 @@\n-                    if( delivrdItemsInThisOrdr.All(x=> x.Value == (thisOrdrReturnItems.TryGetValue(x.Key,out var returnedQty) ? returnedQty : 0 )))\n+                    bool allItemsReturned = true;\n+                    foreach (var delivrdItem in delivrdItemsInThisOrdr)\n+                    {\n+                        int actualReturnedQty = thisOrdrReturnItems.TryGetValue(delivrdItem.Key, out var returnedQty) ? returnedQty : 0;\n+                        if (delivrdItem.Value != actualReturnedQty)\n+                        {\n+                            allItemsReturned = false;\n+                            break;\n+                        }\n+                    }\n+                    if (allItemsReturned)"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "eb636b43-4590-4664-8b69-40894b98b646",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "symbol": "expression_region@93-93",
+      "summary": "Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n@@ -144 +144,11 @@\n-                    if( delivrdItemsInThisOrdr.All(x=> x.Value == (thisOrdrReturnItems.TryGetValue(x.Key,out var returnedQty) ? returnedQty : 0 )))\n+                    bool allItemsReturned = true;\n+                    foreach (var delivrdItem in delivrdItemsInThisOrdr)\n+                    {\n+                        int actualReturnedQty = thisOrdrReturnItems.TryGetValue(delivrdItem.Key, out var returnedQty) ? returnedQty : 0;\n+                        if (delivrdItem.Value != actualReturnedQty)\n+                        {\n+                            allItemsReturned = false;\n+                            break;\n+                        }\n+                    }\n+                    if (allItemsReturned)",
+      "discovered_at": "2026-04-11T06:41:08.880425+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 1,
+    "total_changed_lines": 2,
+    "hard_boundary_violation_count": 0,
+    "soft_boundary_violation_count": 1,
+    "extra_touched_file_count": 0,
+    "outside_primary_region_line_count": 2,
+    "outside_primary_region_count": 1,
+    "scope_audit_mode": "scope_soft_audit",
+    "scope_audit_active": true,
+    "scope_expansion_count": 1,
+    "scope_expansion_reasons": [
+      "outside_primary_region"
+    ],
+    "high_drift_warning": false,
+    "drift_score": 1
+  }
+}

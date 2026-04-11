@@ -1,0 +1,67 @@
+{
+  "status": "pass",
+  "guardrail_mode": "scope",
+  "summary": "Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit.",
+  "violations": [
+    {
+      "type": "outside_primary_region",
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/Interfaces/IJobAbilityApp.cs",
+      "reason": "This hunk changes lines outside the primary issue window 1170-1279; recorded as drift only.",
+      "symbol": "method@1170-1277",
+      "changed_lines": [
+        88
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/HumanResource/Interfaces/IJobAbilityApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/HumanResource/Interfaces/IJobAbilityApp.cs\n@@ -88 +88 @@\n-        Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistory(string userId, JobPosition jobPosition);\n+        Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistoryAsync(string userId, JobPosition jobPosition);"
+    },
+    {
+      "type": "outside_primary_region",
+      "file": "OpenAuth.Core/OpenAuth.WebApi/Controllers/HumanResource/Employee/JobAbilityController.cs",
+      "reason": "This hunk changes lines outside the primary issue window 1170-1279; recorded as drift only.",
+      "symbol": "method@1170-1277",
+      "changed_lines": [
+        188,
+        189,
+        190
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.WebApi/Controllers/HumanResource/Employee/JobAbilityController.cs\n+++ b/OpenAuth.Core/OpenAuth.WebApi/Controllers/HumanResource/Employee/JobAbilityController.cs\n@@ -188,3 +188,3 @@\n-        public async Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistory([FromQuery] string userId, [FromQuery] JobPosition jobPosition)\n-        {\n-            return await _jobAbilityApp.GetAbilityChangeHistory(userId, jobPosition);\n+        public async Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistoryAsync([FromQuery] string userId, [FromQuery] JobPosition jobPosition)\n+        {\n+            return await _jobAbilityApp.GetAbilityChangeHistoryAsync(userId, jobPosition);"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "3cc92b32-9fe1-440a-a8b5-173c53007ac8",
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/Interfaces/IJobAbilityApp.cs",
+      "symbol": "method@1170-1277",
+      "summary": "Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/HumanResource/Interfaces/IJobAbilityApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/HumanResource/Interfaces/IJobAbilityApp.cs\n@@ -88 +88 @@\n-        Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistory(string userId, JobPosition jobPosition);\n+        Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistoryAsync(string userId, JobPosition jobPosition);",
+      "discovered_at": "2026-04-10T15:44:11.380700+00:00",
+      "discovered_by": "diff_reviewer"
+    },
+    {
+      "source_issue_key": "3cc92b32-9fe1-440a-a8b5-173c53007ac8",
+      "file": "OpenAuth.Core/OpenAuth.WebApi/Controllers/HumanResource/Employee/JobAbilityController.cs",
+      "symbol": "method@1170-1277",
+      "summary": "Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.WebApi/Controllers/HumanResource/Employee/JobAbilityController.cs\n+++ b/OpenAuth.Core/OpenAuth.WebApi/Controllers/HumanResource/Employee/JobAbilityController.cs\n@@ -188,3 +188,3 @@\n-        public async Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistory([FromQuery] string userId, [FromQuery] JobPosition jobPosition)\n-        {\n-            return await _jobAbilityApp.GetAbilityChangeHistory(userId, jobPosition);\n+        public async Task<Response<List<AbilityChangeHistoryResp>>> GetAbilityChangeHistoryAsync([FromQuery] string userId, [FromQuery] JobPosition jobPosition)\n+        {\n+            return await _jobAbilityApp.GetAbilityChangeHistoryAsync(userId, jobPosition);",
+      "discovered_at": "2026-04-10T15:44:11.380718+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 3,
+    "hunk_count": 8,
+    "total_changed_lines": 60,
+    "hard_boundary_violation_count": 0,
+    "soft_boundary_violation_count": 2,
+    "extra_touched_file_count": 0,
+    "outside_primary_region_line_count": 4,
+    "outside_primary_region_count": 2,
+    "scope_audit_mode": "scope_soft_audit",
+    "scope_audit_active": true,
+    "scope_expansion_count": 2,
+    "scope_expansion_reasons": [
+      "outside_primary_region"
+    ],
+    "high_drift_warning": false,
+    "drift_score": 2
+  }
+}

@@ -75,3 +75,32 @@ def test_format_build_failure_report_includes_tail_of_logs() -> None:
     assert "... (省略前 1 行)" in report
     assert "error CS0103: name not found\nline3" in report
     assert "error assertion failed\ntest3" in report
+
+
+def test_run_local_build_retries_without_restore_after_nuget_source_failure(monkeypatch, tmp_path) -> None:
+    calls: list[str] = []
+
+    def fake_run(command, *args, **kwargs):
+        calls.append(command)
+        if "--no-restore" in command:
+            return SimpleNamespace(returncode=0, stdout="build ok", stderr="")
+        return SimpleNamespace(
+            returncode=1,
+            stdout="error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json.",
+            stderr="",
+        )
+
+    import pi_sonar_agent.fixers.build_gate as build_gate_module
+
+    monkeypatch.setattr(build_gate_module.subprocess, "run", fake_run)
+
+    result = run_local_build(tmp_path, 'dotnet build "tracked.sln"')
+
+    assert result["succeeded"] is True
+    assert result["build_passed"] is True
+    assert calls == [
+        'dotnet build "tracked.sln"',
+        'dotnet build "tracked.sln" --no-restore',
+    ]
+    assert "NuGet restore/source 故障" in result["build_output"]
+    assert "--no-restore" in result["build_output"]

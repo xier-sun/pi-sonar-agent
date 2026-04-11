@@ -1,0 +1,105 @@
+[2026-04-11 15:53:03] Attempt 1/5 started for dcf25c55-d4c8-425e-a0ee-840a500b4806
+[2026-04-11 15:58:03] Attempt 1 failed: Quality gate verification failed
+[2026-04-11 15:58:03] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_signature] 异步签名规范: 异步方法 ProcessIndirectReceipts 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1185
+   Evidence: private static async Task ProcessIndirectReceipts(IUnitWork unitWork, List<int> orderIds, Dictionary<int, List<ReceiptForOrder>> result) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+[2026-04-11 15:58:03] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate rejected the patch with 1 hard violation(s).
+1. [async_signature] 异步签名规范: 异步方法 ProcessIndirectReceipts 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1185
+   证据: private static async Task ProcessIndirectReceipts(IUnitWork unitWork, List<int> orderIds, Dictionary<int, List<ReceiptForOrder>> result) {
+   原始提示: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+本次重改要求:
+- 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+- 把当前触达的异步方法改成 *Async 结尾；如果这是公开 API 或接口实现，同步接口声明、调用点和 nameof(...)。
+- 不要为了凑 *Async 命名去新建或重命名并不真正异步的 helper；优先把新 helper 保持为同步方法。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-11 15:58:03] Workspace restored to issue baseline
+[2026-04-11 15:58:03] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 15:58:03] Attempt 2/5 started for dcf25c55-d4c8-425e-a0ee-840a500b4806
+[2026-04-11 16:10:28] Attempt 2 failed: Agent completed without modifying any files
+[2026-04-11 16:10:28] Next retry feedback for model:
+上次尝试没有实际修改任何文件。
+这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。
+重试约束:
+- 不要只做分析或解释，必须提交实际代码修改。
+- 修改后立即使用推荐构建命令验证。
+- 如果这是行级问题，只修改 Sonar 指向的那条语句。
+[2026-04-11 16:10:28] Workspace restored to issue baseline
+[2026-04-11 16:10:28] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-11 16:10:28] Attempt 3/5 started for dcf25c55-d4c8-425e-a0ee-840a500b4806
+[2026-04-11 16:15:58] Attempt 3 failed: Quality gate verification failed
+[2026-04-11 16:15:58] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_signature] 异步签名规范: 异步方法 ProcessIndirectReceipts 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1144
+   Evidence: return result; } /// <summary> /// 处理间接收款记录 /// </summary> private static async Task ProcessIndirectReceipts(IUnitWork unitWork, List<int> orderIds, Dictionary<int, List<ReceiptForOrder>> result) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+2. [async_signature] 异步签名规范: 异步方法 ProcessIndirectReceipts 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1145
+   Evidence: } /// <summary> /// 处理间接收款记录 /// </summary> private static async Task ProcessIndirectReceipts(IUnitWork unitWork, List<int> orderIds, Dictionary<int, List<ReceiptForOrder>> result) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+3. [async_signature] 异步签名规范: 异步方法 ProcessIndirectReceipts 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1150
+   Evidence: private static async Task ProcessIndirectReceipts(IUnitWork unitWork, List<int> orderIds, Dictionary<int, List<ReceiptForOrder>> result) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+[2026-04-11 16:15:58] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate rejected the patch with 3 hard violation(s).
+1. [async_signature] 异步签名规范: 异步方法 ProcessIndirectReceipts 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1144
+   证据: return result; } /// <summary> /// 处理间接收款记录 /// </summary> private static async Task ProcessIndirectReceipts(IUnitWork unitWork, List<int> orderIds, Dictionary<int, List<ReceiptForOrder>> result) {
+   原始提示: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+2. [async_signature] 异步签名规范: 异步方法 ProcessIndirectReceipts 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1145
+   证据: } /// <summary> /// 处理间接收款记录 /// </summary> private static async Task ProcessIndirectReceipts(IUnitWork unitWork, List<int> orderIds, Dictionary<int, List<ReceiptForOrder>> result) {
+   原始提示: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+3. [async_signature] 异步签名规范: 异步方法 ProcessIndirectReceipts 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1150
+   证据: private static async Task ProcessIndirectReceipts(IUnitWork unitWork, List<int> orderIds, Dictionary<int, List<ReceiptForOrder>> result) {
+   原始提示: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+本次重改要求:
+- 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+- 把当前触达的异步方法改成 *Async 结尾；如果这是公开 API 或接口实现，同步接口声明、调用点和 nameof(...)。
+- 不要为了凑 *Async 命名去新建或重命名并不真正异步的 helper；优先把新 helper 保持为同步方法。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-11 16:15:58] Workspace restored to issue baseline
+[2026-04-11 16:15:58] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-11 16:15:58] Attempt 4/5 started for dcf25c55-d4c8-425e-a0ee-840a500b4806
+[2026-04-11 16:20:46] Attempt 4 failed: Agent completed without modifying any files
+[2026-04-11 16:20:46] Next retry feedback for model:
+上次尝试没有实际修改任何文件。
+这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。
+重试约束:
+- 不要只做分析或解释，必须提交实际代码修改。
+- 修改后立即使用推荐构建命令验证。
+- 如果这是行级问题，只修改 Sonar 指向的那条语句。
+[2026-04-11 16:20:47] Workspace restored to issue baseline
+[2026-04-11 16:20:47] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-11 16:20:47] Attempt 5/5 started for dcf25c55-d4c8-425e-a0ee-840a500b4806
+[2026-04-11 16:28:28] Attempt 5 failed: Issue changes failed local build verification
+[2026-04-11 16:28:28] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `GetBatchReceiptHistoryInternalAsync` to appear in 2 verification target(s), but 2 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1125-1284 (definition) still missing `GetBatchReceiptHistoryInternalAsync`
+2. OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:140-140 (signature_declaration) still missing `GetBatchReceiptHistoryInternalAsync`
+[2026-04-11 16:28:28] Next retry feedback for model:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `GetBatchReceiptHistoryInternalAsync` to appear in 2 verification target(s), but 2 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs:1125-1284 (definition) still missing `GetBatchReceiptHistoryInternalAsync`
+2. OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:140-140 (signature_declaration) still missing `GetBatchReceiptHistoryInternalAsync`
+[2026-04-11 16:28:29] Workspace restored to issue baseline
+[2026-04-11 16:28:29] Issue skipped: Build verification failed after 5 attempt(s)

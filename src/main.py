@@ -94,83 +94,105 @@ def main():
     target_defaults = load_default_target()
     run_label = time.strftime("%Y%m%d%H%M%S")
     run_started_at = utc_now_iso()
+    state_store = RunStateStore(db_client=create_mysql_client_from_env())
+    run_started_recorded = False
+    target_identity: dict[str, str] = {}
 
     with RunLogSession(run_label=run_label) as log_session:
         print(f"[INFO] 运行日志: {log_session.log_path.as_posix()}")
+        try:
+            runtime_env = load_runtime_environment(
+                default_workspace_root=args.workspace_root,
+            )
 
-        # Load config
-        runtime_env = load_runtime_environment(
-            default_workspace_root=args.workspace_root,
-        )
-
-        target_config = resolve_cli_target_config(
-            args,
-            target_defaults,
-            default_base_branch=DEFAULT_BASE_BRANCH,
-            default_max_issues=DEFAULT_MAX_ISSUES,
-        )
-        missing_fields = missing_required_target_fields(target_config)
-        if missing_fields:
-            field = missing_fields[0]
-            raise RuntimeError(f"缺少 {field}，请通过 CLI、.env 或 targets.json 提供")
-        coordinator = RunCoordinator(runtime_env)
-        state_store = RunStateStore(db_client=create_mysql_client_from_env())
-        coordinator.state_store = state_store
-        state_store.record_event(
-            StateEvent(
-                kind=EventKind.RUN_STARTED,
+            target_config = resolve_cli_target_config(
+                args,
+                target_defaults,
+                default_base_branch=DEFAULT_BASE_BRANCH,
+                default_max_issues=DEFAULT_MAX_ISSUES,
+            )
+            missing_fields = missing_required_target_fields(target_config)
+            if missing_fields:
+                field = missing_fields[0]
+                raise RuntimeError(f"缺少 {field}，请通过 CLI、.env 或 targets.json 提供")
+            target_identity = {
+                "repository": target_config.repository,
+                "author": target_config.author,
+                "project_key": target_config.project_key,
+            }
+            coordinator = RunCoordinator(runtime_env)
+            coordinator.state_store = state_store
+            state_store.record_event(
+                StateEvent(
+                    kind=EventKind.RUN_STARTED,
+                    run_label=run_label,
+                    entity_type="run",
+                    entity_key=run_label,
+                    repository=target_config.repository,
+                    author=target_config.author,
+                    project_key=target_config.project_key,
+                    status="running",
+                    payload={
+                        "mode": "single",
+                        "base_branch": target_config.base_branch,
+                    },
+                )
+            )
+            run_started_recorded = True
+            result = coordinator.run_target(
+                target_config,
+                TargetRunOptions(
+                    run_label=run_label,
+                    keep_workspace=args.keep_workspace,
+                    skip_build=args.skip_build,
+                ),
+            )
+            target_states = (result.target_state,) if result.target_state is not None else ()
+            rollout_flags = load_performance_flags().enabled_flags()
+            run_state = RunState(
                 run_label=run_label,
-                entity_type="run",
-                entity_key=run_label,
-                repository=target_config.repository,
-                author=target_config.author,
-                project_key=target_config.project_key,
-                status="running",
+                status=derive_run_status(target_states),
+                targets=target_states,
+                started_at=run_started_at,
+                finished_at=utc_now_iso(),
+                performance_summary=summarize_run_performance(
+                    target_states,
+                    rollout_flags=rollout_flags,
+                ),
+                rollout_flags=rollout_flags,
+            )
+            run_summary_path = ArtifactWriter().write_run_state(run_state)
+            state_store.record_run_state(run_state, artifact_path=run_summary_path.as_posix())
+            state_store.record_event(
+                StateEvent(
+                    kind=EventKind.RUN_FINISHED,
+                    run_label=run_label,
+                    entity_type="run",
+                    entity_key=run_label,
+                    repository=target_config.repository,
+                    author=target_config.author,
+                    project_key=target_config.project_key,
+                    status=run_state.status.value,
+                    artifact_path=run_summary_path.as_posix(),
+                    payload=run_state.to_dict(),
+                )
+            )
+            print(f"[INFO] 运行摘要: {run_summary_path.as_posix()}")
+        except Exception as exc:
+            state_store.record_run_aborted(
+                run_label=run_label,
+                status="failed",
+                repository=target_identity.get("repository", ""),
+                author=target_identity.get("author", ""),
+                project_key=target_identity.get("project_key", ""),
+                error=str(exc),
+                startup_failure=not run_started_recorded,
                 payload={
                     "mode": "single",
-                    "base_branch": target_config.base_branch,
+                    "run_started_recorded": run_started_recorded,
                 },
             )
-        )
-        result = coordinator.run_target(
-            target_config,
-            TargetRunOptions(
-                run_label=run_label,
-                keep_workspace=args.keep_workspace,
-                skip_build=args.skip_build,
-            ),
-        )
-        target_states = (result.target_state,) if result.target_state is not None else ()
-        rollout_flags = load_performance_flags().enabled_flags()
-        run_state = RunState(
-            run_label=run_label,
-            status=derive_run_status(target_states),
-            targets=target_states,
-            started_at=run_started_at,
-            finished_at=utc_now_iso(),
-            performance_summary=summarize_run_performance(
-                target_states,
-                rollout_flags=rollout_flags,
-            ),
-            rollout_flags=rollout_flags,
-        )
-        run_summary_path = ArtifactWriter().write_run_state(run_state)
-        state_store.record_run_state(run_state, artifact_path=run_summary_path.as_posix())
-        state_store.record_event(
-            StateEvent(
-                kind=EventKind.RUN_FINISHED,
-                run_label=run_label,
-                entity_type="run",
-                entity_key=run_label,
-                repository=target_config.repository,
-                author=target_config.author,
-                project_key=target_config.project_key,
-                status=run_state.status.value,
-                artifact_path=run_summary_path.as_posix(),
-                payload=run_state.to_dict(),
-            )
-        )
-        print(f"[INFO] 运行摘要: {run_summary_path.as_posix()}")
+            raise
 
 
 if __name__ == "__main__":

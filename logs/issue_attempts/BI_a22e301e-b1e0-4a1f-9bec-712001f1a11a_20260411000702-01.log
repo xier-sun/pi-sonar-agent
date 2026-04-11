@@ -1,0 +1,475 @@
+[2026-04-11 00:50:31] Attempt 1/5 started for a22e301e-b1e0-4a1f-9bec-712001f1a11a
+[2026-04-11 00:58:36] Attempt 1 failed: Quality gate verification failed
+[2026-04-11 00:58:36] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+... (省略前 10 行)
+   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+3. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessNullDevEntryItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:101
+   Evidence: } /// <summary> /// 处理无 U_DevEntry 物料的回溯 /// </summary> private async Task<List<dynamic>> ProcessNullDevEntryItemsAsync(List<dynamic> returnItems) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+4. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessNullDevEntryItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:106
+   Evidence: private async Task<List<dynamic>> ProcessNullDevEntryItemsAsync(List<dynamic> returnItems) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+5. [async_requires_await] 异步方法必须真正 await: 异步方法 ToList 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:153
+   Evidence: .ToList(); } /// <summary> /// 获取已交货物料 /// </summary> private async Task<List<dynamic>> GetDeliveredItemsAsync(List<dynamic> returnProductsInFilter) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+6. [async_requires_await] 异步方法必须真正 await: 异步方法 GetDeliveredItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:154
+   Evidence: } /// <summary> /// 获取已交货物料 /// </summary> private async Task<List<dynamic>> GetDeliveredItemsAsync(List<dynamic> returnProductsInFilter) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+7. [async_requires_await] 异步方法必须真正 await: 异步方法 GetDeliveredItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:159
+   Evidence: private async Task<List<dynamic>> GetDeliveredItemsAsync(List<dynamic> returnProductsInFilter) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+8. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:94
+   Evidence: var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+9. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:95
+   Evidence: join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+10. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:96
+   Evidence: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+11. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:137
+   Evidence: var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+12. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:138
+   Evidence: join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+13. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:163
+   Evidence: var delivrdItems = await (from r1 in UnitWork.Find<RDR1>(null)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+14. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:164
+   Evidence: join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+15. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:165
+   Evidence: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+[2026-04-11 00:58:36] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate rejected the patch with 15 hard violation(s).
+1. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ProcessAsync 缺少参数 matchedRules 的 <param> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41
+   证据: ///<summary>
+/// 处理器方法
+/// </summary>
+   原始提示: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+2. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ProcessAsync 有返回值但缺少 <returns> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41
+   证据: ///<summary>
+/// 处理器方法
+/// </summary>
+   原始提示: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+3. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessNullDevEntryItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:101
+   证据: } /// <summary> /// 处理无 U_DevEntry 物料的回溯 /// </summary> private async Task<List<dynamic>> ProcessNullDevEntryItemsAsync(List<dynamic> returnItems) {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+4. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessNullDevEntryItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:106
+   证据: private async Task<List<dynamic>> ProcessNullDevEntryItemsAsync(List<dynamic> returnItems) {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+5. [async_requires_await] 异步方法必须真正 await: 异步方法 ToList 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:153
+   证据: .ToList(); } /// <summary> /// 获取已交货物料 /// </summary> private async Task<List<dynamic>> GetDeliveredItemsAsync(List<dynamic> returnProductsInFilter) {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+6. [async_requires_await] 异步方法必须真正 await: 异步方法 GetDeliveredItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:154
+   证据: } /// <summary> /// 获取已交货物料 /// </summary> private async Task<List<dynamic>> GetDeliveredItemsAsync(List<dynamic> returnProductsInFilter) {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+7. [async_requires_await] 异步方法必须真正 await: 异步方法 GetDeliveredItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:159
+   证据: private async Task<List<dynamic>> GetDeliveredItemsAsync(List<dynamic> returnProductsInFilter) {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+8. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:94
+   证据: var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+9. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:95
+   证据: join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+10. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:96
+   证据: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+11. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:137
+   证据: var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+12. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:138
+   证据: join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+13. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:163
+   证据: var delivrdItems = await (from r1 in UnitWork.Find<RDR1>(null)
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+14. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:164
+   证据: join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+15. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:165
+   证据: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+本次重改要求:
+- 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+- 只为当前触达的公开成员补齐 XML 文档，包括 <summary>/<param>/<returns>；不要顺手补无关公开成员。
+- 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+- 如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。
+- 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-11 00:58:37] Workspace restored to issue baseline
+[2026-04-11 00:58:37] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 00:58:37] Attempt 2/5 started for a22e301e-b1e0-4a1f-9bec-712001f1a11a
+[2026-04-11 01:01:52] Attempt 2 failed: Quality gate verification failed
+[2026-04-11 01:01:52] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 GetReturnItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:227
+   Evidence: } /// <summary> /// 获取退货物料信息 /// </summary> private async Task<List<dynamic>> GetReturnItemsAsync() {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+2. [async_requires_await] 异步方法必须真正 await: 异步方法 GetReturnItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:232
+   Evidence: private async Task<List<dynamic>> GetReturnItemsAsync() {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+3. [async_requires_await] 异步方法必须真正 await: 异步方法 GetHadPenaltyOrdrsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:250
+   Evidence: } /// <summary> /// 获取已有罚息的订单 /// </summary> private async Task<HashSet<int>> GetHadPenaltyOrdrsAsync() {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+4. [async_requires_await] 异步方法必须真正 await: 异步方法 GetHadPenaltyOrdrsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:255
+   Evidence: private async Task<HashSet<int>> GetHadPenaltyOrdrsAsync() {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+5. [async_requires_await] 异步方法必须真正 await: 异步方法 ToHashSet 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:264
+   Evidence: return result.ToHashSet(); } /// <summary> /// 获取已交货物料信息 /// </summary> private async Task<List<dynamic>> GetDeliveredItemsAsync(List<int> orderDocEntries) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+6. [async_requires_await] 异步方法必须真正 await: 异步方法 GetDeliveredItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:265
+   Evidence: } /// <summary> /// 获取已交货物料信息 /// </summary> private async Task<List<dynamic>> GetDeliveredItemsAsync(List<int> orderDocEntries) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+7. [async_requires_await] 异步方法必须真正 await: 异步方法 GetDeliveredItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:270
+   Evidence: private async Task<List<dynamic>> GetDeliveredItemsAsync(List<int> orderDocEntries) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+[2026-04-11 01:01:52] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate rejected the patch with 7 hard violation(s).
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 GetReturnItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:227
+   证据: } /// <summary> /// 获取退货物料信息 /// </summary> private async Task<List<dynamic>> GetReturnItemsAsync() {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+2. [async_requires_await] 异步方法必须真正 await: 异步方法 GetReturnItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:232
+   证据: private async Task<List<dynamic>> GetReturnItemsAsync() {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+3. [async_requires_await] 异步方法必须真正 await: 异步方法 GetHadPenaltyOrdrsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:250
+   证据: } /// <summary> /// 获取已有罚息的订单 /// </summary> private async Task<HashSet<int>> GetHadPenaltyOrdrsAsync() {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+4. [async_requires_await] 异步方法必须真正 await: 异步方法 GetHadPenaltyOrdrsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:255
+   证据: private async Task<HashSet<int>> GetHadPenaltyOrdrsAsync() {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+5. [async_requires_await] 异步方法必须真正 await: 异步方法 ToHashSet 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:264
+   证据: return result.ToHashSet(); } /// <summary> /// 获取已交货物料信息 /// </summary> private async Task<List<dynamic>> GetDeliveredItemsAsync(List<int> orderDocEntries) {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+6. [async_requires_await] 异步方法必须真正 await: 异步方法 GetDeliveredItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:265
+   证据: } /// <summary> /// 获取已交货物料信息 /// </summary> private async Task<List<dynamic>> GetDeliveredItemsAsync(List<int> orderDocEntries) {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+7. [async_requires_await] 异步方法必须真正 await: 异步方法 GetDeliveredItemsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:270
+   证据: private async Task<List<dynamic>> GetDeliveredItemsAsync(List<int> orderDocEntries) {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+本次重改要求:
+- 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+- 如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-11 01:01:52] Workspace restored to issue baseline
+[2026-04-11 01:01:52] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-11 01:01:52] Attempt 3/5 started for a22e301e-b1e0-4a1f-9bec-712001f1a11a
+[2026-04-11 01:05:46] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-11 01:05:46] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+关键错误:
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(127,46): error CS1503: 参数 1: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(127,70): error CS1503: 参数 2: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(135,78): error CS1503: 参数 1: 无法从“System.Collections.Generic.List<<anonymous type: int DocEntry, int? LineNum, string ItemCode, decimal? DelivrdQty, decimal? Price, string ManSerNum, string ManBtchNum, decimal? LastPurPrc, int? SlpCode>>”转换为“System.Collections.Generic.List<dynamic>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(135,103): error CS1503: 参数 3: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(262,56): error CS0019: 运算符“??”无法应用于“decimal”和“int”类型的操作数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(127,46): error CS1503: 参数 1: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(127,70): error CS1503: 参数 2: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(135,78): error CS1503: 参数 1: 无法从“System.Collections.Generic.List<<anonymous type: int DocEntry, int? LineNum, string ItemCode, decimal? DelivrdQty, decimal? Price, string ManSerNum, string ManBtchNum, decimal? LastPurPrc, int? SlpCode>>”转换为“System.Collections.Generic.List<dynamic>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(135,103): error CS1503: 参数 3: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(262,56): error CS0019: 运算符“??”无法应用于“decimal”和“int”类型的操作数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+
+构建日志:
+... (省略前 159 行)
+C:\Users\neware\.nuget\packages\system.security.cryptography.xml\8.0.2\buildTransitive\netcoreapp2.0\System.Security.Cryptography.Xml.targets(4,5): warning : System.Security.Cryptography.Xml 8.0.2 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\microsoft.bcl.timeprovider\8.0.0\buildTransitive\netcoreapp2.0\Microsoft.Bcl.TimeProvider.targets(4,5): warning : Microsoft.Bcl.TimeProvider 8.0.0 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: 目标框架“netcoreapp3.1”不受支持，将来不会收到安全更新。有关支持策略的详细信息，请参阅 https://aka.ms/dotnet-core-support。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1603: Infrastructure 依赖于 Serilog.Sinks.Elasticsearch (>= 7.0.0)，但没有找到 Serilog.Sinks.Elasticsearch 7.0.0。已改为解析 Serilog.Sinks.Elasticsearch 7.1.0。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1603: Infrastructure 依赖于 System.Net.Http.Json (>= 3.0.0)，但没有找到 System.Net.Http.Json 3.0.0。已改为解析 System.Net.Http.Json 3.2.0。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Core 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Word 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Npoi.Mapper 6.2.2”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Spire.Doc 13.3.7”。此包可能与项目不完全兼容。
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\HumanResource\UserRegister\UserRegisterDetail.cs(575,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(168,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(197,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(228,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AccraditationBeforeSaleDemandReq.cs(44,23): warning CS0108: “AccraditationBeforeSaleDemandReq.FlowInstanceId”隐藏继承的成员“VerificationReq.FlowInstanceId”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECR\Dto\EcrProductionDto.cs(21,23): warning CS0108: “EcrProductionDto.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryDetectionItemResp.cs(21,21): warning CS0108: “FatCategoryDetectionItemResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryResp.cs(22,21): warning CS0108: “FatCategoryResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(173,31): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(274,27): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(284,32): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\CompletionReportApp.cs(615,13): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\MD\Implement\BusinessLabelApiApp.cs(1354,17): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(127,46): error CS1503: 参数 1: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(127,70): error CS1503: 参数 2: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(135,78): error CS1503: 参数 1: 无法从“System.Collections.Generic.List<<anonymous type: int DocEntry, int? LineNum, string ItemCode, decimal? DelivrdQty, decimal? Price, string ManSerNum, string ManBtchNum, decimal? LastPurPrc, int? SlpCode>>”转换为“System.Collections.Generic.List<dynamic>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(135,103): error CS1503: 参数 3: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(262,56): error CS0019: 运算符“??”无法应用于“decimal”和“int”类型的操作数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+    90 个警告
+    5 个错误
+
+已用时间 00:00:52.90
+[2026-04-11 01:05:46] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS1503 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs:127:46
+   错误信息: 参数 1: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>”
+   出错代码片段:
+ 125 |                     var delivrdItemsInThisOrdr = delivrdProductsLookUp[group.Key].GroupBy(x=>x.ItemCode).Select(x=> new { ItemCode = x.Key, TotalQty = x.Sum(s=>s.DelivrdQty) }).ToDictionary(k=>k.ItemCode,v=>v.TotalQty);
+ 126 |                     //遍历订单中所有有价物料，检查每个物料是否都已退完
+ 127 |                     if( IsOrderFullyReturned(delivrdItemsInThisOrdr, thisOrdrReturnItems))
+ 128 |                     {
+ 129 |                         // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+2. CS1503 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs:127:70
+   错误信息: 参数 2: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>”
+   出错代码片段:
+ 125 |                     var delivrdItemsInThisOrdr = delivrdProductsLookUp[group.Key].GroupBy(x=>x.ItemCode).Select(x=> new { ItemCode = x.Key, TotalQty = x.Sum(s=>s.DelivrdQty) }).ToDictionary(k=>k.ItemCode,v=>v.TotalQty);
+ 126 |                     //遍历订单中所有有价物料，检查每个物料是否都已退完
+ 127 |                     if( IsOrderFullyReturned(delivrdItemsInThisOrdr, thisOrdrReturnItems))
+ 128 |                     {
+ 129 |                         // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+3. CS1503 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs:135:78
+   错误信息: 参数 1: 无法从“System.Collections.Generic.List<<anonymous type: int DocEntry, int? LineNum, string ItemCode, decimal? DelivrdQty, decimal? Price, string ManSerNum, string ManBtchNum, decimal? LastPurPrc, int? SlpCode>>”转换为“System.Collections.Generic.List<dynamic>”
+   出错代码片段:
+ 133 |                             .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+ 134 |                         // 未退的 Price=0 物料成本 = sum(未退数量 * LastPurPrc)
+ 135 |                         var fixedPenaltyAmount = CalculateFixedPenaltyAmount(delivrdItems, group.Key, returnedZeroPriceQtyByItem);
+ 136 |                         var slpCode = delivrdItems.FirstOrDefault(x => x.Price == 0 && x.DocEntry == group.Key)?.SlpCode;
+ 137 | 
+4. CS1503 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs:135:103
+   错误信息: 参数 3: 无法从“System.Collections.Generic.Dictionary<string, decimal?>”转换为“System.Collections.Generic.Dictionary<string, decimal>”
+   出错代码片段:
+ 133 |                             .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+ 134 |                         // 未退的 Price=0 物料成本 = sum(未退数量 * LastPurPrc)
+ 135 |                         var fixedPenaltyAmount = CalculateFixedPenaltyAmount(delivrdItems, group.Key, returnedZeroPriceQtyByItem);
+ 136 |                         var slpCode = delivrdItems.FirstOrDefault(x => x.Price == 0 && x.DocEntry == group.Key)?.SlpCode;
+ 137 | 
+5. CS0019 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs:262:56
+   错误信息: 运算符“??”无法应用于“decimal”和“int”类型的操作数
+   出错代码片段:
+ 260 |                 var totalDelivrdQty = g.Sum(s => (decimal)s.GetType().GetProperty("DelivrdQty").GetValue(s));
+ 261 |                 returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+ 262 |                 var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+ 263 |                 return unreturnedQty > 0 ? unreturnedQty * (decimal)g.First().GetType().GetProperty("LastPurPrc").GetValue(g.First()) : (decimal?)0;
+ 264 |             });
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+[2026-04-11 01:05:46] Workspace restored to issue baseline
+[2026-04-11 01:05:46] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-11 01:05:46] Attempt 4/5 started for a22e301e-b1e0-4a1f-9bec-712001f1a11a
+[2026-04-11 01:11:08] Attempt 4 failed: Quality gate verification failed
+[2026-04-11 01:11:08] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ProcessAsync 缺少参数 matchedRules 的 <param> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41
+   Evidence: ///<summary>
+/// 处理器方法
+/// </summary>
+   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+2. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ProcessAsync 有返回值但缺少 <returns> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41
+   Evidence: ///<summary>
+/// 处理器方法
+/// </summary>
+   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+3. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:225
+   Evidence: }); } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+4. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:109
+   Evidence: return await (from r1 in UnitWork.Find<RIN1>(null)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+5. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:110
+   Evidence: join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+6. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:111
+   Evidence: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+7. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:142
+   Evidence: var result = await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+8. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:143
+   Evidence: join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.Rule.RuleDefinitionId
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+9. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:154
+   Evidence: return await (from r1 in UnitWork.Find<RDR1>(null)
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+10. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:155
+   Evidence: join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+11. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:156
+   Evidence: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+[2026-04-11 01:11:08] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate rejected the patch with 11 hard violation(s).
+1. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ProcessAsync 缺少参数 matchedRules 的 <param> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41
+   证据: ///<summary>
+/// 处理器方法
+/// </summary>
+   原始提示: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+2. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ProcessAsync 有返回值但缺少 <returns> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41
+   证据: ///<summary>
+/// 处理器方法
+/// </summary>
+   原始提示: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+3. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:225
+   证据: }); } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+4. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:109
+   证据: return await (from r1 in UnitWork.Find<RIN1>(null)
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+5. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:110
+   证据: join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+6. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:111
+   证据: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+7. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:142
+   证据: var result = await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+8. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:143
+   证据: join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.Rule.RuleDefinitionId
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+9. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:154
+   证据: return await (from r1 in UnitWork.Find<RDR1>(null)
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+10. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:155
+   证据: join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+11. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:156
+   证据: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+本次重改要求:
+- 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+- 只为当前触达的公开成员补齐 XML 文档，包括 <summary>/<param>/<returns>；不要顺手补无关公开成员。
+- 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+- 如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。
+- 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-11 01:11:08] Workspace restored to issue baseline
+[2026-04-11 01:11:08] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-11 01:11:08] Attempt 5/5 started for a22e301e-b1e0-4a1f-9bec-712001f1a11a
+[2026-04-11 01:14:50] Attempt 5 failed: Forbidden tool used during issue fix
+[2026-04-11 01:14:50] Build failure report:
+错误: Forbidden tool used during issue fix
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+关键错误:
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(74,104): error CS1061: “RIN1”未包含“U_DevEntry”的定义，并且找不到可接受第一个“RIN1”类型参数的可访问扩展方法“U_DevEntry”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(103,82): error CS1061: “PenaltyEvent”未包含“Rule”的定义，并且找不到可接受第一个“PenaltyEvent”类型参数的可访问扩展方法“Rule”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(96,121): error CS0165: 使用了未赋值的局部变量“resolved” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(192,60): error CS0019: 运算符“??”无法应用于“decimal”和“int”类型的操作数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(74,104): error CS1061: “RIN1”未包含“U_DevEntry”的定义，并且找不到可接受第一个“RIN1”类型参数的可访问扩展方法“U_DevEntry”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(103,82): error CS1061: “PenaltyEvent”未包含“Rule”的定义，并且找不到可接受第一个“PenaltyEvent”类型参数的可访问扩展方法“Rule”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(96,121): error CS0165: 使用了未赋值的局部变量“resolved” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(192,60): error CS0019: 运算符“??”无法应用于“decimal”和“int”类型的操作数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+
+构建日志:
+... (省略前 244 行)
+C:\Users\neware\.nuget\packages\system.security.cryptography.pkcs\8.0.1\buildTransitive\netcoreapp2.0\System.Security.Cryptography.Pkcs.targets(4,5): warning : System.Security.Cryptography.Pkcs 8.0.1 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\system.security.cryptography.xml\8.0.2\buildTransitive\netcoreapp2.0\System.Security.Cryptography.Xml.targets(4,5): warning : System.Security.Cryptography.Xml 8.0.2 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Users\neware\.nuget\packages\microsoft.bcl.timeprovider\8.0.0\buildTransitive\netcoreapp2.0\Microsoft.Bcl.TimeProvider.targets(4,5): warning : Microsoft.Bcl.TimeProvider 8.0.0 doesn't support netcoreapp3.1 and has not been tested with it. Consider upgrading your TargetFramework to net6.0 or later. You may also set <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings> in the project file to ignore this warning and attempt to run in this unsupported configuration at your own risk. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: 目标框架“netcoreapp3.1”不受支持，将来不会收到安全更新。有关支持策略的详细信息，请参阅 https://aka.ms/dotnet-core-support。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1603: Infrastructure 依赖于 Serilog.Sinks.Elasticsearch (>= 7.0.0)，但没有找到 Serilog.Sinks.Elasticsearch 7.0.0。已改为解析 Serilog.Sinks.Elasticsearch 7.1.0。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1603: Infrastructure 依赖于 System.Net.Http.Json (>= 3.0.0)，但没有找到 System.Net.Http.Json 3.0.0。已改为解析 System.Net.Http.Json 3.2.0。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Core 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“NetOfficeFw.Word 1.7.4.11”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Npoi.Mapper 6.2.2”。此包可能与项目不完全兼容。
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.WebApi\OpenAuth.WebApi.csproj : warning NU1701: 已使用“.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1”而不是项目目标框架“.NETCoreApp,Version=v3.1”还原包“Spire.Doc 13.3.7”。此包可能与项目不完全兼容。
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+C:\Program Files\dotnet\sdk\10.0.100\Microsoft.Common.CurrentVersion.targets(2437,5): warning MSB3246: 解析的文件包含错误图像、无元数据或不可访问。PE image does not have metadata. PE image does not have metadata. [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(20,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,55): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“3”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECN\Response\WmsProduceTrailResp.cs(82,58): warning CS1570: XML 注释出现 XML 格式错误 --“此位置无法使用字符“6”。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\HumanResource\UserRegister\UserRegisterDetail.cs(575,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(168,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(197,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AddOrUpdateCompletionReportReq.cs(228,13): warning CS1570: XML 注释出现 XML 格式错误 --“在此位置不应为结束标记。” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\Request\AccraditationBeforeSaleDemandReq.cs(44,23): warning CS0108: “AccraditationBeforeSaleDemandReq.FlowInstanceId”隐藏继承的成员“VerificationReq.FlowInstanceId”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Engineering\ECR\Dto\EcrProductionDto.cs(21,23): warning CS0108: “EcrProductionDto.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryDetectionItemResp.cs(21,21): warning CS0108: “FatCategoryDetectionItemResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Quality\Response\FatCategoryResp.cs(22,21): warning CS0108: “FatCategoryResp.Id”隐藏继承的成员“BaseEntity<string>.Id”。如果是有意隐藏，请使用关键字 new。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(173,31): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(274,27): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\DbExtension.cs(284,32): warning CS0618: “DbContext.Query<TQuery>()”已过时:“Use Set() for entity types without keys” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\MD\Implement\BusinessLabelApiApp.cs(1354,17): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Serve\CompletionReportApp.cs(615,13): warning CS4014: 由于此调用不会等待，因此在此调用完成之前将会继续执行当前方法。请考虑将 "await" 运算符应用于调用结果。 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(74,104): error CS1061: “RIN1”未包含“U_DevEntry”的定义，并且找不到可接受第一个“RIN1”类型参数的可访问扩展方法“U_DevEntry”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(103,82): error CS1061: “PenaltyEvent”未包含“Rule”的定义，并且找不到可接受第一个“PenaltyEvent”类型参数的可访问扩展方法“Rule”(是否缺少 using 指令或程序集引用?) [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(96,121): error CS0165: 使用了未赋值的局部变量“resolved” [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs(192,60): error CS0019: 运算符“??”无法应用于“decimal”和“int”类型的操作数 [D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\OpenAuth.App.csproj]
+    129 个警告
+    4 个错误
+
+已用时间 00:00:49.51
+[2026-04-11 01:14:51] Next retry feedback for model:
+上次尝试使用了被禁止的工具，或污染了当前 issue 的 Git 基线。
+这次严禁使用 git_add、git_commit、git_push；只允许直接编辑代码并运行推荐构建命令。
+如果使用 shell 工具（工具名 Bash），只写 bash 兼容命令；允许无害操作。
+严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码。
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS1061 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs:74:104
+   错误信息: “RIN1”未包含“U_DevEntry”的定义，并且找不到可接受第一个“RIN1”类型参数的可访问扩展方法“U_DevEntry”(是否缺少 using 指令或程序集引用?)
+   出错代码片段:
+  72 |                     .Join(UnitWork.Find<OITM>(null), x => x.r1.ItemCode, m => m.ItemCode, (x, m) => new { x.r1, x.r, m })
+  73 |                     .Where(x => x.r.CANCELED == "N" && (x.r.U_New_ORDRID == null || x.r.U_New_ORDRID == ""))
+  74 |                     .Select(x => new { x.r.DocEntry, x.r.U_New_ORDRID, x.r1.ItemCode, x.r1.Price, x.r1.U_DevEntry, x.r1.Quantity, x.r1.StockValue, x.m.LastPurPrc, x.r.CreateDate, x.r1.BaseEntry, x.r1.BaseType })
+  75 |                     .ToListAsync();
+  76 | 
+2. CS1061 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs:103:82
+   错误信息: “PenaltyEvent”未包含“Rule”的定义，并且找不到可接受第一个“PenaltyEvent”类型参数的可访问扩展方法“Rule”(是否缺少 using 指令或程序集引用?)
+   出错代码片段:
+ 101 |                 var returnProducts = returnItemsWithDevEntry.Where(m => m.Price > 0).ToList();
+ 102 |                 var hadPenaltyOrdrs = (await UnitWork.Find<PenaltyRuleDefinition>(null)
+ 103 |                     .Join(UnitWork.Find<PenaltyEvent>(null), pd => pd.Id, r => r.Rule.RuleDefinitionId, (pd, r) => new { pd, r })
+ 104 |                     .Where(x => x.pd.RuleHandlerCode == HandlerCode)
+ 105 |                     .Select(x => Convert.ToInt32(x.r.TriggerDocEntry))
+3. CS0165 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs:96:121
+   错误信息: 使用了未赋值的局部变量“resolved”
+   出错代码片段:
+  94 |                     ResolvedDevEntry = !string.IsNullOrEmpty(x.U_DevEntry)
+  95 |                         ? (int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0)
+  96 |                         : (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved) ? resolved : 0)
+  97 |                 }).Where(x => x.ResolvedDevEntry > 0 
+  98 |                 //&& !csOrders.Contains(x.ResolvedDevEntry)
+4. CS0019 at D:\MyProjects\pi-sonar-agent\.agent_workspaces\fix_BI_20260411000702-01\OpenAuth.Core\OpenAuth.App\Finance\ReturnUnRelNewOrderProcessor.cs:192:60
+   错误信息: 运算符“??”无法应用于“decimal”和“int”类型的操作数
+   出错代码片段:
+ 190 |                     var totalDelivrdQty = g.Sum(s => (decimal)s.DelivrdQty);
+ 191 |                     returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+ 192 |                     var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+ 193 |                     return unreturnedQty > 0 ? unreturnedQty * (decimal)g.First().LastPurPrc : (decimal?)0;
+ 194 |                 });
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+[2026-04-11 01:14:51] Workspace restored to issue baseline
+[2026-04-11 01:14:51] Issue skipped: Forbidden tool usage polluted the issue attempt after 5 attempt(s)

@@ -1,0 +1,161 @@
+{
+  "issue_key": "issue-early-stop",
+  "repository": "repo",
+  "run_label": "run-early-stop",
+  "rule_id": "csharpsquid:S3776",
+  "file_path": "/tracked.cs",
+  "line": 1,
+  "status": "skipped",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "retrying",
+      "started_at": "2026-04-11T06:56:45.144652+00:00",
+      "finished_at": "2026-04-11T06:56:45.145381+00:00",
+      "duration_seconds": 0.001,
+      "failure_kind": "build",
+      "retry_reason": "build_verification_failed",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": true,
+      "error": "Issue changes failed local build verification",
+      "skip_reason": "",
+      "summary": "",
+      "changed_files": [
+        "tracked.cs"
+      ],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\repo_issue-early-stop_run-early-stop.log",
+      "artifact_dir": "logs/issue_artifacts/repo/run-early-stop/issue-early-stop/attempt-01",
+      "performance_metrics": {
+        "attempt_total_duration_seconds": 0.001
+      },
+      "rollout_flags": []
+    },
+    {
+      "attempt_number": 2,
+      "status": "retrying",
+      "started_at": "2026-04-11T06:56:45.233818+00:00",
+      "finished_at": "2026-04-11T06:56:45.234304+00:00",
+      "duration_seconds": 0.0,
+      "failure_kind": "build",
+      "retry_reason": "build_verification_failed",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": true,
+      "error": "Issue changes failed local build verification",
+      "skip_reason": "",
+      "summary": "",
+      "changed_files": [
+        "tracked.cs"
+      ],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\repo_issue-early-stop_run-early-stop.log",
+      "artifact_dir": "logs/issue_artifacts/repo/run-early-stop/issue-early-stop/attempt-02",
+      "performance_metrics": {
+        "attempt_total_duration_seconds": 0.0
+      },
+      "rollout_flags": []
+    },
+    {
+      "attempt_number": 3,
+      "status": "retrying",
+      "started_at": "2026-04-11T06:56:45.316807+00:00",
+      "finished_at": "2026-04-11T06:56:45.317209+00:00",
+      "duration_seconds": 0.0,
+      "failure_kind": "build",
+      "retry_reason": "build_verification_failed",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": true,
+      "error": "Issue changes failed local build verification",
+      "skip_reason": "",
+      "summary": "",
+      "changed_files": [
+        "tracked.cs"
+      ],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\repo_issue-early-stop_run-early-stop.log",
+      "artifact_dir": "logs/issue_artifacts/repo/run-early-stop/issue-early-stop/attempt-03",
+      "performance_metrics": {
+        "attempt_total_duration_seconds": 0.0
+      },
+      "rollout_flags": []
+    },
+    {
+      "attempt_number": 4,
+      "status": "retrying",
+      "started_at": "2026-04-11T06:56:45.403417+00:00",
+      "finished_at": "2026-04-11T06:56:45.403873+00:00",
+      "duration_seconds": 0.0,
+      "failure_kind": "build",
+      "retry_reason": "build_verification_failed",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": true,
+      "error": "Issue changes failed local build verification",
+      "skip_reason": "",
+      "summary": "",
+      "changed_files": [
+        "tracked.cs"
+      ],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\repo_issue-early-stop_run-early-stop.log",
+      "artifact_dir": "logs/issue_artifacts/repo/run-early-stop/issue-early-stop/attempt-04",
+      "performance_metrics": {
+        "attempt_total_duration_seconds": 0.0
+      },
+      "rollout_flags": []
+    },
+    {
+      "attempt_number": 5,
+      "status": "retrying",
+      "started_at": "2026-04-11T06:56:45.489789+00:00",
+      "finished_at": "2026-04-11T06:56:45.490219+00:00",
+      "duration_seconds": 0.0,
+      "failure_kind": "build",
+      "retry_reason": "build_verification_failed",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": true,
+      "error": "Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.",
+      "skip_reason": "Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.",
+      "summary": "",
+      "changed_files": [
+        "tracked.cs"
+      ],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\repo_issue-early-stop_run-early-stop.log",
+      "artifact_dir": "logs/issue_artifacts/repo/run-early-stop/issue-early-stop/attempt-05",
+      "performance_metrics": {
+        "attempt_total_duration_seconds": 0.0
+      },
+      "rollout_flags": []
+    }
+  ],
+  "final_failure_kind": "build",
+  "final_error": "Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.",
+  "final_skip_reason": "Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.",
+  "final_summary": "",
+  "final_boundary_failure_code": "",
+  "final_secondary_boundary_failure_codes": [],
+  "artifact_root": "logs/issue_artifacts/repo/run-early-stop/issue-early-stop",
+  "performance_summary": {
+    "issue_attempt_count": 5,
+    "issue_total_duration_seconds": 0.001,
+    "avg_attempt_duration_seconds": 0.0,
+    "model_timeout_attempts": 0,
+    "scope_reject_attempts": 0,
+    "boundary_hard_reject_attempts": 0,
+    "build_invocation_count": 0,
+    "follow_up_timeout_attempts": 0,
+    "patch_salvaged_attempts": 0,
+    "rollout_flags": []
+  },
+  "rollout_flags": []
+}

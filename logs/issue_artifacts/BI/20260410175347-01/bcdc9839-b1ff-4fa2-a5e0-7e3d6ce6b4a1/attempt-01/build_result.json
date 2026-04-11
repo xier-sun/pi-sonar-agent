@@ -1,0 +1,201 @@
+{
+  "success": false,
+  "build_passed": false,
+  "build_verification_failed": true,
+  "retryable_failure": true,
+  "failure_kind": "build",
+  "error": "Issue changes failed local build verification",
+  "skip_reason": "",
+  "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+  "build_output": "Fast compile failed: dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\" --no-restore -v:q\n\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: 目标框架“netcoreapp3.1”不受支持，将来不会收到安全更新。有关支持策略的详细信息，请参阅 https://aka.ms/dotnet-core-support。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\Sap.Handler\\Sap.Handler.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\MQ\\Neware.Cap\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\MQ\\Neware.Cap\\Neware.Cap.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.App.Tests\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.App.Tests\\OpenAuth.App.Tests.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\Sap.Handler\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\Sap.Handler\\Sap.Handler.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\Infrastructure\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\Infrastructure\\Infrastructure.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.App\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.App\\OpenAuth.App.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.Repository\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.Repository\\OpenAuth.Repository.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: 目标框架“netcoreapp3.1”不受支持，将来不会收到安全更新。有关支持策略的详细信息，请参阅 https://aka.ms/dotnet-core-support。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.WebApi\\OpenAuth.WebApi.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.WebApi\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.WebApi\\OpenAuth.WebApi.csproj]\n\n生成失败。\n\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: 目标框架“netcoreapp3.1”不受支持，将来不会收到安全更新。有关支持策略的详细信息，请参阅 https://aka.ms/dotnet-core-support。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\Sap.Handler\\Sap.Handler.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: 目标框架“netcoreapp3.1”不受支持，将来不会收到安全更新。有关支持策略的详细信息，请参阅 https://aka.ms/dotnet-core-support。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.WebApi\\OpenAuth.WebApi.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\MQ\\Neware.Cap\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\MQ\\Neware.Cap\\Neware.Cap.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.App.Tests\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.App.Tests\\OpenAuth.App.Tests.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\Sap.Handler\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\Sap.Handler\\Sap.Handler.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\Infrastructure\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\Infrastructure\\Infrastructure.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.App\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.App\\OpenAuth.App.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.Repository\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.Repository\\OpenAuth.Repository.csproj]\nC:\\Program Files\\dotnet\\sdk\\10.0.100\\Sdks\\Microsoft.NET.Sdk\\targets\\Microsoft.PackageDependencyResolution.targets(266,5): error NETSDK1004: 找不到资产文件“D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.WebApi\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。 [D:\\MyProjects\\pi-sonar-agent\\.agent_workspaces\\fix_BI_20260410175347-01\\OpenAuth.Core\\OpenAuth.WebApi\\OpenAuth.WebApi.csproj]\n    2 个警告\n    7 个错误\n\n已用时间 00:00:00.51",
+  "guardrail_mode": "scope",
+  "quality_gate_result": {
+    "status": "pass",
+    "summary": "No post-edit changed lines were available for quality-gate review.",
+    "applied_rule_ids": [
+      "public_xml_docs",
+      "async_signature",
+      "async_requires_await",
+      "linq_method_syntax",
+      "cognitive_complexity",
+      "zero_redundant_code",
+      "static_preferred",
+      "sealed_preferred",
+      "constructor_dependency_injection",
+      "business_comments_chinese",
+      "finance_terms_chinese"
+    ],
+    "violations": [],
+    "soft_findings": []
+  },
+  "boundary_failure_code": "",
+  "boundary_failure_summary": "",
+  "secondary_boundary_failure_codes": [],
+  "performance_metrics": {
+    "runtime_total_duration_seconds": 68.093,
+    "time_to_first_model_content_seconds": 0.578,
+    "time_after_first_edit_to_finalize_seconds": 21.628,
+    "tool_call_count": 3,
+    "read_call_count": 1,
+    "edit_call_count": 2,
+    "assistant_text_events": 3,
+    "assistant_text_chars": 218,
+    "model_timeout_stage": "",
+    "last_progress_stage": "result_message",
+    "saw_result_event": true,
+    "continuation_retry_count": 0,
+    "continuation_recovered": false,
+    "continuation_timeout_stages": [],
+    "execution_profile": "fast_path_short_form",
+    "fast_path_enabled": true,
+    "effective_max_turns": 6,
+    "patch_salvaged": false,
+    "fast_compile_invoked": true,
+    "fast_compile_passed": false,
+    "fast_compile_duration_seconds": 0.741,
+    "fast_compile_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\" --no-restore -v:q",
+    "build_duration_seconds": 0.0,
+    "build_invoked": false,
+    "validation_pipeline": [
+      "build",
+      "scope_review",
+      "diff_review"
+    ],
+    "verification_schedule": {
+      "run_boundary_first": true,
+      "run_propagation_check_before_build": true,
+      "run_quality_gate_before_build": true,
+      "run_rule_validation_before_build": true,
+      "run_fast_compile_before_build": true,
+      "skip_build_on_precheck_failure": true,
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.plan_first_complex_rules",
+        "planner.repair_archetypes.constraint_injection",
+        "planner.repair_archetypes.strategy_selection",
+        "perf.layered_verification",
+        "verifier.propagation_lifecycle",
+        "verifier.fast_compile",
+        "perf.patch_salvage",
+        "perf.continuation_retry",
+        "runtime.edit_failure_context_feedback",
+        "perf.fast_path_max_turns=6",
+        "perf.continuation_retry_limit=2"
+      ]
+    }
+  },
+  "model_timeout_stage": "",
+  "patch_salvaged": false,
+  "compliance_summary": {
+    "status": "pass",
+    "summary": "No post-edit changed lines were available for quality-gate review.",
+    "source_path": "D:/MyProjects/pi-sonar-agent/data/csharp-quality-gate.md",
+    "hard_rule_count": 5,
+    "soft_rule_count": 6,
+    "passed_rule_count": 11,
+    "failed_rule_count": 0,
+    "soft_finding_count": 0,
+    "not_applicable_count": 0,
+    "checks": [
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "本次新增或改写的公开类、公开方法、公开属性、公开实体必须有完整 XML 文档注释。",
+        "message": ""
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "异步方法必须以 Async 结尾，返回 Task/Task<T>，严禁 async void（事件处理器除外）。",
+        "message": ""
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "异步方法内部如果没有 await，应改为同步方法或直接返回 Task。",
+        "message": ""
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "新增或改写的 LINQ 表达式优先使用方法语法，不要引入 query syntax。",
+        "message": ""
+      },
+      {
+        "rule_id": "cognitive_complexity",
+        "title": "单方法认知复杂度不超过 30",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "触达的方法应通过提取子方法、提前返回等方式控制认知复杂度。",
+        "message": ""
+      },
+      {
+        "rule_id": "zero_redundant_code",
+        "title": "零冗余代码",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "不要在当前 patch 中留下未使用变量、方法、类或 using。",
+        "message": ""
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "如果新增方法不依赖实例状态，优先标记为 static。",
+        "message": ""
+      },
+      {
+        "rule_id": "sealed_preferred",
+        "title": "新增不继承的类优先 sealed",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "如果新增类不打算被继承，优先使用 sealed。",
+        "message": ""
+      },
+      {
+        "rule_id": "constructor_dependency_injection",
+        "title": "优先构造函数注入",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "依赖注入优先通过构造函数注入接口，并保持当前仓库既有注册模式一致。",
+        "message": ""
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "新增业务逻辑注释优先使用专业中文表达。",
+        "message": ""
+      },
+      {
+        "rule_id": "finance_terms_chinese",
+        "title": "财务术语保持专业中文",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "财务及核心业务术语应保持专业中文表达，例如罚息、应收账款、账务、呆滞库存、订单取消。",
+        "message": ""
+      }
+    ]
+  },
+  "follow_up_log_path": "",
+  "repair_plan": null,
+  "plan_precheck": {
+    "status": "not_applicable",
+    "blocking": false,
+    "code": "",
+    "summary": "",
+    "details": [],
+    "guidance": []
+  }
+}

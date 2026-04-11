@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 import subprocess
@@ -48,7 +49,8 @@ from pi_sonar_agent.core.state import (
 from pi_sonar_agent.core.state_store import RunStateStore
 from pi_sonar_agent.fixers.build_gate import format_build_failure_report
 
-DEFAULT_MAX_BUILD_RETRIES = 3
+DEFAULT_MAX_BUILD_RETRIES = 5
+EARLY_RETRY_ABORT_MIN_ATTEMPTS = 5
 
 
 def _sanitize_name(value: str) -> str:
@@ -144,6 +146,10 @@ def _build_retry_guidance(errors: list[CompilerErrorContext]) -> list[str]:
         guidance.append("不要引入未定义的新类型、返回类型或 DTO；如果确实需要新类型，必须同时定义并正确引用。")
     if "CS0103" in codes:
         guidance.append("不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。")
+        guidance.append("如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。")
+    if "CS1061" in codes:
+        guidance.append("不要留下不完整的成员重命名或类型迁移；先修复调用点与定义的成员名/类型不一致。")
+        guidance.append("如果新的 helper 或中间类型导致成员访问链断裂，回退为更小的原方法内重构。")
     return guidance
 
 
@@ -333,6 +339,101 @@ def _extract_boundary_failure_context(result: FixResult) -> BoundaryFailureConte
     )
 
 
+def _build_failure_detail_key(
+    result: FixResult,
+    *,
+    compiler_errors: tuple[CompilerErrorContext, ...],
+    boundary_failure: BoundaryFailureContext | None,
+    quality_gate_failure: QualityGateFailureContext | None,
+    plan_failure: PlanFailureContext | None,
+) -> str:
+    if quality_gate_failure is not None and quality_gate_failure.violations:
+        return "quality_gate:" + ",".join(
+            dict.fromkeys(item.rule_id for item in quality_gate_failure.violations if item.rule_id)
+        )
+    if plan_failure is not None and plan_failure.code:
+        return f"plan:{plan_failure.code}"
+    if boundary_failure is not None and boundary_failure.code:
+        return f"boundary:{boundary_failure.code}"
+    if compiler_errors:
+        return "compiler:" + ",".join(dict.fromkeys(item.code for item in compiler_errors if item.code))
+    if result.failure_kind == "model_timeout":
+        return f"timeout:{str(getattr(result, 'model_timeout_stage', '')).strip() or 'unknown'}"
+    if result.failure_kind == "rule_validation":
+        return "rule_validation:" + (str(result.error or result.summary or "").strip().splitlines() or ["unknown"])[0][:120]
+    if result.failure_kind:
+        normalized_output = " ".join(str(result.build_output or result.error or "").split())
+        if normalized_output:
+            digest = hashlib.sha1(normalized_output.encode("utf-8")).hexdigest()[:12]
+            return f"{result.failure_kind}:{digest}"
+        return result.failure_kind
+    return ""
+
+
+def _build_strategy_fingerprint(result: FixResult) -> str:
+    edit_contract = getattr(result, "edit_contract", None)
+    repair_plan = getattr(result, "repair_plan", None) or getattr(edit_contract, "repair_plan", None)
+    parts = [
+        f"profile={str(getattr(edit_contract, 'execution_profile', '')).strip()}",
+        f"fast_path={int(bool(getattr(edit_contract, 'fast_path_enabled', False)))}",
+        f"plan_first={int(bool(getattr(edit_contract, 'plan_first_enabled', False)))}",
+        "caps=" + ",".join(getattr(edit_contract, "allowed_capabilities", ()) or ()),
+        f"shape={str(getattr(repair_plan, 'repair_shape', '')).strip()}",
+        f"archetype={str(getattr(repair_plan, 'selected_archetype', '')).strip()}",
+        f"fallback={str(getattr(repair_plan, 'fallback_archetype', '')).strip()}",
+        "archetype_chain=" + ">".join(getattr(repair_plan, "archetype_chain", ()) or ()),
+    ]
+    return "|".join(part for part in parts if not part.endswith("="))
+
+
+def _build_diff_fingerprint(workspace_path: Path, result: FixResult) -> str:
+    changed_files = _normalize_changed_files(result)
+    if not changed_files:
+        return "no_change"
+
+    digest = hashlib.sha1()
+    for rel_path in changed_files:
+        digest.update(rel_path.encode("utf-8"))
+        digest.update(b"\0")
+        candidate = workspace_path / rel_path
+        if not candidate.exists() or not candidate.is_file():
+            digest.update(b"<missing>")
+            digest.update(b"\0")
+            continue
+        try:
+            digest.update(candidate.read_bytes())
+        except Exception:
+            digest.update(candidate.read_text(encoding="utf-8", errors="replace").encode("utf-8"))
+        digest.update(b"\0")
+    return digest.hexdigest()[:16]
+
+
+def _should_abort_retry_early(
+    previous_retry_context: RetryContext | None,
+    next_retry_context: RetryContext,
+) -> bool:
+    if previous_retry_context is None:
+        return False
+    if previous_retry_context.model_timeout_failed or next_retry_context.model_timeout_failed:
+        return False
+    if previous_retry_context.failure_kind != next_retry_context.failure_kind:
+        return False
+    if not next_retry_context.failure_detail_key:
+        return False
+    if previous_retry_context.failure_detail_key != next_retry_context.failure_detail_key:
+        return False
+    if previous_retry_context.strategy_fingerprint != next_retry_context.strategy_fingerprint:
+        return False
+    return previous_retry_context.diff_fingerprint == next_retry_context.diff_fingerprint
+
+
+def _build_early_retry_stop_reason(result: FixResult, attempt: int, retry_context: RetryContext) -> str:
+    detail = retry_context.failure_detail_key or result.failure_kind or "unknown_failure"
+    return (
+        f"Retry stopped early after {attempt} attempt(s): repeated `{detail}` with unchanged strategy and diff."
+    )
+
+
 def build_retry_context(
     workspace_path: Path,
     result: FixResult,
@@ -344,9 +445,23 @@ def build_retry_context(
 
     raw_output = str(result.build_output or "").strip()
     compiler_errors = tuple(_extract_compiler_errors(workspace_path, result.build_output))
+    boundary_failure = _extract_boundary_failure_context(result)
+    scope_violation = _extract_scope_violation_context(raw_output, issue)
+    review_failure = _extract_review_failure_context(result)
+    quality_gate_failure = _extract_quality_gate_failure_context(result)
+    plan_failure = _extract_plan_failure_context(result)
     return RetryContext(
         source_attempt_number=source_attempt_number,
         failure_kind=result.failure_kind,
+        failure_detail_key=_build_failure_detail_key(
+            result,
+            compiler_errors=compiler_errors,
+            boundary_failure=boundary_failure,
+            quality_gate_failure=quality_gate_failure,
+            plan_failure=plan_failure,
+        ),
+        strategy_fingerprint=_build_strategy_fingerprint(result),
+        diff_fingerprint=_build_diff_fingerprint(workspace_path, result),
         error=result.error or "",
         summary=result.summary,
         build_command=result.build_command,
@@ -356,11 +471,11 @@ def build_retry_context(
         changed_files=_normalize_changed_files(result),
         compiler_errors=compiler_errors,
         guidance=tuple(_build_retry_guidance(list(compiler_errors))) if compiler_errors else (),
-        boundary_failure=_extract_boundary_failure_context(result),
-        scope_violation=_extract_scope_violation_context(raw_output, issue),
-        review_failure=_extract_review_failure_context(result),
-        quality_gate_failure=_extract_quality_gate_failure_context(result),
-        plan_failure=_extract_plan_failure_context(result),
+        boundary_failure=boundary_failure,
+        scope_violation=scope_violation,
+        review_failure=review_failure,
+        quality_gate_failure=quality_gate_failure,
+        plan_failure=plan_failure,
         model_timeout_summary=(
             _summarize_model_timeout(raw_output, getattr(result, "model_timeout_stage", ""))
             if result.failure_kind == "model_timeout"
@@ -422,6 +537,8 @@ def _build_final_skip_reason(result: FixResult, attempts: int) -> str:
         return f"C# quality gate verification failed after {attempts} attempt(s)"
     if result.failure_kind == "plan_conflict":
         return f"Plan precheck rejected the edit after {attempts} attempt(s)"
+    if result.failure_kind == "tool_input_invalid":
+        return f"Agent emitted invalid Edit/MultiEdit input after {attempts} attempt(s)"
     if result.failure_kind == "no_change":
         return f"Agent completed without modifying any files after {attempts} attempt(s)"
     if result.failure_kind == "rule_validation":
@@ -944,6 +1061,8 @@ def process_issue_with_retries(
                 ),
             )
             next_retry_feedback = render_retry_context(next_retry_context)
+            if next_retry_feedback:
+                logger.write("Next retry feedback for model:\n" + next_retry_feedback)
             attempt_state = write_attempt_artifacts(
                 attempt=attempt,
                 started_at=attempt_started_at,
@@ -964,6 +1083,17 @@ def process_issue_with_retries(
             logger.write("Workspace restored to issue baseline")
 
             should_retry = result.retryable_failure or result.build_verification_failed
+            if (
+                should_retry
+                and attempt < max_build_retries
+                and attempt >= EARLY_RETRY_ABORT_MIN_ATTEMPTS
+                and _should_abort_retry_early(retry_context, next_retry_context)
+            ):
+                should_retry = False
+                result.skip_reason = _build_early_retry_stop_reason(result, attempt, next_retry_context)
+                logger.write(
+                    "Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change."
+                )
             if should_retry and attempt < max_build_retries:
                 retry_context = next_retry_context
                 retry_feedback = next_retry_feedback or failure_report or (result.error or "")
@@ -972,8 +1102,10 @@ def process_issue_with_retries(
 
             if should_retry:
                 result.skip_reason = _build_final_skip_reason(result, attempt)
-            else:
+            elif not result.skip_reason:
                 result.skip_reason = result.error or "Issue fix failed"
+            else:
+                result.skip_reason = result.skip_reason or result.error or "Issue fix failed"
             result.error = result.skip_reason
             result.skipped = True
             logger.write(f"Issue skipped: {result.skip_reason}")

@@ -1,0 +1,271 @@
+{
+  "issue_key": "0fb3e377-0955-41cb-8cae-729a28012d3c",
+  "rule_id": "csharpsquid:S3776",
+  "message": "Refactor this method to reduce its Cognitive Complexity from 31 to the 30 allowed.",
+  "line": 171,
+  "text_range": {
+    "startLine": 171,
+    "endLine": 171,
+    "startOffset": 26,
+    "endOffset": 36
+  },
+  "flows": [
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 175,
+            "endLine": 175,
+            "startOffset": 16,
+            "endOffset": 23
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 182,
+            "endLine": 182,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 188,
+            "endLine": 188,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 193,
+            "endLine": 193,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 197,
+            "endLine": 197,
+            "startOffset": 20,
+            "endOffset": 24
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 203,
+            "endLine": 203,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 207,
+            "endLine": 207,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 212,
+            "endLine": 212,
+            "startOffset": 20,
+            "endOffset": 24
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 218,
+            "endLine": 218,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 220,
+            "endLine": 220,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 230,
+            "endLine": 230,
+            "startOffset": 73,
+            "endOffset": 75
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 231,
+            "endLine": 231,
+            "startOffset": 61,
+            "endOffset": 63
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 233,
+            "endLine": 233,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 237,
+            "endLine": 237,
+            "startOffset": 108,
+            "endOffset": 110
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 238,
+            "endLine": 238,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 244,
+            "endLine": 244,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 255,
+            "endLine": 255,
+            "startOffset": 20,
+            "endOffset": 24
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 275,
+            "endLine": 275,
+            "startOffset": 12,
+            "endOffset": 17
+          }
+        }
+      ]
+    }
+  ],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+  "severity": "CRITICAL",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

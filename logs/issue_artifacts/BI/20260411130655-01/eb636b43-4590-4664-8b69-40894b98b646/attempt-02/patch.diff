@@ -1,0 +1,38 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -141,7 +141,17 @@
+                     var thisOrdrReturnItems = group.GroupBy(x => x.ItemCode).Select(x => new { ItemCode = x.Key, TotalQty = x.Sum(s => s.Quantity) }).ToDictionary(k => k.ItemCode, v => v.TotalQty);
+
+                     var delivrdItemsInThisOrdr = delivrdProductsLookUp[group.Key].GroupBy(x=>x.ItemCode).Select(x=> new { ItemCode = x.Key, TotalQty = x.Sum(s=>s.DelivrdQty) }).ToDictionary(k=>k.ItemCode,v=>v.TotalQty);
+
+                     //遍历订单中所有有价物料，检查每个物料是否都已退完
+
+-                    if( delivrdItemsInThisOrdr.All(x=> x.Value == (thisOrdrReturnItems.TryGetValue(x.Key,out var returnedQty) ? returnedQty : 0 )))
+
++                    bool allItemsReturned = true;
+
++                    foreach (var delivrdItem in delivrdItemsInThisOrdr)
+
++                    {
+
++                        int actualReturnedQty = thisOrdrReturnItems.TryGetValue(delivrdItem.Key, out var returnedQty) ? returnedQty : 0;
+
++                        if (delivrdItem.Value != actualReturnedQty)
+
++                        {
+
++                            allItemsReturned = false;
+
++                            break;
+
++                        }
+
++                    }
+
++                    if (allItemsReturned)
+
+                     {
+
+                         // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+
+                         var returnedZeroPriceQtyByItem = returnItemsWithDevEntry

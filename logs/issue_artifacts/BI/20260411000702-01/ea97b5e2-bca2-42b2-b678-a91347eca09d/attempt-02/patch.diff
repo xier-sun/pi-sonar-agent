@@ -1,0 +1,594 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IPenaltyCalculationService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IPenaltyCalculationService.cs
+@@ -10,11 +10,11 @@
+     public interface IPenaltyCalculationService : IDependency
+
+     {
+
+         /// <summary>
+
+-        /// 
+
++        /// 后台服务：执行罚款计算任务
+
+         /// </summary>
+
+-        /// <param name="jobRunId"></param>
+
++        /// <param name="jobRunId">任务运行ID</param>
+
+         /// <returns></returns>
+
+-        Task BackgroundService(string jobRunId);
+
++        Task BackgroundServiceAsync(string jobRunId);
+
+         /// <summary>
+
+         ///
+
+         /// </summary>
+
+--- a/OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs
+@@ -44,11 +44,11 @@
+             _ledgerService = ledgerService;
+
+         }
+
+         /// <summary>
+
+-        /// 
+
+-        /// </summary>
+
+-        /// <param name="jobRunId"></param>
+
+-        /// <returns></returns>
+
+-        public async Task BackgroundService(string jobRunId)
+
++        /// 后台服务：执行罚款计算任务
+
++        /// </summary>
+
++        /// <param name="jobRunId">任务运行ID</param>
+
++        /// <returns></returns>
+
++        public async Task BackgroundServiceAsync(string jobRunId)
+
+         {
+
+             // 获取所有活跃的罚款事件
+
+             var allActive = await UnitWork.Find<PenaltyRuleDefinition>(r => r.IsActive).ToListAsync();
+
+@@ -59,110 +59,155 @@
+             foreach (var group in allActiveRules)
+
+             {
+
+                 // 找到对应的Code
+
+-                var processor = _allProcessors.FirstOrDefault(p => p.HandlerCode == group.Key);
+
++                var processor = _allProcessors.FirstOrDefault(p =>HandlerCode == group.Key);
+
+                 if (processor != null)
+
+                 {
+
+                     // 处理器工作
+
+                     var (newEvents, resolvedEvents, canceledEvents) = await processor.ProcessAsync(group.ToList());
+
+ 
+
+-                    // 立案
+
+-                    var addDbEvent = new List<PenaltyEvent>();
+
+-                    foreach (var eventData in newEvents)
+
++                    // 立案处理
+
++                    await ProcessNewEventsAsync(newEvents);
+
++
+
++                    // 结案和取消处理
+
++                    var updateList = new List<PenaltyEvent>();
+
++                    ProcessResolvedEvents(resolvedEvents, updateList);
+
++                    ProcessCanceledEvents(canceledEvents, updateList);
+
++                    if (updateList.Any())
+
+                     {
+
+-                        // 检查是否已立案 (防止重跑)
+
+-                        bool isAlreadyActive = await UnitWork.Find<PenaltyEvent>(null).AnyAsync(e =>
+
+-                            e.RuleDefinitionId == eventData.RuleDefinitionId &&
+
+-                            e.TriggerDocEntry == eventData.TriggerDocEntry &&
+
+-                           (eventData.PenaltyType == "FIXED" || e.EventStatus == "ACTIVE"));
+
+-
+
+-
+
+-                        if (!isAlreadyActive)
+
+-                        {
+
+-                            var dbEvent = new PenaltyEvent
+
+-                            {
+
+-                                RuleDefinitionId = eventData.RuleDefinitionId,
+
+-                                SlpCode = eventData.SlpCode,
+
+-                                SlpName = eventData.SlpName,
+
+-                                TriggerDocType = eventData.TriggerDocType,
+
+-                                TriggerDocEntry = eventData.TriggerDocEntry,
+
+-                                SEDocEntry = eventData.SEDocEntry,
+
+-                                PenaltyBaseAmount = eventData.PenaltyBaseAmount,
+
+-                                TriggerEventDate = eventData.TriggerEventDate,
+
+-                                PenaltyStartDate = eventData.PenaltyStartDate,
+
+-                                EventStatus = "ACTIVE", // 关键：设为活跃
+
+-                                Description = eventData.EventDescription,
+
+-
+
+-                            };
+
+-                            addDbEvent.Add(dbEvent);
+
+-
+
+-                        }
+
++                        await UnitWork.BatchUpdateAsync<PenaltyEvent>(updateList.ToArray());
+
+                     }
+
+-                    if (addDbEvent.Any())
+
+-                    {
+
+-                        await UnitWork.BatchAddAsync<PenaltyEvent, int>(addDbEvent.ToArray());
+
+-                    }
+
+-                    //  结案 (处理已解决的事件）停止计息等
+
+-                    var updatePenaltyEventList = new List<PenaltyEvent>();
+
+-                    if (resolvedEvents.Any())
+
+-                    {
+
+-                        var resolvedIds = resolvedEvents.Select(x => x.EventId).ToList();
+
+-                        var eventToResolve = await UnitWork.Find<PenaltyEvent>(x => x.EventStatus == "ACTIVE" && resolvedIds.Contains(x.Id)).ToListAsync();
+
+-                        foreach (var ent in eventToResolve)
+
+-                        {
+
+-                            // 找到对应的结案信息，用户获取实际结案时间
+
+-                            var resolveInfo = resolvedEvents.FirstOrDefault(x => x.EventId == ent.Id);
+
+-
+
+-                            ent.EventStatus = "RESOLVED";
+
+-                            ent.ResolvedDate = resolveInfo?.ActualResolvedDate ?? DateTime.Now;
+
+-
+
+-                            updatePenaltyEventList.Add(ent);
+
+-                        }
+
+-                    }
+
+-                    // 取消
+
+-                    if (canceledEvents.Any())
+
+-                    {
+
+-                        var canceledIds = canceledEvents.Select(x => x.EventId).ToList();
+
+-                        var eventsToCancel = await UnitWork.Find<PenaltyEvent>(x => x.EventStatus == "ACTIVE" && canceledIds.Contains(x.Id)).ToListAsync();
+
+-                        foreach (var ent in eventsToCancel)
+
+-                        {
+
+-                            var cancelInfo = canceledEvents.FirstOrDefault(x => x.EventId == ent.Id);
+
+-                            ent.EventStatus = "CANCELED";
+
+-                            ent.ResolvedDate = cancelInfo?.CanceledDate ?? DateTime.Now;
+
+-                            ent.Remark = cancelInfo?.CancelReason;
+
+-                            updatePenaltyEventList.Add(ent);
+
+-                        }
+
+-                    }
+
+-                    if (updatePenaltyEventList.Any())
+
+-                    {
+
+-                        await UnitWork.BatchUpdateAsync<PenaltyEvent>(updatePenaltyEventList.ToArray());
+
+-                    }
+
+-                    //更新水印
+
+-                    var audit = await UnitWork.Find<PenaltyJobAudit>(x => x.HandlerCode == group.Key).FirstOrDefaultAsync();
+
+-                    if (audit == null)
+
+-                    {
+
+-                        var addAudit = new PenaltyJobAudit
+
+-                        {
+
+-                            HandlerCode = group.Key,
+
+-                            LastProcessedTimestamp = DateTime.Now
+
+-                        };
+
+-                        await UnitWork.AddAsync<PenaltyJobAudit, int>(addAudit);
+
+-                    }
+
+-                    else
+
+-                    {
+
+-                        audit.LastProcessedTimestamp = DateTime.Now;
+
+-                        await UnitWork.UpdateAsync<PenaltyJobAudit>(audit);
+
+-                    }
+
++
+
++                    // 更新水印
+
++                    await UpdateJobAuditAsync(group.Key);
+
++
+
+                     await UnitWork.SaveAsync();
+
+ 
+
+-                    //记账
+
++                    // 记账
+
+                     await _ledgerService.ProcessDailyCalculations(jobRunId, group.FirstOrDefault().Id);
+
+                     // 计算并更新每个罚款事件的总罚款金额
+
+                     await UpdateTotalPenaltyAmounts(group.FirstOrDefault().Id);
+
+                 }
+
+             }
+
+-            
+
+-
+
+-            
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理新罚款事件立案
+
++        /// </summary>
+
++        /// <param name="newEvents">新事件列表</param>
+
++        /// <returns></returns>
+
++        private async Task ProcessNewEventsAsync(IEnumerable<(string RuleDefinitionId, string SlpCode, string SlpName, string TriggerDocType, int TriggerDocEntry, int? SEDocEntry, decimal PenaltyBaseAmount, DateTime TriggerEventDate, DateTime PenaltyStartDate, string EventDescription, string PenaltyType, string? ActualResolvedDate, string? CancelReason)> newEvents)
+
++        {
+
++            var addDbEvent = new List<PenaltyEvent>();
+
++            foreach (var eventData in newEvents)
+
++            {
+
++                bool isAlreadyActive = await IsEventAlreadyActiveAsync(eventData);
+
++                if (!isAlreadyActive)
+
++                {
+
++                    var dbEvent = new PenaltyEvent
+
++                    {
+
++                        RuleDefinitionId = eventData.RuleDefinitionId,
+
++                        SlpCode = eventData.SlpCode,
+
++                        SlpName = eventData.SlpName,
+
++                        TriggerDocType = eventData.TriggerDocType,
+
++                        TriggerDocEntry = eventData.TriggerDocEntry,
+
++                        SEDocEntry = eventData.SEDocEntry,
+
++                        PenaltyBaseAmount = eventData.PenaltyBaseAmount,
+
++                        TriggerEventDate = eventData.TriggerEventDate,
+
++                        PenaltyStartDate = eventData.PenaltyStartDate,
+
++                        EventStatus = "ACTIVE",
+
++                        Description = eventData.EventDescription
+
++                    };
+
++                    addDbEvent.Add(dbEvent);
+
++                }
+
++            }
+
++            if (addDbEvent.Any())
+
++            {
+
++                await UnitWork.BatchAddAsync<PenaltyEvent, int>(addDbEvent.ToArray());
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 检查事件是否已立案
+
++        /// </summary>
+
++        /// <param name="eventData">事件数据</param>
+
++        /// <returns></returns>
+
++        private async Task<bool> IsEventAlreadyActiveAsync((string RuleDefinitionId, string SlpCode, string SlpName, string TriggerDocType, int TriggerDocEntry, int? SEDocEntry, decimal PenaltyBaseAmount, DateTime TriggerEventDate, DateTime PenaltyStartDate, string EventDescription, string PenaltyType, string? ActualResolvedDate, string? CancelReason) eventData)
+
++        {
+
++            return await UnitWork.Find<PenaltyEvent>(null).AnyAsync(e =>
+
++                e.RuleDefinitionId == eventData.RuleDefinitionId &&
+
++                e.TriggerDocEntry == eventData.TriggerDocEntry &&
+
++                (eventData.PenaltyType == "FIXED" || e.EventStatus == "ACTIVE"));
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理已解决的罚款事件
+
++        /// </summary>
+
++        /// <param name="resolvedEvents">已解决事件列表</param>
+
++        /// <param name="updateList">更新列表</param>
+
++        private void ProcessResolvedEvents(IEnumerable<(string EventId, string RuleDefinitionId, string? ActualResolvedDate, string? CancelReason)> resolvedEvents, List<PenaltyEvent> updateList)
+
++        {
+
++            if (!resolvedEvents.Any())
+
++            {
+
++                return;
+
++            }
+
++
+
++            var resolvedIds = resolvedEvents.Select(x => x.EventId).ToList();
+
++            var eventToResolve = UnitWork.Find<PenaltyEvent>(x => x.EventStatus == "ACTIVE" && resolvedIds.Contains(x.Id)).ToList();
+
++            foreach (var ent in eventToResolve)
+
++            {
+
++                var resolveInfo = resolvedEvents.FirstOrDefault(x => x.EventId == ent.Id);
+
++                ent.EventStatus = "RESOLVED";
+
++                ent.ResolvedDate = resolveInfo?.ActualResolvedDate ?? DateTime.Now;
+
++                updateList.Add(ent);
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理已取消的罚款事件
+
++        /// </summary>
+
++        /// <param name="canceledEvents">已取消事件列表</param>
+
++        /// <param name="updateList">更新列表</param>
+
++        private void ProcessCanceledEvents(IEnumerable<(string EventId, string RuleDefinitionId, string? ActualResolvedDate, string? CancelReason)> canceledEvents, List<PenaltyEvent> updateList)
+
++        {
+
++            if (!canceledEvents.Any())
+
++            {
+
++                return;
+
++            }
+
++
+
++            var canceledIds = canceledEvents.Select(x => x.EventId).ToList();
+
++            var eventsToCancel = UnitWork.Find<PenaltyEvent>(x => x.EventStatus == "ACTIVE" && canceledIds.Contains(x.Id)).ToList();
+
++            foreach (var ent in eventsToCancel)
+
++            {
+
++                var cancelInfo = canceledEvents.FirstOrDefault(x => x.EventId == ent.Id);
+
++                ent.EventStatus = "CANCELED";
+
++                ent.ResolvedDate = cancelInfo?.CanceledDate ?? DateTime.Now;
+
++                ent.Remark = cancelInfo?.CancelReason;
+
++                updateList.Add(ent);
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 更新任务审计水印
+
++        /// </summary>
+
++        /// <param name="handlerCode">处理器代码</param>
+
++        /// <returns></returns>
+
++        private async Task UpdateJobAuditAsync(string handlerCode)
+
++        {
+
++            var audit = await UnitWork.Find<PenaltyJobAudit>(x => x.HandlerCode == handlerCode).FirstOrDefaultAsync();
+
++            if (audit == null)
+
++            {
+
++                var addAudit = new PenaltyJobAudit
+
++                {
+
++                    HandlerCode = handlerCode,
+
++                    LastProcessedTimestamp = DateTime.Now
+
++                };
+
++                await UnitWork.AddAsync<PenaltyJobAudit, int>(addAudit);
+
++            }
+
++            else
+
++            {
+
++                audit.LastProcessedTimestamp = DateTime.Now;
+
++                await UnitWork.UpdateAsync<PenaltyJobAudit>(audit);
+
++            }
+
+         }
+
+ 
+
+         /// <summary>
+
+--- a/OpenAuth.Core/OpenAuth.App/Jobs/SlpPenalty/PenaltyCalculationJob.cs
++++ b/OpenAuth.Core/OpenAuth.App/Jobs/SlpPenalty/PenaltyCalculationJob.cs
+@@ -31,7 +31,7 @@
+         public async Task Execute(IJobExecutionContext context)
+
+         {
+
+                 var jobId = context.MergedJobDataMap.GetString(Define.JOBMAPKEY);
+
+-                await _calculationService.BackgroundService(jobId);
+
++                await _calculationService.BackgroundServiceAsync(jobId);
+
+                 _openJobApp.RecordRun(jobId);
+
+             
+
+         }
+
+--- a/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/PenaltyController.cs
++++ b/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/PenaltyController.cs
+@@ -49,7 +49,7 @@
+         public async Task<Response<string>> ExecutePenaltyCalculationJob()
+
+         {
+
+             var jobRunId = "TEST_" + DateTime.Now.ToString("yyyyMMddHHmmss");
+
+-            await _penaltyCalculationService.BackgroundService(jobRunId);
+
++            await _penaltyCalculationService.BackgroundServiceAsync(jobRunId);
+
+             return new Response<string> { Message = "罚款计算任务执行成功", Result = jobRunId };
+
+         }
+
+         /// <summary>

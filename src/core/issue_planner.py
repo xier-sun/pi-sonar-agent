@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from pi_sonar_agent.agent.rule_policies import (
@@ -85,6 +85,10 @@ class IssuePlanner:
     )
     _PRIVATE_METHOD_PATTERN = re.compile(r"\bprivate\b")
     _METHOD_NAME_PATTERN = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+
+    @staticmethod
+    def _dedupe_text(items: list[str] | tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(dict.fromkeys(str(item).strip() for item in items if str(item).strip()))
 
     @staticmethod
     def _normalize_path(file_path: str) -> str:
@@ -667,6 +671,49 @@ class IssuePlanner:
             return first_token not in {"await", "return", "if", "for", "foreach", "while", "switch", "case"}
         return False
 
+    @staticmethod
+    def _find_enclosing_type_kind(source_lines: list[str], line_number: int) -> str:
+        type_pattern = re.compile(r"\b(interface|class|record|struct)\b")
+        for index in range(min(line_number - 1, len(source_lines) - 1), -1, -1):
+            stripped = str(source_lines[index] or "").strip()
+            if not stripped or stripped.startswith("//"):
+                continue
+            match = type_pattern.search(stripped)
+            if match:
+                return match.group(1)
+        return ""
+
+    @classmethod
+    def _is_contract_signature_declaration(
+        cls,
+        source_lines: list[str],
+        line_number: int,
+        line: str,
+        method_name: str,
+    ) -> bool:
+        stripped = str(line or "").strip()
+        if not cls._looks_like_method_declaration_line(stripped, method_name):
+            return False
+
+        normalized = f" {stripped} "
+        if any(token in normalized for token in (" override ", " abstract ", " virtual ")):
+            return True
+        if re.search(rf"\.[ \t]*{re.escape(method_name)}\s*\(", stripped):
+            return True
+
+        enclosing_type_kind = cls._find_enclosing_type_kind(source_lines, line_number)
+        return enclosing_type_kind == "interface"
+
+    @staticmethod
+    def _looks_like_embedded_callsite_on_declaration_line(line: str, method_name: str) -> bool:
+        stripped = str(line or "").strip()
+        if stripped.count(f"{method_name}(") >= 2:
+            return True
+        if "=>" in stripped:
+            _, _, suffix = stripped.partition("=>")
+            return bool(re.search(rf"\b{re.escape(method_name)}\s*\(", suffix))
+        return False
+
     @classmethod
     def _scan_signature_propagation_targets(
         cls,
@@ -716,11 +763,20 @@ class IssuePlanner:
                     if cls._looks_like_method_declaration_line(stripped, method_name):
                         if relative_path == issue_path:
                             continue
-                        kind = "signature_declaration"
-                        reason = (
-                            f"Declaration or interface member referencing `{method_name}` must stay aligned "
-                            f"with `{proposed_method_name}`."
-                        )
+                        if cls._is_contract_signature_declaration(lines, line_number, stripped, method_name):
+                            kind = "signature_declaration"
+                            reason = (
+                                f"Declaration or interface member referencing `{method_name}` must stay aligned "
+                                f"with `{proposed_method_name}`."
+                            )
+                        elif cls._looks_like_embedded_callsite_on_declaration_line(stripped, method_name):
+                            kind = "callsite"
+                            reason = (
+                                f"Callsite invoking `{method_name}` must be updated when the method is renamed "
+                                f"to `{proposed_method_name}`."
+                            )
+                        else:
+                            continue
                     else:
                         kind = "callsite"
                         reason = (
@@ -747,6 +803,37 @@ class IssuePlanner:
                 )
 
         return tuple(results)
+
+    @staticmethod
+    def _retry_quality_gate_rule_ids(retry_context: RetryContext | None) -> frozenset[str]:
+        if retry_context is None or retry_context.quality_gate_failure is None:
+            return frozenset()
+        return frozenset(
+            str(item.rule_id).strip()
+            for item in retry_context.quality_gate_failure.violations
+            if str(item.rule_id).strip()
+        )
+
+    @staticmethod
+    def _retry_compiler_error_codes(retry_context: RetryContext | None) -> frozenset[str]:
+        if retry_context is None:
+            return frozenset()
+        return frozenset(
+            str(item.code).strip().upper()
+            for item in retry_context.compiler_errors
+            if str(item.code).strip()
+        )
+
+    @staticmethod
+    def _planner_lesson_quality_gate_rule_ids(
+        planner_lessons: tuple[PlannerLesson, ...],
+    ) -> frozenset[str]:
+        return frozenset(
+            str(rule_id).strip()
+            for lesson in planner_lessons
+            for rule_id in getattr(lesson, "quality_gate_rule_ids", ()) or ()
+            if str(rule_id).strip()
+        )
 
     @classmethod
     def _should_enable_plan_first(
@@ -784,8 +871,22 @@ class IssuePlanner:
         issue_line: int,
         scope_start_line: int,
         scope_end_line: int,
+        retry_context: RetryContext | None = None,
+        planner_lessons: tuple[PlannerLesson, ...] = (),
+        enable_archetype_strategy_selection: bool = True,
+        enable_constraint_injection: bool = True,
     ) -> RepairPlan:
         normalized_rule_id = str(rule_id or "").strip()
+        retry_quality_gate_ids = cls._retry_quality_gate_rule_ids(retry_context)
+        lesson_quality_gate_ids = cls._planner_lesson_quality_gate_rule_ids(planner_lessons)
+        observed_quality_gate_ids = frozenset((*retry_quality_gate_ids, *lesson_quality_gate_ids))
+        retry_compiler_codes = cls._retry_compiler_error_codes(retry_context)
+        retry_failure_kind = str(getattr(retry_context, "failure_kind", "")).strip()
+        saw_symbol_closure_failure = bool(retry_compiler_codes.intersection({"CS0103", "CS1061"}))
+        saw_async_gate_retry = bool(
+            observed_quality_gate_ids.intersection({"async_requires_await", "async_signature"})
+        )
+        saw_public_surface_retry = "public_xml_docs" in observed_quality_gate_ids
         repair_shape = "statement_fix"
         if METHOD_CLUSTER_DELETE_CAPABILITY in allowed_capabilities:
             repair_shape = "member_cluster_delete"
@@ -808,7 +909,15 @@ class IssuePlanner:
         new_helpers: list[str] = []
         method_name = ""
         proposed_method_name = ""
+        selected_archetype = ""
+        fallback_archetype = ""
+        archetype_chain: tuple[str, ...] = ()
+        constraint_hints: tuple[str, ...] = ()
         propagation_targets: tuple[RepairPropagationTarget, ...] = ()
+        verification_targets: list[RepairPropagationTarget] = []
+        strategy_preferences: list[str] = []
+        impact_summary = "Keep the fix centered on the primary file and avoid unnecessary propagation."
+        prefer_signature_preserving_archetype = False
 
         if method_descriptor is not None:
             method_name = str(method_descriptor.get("name", "")).strip()
@@ -827,7 +936,7 @@ class IssuePlanner:
                 }
                 method_descriptor["proposed_name"] = proposed_method_name
                 risk_notes.append(
-                    f"目标方法 {method_name} 是异步方法但未使用 Async 后缀；如当前 patch 触达该方法签名，可能需要显式允许 signature_change。"
+                    f"目标方法 {method_name} 是异步方法但未使用 Async 后缀；如当前 patch 触达该方法签名，优先在传播闭包明确时再执行 rename。"
                 )
                 if requires_propagation:
                     propagation_targets = cls._scan_signature_propagation_targets(
@@ -845,6 +954,67 @@ class IssuePlanner:
                         risk_notes.append(
                             "目标方法是公开方法；如果需要改名，必须显式识别并同步接口、调用点和 nameof 引用。"
                         )
+                if requires_propagation and not propagation_targets:
+                    requires_signature_change = False
+                    requires_propagation = False
+                    proposed_method_name = ""
+                    method_descriptor["proposed_name"] = ""
+                    propagation_targets = ()
+                    prefer_signature_preserving_archetype = True
+                    risk_notes.append(
+                        "尚未识别到可靠的签名传播目标；本轮计划自动降级为保签名重构，避免 edit 前直接硬跳过。"
+                    )
+                    strategy_preferences.extend(
+                        (
+                            "prefer_signature_preserving_refactor",
+                            "avoid_signature_change_without_verified_targets",
+                        )
+                    )
+                    impact_summary = (
+                        f"Keep `{method_name}` stable in this attempt and reduce complexity inside the current body "
+                        "until verified propagation targets become available."
+                    )
+                else:
+                    if proposed_method_name:
+                        verification_targets.append(
+                            RepairPropagationTarget(
+                                file=normalized_path,
+                                symbol=f"definition@{method_descriptor.get('start_line', 0)}-{method_descriptor.get('end_line', 0)}",
+                                kind="definition",
+                                reason=(
+                                    f"Primary method declaration `{method_name}` must be updated to "
+                                    f"`{proposed_method_name}`."
+                                ),
+                                start_line=int(method_descriptor.get("start_line", 0) or 0),
+                                end_line=int(method_descriptor.get("end_line", 0) or 0),
+                            )
+                        )
+                        strategy_preferences.append("rename_primary_symbol_before_finish")
+                    if propagation_targets:
+                        verification_targets.extend(propagation_targets)
+                        impacted_files = len(
+                            {
+                                target.file
+                                for target in propagation_targets
+                                if str(target.file or "").strip()
+                            }
+                        )
+                        impact_summary = (
+                            f"Rename `{method_name}` to `{proposed_method_name}` and synchronize "
+                            f"{len(propagation_targets)} propagation target(s) across {max(1, impacted_files)} file(s)."
+                        )
+                        strategy_preferences.extend(
+                            (
+                                "complete_propagation_before_finish",
+                                "keep_signature_declarations_and_callsites_in_sync",
+                            )
+                        )
+                    elif requires_signature_change:
+                        impact_summary = (
+                            f"Rename `{method_name}` to `{proposed_method_name}` in the primary file and avoid "
+                            "unfinished propagation."
+                        )
+                        strategy_preferences.append("avoid_partial_signature_updates")
 
         if normalized_rule_id == "csharpsquid:S3776" and HELPER_EXTRACT_CAPABILITY in allowed_capabilities:
             new_helpers.append("private helper(s) extracted from the target method")
@@ -856,10 +1026,91 @@ class IssuePlanner:
                     await_source="Prefer sync helper extraction unless the helper owns an awaited call.",
                 )
             )
-            risk_notes.append("提取 helper 时，只有真实包含 await 的 helper 才保留 async；否则改为同步 helper。")
+            risk_notes.extend(
+                (
+                    "S3776 默认优先保留现有公开签名和可见性，除非 propagation 闭包已经明确。",
+                    "提取 helper 时，只有真实包含 await 的 helper 才保留 async；否则改为同步 helper。",
+                )
+            )
+            strategy_preferences.extend(
+                (
+                    "prefer_signature_preserving_refactor",
+                    "prefer_private_sync_helpers",
+                    "avoid_new_public_surface",
+                    "avoid_new_types_for_state_transport",
+                    "helper_budget<=2",
+                )
+            )
+            if saw_async_gate_retry:
+                risk_notes.append("最近失败集中在 async 门禁；下一轮默认采用 sync-first helper / body-only 重构。")
+                strategy_preferences.extend(
+                    (
+                        "retry_sync_first",
+                        "avoid_async_helper_expansion",
+                        "avoid_async_rename_churn",
+                    )
+                )
+            if saw_public_surface_retry:
+                risk_notes.append("最近失败触发 public_xml_docs；下一轮禁止新增 public/protected helper、DTO 或属性。")
+                strategy_preferences.extend(
+                    (
+                        "forbid_new_public_surface_on_retry",
+                        "prefer_private_or_local_state_carriers",
+                    )
+                )
+            if saw_symbol_closure_failure:
+                risk_notes.append("最近失败出现 CS0103/CS1061；下一轮应减少 helper 扩散，优先在原方法内化简控制流。")
+                strategy_preferences.extend(
+                    (
+                        "avoid_helper_fanout_after_symbol_errors",
+                        "prefer_inline_block_simplification",
+                    )
+                )
+            if retry_failure_kind == "no_change":
+                risk_notes.append("上一轮没有产生有效补丁；下一轮必须提交具体的小范围代码修改。")
+                strategy_preferences.append("force_concrete_delta")
+
+        if normalized_rule_id in {"csharpsquid:S1144", "csharpsquid:S1481", "csharpsquid:S125"}:
+            risk_notes.append("当前规则应保持删除/清理型最小补丁，不应引入签名调整、helper 提取或新的公开成员。")
+            strategy_preferences.extend(
+                (
+                    "prefer_minimal_deletion_patch",
+                    "avoid_async_or_signature_churn",
+                    "avoid_unrelated_public_member_edits",
+                )
+            )
+            if retry_failure_kind == "no_change":
+                strategy_preferences.append("force_direct_local_edit")
 
         if METHOD_CLUSTER_DELETE_CAPABILITY in allowed_capabilities:
             risk_notes.append("删除未使用 private 成员时，只允许扩大到合同已声明的紧邻 private helper cluster。")
+            strategy_preferences.append("limit_member_cluster_deletion_to_declared_range")
+
+        if enable_archetype_strategy_selection:
+            archetype_chain = cls._select_repair_archetype_chain(
+                rule_id=normalized_rule_id,
+                allowed_capabilities=allowed_capabilities,
+                requires_signature_change=requires_signature_change,
+                requires_propagation=requires_propagation,
+                retry_context=retry_context,
+                planner_lessons=planner_lessons,
+                prefer_signature_preserving=prefer_signature_preserving_archetype,
+            )
+            if archetype_chain:
+                selected_archetype = archetype_chain[0]
+                fallback_archetype = archetype_chain[1] if len(archetype_chain) > 1 else ""
+        if enable_constraint_injection:
+            constraint_hints = cls._build_repair_constraint_hints(
+                rule_id=normalized_rule_id,
+                selected_archetype=selected_archetype,
+                allowed_capabilities=allowed_capabilities,
+                expected_quality_gates=expected_quality_gates,
+                requires_signature_change=requires_signature_change,
+                requires_propagation=requires_propagation,
+                proposed_method_name=proposed_method_name,
+                retry_context=retry_context,
+                planner_lessons=planner_lessons,
+            )
 
         target_symbols = [target_symbol.symbol]
         target_symbols.extend(symbol.symbol for symbol in allowed_related_symbols)
@@ -873,9 +1124,34 @@ class IssuePlanner:
             primary_file=normalized_path,
             primary_method_name=method_name,
             proposed_method_name=proposed_method_name,
+            selected_archetype=selected_archetype,
+            fallback_archetype=fallback_archetype,
+            archetype_chain=archetype_chain,
+            constraint_hints=constraint_hints,
             target_symbols=tuple(dict.fromkeys(item for item in target_symbols if str(item).strip())),
             new_helpers=tuple(dict.fromkeys(new_helpers)),
             helper_async_map=tuple(helper_plans),
+            propagation_budget=len(
+                {
+                    (
+                        str(target.file or "").strip(),
+                        str(target.symbol or "").strip(),
+                        int(target.start_line or 0),
+                        int(target.end_line or 0),
+                    )
+                    for target in verification_targets
+                    if str(target.symbol or "").strip()
+                }
+            ),
+            impact_summary=impact_summary,
+            strategy_preferences=tuple(dict.fromkeys(item for item in strategy_preferences if str(item).strip())),
+            verification_targets=tuple(
+                dict.fromkeys(
+                    target
+                    for target in verification_targets
+                    if str(target.symbol or "").strip()
+                )
+            ),
             requires_signature_change=requires_signature_change,
             requires_propagation=requires_propagation,
             requires_new_type=False,
@@ -884,6 +1160,141 @@ class IssuePlanner:
             expected_quality_gates=expected_quality_gates,
             risk_notes=tuple(dict.fromkeys(risk_notes)),
         )
+
+    @classmethod
+    def _select_repair_archetype_chain(
+        cls,
+        *,
+        rule_id: str,
+        allowed_capabilities: tuple[str, ...],
+        requires_signature_change: bool,
+        requires_propagation: bool,
+        retry_context: RetryContext | None = None,
+        planner_lessons: tuple[PlannerLesson, ...] = (),
+        prefer_signature_preserving: bool = False,
+    ) -> tuple[str, ...]:
+        retry_quality_gate_ids = cls._retry_quality_gate_rule_ids(retry_context)
+        lesson_quality_gate_ids = cls._planner_lesson_quality_gate_rule_ids(planner_lessons)
+        observed_quality_gate_ids = frozenset((*retry_quality_gate_ids, *lesson_quality_gate_ids))
+        retry_compiler_codes = cls._retry_compiler_error_codes(retry_context)
+        retry_failure_kind = str(getattr(retry_context, "failure_kind", "")).strip()
+
+        if rule_id in {"csharpsquid:S125", "csharpsquid:S1481", "csharpsquid:S1144"}:
+            return ("declaration_hygiene", "expression_simplification")
+        if requires_signature_change and requires_propagation:
+            return (
+                "bounded_signature_propagation",
+                "signature_preserving_refactor",
+                "expression_simplification",
+            )
+        if METHOD_CLUSTER_DELETE_CAPABILITY in allowed_capabilities:
+            return ("declaration_hygiene", "expression_simplification")
+        if rule_id == "csharpsquid:S3776":
+            if prefer_signature_preserving:
+                return ("signature_preserving_refactor", "expression_simplification")
+            if retry_compiler_codes.intersection({"CS0103", "CS1061"}) or retry_failure_kind == "no_change":
+                return ("signature_preserving_refactor", "expression_simplification")
+            if observed_quality_gate_ids.intersection({"async_requires_await", "public_xml_docs"}):
+                return ("signature_preserving_refactor", "expression_simplification")
+            if requires_signature_change:
+                return ("signature_preserving_refactor", "expression_simplification")
+            return (
+                "method_decomposition",
+                "signature_preserving_refactor",
+                "expression_simplification",
+            )
+        if HELPER_EXTRACT_CAPABILITY in allowed_capabilities:
+            return (
+                "method_decomposition",
+                "signature_preserving_refactor",
+                "expression_simplification",
+            )
+        if requires_signature_change:
+            return ("signature_preserving_refactor", "expression_simplification")
+        return ("expression_simplification",)
+
+    @classmethod
+    def _build_repair_constraint_hints(
+        cls,
+        *,
+        rule_id: str,
+        selected_archetype: str,
+        allowed_capabilities: tuple[str, ...],
+        expected_quality_gates: tuple[str, ...],
+        requires_signature_change: bool,
+        requires_propagation: bool,
+        proposed_method_name: str,
+        retry_context: RetryContext | None = None,
+        planner_lessons: tuple[PlannerLesson, ...] = (),
+    ) -> tuple[str, ...]:
+        retry_quality_gate_ids = cls._retry_quality_gate_rule_ids(retry_context)
+        lesson_quality_gate_ids = cls._planner_lesson_quality_gate_rule_ids(planner_lessons)
+        observed_quality_gate_ids = frozenset((*retry_quality_gate_ids, *lesson_quality_gate_ids))
+        retry_compiler_codes = cls._retry_compiler_error_codes(retry_context)
+        retry_failure_kind = str(getattr(retry_context, "failure_kind", "")).strip()
+        hints: list[str] = []
+        if selected_archetype == "method_decomposition":
+            hints.extend(
+                (
+                    "Prefer extracting small private helpers instead of rewriting the whole method in one patch.",
+                    "Keep each helper focused on one branch/phase so follow-up edits can land incrementally.",
+                    "Extract at most two small helpers in one attempt and keep the rest of the logic in the original method.",
+                    "Default every extracted helper to private and synchronous unless the helper body itself contains a real await.",
+                    "Do not introduce public/protected helper methods, DTOs, or properties just to carry extracted state.",
+                )
+            )
+        elif selected_archetype == "bounded_signature_propagation":
+            hints.extend(
+                (
+                    "Update the primary declaration first, then synchronize declared interfaces, callsites, and nameof(...) references before finishing.",
+                    "Do not widen propagation beyond the declared verification targets unless build or quality-gate feedback proves it is necessary.",
+                )
+            )
+        elif selected_archetype == "signature_preserving_refactor":
+            hints.extend(
+                (
+                    "Prefer refactoring inside the existing method body and preserve the externally visible signature when possible.",
+                    "If helper extraction would depend on many outer locals, fall back to local block simplification inside the current method.",
+                )
+            )
+        elif selected_archetype == "declaration_hygiene":
+            hints.extend(
+                (
+                    "Limit declaration cleanup to the declared anchor/member cluster and avoid opportunistic deletions outside that range.",
+                    "Use deletion-only or accessor-tightening patches; do not rename methods or add unrelated XML docs while cleaning unused members.",
+                )
+            )
+        elif selected_archetype:
+            hints.append("Keep the patch narrowly focused on the selected repair archetype and avoid unrelated rewrites.")
+
+        if HELPER_EXTRACT_CAPABILITY in allowed_capabilities:
+            hints.append("New helpers should default to private methods unless the contract explicitly requires broader visibility.")
+        if "async_signature" in expected_quality_gates and proposed_method_name:
+            hints.append(f"If the touched async method remains async, keep the declaration aligned with `{proposed_method_name}` and propagate the rename completely before finishing.")
+        elif "async_signature" in expected_quality_gates:
+            hints.append("Any touched async method must use an Async suffix and a Task/Task<T> return type.")
+        if "async_requires_await" in expected_quality_gates:
+            hints.append("Do not keep async on helpers or methods that no longer contain a real await.")
+        if METHOD_CLUSTER_DELETE_CAPABILITY in allowed_capabilities:
+            hints.append("When cleaning unused members, stop at the declared private helper cluster instead of deleting adjacent but unrelated members.")
+        if requires_signature_change and not requires_propagation:
+            hints.append("If signature propagation is not declared, keep the rename local and avoid partial external contract updates.")
+        if requires_propagation:
+            hints.append("Propagation is only complete when declaration, interface, callsite, and nameof(...) targets stay in sync.")
+        if rule_id == "csharpsquid:S3776":
+            hints.append("For S3776, keep the externally visible API stable unless the plan explicitly provides verified propagation targets.")
+        if "async_requires_await" in observed_quality_gate_ids:
+            hints.append("Retry downgrade: new helpers and extracted phases must stay synchronous unless their bodies contain a real await.")
+        if "async_signature" in observed_quality_gate_ids:
+            hints.append("Retry downgrade: do not rename helpers to *Async unless they are truly async; keep async naming changes tightly bounded.")
+        if "public_xml_docs" in observed_quality_gate_ids:
+            hints.append("Retry downgrade: avoid any new public/protected surface in this patch; solve the issue with private/local constructs instead.")
+        if retry_compiler_codes.intersection({"CS0103", "CS1061"}):
+            hints.append("Retry downgrade: avoid helper fan-out that depends on many outer locals; if extraction needs several captured values, keep the logic in the current method.")
+        if retry_failure_kind == "no_change":
+            hints.append("This retry must end with a concrete code delta; do not stop after analysis.")
+        hints.append("Avoid introducing new public or protected surface area unless the contract explicitly requires it.")
+        return cls._dedupe_text(hints)
 
     @classmethod
     def _precheck_repair_plan(
@@ -1126,6 +1537,12 @@ class IssuePlanner:
             lines.append(f"- Primary Method: {repair_plan.primary_method_name}")
         if repair_plan.proposed_method_name:
             lines.append(f"- Proposed Method Name: {repair_plan.proposed_method_name}")
+        if repair_plan.selected_archetype:
+            lines.append(f"- Selected Archetype: {repair_plan.selected_archetype}")
+        if repair_plan.fallback_archetype:
+            lines.append(f"- Fallback Archetype: {repair_plan.fallback_archetype}")
+        if repair_plan.archetype_chain:
+            lines.append("- Archetype Chain: " + " -> ".join(repair_plan.archetype_chain))
         if repair_plan.new_helpers:
             lines.append("- Planned Helpers: " + ", ".join(repair_plan.new_helpers))
         if repair_plan.helper_async_map:
@@ -1154,6 +1571,29 @@ class IssuePlanner:
                     for target in repair_plan.propagation_targets
                 )
             )
+        if repair_plan.verification_targets:
+            lines.append(
+                "- Verification Targets: "
+                + "; ".join(
+                    f"{target.file}:{target.symbol} ({target.kind or 'target'})"
+                    for target in repair_plan.verification_targets
+                )
+            )
+        if repair_plan.auto_upgraded_capabilities:
+            lines.append(
+                "- Auto Upgraded Capabilities: "
+                + ", ".join(repair_plan.auto_upgraded_capabilities)
+            )
+        if repair_plan.propagation_budget:
+            lines.append(f"- Propagation Budget: {repair_plan.propagation_budget}")
+        if repair_plan.impact_summary:
+            lines.append(f"- Impact Summary: {repair_plan.impact_summary}")
+        if repair_plan.strategy_preferences:
+            lines.append(
+                "- Strategy Preferences: " + ", ".join(repair_plan.strategy_preferences)
+            )
+        if repair_plan.constraint_hints:
+            lines.append("- Constraint Hints: " + " | ".join(repair_plan.constraint_hints))
         if repair_plan.expected_boundary_capabilities:
             lines.append(
                 "- Expected Boundary Capabilities: "
@@ -1334,6 +1774,14 @@ class IssuePlanner:
                 issue_line=issue_line,
                 scope_start_line=scope_start_line,
                 scope_end_line=scope_end_line,
+                retry_context=retry_context,
+                planner_lessons=planner_lessons,
+                enable_archetype_strategy_selection=bool(
+                    getattr(effective_performance_flags, "repair_archetype_strategy_selection", True)
+                ),
+                enable_constraint_injection=bool(
+                    getattr(effective_performance_flags, "repair_archetype_constraint_injection", True)
+                ),
             )
             if plan_first_enabled
             else None
@@ -1352,6 +1800,11 @@ class IssuePlanner:
                     promoted_capabilities.append(MULTI_FILE_REFACTOR_CAPABILITY)
             normalized_promoted_capabilities = tuple(dict.fromkeys(promoted_capabilities))
             if normalized_promoted_capabilities != allowed_capabilities:
+                auto_upgraded_capabilities = tuple(
+                    capability
+                    for capability in normalized_promoted_capabilities
+                    if capability not in allowed_capabilities
+                )
                 allowed_capabilities = normalized_promoted_capabilities
                 repair_plan = cls._build_repair_plan(
                     rule_id=rule_id,
@@ -1365,6 +1818,18 @@ class IssuePlanner:
                     issue_line=issue_line,
                     scope_start_line=scope_start_line,
                     scope_end_line=scope_end_line,
+                    retry_context=retry_context,
+                    planner_lessons=planner_lessons,
+                    enable_archetype_strategy_selection=bool(
+                        getattr(effective_performance_flags, "repair_archetype_strategy_selection", True)
+                    ),
+                    enable_constraint_injection=bool(
+                        getattr(effective_performance_flags, "repair_archetype_constraint_injection", True)
+                    ),
+                )
+                repair_plan = replace(
+                    repair_plan,
+                    auto_upgraded_capabilities=auto_upgraded_capabilities,
                 )
         plan_precheck = cls._precheck_repair_plan(
             repair_plan=repair_plan,

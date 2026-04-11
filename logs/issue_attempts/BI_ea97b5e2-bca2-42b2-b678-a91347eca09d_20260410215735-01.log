@@ -1,0 +1,85 @@
+[2026-04-10 22:58:11] Attempt 1/3 started for ea97b5e2-bca2-42b2-b678-a91347eca09d
+[2026-04-10 23:01:12] Attempt 1 failed: Quality gate verification failed
+[2026-04-10 23:01:12] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+... (省略前 15 行)
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+6. [async_signature] 异步签名规范: 异步方法 ProcessResolvedEvents 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:123
+   Evidence: private async Task<List<PenaltyEvent>> ProcessResolvedEvents(IEnumerable<ResolvedEventData> resolvedEvents) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+7. [async_signature] 异步签名规范: 异步方法 ProcessCanceledEvents 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:139
+   Evidence: return updateList; } /// <summary> /// 处理已取消的罚款事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessCanceledEvents(IEnumerable<CanceledEventData> canceledEvents) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+8. [async_signature] 异步签名规范: 异步方法 ProcessCanceledEvents 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:140
+   Evidence: } /// <summary> /// 处理已取消的罚款事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessCanceledEvents(IEnumerable<CanceledEventData> canceledEvents) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+9. [async_signature] 异步签名规范: 异步方法 ProcessCanceledEvents 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:145
+   Evidence: private async Task<List<PenaltyEvent>> ProcessCanceledEvents(IEnumerable<CanceledEventData> canceledEvents) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+10. [async_signature] 异步签名规范: 异步方法 UpdateJobAuditTimestamp 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:162
+   Evidence: return updateList; } /// <summary> /// 更新任务审计时间戳 /// </summary> private async Task UpdateJobAuditTimestamp(string handlerCode) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+11. [async_signature] 异步签名规范: 异步方法 UpdateJobAuditTimestamp 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:163
+   Evidence: } /// <summary> /// 更新任务审计时间戳 /// </summary> private async Task UpdateJobAuditTimestamp(string handlerCode) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+12. [async_signature] 异步签名规范: 异步方法 UpdateJobAuditTimestamp 没有以 Async 结尾。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:168
+   Evidence: private async Task UpdateJobAuditTimestamp(string handlerCode) {
+   Retry Hint: 异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。
+13. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessResolvedEvents 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:117
+   Evidence: } } /// <summary> /// 处理已解决的罚款事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessResolvedEvents(IEnumerable<ResolvedEventData> resolvedEvents) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+14. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessResolvedEvents 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:118
+   Evidence: } /// <summary> /// 处理已解决的罚款事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessResolvedEvents(IEnumerable<ResolvedEventData> resolvedEvents) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+15. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessResolvedEvents 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:123
+   Evidence: private async Task<List<PenaltyEvent>> ProcessResolvedEvents(IEnumerable<ResolvedEventData> resolvedEvents) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+16. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessCanceledEvents 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:139
+   Evidence: return updateList; } /// <summary> /// 处理已取消的罚款事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessCanceledEvents(IEnumerable<CanceledEventData> canceledEvents) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+17. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessCanceledEvents 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:140
+   Evidence: } /// <summary> /// 处理已取消的罚款事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessCanceledEvents(IEnumerable<CanceledEventData> canceledEvents) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+18. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessCanceledEvents 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:145
+   Evidence: private async Task<List<PenaltyEvent>> ProcessCanceledEvents(IEnumerable<CanceledEventData> canceledEvents) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+[2026-04-10 23:01:13] Workspace restored to issue baseline
+[2026-04-10 23:01:13] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-10 23:01:13] Attempt 2/3 started for ea97b5e2-bca2-42b2-b678-a91347eca09d
+[2026-04-10 23:07:32] Attempt 2 failed: Quality gate verification failed
+[2026-04-10 23:07:32] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessStatusChangeEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:116
+   Evidence: } } /// <summary> /// 处理已解决和已取消的罚款事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessStatusChangeEventsAsync(IEnumerable<ResolvedEventData> resolvedEvents, IEnumerable<CanceledEventData> canceledEvents) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+2. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessStatusChangeEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:117
+   Evidence: } /// <summary> /// 处理已解决和已取消的罚款事件 /// </summary> private async Task<List<PenaltyEvent>> ProcessStatusChangeEventsAsync(IEnumerable<ResolvedEventData> resolvedEvents, IEnumerable<CanceledEventData> canceledEvents) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+3. [async_requires_await] 异步方法必须真正 await: 异步方法 ProcessStatusChangeEventsAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:122
+   Evidence: private async Task<List<PenaltyEvent>> ProcessStatusChangeEventsAsync(IEnumerable<ResolvedEventData> resolvedEvents, IEnumerable<CanceledEventData> canceledEvents) {
+   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+[2026-04-10 23:07:32] Workspace restored to issue baseline
+[2026-04-10 23:07:32] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-10 23:07:32] Attempt 3/3 started for ea97b5e2-bca2-42b2-b678-a91347eca09d
+[2026-04-10 23:13:56] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-10 23:13:56] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `BackgroundServiceAsync` to appear in 4 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs:50-166 (definition) still missing `BackgroundServiceAsync`
+[2026-04-10 23:13:57] Workspace restored to issue baseline
+[2026-04-10 23:13:57] Issue skipped: Build verification failed after 3 attempt(s)

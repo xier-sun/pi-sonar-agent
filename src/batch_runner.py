@@ -92,87 +92,103 @@ def main() -> None:
 
     run_label = time.strftime("%Y%m%d%H%M%S")
     run_started_at = utc_now_iso()
+    state_store = RunStateStore(db_client=create_mysql_client_from_env())
+    run_started_recorded = False
     with RunLogSession(run_label=run_label, prefix="batch") as log_session:
         print(f"[INFO] 运行日志: {log_session.log_path.as_posix()}")
-        runtime_env = load_runtime_environment()
-        coordinator = RunCoordinator(runtime_env)
-        state_store = RunStateStore(db_client=create_mysql_client_from_env())
-        coordinator.state_store = state_store
-        targets = load_targets(config_path)
-        state_store.record_event(
-            StateEvent(
-                kind=EventKind.RUN_STARTED,
+        try:
+            runtime_env = load_runtime_environment()
+            coordinator = RunCoordinator(runtime_env)
+            coordinator.state_store = state_store
+            targets = load_targets(config_path)
+            state_store.record_event(
+                StateEvent(
+                    kind=EventKind.RUN_STARTED,
+                    run_label=run_label,
+                    entity_type="run",
+                    entity_key=run_label,
+                    status="running",
+                    payload={
+                        "mode": "batch",
+                        "target_count": len(targets),
+                        "config_path": config_path.as_posix(),
+                    },
+                )
+            )
+            run_started_recorded = True
+            print(f"加载 {len(targets)} 个目标")
+
+            total_successful = 0
+            total_skipped = 0
+            total_failed = 0
+            total_prs = 0
+            target_states: list[TargetState] = []
+
+            for index, target in enumerate(targets, 1):
+                target_run_label = f"{run_label}-{index:02d}"
+                result = run_for_target(
+                    target,
+                    coordinator,
+                    run_label=target_run_label,
+                    show_banner=True,
+                )
+                total_successful += result.successful
+                total_skipped += result.skipped
+                total_failed += result.failed
+                if result.pr_url:
+                    total_prs += 1
+                if result.target_state is not None:
+                    target_states.append(result.target_state)
+
+            rollout_flags = load_performance_flags().enabled_flags()
+            run_state = RunState(
                 run_label=run_label,
-                entity_type="run",
-                entity_key=run_label,
-                status="running",
+                status=derive_run_status(target_states),
+                targets=tuple(target_states),
+                started_at=run_started_at,
+                finished_at=utc_now_iso(),
+                performance_summary=summarize_run_performance(
+                    tuple(target_states),
+                    rollout_flags=rollout_flags,
+                ),
+                rollout_flags=rollout_flags,
+            )
+            run_summary_path = ArtifactWriter().write_run_state(run_state)
+            state_store.record_run_state(run_state, artifact_path=run_summary_path.as_posix())
+            state_store.record_event(
+                StateEvent(
+                    kind=EventKind.RUN_FINISHED,
+                    run_label=run_label,
+                    entity_type="run",
+                    entity_key=run_label,
+                    status=run_state.status.value,
+                    artifact_path=run_summary_path.as_posix(),
+                    payload=run_state.to_dict(),
+                )
+            )
+
+            print(f"\n{'=' * 60}")
+            print("BATTLE REPORT")
+            print(f"{'=' * 60}")
+            print(f"Total Fixed     : {total_successful}")
+            print(f"Total Skipped   : {total_skipped}")
+            print(f"Total Failed    : {total_failed}")
+            print(f"Total PRs       : {total_prs}")
+            print(f"Run Summary     : {run_summary_path.as_posix()}")
+            print(f"{'=' * 60}")
+        except Exception as exc:
+            state_store.record_run_aborted(
+                run_label=run_label,
+                status="failed",
+                error=str(exc),
+                startup_failure=not run_started_recorded,
                 payload={
                     "mode": "batch",
-                    "target_count": len(targets),
                     "config_path": config_path.as_posix(),
+                    "run_started_recorded": run_started_recorded,
                 },
             )
-        )
-        print(f"加载 {len(targets)} 个目标")
-
-        total_successful = 0
-        total_skipped = 0
-        total_failed = 0
-        total_prs = 0
-        target_states: list[TargetState] = []
-
-        for index, target in enumerate(targets, 1):
-            target_run_label = f"{run_label}-{index:02d}"
-            result = run_for_target(
-                target,
-                coordinator,
-                run_label=target_run_label,
-                show_banner=True,
-            )
-            total_successful += result.successful
-            total_skipped += result.skipped
-            total_failed += result.failed
-            if result.pr_url:
-                total_prs += 1
-            if result.target_state is not None:
-                target_states.append(result.target_state)
-
-        rollout_flags = load_performance_flags().enabled_flags()
-        run_state = RunState(
-            run_label=run_label,
-            status=derive_run_status(target_states),
-            targets=tuple(target_states),
-            started_at=run_started_at,
-            finished_at=utc_now_iso(),
-            performance_summary=summarize_run_performance(
-                tuple(target_states),
-                rollout_flags=rollout_flags,
-            ),
-            rollout_flags=rollout_flags,
-        )
-        run_summary_path = ArtifactWriter().write_run_state(run_state)
-        state_store.record_run_state(run_state, artifact_path=run_summary_path.as_posix())
-        state_store.record_event(
-            StateEvent(
-                kind=EventKind.RUN_FINISHED,
-                run_label=run_label,
-                entity_type="run",
-                entity_key=run_label,
-                status=run_state.status.value,
-                artifact_path=run_summary_path.as_posix(),
-                payload=run_state.to_dict(),
-            )
-        )
-
-        print(f"\n{'=' * 60}")
-        print("BATTLE REPORT")
-        print(f"{'=' * 60}")
-        print(f"Total Fixed     : {total_successful}")
-        print(f"Total Skipped   : {total_skipped}")
-        print(f"Total Failed    : {total_failed}")
-        print(f"Total PRs       : {total_prs}")
-        print(f"Run Summary     : {run_summary_path.as_posix()}")
-        print(f"{'=' * 60}")
+            raise
 
 
 def _bool_flag(value: object) -> bool:

@@ -1,0 +1,143 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs
+@@ -888,7 +888,6 @@
+             reimAllidLst.AddRange(reimsubsids.Select(x => x.Id).ToList());
+
+             reimAllidLst.AddRange(reimotherids.Select(x => x.Id).ToList());
+
+             reimAllidLst.AddRange(reimfarsids.Select(x => x.Id).ToList());
+
+-            //获取附件
+
+             var FileLst = await UnitWork.Find<ReimburseAttachment>(null).Where(x => reimAllidLst.Contains(x.ReimburseId)).Where(x => x.FileId != null && x.FileType != null).Select(x => new { x.Id, x.ReimburseId, x.FileType, x.IsPDF, x.ReimburseType }).ToListAsync();
+
+             var reqAll = new List<QueryReimburseNeedPrintReq>();
+
+             foreach (var itemModel in reimburseInfos.Select(x => x.Id))
+
+@@ -899,60 +898,16 @@
+                 {
+
+                     var reqLst = new List<QueryReimburseNeedPrintReq>();
+
+                     var Realreimfarsids = reimfarsids.Where(x => x.ReimburseInfoId == itemModel).ToList();
+
+-                    foreach (var rr in Realreimfarsids)
+
+-                    {
+
+-                        var reqChild = new QueryReimburseNeedPrintReq();
+
+-                        reqChild.Id = rr.Id;
+
+-                        var RealFileLst = FileLst.Where(xx => xx.ReimburseId == rr.Id).Where(rr => rr.IsPDF != 1).Where(rr => !rr.FileType.Contains("pdf")).Where(x => x.ReimburseType == 2).ToList();
+
+-                        if (RealFileLst.Count > 0)
+
+-                        {
+
+-                            reqChild.NeedPrint = 1;
+
+-                        }
+
+-                        else
+
+-                        {
+
+-                            reqChild.NeedPrint = 0;
+
+-                        }
+
+-                        reqLst.Add(reqChild);
+
+-                    }
+
++                    ProcessReimburseItems(Realreimfarsids, FileLst, reqLst, 2);
+
+                     var Realreimsubsids = reimsubsids.Where(x => x.ReimburseInfoId == itemModel).ToList();
+
+                     if (Realreimsubsids.Any())
+
+                     {
+
+-
+
+-
+
+-                        foreach (var rr in Realreimsubsids)
+
+-                        {
+
+-                            var reqChild = new QueryReimburseNeedPrintReq();
+
+-                            reqChild.Id = rr.Id;
+
+-                            var RealFileLst = FileLst.Where(xx => xx.ReimburseId == rr.Id).Where(rr => !rr.FileType.Contains("pdf") && rr.IsPDF != 1).Where(x => x.ReimburseType == 3).ToList();
+
+-                            if (RealFileLst.Count > 0)
+
+-                            {
+
+-                                reqChild.NeedPrint = 1;
+
+-                            }
+
+-                            else
+
+-                            {
+
+-                                reqChild.NeedPrint = 0;
+
+-                            }
+
+-                            reqLst.Add(reqChild);
+
+-                        }
+
++                        ProcessReimburseItems(Realreimsubsids, FileLst, reqLst, 3);
+
+                     }
+
+                     var Realreimotherids = reimotherids.Where(x => x.ReimburseInfoId == itemModel).ToList();
+
+                     if (Realreimotherids.Any())
+
+                     {
+
+-                        foreach (var rr in Realreimotherids)
+
+-                        {
+
+-                            var reqChild = new QueryReimburseNeedPrintReq();
+
+-                            reqChild.Id = rr.Id;
+
+-                            var RealFileLst = FileLst.Where(xx => xx.ReimburseId == rr.Id).Where(rr => !rr.FileType.Contains("pdf") && rr.IsPDF != 1).Where(x => x.ReimburseType == 4).ToList();
+
+-                            if (RealFileLst.Count > 0)
+
+-                            {
+
+-                                reqChild.NeedPrint = 1;
+
+-                            }
+
+-                            else
+
+-                            {
+
+-                                reqChild.NeedPrint = 0;
+
+-                            }
+
+-                            reqLst.Add(reqChild);
+
+-                        }
+
++                        ProcessReimburseItems(Realreimotherids, FileLst, reqLst, 4);
+
+                     }
+
+                     req.Child = reqLst;
+
+                     if (req.Child != null && req.Child.Count > 0 && req.Child.Any(x => x.NeedPrint == 1))

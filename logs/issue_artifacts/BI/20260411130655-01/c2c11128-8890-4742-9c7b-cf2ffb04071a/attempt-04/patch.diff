@@ -1,0 +1,300 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/Reimburse/Services/ReimburseCommonService.cs
+@@ -893,83 +893,77 @@
+             var reqAll = new List<QueryReimburseNeedPrintReq>();
+
+             foreach (var itemModel in reimburseInfos.Select(x => x.Id))
+
+             {
+
+-                var req = new QueryReimburseNeedPrintReq();
+
+-                req.Id = itemModel;
+
+-                if (FileLst != null && FileLst.Count > 0)
+
+-                {
+
+-                    var reqLst = new List<QueryReimburseNeedPrintReq>();
+
+-                    var Realreimfarsids = reimfarsids.Where(x => x.ReimburseInfoId == itemModel).ToList();
+
+-                    foreach (var rr in Realreimfarsids)
+
+-                    {
+
+-                        var reqChild = new QueryReimburseNeedPrintReq();
+
+-                        reqChild.Id = rr.Id;
+
+-                        var RealFileLst = FileLst.Where(xx => xx.ReimburseId == rr.Id).Where(rr => rr.IsPDF != 1).Where(rr => !rr.FileType.Contains("pdf")).Where(x => x.ReimburseType == 2).ToList();
+
+-                        if (RealFileLst.Count > 0)
+
+-                        {
+
+-                            reqChild.NeedPrint = 1;
+
+-                        }
+
+-                        else
+
+-                        {
+
+-                            reqChild.NeedPrint = 0;
+
+-                        }
+
+-                        reqLst.Add(reqChild);
+
+-                    }
+
+-                    var Realreimsubsids = reimsubsids.Where(x => x.ReimburseInfoId == itemModel).ToList();
+
+-                    if (Realreimsubsids.Any())
+
+-                    {
+
+-
+
+-
+
+-                        foreach (var rr in Realreimsubsids)
+
+-                        {
+
+-                            var reqChild = new QueryReimburseNeedPrintReq();
+
+-                            reqChild.Id = rr.Id;
+
+-                            var RealFileLst = FileLst.Where(xx => xx.ReimburseId == rr.Id).Where(rr => !rr.FileType.Contains("pdf") && rr.IsPDF != 1).Where(x => x.ReimburseType == 3).ToList();
+
+-                            if (RealFileLst.Count > 0)
+
+-                            {
+
+-                                reqChild.NeedPrint = 1;
+
+-                            }
+
+-                            else
+
+-                            {
+
+-                                reqChild.NeedPrint = 0;
+
+-                            }
+
+-                            reqLst.Add(reqChild);
+
+-                        }
+
+-                    }
+
+-                    var Realreimotherids = reimotherids.Where(x => x.ReimburseInfoId == itemModel).ToList();
+
+-                    if (Realreimotherids.Any())
+
+-                    {
+
+-                        foreach (var rr in Realreimotherids)
+
+-                        {
+
+-                            var reqChild = new QueryReimburseNeedPrintReq();
+
+-                            reqChild.Id = rr.Id;
+
+-                            var RealFileLst = FileLst.Where(xx => xx.ReimburseId == rr.Id).Where(rr => !rr.FileType.Contains("pdf") && rr.IsPDF != 1).Where(x => x.ReimburseType == 4).ToList();
+
+-                            if (RealFileLst.Count > 0)
+
+-                            {
+
+-                                reqChild.NeedPrint = 1;
+
+-                            }
+
+-                            else
+
+-                            {
+
+-                                reqChild.NeedPrint = 0;
+
+-                            }
+
+-                            reqLst.Add(reqChild);
+
+-                        }
+
+-                    }
+
+-                    req.Child = reqLst;
+
+-                    if (req.Child != null && req.Child.Count > 0 && req.Child.Any(x => x.NeedPrint == 1))
+
+-                    {
+
+-                        req.NeedPrint = 1;
+
+-                    }
+
+-                }
+
+-                else
+
+-                {
+
+-                    req.NeedPrint = -1;
+
+-                }
+
++                var req = BuildReimburseNeedPrintReq(itemModel, FileLst, reimfarsids, reimsubsids, reimotherids);
+
+                 reqAll.Add(req);
+
+                 needPrintReqs = reqAll;
+
+             }
+
+ 
+
+-
+
+             return needPrintReqs;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 构建报销单打印请求对象
+
++        /// </summary>
+
++        private QueryReimburseNeedPrintReq BuildReimburseNeedPrintReq(int itemModel, List<dynamic> FileLst, List<dynamic> reimfarsids, List<dynamic> reimsubsids, List<dynamic> reimotherids)
+
++        {
+
++            var req = new QueryReimburseNeedPrintReq();
+
++            req.Id = itemModel;
+
++            if (FileLst != null && FileLst.Count > 0)
+
++            {
+
++                req.Child = BuildReimbursePrintChildList(itemModel, FileLst, reimfarsids, reimsubsids, reimotherids);
+
++                req.NeedPrint = CalculateParentNeedPrint(req.Child);
+
++            }
+
++            else
+
++            {
+
++                req.NeedPrint = -1;
+
++            }
+
++            return req;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 构建报销单打印子列表
+
++        /// </summary>
+
++        private List<QueryReimburseNeedPrintReq> BuildReimbursePrintChildList(int itemModel, List<dynamic> FileLst, List<dynamic> reimfarsids, List<dynamic> reimsubsids, List<dynamic> reimotherids)
+
++        {
+
++            var reqLst = new List<QueryReimburseNeedPrintReq>();
+
++            ProcessReimburseType(reimfarsids.Where(x => x.ReimburseInfoId == itemModel).ToList(), FileLst, reqLst, 2);
+
++            ProcessReimburseType(reimsubsids.Where(x => x.ReimburseInfoId == itemModel).ToList(), FileLst, reqLst, 3);
+
++            ProcessReimburseType(reimotherids.Where(x => x.ReimburseInfoId == itemModel).ToList(), FileLst, reqLst, 4);
+
++            return reqLst;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理报销类型打印状态
+
++        /// </summary>
+
++        private void ProcessReimburseType(List<dynamic> reimIds, List<dynamic> FileLst, List<QueryReimburseNeedPrintReq> reqLst, int reimburseType)
+
++        {
+
++            foreach (var rr in reimIds)
+
++            {
+
++                var reqChild = new QueryReimburseNeedPrintReq { Id = rr.Id };
+
++                reqChild.NeedPrint = CheckNeedPrint(FileLst, rr.Id, reimburseType);
+
++                reqLst.Add(reqChild);
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 检查是否需要打印
+
++        /// </summary>
+
++        private int CheckNeedPrint(List<dynamic> FileLst, int reimburseId, int reimburseType)
+
++        {
+
++            var RealFileLst = FileLst.Where(xx => xx.ReimburseId == reimburseId).Where(rr => rr.IsPDF != 1).Where(rr => !rr.FileType.Contains("pdf")).Where(x => x.ReimburseType == reimburseType).ToList();
+
++            return RealFileLst.Count > 0 ? 1 : 0;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 计算父节点打印状态
+
++        /// </summary>
+
++        private int CalculateParentNeedPrint(List<QueryReimburseNeedPrintReq> childList)
+
++        {
+
++            if (childList != null && childList.Count > 0 && childList.Any(x => x.NeedPrint == 1))
+
++            {
+
++                return 1;
+
++            }
+
++            return 0;
+
+         }
+
+ 
+
+         /// <summary>

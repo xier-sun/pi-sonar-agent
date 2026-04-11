@@ -1,0 +1,24 @@
+{
+  "attempt_number": 1,
+  "status": "retrying",
+  "started_at": "2026-04-11T06:56:45.919429+00:00",
+  "finished_at": "2026-04-11T06:56:45.919746+00:00",
+  "duration_seconds": 0.0,
+  "failure_kind": "model_timeout",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "error": "Claude SDK Client 在 60 秒内未完成初始化",
+  "skip_reason": "",
+  "summary": "",
+  "changed_files": [],
+  "boundary_failure_code": "",
+  "secondary_boundary_failure_codes": [],
+  "issue_log_path": "logs\\issue_attempts\\repo_issue-connect-timeout_run-connect-timeout.log",
+  "artifact_dir": "logs/issue_artifacts/repo/run-connect-timeout/issue-connect-timeout/attempt-01",
+  "performance_metrics": {
+    "attempt_total_duration_seconds": 0.0
+  },
+  "rollout_flags": []
+}

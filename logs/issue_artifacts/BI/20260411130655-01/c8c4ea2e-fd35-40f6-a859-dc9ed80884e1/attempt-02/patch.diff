@@ -1,0 +1,18 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
+@@ -192,7 +192,7 @@
+         /// <summary>
+
+         /// 快照报表权限校验（复用salereceivable模块权限）
+
+         /// </summary>
+
+-        public async Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermission(OverdueAgingSnapshotReq req)
+
++        public async Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermissionAsync(OverdueAgingSnapshotReq req)
+
+         {
+
+             var loginContext = _auth.GetCurrentUser() ?? throw new CommonException(Define.LoginHasExpired, Define.INVALID_TOKEN);
+
+             var loginUser = loginContext.User;

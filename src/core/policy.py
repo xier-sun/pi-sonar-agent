@@ -10,6 +10,26 @@ from pi_sonar_agent.core.hooks import RuntimeHook, ToolCallContext
 from pi_sonar_agent.core.registry import ToolKind, ToolRegistry
 from pi_sonar_agent.core.tool_surface import CONTROLLED_BASH_TOOL, CONTROLLED_SHELL_DISPLAY_NAME
 
+_TOOL_NAME_WRAPPER_PATTERN = re.compile(r"</?[^>]+>")
+_TOOL_NAME_ALIASES = {
+    "readasync": "Read",
+    "editasync": "Edit",
+    "multieditasync": "MultiEdit",
+    "writeasync": "Write",
+}
+
+
+def normalize_tool_name(tool_name: str) -> str:
+    """Collapse SDK/model wrapper noise around tool names to the registry form."""
+
+    raw_value = str(tool_name or "").strip()
+    if not raw_value:
+        return ""
+    normalized = _TOOL_NAME_WRAPPER_PATTERN.sub("", raw_value).strip()
+    if not normalized:
+        normalized = raw_value
+    return _TOOL_NAME_ALIASES.get(normalized.lower(), normalized)
+
 
 @dataclass(frozen=True)
 class ToolDecision:
@@ -50,7 +70,11 @@ class ToolPolicy:
     def __init__(self, registry: ToolRegistry, allowed_tools: Iterable[str]) -> None:
         self.registry = registry
         self._allowed_tools = tuple(
-            dict.fromkeys(str(name) for name in allowed_tools if str(name).strip())
+            dict.fromkeys(
+                normalized
+                for name in allowed_tools
+                if (normalized := normalize_tool_name(str(name)))
+            )
         )
         exact_tools: list[str] = []
         scoped_rules: dict[str, list[str]] = {}
@@ -78,12 +102,13 @@ class ToolPolicy:
         if not value.endswith(")") or "(" not in value:
             return None
         tool_name, _, raw_rule = value.partition("(")
-        if not tool_name:
+        normalized_tool_name = normalize_tool_name(tool_name)
+        if not normalized_tool_name:
             return None
         rule_content = raw_rule[:-1].strip()
         if not rule_content or rule_content == "*":
             return None
-        return tool_name, rule_content
+        return normalized_tool_name, rule_content
 
     @staticmethod
     def _normalize_shell_command(payload: dict[str, object] | None) -> str:
@@ -115,10 +140,11 @@ class ToolPolicy:
     def classify(self, tool_name: str, payload: dict[str, object] | None = None) -> ToolDecision:
         """Return the classification/allowance decision for a tool."""
 
-        spec = self.registry.get(tool_name)
+        normalized_tool_name = normalize_tool_name(tool_name)
+        spec = self.registry.get(normalized_tool_name)
         if spec is None:
             return ToolDecision(
-                tool_name=tool_name,
+                tool_name=normalized_tool_name or tool_name,
                 allowed=False,
                 kind=ToolKind.UNKNOWN,
                 reason="Tool is not registered for the issue-fix runtime.",
@@ -127,7 +153,7 @@ class ToolPolicy:
 
         if spec.kind == ToolKind.FORBIDDEN:
             return ToolDecision(
-                tool_name=tool_name,
+                tool_name=normalized_tool_name,
                 allowed=False,
                 kind=spec.kind,
                 tags=spec.tags,
@@ -135,12 +161,12 @@ class ToolPolicy:
                 policy_violation=True,
             )
 
-        if tool_name == CONTROLLED_BASH_TOOL:
+        if normalized_tool_name == CONTROLLED_BASH_TOOL:
             command = self._normalize_shell_command(payload)
-            if tool_name in self._allowed_lookup or tool_name in self._scoped_rules:
+            if normalized_tool_name in self._allowed_lookup or normalized_tool_name in self._scoped_rules:
                 if self._is_high_risk_shell_command(command):
                     return ToolDecision(
-                        tool_name=tool_name,
+                        tool_name=normalized_tool_name,
                         allowed=False,
                         kind=spec.kind,
                         tags=spec.tags,
@@ -148,14 +174,14 @@ class ToolPolicy:
                         policy_violation=True,
                     )
                 return ToolDecision(
-                    tool_name=tool_name,
+                    tool_name=normalized_tool_name,
                     allowed=True,
                     kind=spec.kind,
                     tags=spec.tags,
                     matched_rule="windows-shell-safe",
                 )
             return ToolDecision(
-                tool_name=tool_name,
+                tool_name=normalized_tool_name,
                 allowed=False,
                 kind=spec.kind,
                 tags=spec.tags,
@@ -163,9 +189,9 @@ class ToolPolicy:
                 policy_violation=True,
             )
 
-        if tool_name in self._allowed_lookup:
+        if normalized_tool_name in self._allowed_lookup:
             return ToolDecision(
-                tool_name=tool_name,
+                tool_name=normalized_tool_name,
                 allowed=True,
                 kind=spec.kind,
                 tags=spec.tags,
@@ -173,7 +199,7 @@ class ToolPolicy:
 
         if spec.kind == ToolKind.CONTROLLED:
             return ToolDecision(
-                tool_name=tool_name,
+                tool_name=normalized_tool_name,
                 allowed=False,
                 kind=spec.kind,
                 tags=spec.tags,
@@ -181,7 +207,7 @@ class ToolPolicy:
             )
 
         return ToolDecision(
-            tool_name=tool_name,
+            tool_name=normalized_tool_name,
             allowed=False,
             kind=spec.kind,
             tags=spec.tags,

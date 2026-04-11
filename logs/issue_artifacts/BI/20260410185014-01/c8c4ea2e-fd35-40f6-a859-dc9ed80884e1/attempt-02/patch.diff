@@ -1,0 +1,310 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
+@@ -192,7 +192,9 @@
+         /// <summary>
+
+         /// 快照报表权限校验（复用salereceivable模块权限）
+
+         /// </summary>
+
+-        public async Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermission(OverdueAgingSnapshotReq req)
+
++        /// <param name="req">查询参数</param>
+
++        /// <returns>权限校验结果：是否有权限、状态码、消息</returns>
+
++        public async Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermissionAsync(OverdueAgingSnapshotReq req)
+
+         {
+
+             var loginContext = _auth.GetCurrentUser() ?? throw new CommonException(Define.LoginHasExpired, Define.INVALID_TOKEN);
+
+             var loginUser = loginContext.User;
+
+@@ -206,18 +208,57 @@
+                 case view_all:
+
+                     break;
+
+                 case view_dept:
+
+-                    var deptResult = await HandleSnapshotDeptView(loginUser.User_Id, req);
+
++                    var deptResult = await HandleSnapshotDeptViewAsync(loginUser.User_Id, req);
+
+                     if (deptResult.HasError) return deptResult.Result;
+
+                     break;
+
+                 case view_self:
+
+-                    var selfResult = await HandleSnapshotSelfView(loginUser.User_Id, req);
+
++                    var selfResult = await HandleSnapshotSelfViewAsync(loginUser.User_Id, req);
+
+                     if (selfResult.HasError) return selfResult.Result;
+
+                     break;
+
+                 default:
+
+                     return (true, 500, "用户角色未配置模块权限");
+
+             }
+
+ 
+
+-            // 处理公司主体标识权限
+
++            var indicatorResult = await ApplySnapshotIndicatorPermissionAsync(req, moduleElements);
+
++            if (indicatorResult.IsNoRight) return (indicatorResult.IsNoRight, indicatorResult.Code, indicatorResult.Message);
+
++
+
++            return (false, 200, string.Empty);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 获取salereceivable模块元素权限
+
++        /// </summary>
+
++        private async Task<List<ModuleElement>> GetSnapshotModuleElements(List<string> roleIds)
+
++        {
+
++            var modules = from m in UnitWork.Find<Module>(null)
+
++                          join r in UnitWork.Find<Relevance>(null) on m.Id equals r.SecondId
+
++                          join role in UnitWork.Find<Role>(null) on r.FirstId equals role.Id
+
++                          where r.Key == Define.ROLEMODULE && roleIds.Contains(r.FirstId) && m.Code == FinanceConsts.SalesInvoiceCode
+
++                          select new { m, roleId = role.Id };
+
++
+
++            return await (from me in UnitWork.Find<ModuleElement>(null)
+
++                          join r in UnitWork.Find<Relevance>(null) on me.Id equals r.SecondId
+
++                          join role in UnitWork.Find<Role>(null) on r.FirstId equals role.Id
+
++                          join mo in modules on new { roleId = role.Id, MId = me.ModuleId } equals new { mo.roleId, MId = mo.m.Id }
+
++                          where r.Key == Define.ROLEELEMENT && roleIds.Contains(r.FirstId)
+
++                          select me).ToListAsync();
+
++        }
+
++
+
++        /// <summary>
+
++        /// 获取当前有效的DomId
+
++        /// </summary>
+
++        private static string GetSnapshotModuleElementDomId(List<ModuleElement> elements)
+
++        {
+
++            if (elements.Exists(x => x.DomId == view_all)) return view_all;
+
++            if (elements.Exists(x => x.DomId == view_dept)) return view_dept;
+
++            return elements.Exists(x => x.DomId == view_self) ? view_self : null;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 应用公司主体标识权限
+
++        /// </summary>
+
++        private async Task<(bool IsNoRight, int Code, string Message)> ApplySnapshotIndicatorPermissionAsync(OverdueAgingSnapshotReq req, List<ModuleElement> moduleElements)
+
++        {
+
+             var customQryCategory = await UnitWork.Find<Category>(x => x.TypeId == FinanceConsts.FICO_Custom_Query_Filter).ToListAsync();
+
+             var haveCustomQueryRight = customQryCategory.Select(x => x.DtCode).Intersect(moduleElements.Select(x => x.DomId)).Distinct().ToList();
+
+             if (haveCustomQueryRight.Count > 0)
+
+@@ -251,42 +292,13 @@
+                         req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? "N" : i);
+
+                 }
+
+             }
+
+-            return (false, 200, string.Empty);
+
+-        }
+
+-
+
+-        /// <summary>
+
+-        /// 获取salereceivable模块元素权限
+
+-        /// </summary>
+
+-        private async Task<List<ModuleElement>> GetSnapshotModuleElements(List<string> roleIds)
+
+-        {
+
+-            var modules = from m in UnitWork.Find<Module>(null)
+
+-                          join r in UnitWork.Find<Relevance>(null) on m.Id equals r.SecondId
+
+-                          join role in UnitWork.Find<Role>(null) on r.FirstId equals role.Id
+
+-                          where r.Key == Define.ROLEMODULE && roleIds.Contains(r.FirstId) && m.Code == FinanceConsts.SalesInvoiceCode
+
+-                          select new { m, roleId = role.Id };
+
+-
+
+-            return await (from me in UnitWork.Find<ModuleElement>(null)
+
+-                          join r in UnitWork.Find<Relevance>(null) on me.Id equals r.SecondId
+
+-                          join role in UnitWork.Find<Role>(null) on r.FirstId equals role.Id
+
+-                          join mo in modules on new { roleId = role.Id, MId = me.ModuleId } equals new { mo.roleId, MId = mo.m.Id }
+
+-                          where r.Key == Define.ROLEELEMENT && roleIds.Contains(r.FirstId)
+
+-                          select me).ToListAsync();
+
+-        }
+
+-
+
+-        /// <summary>
+
+-        /// 获取当前有效的DomId
+
+-        /// </summary>
+
+-        private static string GetSnapshotModuleElementDomId(List<ModuleElement> elements)
+
+-        {
+
+-            if (elements.Exists(x => x.DomId == view_all)) return view_all;
+
+-            if (elements.Exists(x => x.DomId == view_dept)) return view_dept;
+
+-            return elements.Exists(x => x.DomId == view_self) ? view_self : null;
+
++            return (false, 0, string.Empty);
+
+         }
+
+ 
+
+         /// <summary>
+
+         /// 处理部门查看权限
+
+         /// </summary>
+
+-        private async Task<(bool HasError, (bool, int, string) Result)> HandleSnapshotDeptView(int? userId, OverdueAgingSnapshotReq req)
+
++        private async Task<(bool HasError, (bool, int, string) Result)> HandleSnapshotDeptViewAsync(int? userId, OverdueAgingSnapshotReq req)
+
+         {
+
+             if (!userId.HasValue) return (false, default);
+
+             var slpCode = await UnitWork.Find<sbo_user>(x =>
+
+@@ -305,7 +317,7 @@
+         /// <summary>
+
+         /// 处理个人查看权限
+
+         /// </summary>
+
+-        private async Task<(bool HasError, (bool, int, string) Result)> HandleSnapshotSelfView(int? userId, OverdueAgingSnapshotReq req)
+
++        private async Task<(bool HasError, (bool, int, string) Result)> HandleSnapshotSelfViewAsync(int? userId, OverdueAgingSnapshotReq)
+
+         {
+
+             var slpCode = await UnitWork.Find<sbo_user>(x =>
+
+                 x.sbo_id == Define.SBO_ID && x.user_id == userId)
+
+--- a/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IDailyOverdueSnapshotApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IDailyOverdueSnapshotApp.cs
+@@ -26,8 +26,8 @@
+         /// <summary>
+
+         /// 获取逾期快照权限（根据用户ID和查询参数判断是否有权限访问逾期快照数据）
+
+         /// </summary>
+
+-        /// <param name="req"></param>
+
+-        /// <returns></returns>
+
+-        Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermission(OverdueAgingSnapshotReq req);
+
++        /// <param name="req">查询参数</param>
+
++        /// <returns>权限校验结果：是否有权限、状态码、消息</returns>
+
++        Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermissionAsync(OverdueAgingSnapshotReq req);
+
+     }
+
+ }
+
+--- a/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/FinanceHomeController.cs
++++ b/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/FinanceHomeController.cs
+@@ -261,7 +261,7 @@
+             var result = new TableData<OverdueAgingChartWrapper>();
+
+             try
+
+             {
+
+-                var (isNoRight, code, message) = await _dailyOverdueSnapshotApp.GetSnapshotPermission(req);
+
++                var (isNoRight, code, message) = await _dailyOverdueSnapshotApp.GetSnapshotPermissionAsync(req);
+
+                 if (!isNoRight)
+
+                 {
+
+                     result.Data = await _dailyOverdueSnapshotApp.GetOverdueAgingSnapshotChart(req);
+
+@@ -289,7 +289,7 @@
+             var result = new TableData<OverdueAgingDetailWrapper>();
+
+             try
+
+             {
+
+-                var (isNoRight, code, message) = await _dailyOverdueSnapshotApp.GetSnapshotPermission(req);
+
++                var (isNoRight, code, message) = await _dailyOverdueSnapshotApp.GetSnapshotPermissionAsync(req);
+
+                 if (isNoRight)
+
+                     return new TableData<OverdueAgingDetailWrapper> { Code = code, Message = message, Data = new OverdueAgingDetailWrapper { ColumnHeaders = new List<ColumnHeader>(), Data = new List<OverdueAgingDetailResp>() } };
+
+                 result.Data = await _dailyOverdueSnapshotApp.GetOverdueAgingSnapshotDetail(req);

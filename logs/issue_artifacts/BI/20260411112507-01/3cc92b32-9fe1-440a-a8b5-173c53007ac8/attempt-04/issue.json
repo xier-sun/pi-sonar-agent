@@ -1,0 +1,327 @@
+{
+  "issue_key": "3cc92b32-9fe1-440a-a8b5-173c53007ac8",
+  "rule_id": "csharpsquid:S3776",
+  "message": "Refactor this method to reduce its Cognitive Complexity from 50 to the 30 allowed.",
+  "line": 1170,
+  "text_range": {
+    "startLine": 1170,
+    "endLine": 1170,
+    "startOffset": 68,
+    "endOffset": 91
+  },
+  "flows": [
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1173,
+            "endLine": 1173,
+            "startOffset": 40,
+            "endOffset": 42
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1177,
+            "endLine": 1177,
+            "startOffset": 12,
+            "endOffset": 14
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1194,
+            "endLine": 1194,
+            "startOffset": 12,
+            "endOffset": 19
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 1200,
+            "endLine": 1200,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1206,
+            "endLine": 1206,
+            "startOffset": 16,
+            "endOffset": 20
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 1213,
+            "endLine": 1213,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1213,
+            "endLine": 1213,
+            "startOffset": 41,
+            "endOffset": 43
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 1215,
+            "endLine": 1215,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1220,
+            "endLine": 1220,
+            "startOffset": 24,
+            "endOffset": 28
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1226,
+            "endLine": 1226,
+            "startOffset": 20,
+            "endOffset": 24
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1226,
+            "endLine": 1226,
+            "startOffset": 46,
+            "endOffset": 48
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 1232,
+            "endLine": 1232,
+            "startOffset": 20,
+            "endOffset": 27
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 1235,
+            "endLine": 1235,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1235,
+            "endLine": 1235,
+            "startOffset": 45,
+            "endOffset": 47
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+5 (incl 4 for nesting)",
+          "textRange": {
+            "startLine": 1238,
+            "endLine": 1238,
+            "startOffset": 32,
+            "endOffset": 33
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 1243,
+            "endLine": 1243,
+            "startOffset": 50,
+            "endOffset": 51
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1245,
+            "endLine": 1245,
+            "startOffset": 16,
+            "endOffset": 20
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 1249,
+            "endLine": 1249,
+            "startOffset": 20,
+            "endOffset": 27
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 1252,
+            "endLine": 1252,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1252,
+            "endLine": 1252,
+            "startOffset": 45,
+            "endOffset": 47
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+5 (incl 4 for nesting)",
+          "textRange": {
+            "startLine": 1255,
+            "endLine": 1255,
+            "startOffset": 32,
+            "endOffset": 33
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 1260,
+            "endLine": 1260,
+            "startOffset": 50,
+            "endOffset": 51
+          }
+        }
+      ]
+    }
+  ],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs",
+  "severity": "CRITICAL",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

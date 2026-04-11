@@ -1,0 +1,40 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -1570,15 +1570,10 @@
+                 }
+
+ 
+
+                 // 5. 获取退货记录
+
+-                if (!batchReturns.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.ReturnForOverDue> allReturns))
+
+-                {
+
+-                    allReturns = new List<HistoricalOverdueCalculationService.ReturnForOverDue>();
+
+-                }
+
+-
+
+-                if (batchRefunds == null || !batchRefunds.TryGetValue(order.DocEntry, out List<SaleRefund> allRefunds))
+
+-                {
+
+-                    allRefunds = new List<SaleRefund>();
+
+-                }
+
++                allReturns = GetBatchReturnsOrDefault(batchReturns, order.DocEntry);
+
++
+
++                // 6. 获取退款记录
+
++                allRefunds = GetBatchRefundsOrDefault(batchRefunds, order.DocEntry);
+
+ 
+
+                 // 6. 获取清账记录
+
+                 if (!batchClearRecons.TryGetValue(order.DocEntry, out List<HistoricalOverdueCalculationService.ClearReconForOverDue> allClearRecons))

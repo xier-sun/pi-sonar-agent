@@ -1,0 +1,13 @@
+{
+  "issue_key": "issue-quality-gate-retry",
+  "rule_id": "csharpsquid:S6562",
+  "message": "Provide the DateTimeKind when creating this object.",
+  "line": 199,
+  "text_range": {},
+  "flows": [],
+  "component": "BI:OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

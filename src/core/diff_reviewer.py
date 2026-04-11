@@ -340,18 +340,35 @@ class DiffReviewer:
             )
 
         drift_score = cls._drift_score((*hard_violations, *soft_violations))
+        extra_touched_file_count = sum(
+            1 for item in soft_violations if item.type == "extra_touched_file"
+        )
+        outside_primary_region_count = sum(
+            1 for item in soft_violations if item.type == "outside_primary_region"
+        )
+        scope_expansion_reasons = tuple(
+            dict.fromkeys(
+                item.type
+                for item in soft_violations
+                if item.type in {"outside_primary_region", "extra_touched_file"}
+            )
+        )
         metrics = {
             "changed_file_count": len(file_changes),
             "hunk_count": sum(change.hunk_count for change in file_changes),
             "total_changed_lines": sum(len(change.boundary_changed_lines) for change in file_changes),
             "hard_boundary_violation_count": len(hard_violations),
             "soft_boundary_violation_count": len(soft_violations),
-            "extra_touched_file_count": sum(
-                1 for item in soft_violations if item.type == "extra_touched_file"
-            ),
+            "extra_touched_file_count": extra_touched_file_count,
             "outside_primary_region_line_count": sum(
                 len(item.changed_lines) for item in soft_violations if item.type == "outside_primary_region"
             ),
+            "outside_primary_region_count": outside_primary_region_count,
+            "scope_audit_mode": "scope_soft_audit",
+            "scope_audit_active": True,
+            "scope_expansion_count": extra_touched_file_count + outside_primary_region_count,
+            "scope_expansion_reasons": list(scope_expansion_reasons),
+            "high_drift_warning": drift_score >= 3,
             "drift_score": drift_score,
         }
         summary = cls._build_audit_summary(

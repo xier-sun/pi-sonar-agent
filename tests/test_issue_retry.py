@@ -7,6 +7,7 @@ from pathlib import Path
 from pi_sonar_agent.agent.claude_agent import FixResult, SonarIssue
 from pi_sonar_agent.core.issue_retry import (
     _summarize_model_timeout,
+    build_retry_context,
     build_retry_feedback,
     capture_workspace_baseline,
     cleanup_workspace_baseline,
@@ -180,6 +181,63 @@ def test_process_issue_with_retries_skips_after_three_build_failures(tmp_path) -
     assert (Path(result.artifact_root) / "compliance_summary.json").exists()
 
 
+def test_process_issue_with_retries_defaults_to_five_attempts(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    tracked_file = repo / "tracked.cs"
+    tracked_file.write_text("previous success\n", encoding="utf-8")
+
+    issue = SonarIssue(
+        key="issue-default-five",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=1,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def fix_issue(self, issue, workspace_path, build_command, retry_feedback=""):
+            self.calls += 1
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=[{"file": "tracked.cs", "action": "modified"}],
+                build_passed=False,
+                build_verification_failed=True,
+                error="Issue changes failed local build verification",
+                build_command=build_command,
+                build_output=f"{tracked_file}(1,1): error CS0103: name not found [tracked.csproj]",
+                retryable_failure=True,
+                failure_kind="build",
+            )
+
+    agent = FakeAgent()
+
+    result = process_issue_with_retries(
+        agent=agent,
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-default-five",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.attempts == 5
+    assert agent.calls == 5
+    assert result.skip_reason == "Build verification failed after 5 attempt(s)"
+
+
 def test_process_issue_with_retries_retries_when_agent_makes_no_changes(tmp_path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -230,6 +288,34 @@ def test_process_issue_with_retries_retries_when_agent_makes_no_changes(tmp_path
     assert result.attempts == 3
     assert "上次尝试没有实际修改任何文件" in agent.retry_feedbacks[1]
     assert "必须对 Sonar 指向的代码真正落盘修改" in agent.retry_feedbacks[2]
+
+
+def test_build_retry_feedback_explains_invalid_edit_tool_input(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-tool-input-invalid",
+        file_path="tracked.cs",
+        error="Model emitted an invalid Edit/MultiEdit call",
+        build_output=(
+            "InputValidationError: Edit failed due to the following issues:\n"
+            "The required parameter `file_path` is missing\n"
+            "The required parameter `old_string` is missing\n"
+            "The required parameter `new_string` is missing"
+        ),
+        retryable_failure=True,
+        failure_kind="tool_input_invalid",
+    )
+
+    feedback = build_retry_feedback(repo, result)
+
+    assert "无效的 Edit/MultiEdit 工具调用" in feedback
+    assert "file_path" in feedback
+    assert "old_string" in feedback
+    assert "new_string" in feedback
+    assert "不要发送空工具调用" in feedback
 
 
 def test_build_retry_feedback_preserves_scope_violation_details(tmp_path) -> None:
@@ -514,9 +600,91 @@ def test_build_retry_feedback_includes_quality_gate_failures(tmp_path) -> None:
     assert "没有通过 C# 质量门禁" in feedback
     assert "public_xml_docs" in feedback
     assert "只补当前 patch 触达的公开成员 XML 文档" in feedback
+    assert "不要新增 public/protected helper、DTO、property" in feedback
     assert "同步接口声明、调用点和 nameof(...)" in feedback
+    assert "不要为了凑 *Async 命名去新建或重命名并不真正异步的 helper" in feedback
     assert "移除 async 并改成同步方法" in feedback
+    assert "新提取的 helper 默认保持同步" in feedback
     assert "只修这些门禁问题，保留已经通过的其它改动" in feedback
+
+
+def test_process_issue_with_retries_passes_quality_gate_failure_to_next_attempt_and_logs_it(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    issue = SonarIssue(
+        key="issue-quality-gate-retry",
+        rule="csharpsquid:S6562",
+        message="Provide the DateTimeKind when creating this object.",
+        line=199,
+        component="BI:OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.retry_feedbacks: list[str] = []
+
+        def fix_issue(self, issue, workspace_path, build_command, retry_feedback=""):
+            self.retry_feedbacks.append(retry_feedback)
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=[{"file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs", "action": "modified"}],
+                build_passed=True,
+                build_verification_failed=False,
+                error="Quality gate verification failed",
+                build_command=build_command,
+                build_output=(
+                    "Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:\n"
+                    "1. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。"
+                ),
+                retryable_failure=True,
+                failure_kind="quality_gate",
+                quality_gate_result={
+                    "status": "retry",
+                    "summary": "Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:",
+                    "violations": [
+                        {
+                            "rule_id": "async_requires_await",
+                            "title": "异步方法必须真正 await",
+                            "message": "异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。",
+                            "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+                            "line": 199,
+                            "evidence": "private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync(...)",
+                            "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。",
+                        }
+                    ],
+                },
+            )
+
+    agent = FakeAgent()
+
+    result = process_issue_with_retries(
+        agent=agent,
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-quality-gate-feedback",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
+        max_build_retries=2,
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.attempts == 2
+    assert agent.retry_feedbacks[0] == ""
+    assert "没有通过 C# 质量门禁" in agent.retry_feedbacks[1]
+    assert "async_requires_await" in agent.retry_feedbacks[1]
+    assert "ResolveOrderDocEntryFromReturnChainAsync 没有实际 await" in agent.retry_feedbacks[1]
+    assert "如果方法标了 async，就必须真正 await" in agent.retry_feedbacks[1]
+    issue_log = Path(result.issue_log_path).read_text(encoding="utf-8")
+    assert "Next retry feedback for model:" in issue_log
+    assert "async_requires_await" in issue_log
 
 
 def test_build_retry_feedback_includes_plan_precheck_conflict(tmp_path) -> None:
@@ -549,3 +717,206 @@ def test_build_retry_feedback_includes_plan_precheck_conflict(tmp_path) -> None:
     assert "Plan 预检阶段" in feedback
     assert "signature_change_not_allowed" in feedback or "signature_change" in feedback
     assert "显式放开 signature_change" in feedback
+
+
+def test_build_retry_context_records_failure_and_strategy_fingerprints(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    tracked_file = repo / "tracked.cs"
+    tracked_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    repair_plan = type(
+        "RepairPlanStub",
+        (),
+        {
+            "repair_shape": "method_rewrite_with_helpers",
+            "selected_archetype": "method_decomposition",
+            "fallback_archetype": "signature_preserving_refactor",
+            "archetype_chain": ("method_decomposition", "signature_preserving_refactor"),
+        },
+    )()
+    edit_contract = type(
+        "EditContractStub",
+        (),
+        {
+            "execution_profile": "plan_first_full_path",
+            "fast_path_enabled": False,
+            "plan_first_enabled": True,
+            "allowed_capabilities": ("helper_extract",),
+            "repair_plan": repair_plan,
+            "quality_gate_rules": (),
+        },
+    )()
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-fingerprint",
+        file_path="tracked.cs",
+        changes=[{"file": "tracked.cs", "action": "modified"}],
+        error="Quality gate verification failed",
+        build_output="Quality gate verification failed.",
+        retryable_failure=True,
+        failure_kind="quality_gate",
+        edit_contract=edit_contract,
+        repair_plan=repair_plan,
+        quality_gate_result={
+            "status": "retry",
+            "summary": "gate failed",
+            "violations": [
+                {
+                    "rule_id": "async_signature",
+                    "title": "异步签名规范",
+                    "message": "async method missing Async suffix",
+                }
+            ],
+        },
+    )
+
+    retry_context = build_retry_context(repo, result, source_attempt_number=1)
+
+    assert retry_context.failure_kind == "quality_gate"
+    assert retry_context.failure_detail_key == "quality_gate:async_signature"
+    assert "profile=plan_first_full_path" in retry_context.strategy_fingerprint
+    assert "archetype=method_decomposition" in retry_context.strategy_fingerprint
+    assert retry_context.diff_fingerprint != ""
+    assert retry_context.diff_fingerprint != "no_change"
+
+
+def test_process_issue_with_retries_stops_early_on_identical_failure_and_diff(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    tracked_file = repo / "tracked.cs"
+    tracked_file.write_text("previous success\n", encoding="utf-8")
+
+    issue = SonarIssue(
+        key="issue-early-stop",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=1,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    repair_plan = type(
+        "RepairPlanStub",
+        (),
+        {
+            "repair_shape": "method_rewrite_with_helpers",
+            "selected_archetype": "method_decomposition",
+            "fallback_archetype": "signature_preserving_refactor",
+            "archetype_chain": ("method_decomposition", "signature_preserving_refactor"),
+        },
+    )()
+    edit_contract = type(
+        "EditContractStub",
+        (),
+        {
+            "scope_mode": "method",
+            "execution_profile": "plan_first_full_path",
+            "fast_path_enabled": False,
+            "plan_first_enabled": True,
+            "allowed_capabilities": ("helper_extract",),
+            "repair_plan": repair_plan,
+            "quality_gate_rules": (),
+        },
+    )()
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def fix_issue(self, issue, workspace_path, build_command, retry_feedback="", retry_context=None):
+            self.calls += 1
+            tracked_file.write_text("same bad change\n", encoding="utf-8")
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=[{"file": "tracked.cs", "action": "modified"}],
+                build_passed=False,
+                build_verification_failed=True,
+                error="Issue changes failed local build verification",
+                build_command=build_command,
+                build_output=f"{tracked_file}(1,1): error CS0103: name not found [tracked.csproj]",
+                retryable_failure=True,
+                failure_kind="build",
+                edit_contract=edit_contract,
+                repair_plan=repair_plan,
+            )
+
+    agent = FakeAgent()
+
+    result = process_issue_with_retries(
+        agent=agent,
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-early-stop",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
+        max_build_retries=6,
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert agent.calls == 5
+    assert result.attempts == 5
+    assert "Retry stopped early after 5 attempt(s)" in result.skip_reason
+
+
+def test_process_issue_with_retries_does_not_stop_early_on_repeated_client_connect_timeout(
+    tmp_path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    issue = SonarIssue(
+        key="issue-connect-timeout",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=1,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def fix_issue(self, issue, workspace_path, build_command, retry_feedback="", retry_context=None):
+            self.calls += 1
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                error="Claude SDK Client 在 60 秒内未完成初始化",
+                build_command=build_command,
+                build_output="Claude SDK Client 在 60 秒内未完成初始化",
+                retryable_failure=True,
+                failure_kind="model_timeout",
+                model_timeout_stage="client_connect_timeout",
+            )
+
+    agent = FakeAgent()
+
+    result = process_issue_with_retries(
+        agent=agent,
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-connect-timeout",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
+        max_build_retries=3,
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert agent.calls == 3
+    assert result.attempts == 3
+    assert result.skip_reason == "Model response timed out after 3 attempt(s)"

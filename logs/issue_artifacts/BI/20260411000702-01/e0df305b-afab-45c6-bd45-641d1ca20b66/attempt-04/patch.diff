@@ -1,0 +1,647 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
+@@ -454,7 +454,7 @@
+         /// <summary>
+
+         /// 批量预加载所有需要的共享数据
+
+         /// </summary>
+
+-        private async Task<SharedDataCache> PreloadSharedData(List<ORDR> orders)
+
++        private async Task<SharedDataCache> PreloadSharedDataAsync(List<ORDR> orders)
+
+         {
+
+             var orderIds = orders.Select(o => o.DocEntry).ToList();
+
+ 
+
+@@ -718,6 +718,314 @@
+                 }
+
+             }
+
+             return cache;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 加载订单开票信息
+
++        /// </summary>
+
++        private async Task<Dictionary<int, List<InvoiceHistoryItem>>> LoadOrderInvoicesAsync(List<int> orderIds)
+
++        {
+
++            var invoiceDict = new Dictionary<int, List<InvoiceHistoryItem>>();
+
++            var mastersList = await UnitWork.Find<FinancebillapplicationMaster>(m => orderIds.Contains(m.DocEntry) && !string.IsNullOrEmpty(m.CardCode))
+
++                .Select(m => new { m.Id, m.DocEntry })
+
++                .ToListAsync();
+
++            var masterIds = mastersList.Select(m => m.Id).ToList();
+
++            var taxDetailsList = await UnitWork.Find<FinancebillapplicationTaxdetails>(t => masterIds.Contains(t.BillId) && t.TaxDate != null && t.TaxAmount > 0m)
+
++                .ToListAsync();
+
++
+
++            foreach (var master in mastersList)
+
++            {
+
++                var details = taxDetailsList.Where(td => td.BillId == master.Id)
+
++                    .Select(td => new InvoiceHistoryItem
+
++                    {
+
++                        InvoiceDate = td.TaxDate.Value,
+
++                        InvoiceAmount = td.TaxAmount.Value,
+
++                        BillId = master.Id,
+
++                        TaxNo = td.TaxNo
+
++                    }).OrderBy(item => item.InvoiceDate).ToList();
+
++
+
++                if (!invoiceDict.ContainsKey(master.DocEntry))
+
++                    invoiceDict[master.DocEntry] = new List<InvoiceHistoryItem>();
+
++                invoiceDict[master.DocEntry].AddRange(details);
+
++            }
+
++            return invoiceDict;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 加载收款相关数据
+
++        /// </summary>
+
++        private async Task<(Dictionary<int, List<ORCT>> directReceiptsByOrder, Dictionary<int, List<int>> orderToInv1Entries, Dictionary<int, ORCT> indirectReceiptsDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadReceiptRelatedDataAsync(List<int> orderIds)
+
++        {
+
++            var directReceiptsList = await LoadDirectReceiptsAsync(orderIds);
+
++            var directReceiptsByOrder = directReceiptsList
+
++                .GroupBy(r => r.U_XSDD.Value)
+
++                .ToDictionary(g => g.Key, g => g.ToList());
+
++
+
++            var dln1EntriesDict = await LoadDln1EntriesAsync(orderIds);
+
++            var allDlnEntries = dln1EntriesDict.Values.SelectMany(x => x).Distinct().ToList();
+
++            var (inv1EntriesDict, allRct2) = await LoadInv1AndRct2Async(allDlnEntries);
+
++
+
++            var orderToInv1Entries = BuildOrderToInv1Entries(orderIds, dln1EntriesDict, inv1EntriesDict);
+
++            var indirectReceiptsDict = await LoadIndirectReceiptsAsync(directReceiptsList, allRct2, orderToInv1Entries);
+
++
+
++            return (directReceiptsByOrder, orderToInv1Entries, indirectReceiptsDict, allRct2);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 加载直接收款数据
+
++        /// </summary>
+
++        private async Task<List<ORCT>> LoadDirectReceiptsAsync(List<int> orderIds)
+
++        {
+
++            var directReceiptsList = new List<ORCT>();
+
++            const int batchSize = 1000;
+
++            for (int i = 0; i < orderIds.Count; i += batchSize)
+
++            {
+
++                var batchIds = orderIds.Skip(i).Take(batchSize).ToList();
+
++                var batchResult = await UnitWork.Find<ORCT>(r => r.U_XSDD.HasValue && batchIds.Contains(r.U_XSDD.Value) && r.Canceled != "Y")
+
++                    .ToListAsync();
+
++                directReceiptsList.AddRange(batchResult);
+
++            }
+
++            return directReceiptsList;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 加载DLN1条目
+
++        /// </summary>
+
++        private async Task<Dictionary<int, List<int>>> LoadDln1EntriesAsync(List<int> orderIds)
+
++        {
+
++            var dln1AllResults = new List<(int BaseEntry, int DocEntry)>();
+
++            for (int i = 0; i < orderIds.Count; i += 1000)
+
++            {
+
++                var batchIds = orderIds.Skip(i).Take(1000).ToList();
+
++                var batch = await UnitWork.Find<DLN1>(de => de.BaseEntry.HasValue && batchIds.Contains(de.BaseEntry.Value) && de.BaseType == 17)
+
++                    .Select(de => new { BaseEntry = de.BaseEntry.Value, DocEntry = de.DocEntry.Value })
+
++                    .ToListAsync();
+
++                dln1AllResults.AddRange(batch.Select(x => (x.BaseEntry, x.DocEntry)));
+
++            }
+
++            return dln1AllResults
+
++                .GroupBy(x => x.BaseEntry)
+
++                .ToDictionary(g => g.Key, g => g.Select(x => x.DocEntry).ToList());
+
++        }
+
++
+
++        /// <summary>
+
++        /// 加载INV1和RCT2数据
+
++        /// </summary>
+
++        private async Task<(Dictionary<int, List<int>> inv1EntriesDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2)> LoadInv1AndRct2Async(List<int> allDlnEntries)
+
++        {
+
++            var inv1EntriesDict = new Dictionary<int, List<int>>();
+
++            var allRct2 = new List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)>();
+
++
+
++            if (!allDlnEntries.Any())
+
++                return (inv1EntriesDict, allRct2);
+
++
+
++            var inv1AllResults = await LoadInv1Async(allDlnEntries);
+
++            inv1EntriesDict = inv1AllResults
+
++                .GroupBy(x => x.BaseEntry)
+
++                .ToDictionary(g => g.Key, g => g.Select(x => x.DocEntry).ToList());
+
++
+
++            var allInvEntries = inv1AllResults.Select(x => x.DocEntry).Distinct().ToList();
+
++            if (allInvEntries.Any())
+
++            {
+
++                allRct2 = await LoadRct2Async(allInvEntries);
+
++            }
+
++
+
++            return (inv1EntriesDict, allRct2);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 加载INV1数据
+
++        /// </summary>
+
++        private async Task<List<(int BaseEntry, int DocEntry)>> LoadInv1Async(List<int> allDlnEntries)
+
++        {
+
++            var inv1AllResults = new List<(int BaseEntry, int DocEntry)>();
+
++            for (int i = 0; i < allDlnEntries.Count; i += 1000)
+
++            {
+
++                var batchIds = allDlnEntries.Skip(i).Take(1000).ToList();
+
++                var batch = await UnitWork.Find<INV1>(ie => ie.BaseEntry.HasValue && batchIds.Contains(ie.BaseEntry.Value) && ie.BaseType == 15)
+
++                    .Select(ie => new { BaseEntry = ie.BaseEntry.Value, DocEntry = ie.DocEntry.Value })
+
++                    .ToListAsync();
+
++                inv1AllResults.AddRange(batch.Select(x => (x.BaseEntry, x.DocEntry)));
+
++            }
+
++            return inv1AllResults;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 加载RCT2数据
+
++        /// </summary>
+
++        private async Task<List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC) >> LoadRct2Async(List<int> allInvEntries)
+
++        {
+
++            var rct2AllResults = new List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)>();
+
++            for (int i = 0; i < allInvEntries.Count; i += 1000)
+
++            {
+
++                var batchIds = allInvEntries.Skip(i).Take(1000).ToList();
+
++                var batch = await UnitWork.Find<RCT2>(re => re.DocEntry.HasValue && batchIds.Contains(re.DocEntry.Value) && re.InvType == "13")
+
++                    .Select(re => new { re.DocNum, DocEntry = re.DocEntry, re.SumApplied, re.AppliedFC })
+
++                    .ToListAsync();
+
++                rct2AllResults.AddRange(batch
+
++                    .Where(re => re.DocEntry.HasValue)
+
++                    .Select(re => (re.DocNum, re.DocEntry.Value, re.SumApplied ?? 0M, re.AppliedFC ?? 0M)));
+
++            }
+
++            return rct2AllResults;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 构建订单到INV1条目的映射
+
++        /// </summary>
+
++        private Dictionary<int, List<int>> BuildOrderToInv1Entries(List<int> orderIds, Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict)
+
++        {
+
++            var orderToInv1Entries = new Dictionary<int, List<int>>();
+
++            foreach (var orderId in orderIds)
+
++            {
+
++                if (!dln1EntriesDict.TryGetValue(orderId, out var dlnEntries))
+
++                    continue;
+
++
+
++                var inv1 = new List<int>();
+
++                foreach (var dlnEntry in dlnEntries)
+
++                {
+
++                    if (inv1EntriesDict.TryGetValue(dlnEntry, out var invEntries))
+
++                        inv1.AddRange(invEntries);
+
++                }
+
++                if (inv1.Any())
+
++                    orderToInv1Entries[orderId] = inv1;
+
++            }
+
++            return orderToInv1Entries;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 加载间接收款数据
+
++        /// </summary>
+
++        private async Task<Dictionary<int, ORCT>> LoadIndirectReceiptsAsync(List<ORCT> directReceiptsList, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC) > allRct2, Dictionary<int, List<int>> orderToInv1Entries)
+
++        {
+
++            var directDocNums = directReceiptsList.Select(r => r.DocNum).ToHashSet();
+
++            var indirectRct2DocNums = allRct2.Select(r => r.DocNum).Where(n => !directDocNums.Contains(n)).Distinct().ToList();
+
++
+
++            var indirectReceiptsList = new List<ORCT>();
+
++            for (int i = 0; i < indirectRct2DocNums.Count; i += 1000)
+
++            {
+
++                var batchNums = indirectRct2DocNums.Skip(i).Take(1000).ToList();
+
++                var batch = await UnitWork.Find<ORCT>(r => batchNums.Contains(r.DocNum) && r.Canceled != "Y" && !r.U_XSDD.HasValue).ToListAsync();
+
++                indirect
+
++            }
+
++            return indirectReceiptsList.ToDictionary(r => r.DocNum, r => r);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 构建收款字典
+
++        /// </summary>
+
++        private Dictionary<int, List<ReceiptForOrder>> BuildReceiptDict(List<int> orderIds, Dictionary<int, List<ORCT>> directReceiptsByOrder, Dictionary<int, List<int>> orderToInv1Entries, Dictionary<int, ORCT> indirectReceiptsDict, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC) > allRct2)
+
++        {
+
++            var receiptDict = new Dictionary<int, List<ReceiptForOrder>>();
+
++            var directReceiptsList = directReceiptsByOrder.Values.SelectMany(x => x).ToList();
+
++            var directDocNums = directReceiptsList.Select(r => r.DocNum).ToHashSet();
+
++
+
++            foreach (var orderId in orderIds)
+
++            {
+
++                if (!orderToInv1Entries.TryGetValue(orderId, out var thisOrderInv1))
+
++                    continue;
+
++
+
++                var relatedRct2 = allRct2.Where(r => thisOrderInv1.Contains(r.InvDocEntry)).ToList();
+
++                var relatedIndirectDocNums = relatedRct2.Select(r => r.DocNum).Where(n => !directDocNums.Contains(n)).Distinct().ToHashSet();
+
++
+
++                foreach (var rctDocNum in relatedIndirectDocNums)
+
++                {
+
++                    if (!indirectReceiptsDict.TryGetValue(rctDocNum, out var receipt))
+
++                        continue;
+
++
+
++                    var matchingRct2 = r
+
++                        var receiptForOrder = new ReceiptForOrder
+
++                        {
+
++                            DocEntry = receipt.DocEntry,
+
++                            DocNum = receipt.DocNum,
+
++                            DocDate = receipt.DocDate,
+
++                            Canceled = receipt.Canceled,
+
++                            AppliedAmount = matchingRct2.Sum(r => r.SumApplied),
+
++                            AppliedAmountFC = matchingRct2.Sum(r => r.AppliedFC)
+
++                        };
+
++                        AddReceiptToDict(receiptDict, orderId, receiptForOrder);
+
++                }
+
++            }
+
++
+
++            foreach (var orderId in orderIds)
+
++            {
+
++                if (!directReceiptsByOrder.TryGetValue(orderId, out var orderDirectReceipts))
+
++                    continue;
+
++
+
++                foreach (var receipt in orderDirectReceipts)
+
++                {
+
++                    var receiptForOrder = new ReceiptForOrder
+
++                    {
+
++                        DocEntry = receipt.DocEntry,
+
++                        DocNum = receipt.DocNum,
+
++                        DocDate = receipt.DocDate,
+
++                        Canceled = receipt.Canceled,
+
++                        AppliedAmount = receipt.DocTotal ?? 0M,
+
++                        AppliedAmountFC = receipt.DocTotalFC ?? 0M
+
++                    };
+
++                    AddReceiptToDict(receiptDict, orderId, receiptForOrder);
+
++                }
+
++            }
+
++
+
++            foreach (var orderId in receiptDict.Keys.ToList())
+
++            {
+
++                receiptDict[orderId] = receiptDict[orderId]
+
++                    .GroupBy(r => r.DocEntry)
+
++                    .Select(g => new ReceiptForOrder
+
++                    {
+
++                        DocEntry = g.Key,
+
++                        DocNum = g.First().DocNum,
+
++                        DocDate = g.First().DocDate,
+
++                        Canceled = g.First().Canceled,
+
++                        AppliedAmount = g.Sum(r => r.AppliedAmount),
+
++                        AppliedAmountFC = g.Sum(r => r.AppliedAmountFC)
+
++                    })
+
++                    .OrderBy(r => r.DocDate)
+
++                    .ToList();
+
++            }
+
++            return receiptDict;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 添加收款到字典
+
++        /// </summary>
+
++        private void AddReceiptToDict(Dictionary<int, List<ReceiptForOrder>> receiptDict, int orderId, ReceiptForOrder receipt)
+
++        {
+
++            if (!receiptDict.ContainsKey(orderId))
+
++                receiptDict[orderId] = new List<ReceiptForOrder>();
+
++            receiptDict[orderId].Add(receipt);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 加载可清截止日期
+
++        /// </summary>
+
++        private async Task<Dictionary<int, DateTime?>> LoadCanClearCutOffDatesAsync(List<int> orderIds)
+
++        {
+
++            var batchSaleOrderRemarkCanClear = await UnitWork.Find<SaleOrdrRemark>(r =>
+
++                orderIds.Contains(r.DocEntry) &&
+
++                r.SboId == SboIdEnums.neware_201304 &&
+
++                r.Remark.Contains("("可清单"]))
+
++                .ToListAsync();
+
++
+
++            var batchSaleOrderRemarkCannotClear = await UnitWork.Find<SaleOrdrRemark>(r =>
+
++                orderIds.Contains(r.DocEntry) &&
+
++                r.SboId == SboIdEnums.neware_201304 &&
+
++                r.Remark.Contains("不可清单"))
+
++                .ToListAsync();
+
++
+
++            var canClearCutOffDates = new Dictionary<int, DateTime?>();
+
++            var canClearDict = batchSaleOrderRemarkCanClear.GroupBy(x => x.DocEntry).ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.CreateDate).First());
+
++            var cannotClearDict = batchSaleOrderRemarkCannotClear.GroupBy(x => x.DocEntry).ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.CreateDate).First());
+
++
+
++            foreach (var orderId in orderIds)
+
++            {
+
++                var hasCanClear = canClearDict.TryGetValue(orderId, out var canClearRemark);
+
++                var hasCannotClear = cannotClearDict.TryGetValue(orderId, out var cannotClearRemark);
+
++
+
++                if ((hasCanClear && !hasCannotClear) || (hasCanClear && hasCannotClear && canClearRemark.CreateDate > cannotClearRemark.CreateDate))
+
++                {
+
++                    canClearCutOffDates[orderId] = canClearRemark.CreateDate.Date;
+
++                }
+
++            }
+
++            return canClearCutOffDates;
+
+         }
+
+ 
+
+         /// <summary>

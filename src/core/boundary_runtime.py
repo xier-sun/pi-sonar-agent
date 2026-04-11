@@ -42,6 +42,12 @@ class BoundaryReviewOutcome:
     reviewer_result: ReviewerResult
     reviewer_retry_message: str
     scope_violation: str | None
+    scope_audit_mode: str = "scope_soft_audit"
+    scope_audit_active: bool = True
+    scope_expansion_count: int = 0
+    scope_expansion_reasons: tuple[str, ...] = ()
+    extra_file_touch_count: int = 0
+    high_drift_warning: bool = False
     primary_failure_code: str = ""
     primary_failure_summary: str = ""
     secondary_failure_codes: tuple[str, ...] = ()
@@ -393,6 +399,9 @@ class BoundaryRuntime:
             edit_contract=effective_contract,
             reviewer_result=reviewer_result,
         )
+        reviewer_metrics = (
+            reviewer_result.metrics if isinstance(reviewer_result.metrics, dict) else {}
+        )
         primary_failure = reviewer_failure
         secondary_failures = tuple(
             failure.code
@@ -405,6 +414,18 @@ class BoundaryRuntime:
             reviewer_result=reviewer_result,
             reviewer_retry_message=reviewer_result.to_retry_message(),
             scope_violation=scope_violation,
+            scope_audit_mode=str(
+                reviewer_metrics.get("scope_audit_mode", "scope_soft_audit") or "scope_soft_audit"
+            ),
+            scope_audit_active=bool(reviewer_metrics.get("scope_audit_active", True)),
+            scope_expansion_count=int(reviewer_metrics.get("scope_expansion_count", 0) or 0),
+            scope_expansion_reasons=tuple(
+                str(item).strip()
+                for item in reviewer_metrics.get("scope_expansion_reasons", ())
+                if str(item).strip()
+            ),
+            extra_file_touch_count=int(reviewer_metrics.get("extra_touched_file_count", 0) or 0),
+            high_drift_warning=bool(reviewer_metrics.get("high_drift_warning", False)),
             primary_failure_code=(primary_failure.code if primary_failure is not None else ""),
             primary_failure_summary=(primary_failure.summary if primary_failure is not None else ""),
             secondary_failure_codes=secondary_failures,

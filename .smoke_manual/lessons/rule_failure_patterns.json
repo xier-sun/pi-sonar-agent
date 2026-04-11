@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-04-10T09:22:22.752641+00:00",
+  "patterns": [
+    {
+      "pattern_key": "rule_failure|csharpsquid:S3776|build|method|-|-",
+      "lesson_kind": "rule_failure",
+      "issue_rule_id": "csharpsquid:S3776",
+      "failure_kind": "build",
+      "scope_mode": "method",
+      "guardrail_mode": "",
+      "boundary_failure_code": "",
+      "count": 2,
+      "first_seen_at": "2026-04-10T09:22:22.570002+00:00",
+      "last_seen_at": "2026-04-10T09:22:22.740705+00:00",
+      "latest_summary": "Issue changes failed local build verification",
+      "guidance": [
+        "先修复这些编译错误，再确认 Sonar 问题仍然被修复。",
+        "优先最小化修改，不要额外重写整个文件。",
+        "不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。"
+      ],
+      "evidence": [
+        "D:\\MyProjects\\pi-sonar-agent\\.smoke_manual\\early_stop_9cb29aba\\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]"
+      ],
+      "quality_gate_rule_ids": []
+    }
+  ]
+}

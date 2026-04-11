@@ -1,0 +1,79 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalAfterBillOverdueImportService.cs
+@@ -457,7 +457,6 @@
+         private async Task<SharedDataCache> PreloadSharedData(List<ORDR> orders)
+
+         {
+
+             var orderIds = orders.Select(o => o.DocEntry).ToList();
+
+-
+
+             var cache = new SharedDataCache();
+
+ 
+
+             // 1. 加载所有业务员信息
+
+@@ -468,30 +467,7 @@
+             cache.CustomerTypes = customerTypesList.ToDictionary(ct => ct.CardCode, ct => ct);
+
+ 
+
+             // 3. 批量加载开票信息
+
+-            var invoiceDict = new Dictionary<int, List<InvoiceHistoryItem>>();
+
+-            var mastersList = await UnitWork.Find<FinancebillapplicationMaster>(m => orderIds.Contains(m.DocEntry) && !string.IsNullOrEmpty(m.CardCode))
+
+-                .Select(m => new { m.Id, m.DocEntry })
+
+-                .ToListAsync();
+
+-            var masterIds = mastersList.Select(m => m.Id).ToList();
+
+-            var taxDetailsList = await UnitWork.Find<FinancebillapplicationTaxdetails>(t => masterIds.Contains(t.BillId) && t.TaxDate != null && t.TaxAmount > 0m)
+
+-                .ToListAsync();
+
+-            
+
+-            foreach (var master in mastersList)
+
+-            {
+
+-                var details = taxDetailsList.Where(td => td.BillId == master.Id)
+
+-                    .Select(td => new InvoiceHistoryItem
+
+-                    {
+
+-                        InvoiceDate = td.TaxDate.Value,
+
+-                        InvoiceAmount = td.TaxAmount.Value,
+
+-                        BillId = master.Id,
+
+-                        TaxNo = td.TaxNo
+
+-                    }).OrderBy(item => item.InvoiceDate).ToList();
+
+-                
+
+-                if (!invoiceDict.ContainsKey(master.DocEntry))
+
+-                    invoiceDict[master.DocEntry] = new List<InvoiceHistoryItem>();
+
+-                invoiceDict[master.DocEntry].AddRange(details);
+
+-            }
+
+-            cache.OrderInvoices = invoiceDict;
+
++            cache.OrderInvoices = await LoadOrderInvoicesAsync(orderIds);
+
+ 
+
+             // 4. 批量加载收款信息
+
+             var receiptDict = new Dictionary<int, List<ReceiptForOrder>>();

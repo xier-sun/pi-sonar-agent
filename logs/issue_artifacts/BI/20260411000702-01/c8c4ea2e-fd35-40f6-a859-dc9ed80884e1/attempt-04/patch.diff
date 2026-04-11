@@ -1,0 +1,305 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
+@@ -192,6 +192,8 @@
+         /// <summary>
+
+         /// 快照报表权限校验（复用salereceivable模块权限）
+
+         /// </summary>
+
++        /// <param name="req">逾期快照查询请求参数</param>
+
++        /// <returns>权限校验结果：包含是否无权限、状态码和消息</returns>
+
+         public async Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermission(OverdueAgingSnapshotReq req)
+
+         {
+
+             var loginContext = _auth.GetCurrentUser() ?? throw new CommonException(Define.LoginHasExpired, Define.INVALID_TOKEN);
+
+@@ -201,56 +203,12 @@
+             var moduleElements = await GetSnapshotModuleElements(roles);
+
+ 
+
+             var domId = GetSnapshotModuleElementDomId(moduleElements);
+
+-            switch (domId)
+
+-            {
+
+-                case view_all:
+
+-                    break;
+
+-                case view_dept:
+
+-                    var deptResult = await HandleSnapshotDeptView(loginUser.User_Id, req);
+
+-                    if (deptResult.HasError) return deptResult.Result;
+
+-                    break;
+
+-                case view_self:
+
+-                    var selfResult = await HandleSnapshotSelfView(loginUser.User_Id, req);
+
+-                    if (selfResult.HasError) return selfResult.Result;
+
+-                    break;
+
+-                default:
+
+-                    return (true, 500, "用户角色未配置模块权限");
+
+-            }
+
+-
+
+-            // 处理公司主体标识权限
+
+-            var customQryCategory = await UnitWork.Find<Category>(x => x.TypeId == FinanceConsts.FICO_Custom_Query_Filter).ToListAsync();
+
+-            var haveCustomQueryRight = customQryCategory.Select(x => x.DtCode).Intersect(moduleElements.Select(x => x.DomId)).Distinct().ToList();
+
+-            if (haveCustomQueryRight.Count > 0)
+
+-            {
+
+-                var indicators = customQryCategory.Where(x => haveCustomQueryRight.Contains(x.DtCode)).Select(x => x.DtValue).ToList();
+
+-                if (req.IndicatorList == null || (req.IndicatorList != null && req.IndicatorList.Count == 0))
+
+-                {
+
+-                    req.IndicatorList = indicators;
+
+-                }
+
+-                else if (req.IndicatorList.Except(indicators).Any())
+
+-                {
+
+-                    var invalidItems = req.IndicatorList.Where(x => !indicators.Contains(x)).ToList();
+
+-                    var idcinfo = await UnitWork.Find<crm_oidc>(x => x.sbo_id == Define.SBO_ID).Where(x => invalidItems.Contains(x.Code)).Select(x => x.Name).ToListAsync();
+
+-                    return (true, 500, $"无查看{string.Join("，", idcinfo)}标识的权限");
+
+-                }
+
+-                req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? "N" : i);
+
+-            }
+
+-            else
+
+-            {
+
+-                var loginInfo = _auth.GetLoginInfo();
+
+-                var loginIndicator = loginInfo.IndicateCode;
+
+-                if (loginIndicator != Define.All_IndicatorCode)
+
+-                {
+
+-                    req.Indicator = loginIndicator == Define.Non_IndicatorCode ? "N" : loginIndicator;
+
+-                    req.IndicatorList = new List<string>();
+
+-                }
+
+-                else
+
+-                {
+
+-                    req.Indicator = req.Indicator == Define.Non_IndicatorCode ? "N" : req.Indicator;
+
+-                    if (req.IndicatorList != null)
+
+-                        req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? "N" : i);
+
+-                }
+
+-            }
+
++            var viewPermissionResult = await HandleSnapshotViewPermission(domId, loginUser.User_Id, req);
+
++            if (viewPermissionResult != null) return viewPermissionResult.Value;
+
++
+
++            var indicatorPermissionResult = await HandleIndicatorPermission(moduleElements, req);
+
++            if (indicatorPermissionResult != null) return indicatorPermissionResult.Value;
+
++
+
+             return (false, 200, string.Empty);
+
+         }
+
+ 
+
+@@ -317,6 +275,69 @@
+             return (false, default);
+
+         }
+
+ 
+
++        /// <summary>
+
++        /// 处理快照查看权限（根据DomId判断view_all/view_dept/view_self权限）
+
++        /// </summary>
+
++        private async Task<(bool, int, string)?> HandleSnapshotViewPermission(string domId, int? userId, OverdueAgingSnapshotReq req)
+
++        {
+
++            switch (domId)
+
++            {
+
++                case view_all:
+
++                    return null;
+
++                case view_dept:
+
++                    var deptResult = await HandleSnapshotDeptView(userId, req);
+
++                    if (deptResult.HasError) return deptResult.Result;
+
++                    return null;
+
++                case view_self:
+
++                    var selfResult = await HandleSnapshotSelfView(userId, req);
+
++                    if (selfResult.HasError) return selfResult.Result;
+
++                    return null;
+
++                default:
+
++                    return (true, 500, "用户角色未配置模块权限");
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理公司主体标识权限
+
++        /// </summary>
+
++        private async Task<(bool, int, string)?> HandleIndicatorPermission(List<ModuleElement> moduleElements, OverdueAgingSnapshotReq req)
+
++        {
+
++            var customQryCategory = await UnitWork.Find<Category>(x => x.TypeId == FinanceConsts.FICO_Custom_Query_Filter).ToListAsync();
+
++            var haveCustomQueryRight = customQryCategory.Select(x => x.DtCode).Intersect(moduleElements.Select(x => x.DomId)).Distinct().ToList();
+
++            if (haveCustomQueryRight.Count > 0)
+
++            {
+
++                var indicators = customQryCategory.Where(x => haveCustomQueryRight.Contains(x.DtCode)).Select(x => x.DtValue).ToList();
+
++                if (req.IndicatorList == null || (req.IndicatorList != null && req.IndicatorList.Count == 0))
+
++                {
+
++                    req.IndicatorList = indicators;
+
++                }
+
++                else if (req.IndicatorList.Except(indicators).Any())
+
++                {
+
++                    var invalidItems = req.IndicatorList.Where(x => !indicators.Contains(x)).ToList();
+
++                    var idcinfo = await UnitWork.Find<crm_oidc>(x => x.sbo_id == Define.SBO_ID).Where(x => invalidItems.Contains(x.Code)).Select(x => x.Name).ToListAsync();
+
++                    return (true, 500, $"无查看{string.Join("，", idcinfo)}标识的权限");
+
++                }
+
++                req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? "N" : i);
+
++            }
+
++            else
+
++            {
+
++                var loginInfo = _auth.GetLoginInfo();
+
++                var loginIndicator = loginInfo.IndicateCode;
+
++                if (loginIndicator != Define.All_IndicatorCode)
+
++                {
+
++                    req.Indicator = loginIndicator == Define.Non_IndicatorCode ? "N" : loginIndicator;
+
++                    req.IndicatorList = new List<string>();
+
++                }
+
++                else
+
++                {
+
++                    req.Indicator = req.Indicator == Define.Non_IndicatorCode ? "N" : req.Indicator;
+
++                    if (req.IndicatorList != null)
+
++                        req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? "N" : i);
+
++                }
+
++            }
+
++            return null;
+
++        }
+
++
+
+         #endregion
+
+     }
+
+ }
+
+--- a/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IDailyOverdueSnapshotApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IDailyOverdueSnapshotApp.cs
+@@ -26,8 +26,8 @@
+         /// <summary>
+
+         /// 获取逾期快照权限（根据用户ID和查询参数判断是否有权限访问逾期快照数据）
+
+         /// </summary>
+
+-        /// <param name="req"></param>
+
+-        /// <returns></returns>
+
++        /// <param name="req">逾期快照查询请求参数</param>
+
++        /// <returns>权限校验结果：包含是否无权限、状态码和消息</returns>
+
+         Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermission(OverdueAgingSnapshotReq req);
+
+     }
+
+ }

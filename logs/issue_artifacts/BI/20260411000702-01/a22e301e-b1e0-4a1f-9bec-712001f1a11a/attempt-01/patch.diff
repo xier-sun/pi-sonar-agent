@@ -1,0 +1,582 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -50,124 +50,178 @@
+ 
+
+ 
+
+             try
+
+-            {         
+
+-                var allOslps = await UnitWork.Find<OSLP>(null)
+
+-                                       .ToListAsync();
+
+-                var slpCodeToNameMap = allOslps
+
+-                    .ToDictionary(
+
+-                        x => x.SlpCode,
+
+-                        x => x.SlpName
+
+-                    );
+
+-                // 排除售后
+
+-                //var csOrders = UnitWork.Find<sale_ordr>(x => x.U_ERPFrom == "4" && x.sbo_id == Define.SBO_ID).Select(x => x.DocEntry.Value).ToHashSet();
+
+-                //首先要找到已结算的单据，已结算的单据退货，才需要重新关联新单据
+
+-                //U_DevEntry 为关联的要退的订单号，U_New_OrdrID为关联的新订单号,
+
+-                //若 U_New_OrdrID 没有值，且价格>0的物料全部退完，则说明这个单里的有价物料全退掉了，要计算罚息
+
+-                //罚息基础金额 = 订单中价格=0的物料的 sum(DelivrdQty * LastPurPrc)
+
+-                //若 U_New_OrdrID 有值，则说明这个单是空退, 无实际退货，只是将单据物料关联在新的 U_New_OrdrID 订单上 不用罚息
+
+-                var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)
+
+-                                            join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry
+
+-                                            join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+
+-                                            where r.CANCELED == "N" && (r.U_New_ORDRID == null || r.U_New_ORDRID == "")
+
+-                                            select new { r.DocEntry, r.U_New_ORDRID, r1.ItemCode, r1.Price, r.U_DevEntry, r1.Quantity, r1.StockValue, m.LastPurPrc, r.CreateDate, r1.BaseEntry, r1.BaseType }).ToListAsync();
+
+-
+
+-                // U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 回溯原始订单号
+
+-                var nullDevEntryItems = returnItems.Where(x => string.IsNullOrEmpty(x.U_DevEntry) && x.DocEntry.HasValue && x.BaseEntry.HasValue).ToList();
+
+-                var resolvedDevEntryMap = new Dictionary<int, int>(); // ORIN.DocEntry → 原始ORDR.DocEntry
+
+-                if (nullDevEntryItems.Any())
+
++            {
+
++                // 获取退货单数据及销售伙伴数据
+
++                var (returnItems, slpCodeToNameMap) = await GetReturnItemsAndSalesPartnersAsync();
+
++
+
++                // 处理无 U_DevEntry 物料的回溯
+
++                var returnItemsWithDevEntry = await ProcessNullDevEntryItemsAsync(returnItems);
+
++
+
++                // 获取已罚息订单集合
+
++                var hadPenaltyOrdrs = await GetHadPenaltyOrdersAsync();
+
++
+
++                // 过滤退货产品
+
++                var returnProductsInFilter = FilterReturnProducts(returnItemsWithDevEntry, hadPenaltyOrdrs);
+
++
+
++                // 获取已交货物料
+
++                var delivrdItems = await GetDeliveredItemsAsync(returnProductsInFilter);
+
++                var delivrdProducts = delivrdItems.Where(x => x.Price > 0).ToList();
+
++
+
++                // 处理罚息计算
+
++                ProcessPenaltyCalculation(returnProductsInFilter, delivrdItems, delivrdProducts, returnItemsWithDevEntry, slpCodeToNameMap, rule.Id, newEvents);
+
++
+
++            }
+
++            catch (Exception ex)
+
++            {
+
++                LogHelper.Error(ex, "处理退货未关联新单据处理器失败", nameof(ReturnUnRelNewOrderProcessor), nameof(ProcessAsync));
+
++            }
+
++            return (newEvents, new List<ResolvedEventData>(), new List<CanceledEventData>());
+
++        }
+
++
+
++        /// <summary>
+
++        /// 获取退货单数据及销售伙伴数据
+
++        /// </summary>
+
++        private async Task<(List<dynamic> ReturnItems, Dictionary<int, string> SlpCodeToNameMap)> GetReturnItemsAndSalesPartnersAsync()
+
++        {
+
++            var allOslps = await UnitWork.Find<OSLP>(null).ToListAsync();
+
++            var slpCodeToNameMap = allOslps.ToDictionary(x => x.SlpCode, x => x.SlpName);
+
++
+
++            // 首先要找到已结算的单据，已结算的单据退货，才需要重新关联新单据
+
++            // U_DevEntry 为关联的要退的订单号，U_New_OrdrID为关联的新订单号
+
++            // 若 U_New_OrdrID 没有值，且价格>0的物料全部退完，则说明这个单里的有价物料全退掉了，要计算罚息
+
++            // 罚息基础金额 = 订单中价格=0的物料的 sum(DelivrdQty * LastPurPrc)
+
++            // 若 U_New_OrdrID 有值，则说明这个单是空退, 无实际退货，只是将单据物料关联在新的 U_New_OrdrID 订单上 不用罚息
+
++            var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)
+
++                                     join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry
+
++                                     join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+
++                                     where r.CANCELED == "N" && (r.U_New_ORDRID == null || r.U_New_ORDRID == "")
+
++                                     select new { r.DocEntry, r.U_New_ORDRID, r1.ItemCode, r1.Price, r.U_DevEntry, r1.Quantity, r1.StockValue, m.LastPurPrc, r.CreateDate, r1.BaseEntry, r1.BaseType }).ToListAsync();
+
++
+
++            return (returnItems, slpCodeToNameMap);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理无 U_DevEntry 物料的回溯
+
++        /// </summary>
+
++        private async Task<List<dynamic>> ProcessNullDevEntryItemsAsync(List<dynamic> returnItems)
+
++        {
+
++            // U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 回溯原始订单号
+
++            var nullDevEntryItems = returnItems.Where(x => string.IsNullOrEmpty(x.U_DevEntry) && x.DocEntry.HasValue && x.BaseEntry.HasValue).ToList();
+
++            var resolvedDevEntryMap = new Dictionary<int, int>();
+
++
+
++            if (nullDevEntryItems.Any())
+
++            {
+
++                // 提取回溯所需数据：(ORIN.DocEntry, RIN1.BaseEntry, RIN1.BaseType)
+
++                var traceItems = nullDevEntryItems
+
++                    .Select(x => (OrinDocEntry: x.DocEntry.Value, BaseEntry: x.BaseEntry.Value, BaseType: x.BaseType ?? 0))
+
++                    .Distinct()
+
++                    .ToList();
+
++                resolvedDevEntryMap = await ResolveOrderDocEntryFromReturnChainAsync(traceItems);
+
++            }
+
++
+
++            // 合并：有 U_DevEntry 的直接用，没有的用回溯结果
+
++            return returnItems.Select(x => new
+
++            {
+
++                x.DocEntry, x.U_New_ORDRID, x.ItemCode, x.Price, x.Quantity, x.StockValue, x.LastPurPrc, x.CreateDate,
+
++                ResolvedDevEntry = !string.IsNullOrEmpty(x.U_DevEntry)
+
++                    ? (int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0)
+
++                    : (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved) ? resolved : 0)
+
++            }).Where(x => x.ResolvedDevEntry > 0).ToList();
+
++        }
+
++
+
++        /// <summary>
+
++        /// 获取已罚息订单集合
+
++        /// </summary>
+
++        private async Task<HashSet<int>> GetHadPenaltyOrdersAsync()
+
++        {
+
++            var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)
+
++                                          join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId
+
++                                          where pd.RuleHandlerCode == HandlerCode
+
++                                          select Convert.ToInt32(r.TriggerDocEntry)).ToListAsync()).ToHashSet();
+
++            return hadPenaltyOrdrs;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 过滤退货产品
+
++        /// </summary>
+
++        private List<dynamic> FilterReturnProducts(List<dynamic> returnItemsWithDevEntry, HashSet<int> hadPenaltyOrdrs)
+
++        {
+
++            var returnProducts = returnItemsWithDevEntry.Where(m => m.Price > 0).ToList();
+
++            return returnProducts
+
++                .Where(x => !hadPenaltyOrdrs.Contains(x.ResolvedDevEntry))
+
++                .Select(x => new { x.DocEntry, x.CreateDate, x.Quantity, x.ItemCode, x.Price, U_DevEntry = x.ResolvedDevEntry })
+
++                .ToList();
+
++        }
+
++
+
++        /// <summary>
+
++        /// 获取已交货物料
+
++        /// </summary>
+
++        private async Task<List<dynamic>> GetDeliveredItemsAsync(List<dynamic> returnProductsInFilter)
+
++        {
+
++            var returnOrdrDocEntrys = returnProductsInFilter.Select(x => x.U_DevEntry).Distinct().ToList();
+
++
+
++            var delivrdItems = await (from r1 in UnitWork.Find<RDR1>(null)
+
++                                     join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry
+
++                                     join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+
++                                     where r.CANCELED == "N" && r.DocStatus == "C" && r1.DelivrdQty > 0 && r1.LineStatus == "C" && r1.OpenQty == 0 && m.InvntItem == "Y" && returnOrdrDocEntrys.Contains(r.DocEntry)
+
++                                     select new { r.DocEntry, r1.LineNum, r1.ItemCode, r1.DelivrdQty, r1.Price, m.ManSerNum, m.ManBtchNum, m.LastPurPrc, r.SlpCode }).ToListAsync();
+
++
+
++            return delivrdItems;
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理罚息计算
+
++        /// </summary>
+
++        private void ProcessPenaltyCalculation(List<dynamic> returnProductsInFilter, List<dynamic> delivrdItems, List<dynamic> delivrdProducts, List<dynamic> returnItemsWithDevEntry, Dictionary<int, string> slpCodeToNameMap, string ruleId, List<PenaltyEventData> newEvents)
+
++        {
+
++            var delivrdProductsLookUp = delivrdProducts.ToLookup(x => x.DocEntry);
+
++
+
++            foreach (var group in returnProductsInFilter.GroupBy(x => x.U_DevEntry))
+
++            {
+
++                var thisOrdrReturnItems = group.GroupBy(x => x.ItemCode).Select(x => new { ItemCode = x.Key, TotalQty = x.Sum(s => s.Quantity) }).ToDictionary(k => k.ItemCode, v => v.TotalQty);
+
++                var delivrdItemsInThisOrdr = delivrdProductsLookUp[group.Key].GroupBy(x => x.ItemCode).Select(x => new { ItemCode = x.Key, TotalQty = x.Sum(s => s.DelivrdQty) }).ToDictionary(k => k.ItemCode, v => v.TotalQty);
+
++
+
++                // 遍历订单中所有有价物料，检查每个物料是否都已退完
+
++                if (delivrdItemsInThisOrdr.All(x => x.Value == (thisOrdrReturnItems.TryGetValue(x.Key, out var returnedQty) ? returnedQty : 0)))
+
+                 {
+
+-                    // 提取回溯所需数据：(ORIN.DocEntry, RIN1.BaseEntry, RIN1.BaseType)
+
+-                    var traceItems = nullDevEntryItems
+
+-                        .Select(x => (OrinDocEntry: x.DocEntry.Value, BaseEntry: x.BaseEntry.Value, BaseType: x.BaseType ?? 0))
+
+-                        .Distinct()
+
+-                        .ToList();
+
+-                    resolvedDevEntryMap = await ResolveOrderDocEntryFromReturnChainAsync(traceItems);
+
+-                }
+
+-
+
+-                // 合并：有 U_DevEntry 的直接用，没有的用回溯结果
+
+-                var returnItemsWithDevEntry = returnItems.Select(x => new
+
+-                {
+
+-                    x.DocEntry, x.U_New_ORDRID, x.ItemCode, x.Price, x.Quantity, x.StockValue, x.LastPurPrc, x.CreateDate,
+
+-                    ResolvedDevEntry = !string.IsNullOrEmpty(x.U_DevEntry)
+
+-                        ? (int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0)
+
+-                        : (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved) ? resolved : 0)
+
+-                }).Where(x => x.ResolvedDevEntry > 0 
+
+-                //&& !csOrders.Contains(x.ResolvedDevEntry)
+
+-                ).ToList();
+
+-
+
+-                var returnProducts = returnItemsWithDevEntry.Where(m => m.Price > 0).ToList();
+
+-                var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)
+
+-                                              join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId
+
+-                                              where pd.RuleHandlerCode == HandlerCode
+
+-                                              select Convert.ToInt32(r.TriggerDocEntry)).ToListAsync()).ToHashSet();
+
+-
+
+-                var returnProductsInFilter = returnProducts
+
+-                    .Where(x => !hadPenaltyOrdrs.Contains(x.ResolvedDevEntry))
+
+-                    .Select(x => new { x.DocEntry, x.CreateDate, x.Quantity, x.ItemCode, x.Price, U_DevEntry = x.ResolvedDevEntry })
+
+-                    .ToList();
+
+-                var returnOrdrDocEntrys = returnProductsInFilter.Select(x => x.U_DevEntry).Distinct().ToList();
+
+-
+
+-                var delivrdItems = await (from r1 in UnitWork.Find<RDR1>(null)
+
+-                                             join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry
+
+-                                             join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode
+
+-                                             where
+
+-                                                r.CANCELED == "N" && r.DocStatus == "C" && r1.DelivrdQty > 0 && r1.LineStatus == "C" && r1.OpenQty == 0 && m.InvntItem == "Y"
+
+-                                                &&  returnOrdrDocEntrys.Contains(r.DocEntry)
+
+-                                             select new { r.DocEntry, r1.LineNum, r1.ItemCode, r1.DelivrdQty, r1.Price,m.ManSerNum, m.ManBtchNum ,m.LastPurPrc,r.SlpCode}
+
+-                ).ToListAsync();
+
+-                //delivrdItems = delivrdItems.Where( r=> !csOrders.Contains(r.DocEntry)).ToList();
+
+-                var delivrdProducts = delivrdItems.Where(x => x.Price > 0).ToList();
+
+-
+
+-                var delivrdProductsLookUp = delivrdProducts.ToLookup(x => x.DocEntry);
+
+-                foreach (var group in returnProductsInFilter.GroupBy(x => x.U_DevEntry))
+
+-                {
+
+-                    var thisOrdrReturnItems = group.GroupBy(x => x.ItemCode).Select(x => new { ItemCode = x.Key, TotalQty = x.Sum(s => s.Quantity) }).ToDictionary(k => k.ItemCode, v => v.TotalQty);
+
+-                    var delivrdItemsInThisOrdr = delivrdProductsLookUp[group.Key].GroupBy(x=>x.ItemCode).Select(x=> new { ItemCode = x.Key, TotalQty = x.Sum(s=>s.DelivrdQty) }).ToDictionary(k=>k.ItemCode,v=>v.TotalQty);
+
+-                    //遍历订单中所有有价物料，检查每个物料是否都已退完
+
+-                    if( delivrdItemsInThisOrdr.All(x=> x.Value == (thisOrdrReturnItems.TryGetValue(x.Key,out var returnedQty) ? returnedQty : 0 )))
+
++                    // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+
++                    var returnedZeroPriceQtyByItem = returnItemsWithDevEntry
+
++                        .Where(x => x.Price == 0 && x.ResolvedDevEntry == group.Key)
+
++                        .GroupBy(x => x.ItemCode)
+
++                        .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+
++
+
++                    // 未退的 Price=0 物料成本 = sum(未退数量 * LastPurPrc)
+
++                    var fixedPenaltyAmount = delivrdItems
+
++                        .Where(x => x.Price == 0 && x.DocEntry == group.Key)
+
++                        .GroupBy(x => x.ItemCode)
+
++                        .Sum(g =>
+
++                        {
+
++                            var totalDelivrdQty = g.Sum(s => s.DelivrdQty);
+
++                            returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+
++                            var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+
++                            return unreturnedQty > 0 ? unreturnedQty * g.First().LastPurPrc : (decimal?)0;
+
++                        });
+
++
+
++                    var slpCode = delivrdItems.FirstOrDefault(x => x.Price == 0 && x.DocEntry == group.Key)?.SlpCode;
+
++
+
++                    if (fixedPenaltyAmount.HasValue && fixedPenaltyAmount != 0)
+
+                     {
+
+-                        // 退货单中 Price=0 的物料，按ItemCode汇总已退数量（针对当前原始订单）
+
+-                        var returnedZeroPriceQtyByItem = returnItemsWithDevEntry
+
+-                            .Where(x => x.Price == 0 && x.ResolvedDevEntry == group.Key)
+
+-                            .GroupBy(x => x.ItemCode)
+
+-                            .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+
+-                        // 未退的 Price=0 物料成本 = sum(未退数量 * LastPurPrc)
+
+-                        var fixedPenaltyAmount = delivrdItems
+
+-                            .Where(x => x.Price == 0 && x.DocEntry == group.Key)
+
+-                            .GroupBy(x => x.ItemCode)
+
+-                            .Sum(g =>
+
+-                            {
+
+-                                var totalDelivrdQty = g.Sum(s => s.DelivrdQty);
+
+-                                returnedZeroPriceQtyByItem.TryGetValue(g.Key, out var returnedQty);
+
+-                                var unreturnedQty = totalDelivrdQty - (returnedQty ?? 0);
+
+-                                return unreturnedQty > 0 ? unreturnedQty * g.First().LastPurPrc : (decimal?)0;
+
+-                            });
+
+-                        var slpCode = delivrdItems.FirstOrDefault(x => x.Price == 0 && x.DocEntry == group.Key)?.SlpCode;
+
+-                        
+
+-                        if(fixedPenaltyAmount.HasValue && fixedPenaltyAmount != 0)
+
++                        var PenaltyEvent = new PenaltyEventData
+
+                         {
+
+-                            var PenaltyEvent = new PenaltyEventData
+
+-                            {
+
+-                                RuleDefinitionId = rule.Id,
+
+-                                SlpCode = slpCode,
+
+-                                SlpName = slpCodeToNameMap[slpCode.Value],
+
+-                                TriggerDocType = "ORDR",
+
+-                                TriggerDocEntry = group.Key.ToString(),
+
+-                                SEDocEntry = group.Key, 
+
+-                                PenaltyBaseAmount = fixedPenaltyAmount.Value,
+
+-                                TriggerEventDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
+-                                PenaltyStartDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
+-                            };
+
+-                            newEvents.Add(PenaltyEvent);
+
+-                        }
+
++                            RuleDefinitionId = ruleId,
+
++                            SlpCode = slpCode,
+
++                            SlpName = slpCodeToNameMap[slpCode.Value],
+
++                            TriggerDocType = "ORDR",
+
++                            TriggerDocEntry = group.Key.ToString(),
+
++                            SEDocEntry = group.Key,
+
++                            PenaltyBaseAmount = fixedPenaltyAmount.Value,
+
++                            TriggerEventDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
++                            PenaltyStartDate = group.OrderByDescending(x => x.CreateDate).First().CreateDate,
+
++                        };
+
++                        newEvents.Add(PenaltyEvent);
+
+                     }
+
+                 }
+
+             }
+
+-            catch (Exception ex)
+
+-            {
+
+-                LogHelper.Error(ex, "处理退货未关联新单据处理器失败",nameof(ReturnUnRelNewOrderProcessor),nameof(ProcessAsync));
+
+-            }
+
+-            return (newEvents, new List<ResolvedEventData>(), new List<CanceledEventData>());
+
+         }
+
+ 
+
+         /// <summary>

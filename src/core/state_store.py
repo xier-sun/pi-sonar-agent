@@ -88,6 +88,38 @@ class RunStateStore:
         except Exception as exc:
             self._disable_db(exc)
 
+    def record_run_aborted(
+        self,
+        *,
+        run_label: str,
+        status: str,
+        repository: str = "",
+        author: str = "",
+        project_key: str = "",
+        error: str = "",
+        startup_failure: bool = False,
+        payload: dict[str, Any] | None = None,
+    ) -> None:
+        """Persist a run-level abort or startup failure event."""
+
+        event_kind = EventKind.STARTUP_FAILURE if startup_failure else EventKind.RUN_ABORTED
+        body = dict(payload or {})
+        if error:
+            body.setdefault("error", error)
+        self.record_event(
+            StateEvent(
+                kind=event_kind,
+                run_label=run_label,
+                entity_type="run",
+                entity_key=run_label,
+                repository=repository,
+                author=author,
+                project_key=project_key,
+                status=status,
+                payload=body,
+            )
+        )
+
     def record_target_started(
         self,
         *,
@@ -194,6 +226,47 @@ class RunStateStore:
                     "pr_url": pr_url,
                     "pr_error": pr_error,
                 },
+            )
+        )
+
+    def record_target_aborted(
+        self,
+        *,
+        run_label: str,
+        project_key: str,
+        repository: str,
+        author: str,
+        base_branch: str,
+        total_issues: int,
+        error: str,
+        before_first_issue: bool,
+        startup_failure: bool = False,
+        payload: dict[str, Any] | None = None,
+    ) -> None:
+        """Persist one target abort event."""
+
+        body = {
+            "project_key": project_key,
+            "repository": repository,
+            "author": author,
+            "base_branch": base_branch,
+            "total_issues": total_issues,
+            "before_first_issue": before_first_issue,
+            "startup_failure": startup_failure,
+            "error": error,
+        }
+        body.update(dict(payload or {}))
+        self.record_event(
+            StateEvent(
+                kind=EventKind.TARGET_ABORTED,
+                run_label=run_label,
+                entity_type="target",
+                entity_key=build_target_entity_key(repository, author),
+                repository=repository,
+                author=author,
+                project_key=project_key,
+                status="aborted",
+                payload=body,
             )
         )
 
@@ -376,8 +449,11 @@ class RunStateStore:
         )
 
     def _disable_db(self, exc: Exception) -> None:
+        was_enabled = self._db_enabled
         self._db_enabled = False
         self.last_db_error = str(exc)
+        if was_enabled:
+            print(f"[WARN] StateStore DB sync disabled: {exc}", flush=True)
         if self.db_client is not None:
             with suppress(Exception):
                 self.db_client.disconnect()

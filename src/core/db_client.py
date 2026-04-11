@@ -113,9 +113,9 @@ class MySQLClient:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS fix_state_snapshots (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                run_label VARCHAR(255) NOT NULL,
-                entity_type VARCHAR(50) NOT NULL,
-                entity_key VARCHAR(500) NOT NULL,
+                run_label VARCHAR(64) NOT NULL,
+                entity_type VARCHAR(32) NOT NULL,
+                entity_key VARCHAR(255) NOT NULL,
                 repository VARCHAR(255),
                 author VARCHAR(255),
                 project_key VARCHAR(255),
@@ -136,10 +136,10 @@ class MySQLClient:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS fix_event_records (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                run_label VARCHAR(255) NOT NULL,
-                event_kind VARCHAR(50) NOT NULL,
-                entity_type VARCHAR(50) NOT NULL,
-                entity_key VARCHAR(500) NOT NULL,
+                run_label VARCHAR(64) NOT NULL,
+                event_kind VARCHAR(32) NOT NULL,
+                entity_type VARCHAR(32) NOT NULL,
+                entity_key VARCHAR(255) NOT NULL,
                 repository VARCHAR(255),
                 author VARCHAR(255),
                 project_key VARCHAR(255),

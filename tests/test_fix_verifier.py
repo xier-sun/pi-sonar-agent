@@ -8,6 +8,7 @@ from pi_sonar_agent.core.fix_verifier import FixVerifier
 from pi_sonar_agent.core.issue_contract import EditContract
 from pi_sonar_agent.core.quality_gate import QualityGateRule
 from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
+from pi_sonar_agent.core.repair_plan import RepairPlan, RepairPropagationTarget
 from pi_sonar_agent.core.scope_guard import IssueEditScope
 
 
@@ -106,7 +107,7 @@ def test_fix_verifier_records_soft_drift_without_blocking_build(monkeypatch, tmp
         for item in outcome.reviewer_result.violations
     )
     assert "build ok" in outcome.combined_output
-    assert build_calls == ["build"]
+    assert build_calls == ["build", "build"]
 
 
 def test_fix_verifier_handles_build_timeout(monkeypatch, tmp_path) -> None:
@@ -240,6 +241,326 @@ def test_fix_verifier_rejects_quality_gate_violation(monkeypatch, tmp_path) -> N
     assert outcome.quality_gate_result.violations[0].rule_id == "async_signature"
     assert "异步方法 Process 没有以 Async 结尾" in outcome.combined_output
     assert build_calls == []
+
+
+def test_fix_verifier_short_circuits_build_on_incomplete_signature_propagation(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-propagation",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=8,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    issue_file = tmp_path / "src" / "Foo.cs"
+    issue_file.parent.mkdir(parents=True, exist_ok=True)
+    issue_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    public async Task Sync()",
+                "    {",
+                "        await AutoPlugin(ids);",
+                "    }",
+                "",
+                "    public async Task AutoPluginAsync(IEnumerable<int> orderIds)",
+                "    {",
+                "        await SaveAsync(orderIds);",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        repair_plan=RepairPlan(
+            repair_shape="signature_adjustment",
+            primary_file="src/Foo.cs",
+            primary_method_name="AutoPlugin",
+            proposed_method_name="AutoPluginAsync",
+            requires_signature_change=True,
+            requires_propagation=True,
+            verification_targets=(
+                RepairPropagationTarget(
+                    file="src/Foo.cs",
+                    symbol="definition@8-10",
+                    kind="definition",
+                    reason="definition sync",
+                    start_line=8,
+                    end_line=10,
+                ),
+                RepairPropagationTarget(
+                    file="src/Foo.cs",
+                    symbol="callsite@5-5",
+                    kind="callsite",
+                    reason="callsite sync",
+                    start_line=5,
+                    end_line=5,
+                ),
+            ),
+        ),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(8,),
+            before_changed_lines=(8,),
+            after_changed_lines=(8,),
+            diff_text=(
+                "@@ -8,1 +8,1 @@\n"
+                "-    public async Task AutoPlugin(IEnumerable<int> orderIds)\n"
+                "+    public async Task AutoPluginAsync(IEnumerable<int> orderIds)\n"
+            ),
+            hunk_count=1,
+        ),
+    )
+
+    build_calls: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    def fake_run(*args, **kwargs):
+        build_calls.append("build")
+        return FakeCompletedProcess()
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="scope",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content=issue_file.read_text(encoding="utf-8"),
+    )
+
+    assert outcome.build_passed is False
+    assert outcome.build_invoked is False
+    assert outcome.propagation_check_result.status == "retry"
+    assert "Residual Targets:" in outcome.combined_output
+    assert "callsite" in outcome.combined_output
+    assert build_calls == []
+
+
+def test_fix_verifier_short_circuits_full_build_when_fast_compile_fails(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-fast-compile",
+        rule="csharpsquid:S1481",
+        message="移除未使用变量",
+        line=8,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build",),
+        scope_mode="statement",
+        validation_line_range=(8, 8),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(8,),
+            before_changed_lines=(8,),
+            after_changed_lines=(),
+            diff_text="@@ -8,1 +8,0 @@\n-        var unused = 1;\n",
+            hunk_count=1,
+        ),
+    )
+
+    commands: list[str] = []
+
+    class FastCompileFailedProcess:
+        returncode = 1
+        stdout = "CSC : error CS0103: The name 'Foo' does not exist"
+        stderr = ""
+
+    class BuildPassedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    def fake_run(command, *args, **kwargs):
+        commands.append(command)
+        if "--no-restore" in command:
+            return FastCompileFailedProcess()
+        return BuildPassedProcess()
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="scope",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content="\n".join(
+            [
+                "class Foo",
+                "{",
+                "    void Demo()",
+                "    {",
+                "        Run();",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+    )
+
+    assert outcome.fast_compile_invoked is True
+    assert outcome.fast_compile_passed is False
+    assert outcome.build_invoked is False
+    assert outcome.build_passed is False
+    assert outcome.fast_compile_command.endswith('--no-restore -v:q')
+    assert "Fast compile failed" in outcome.combined_output
+    assert commands == ['dotnet build "src/Foo.sln" --no-restore -v:q']
+
+
+def test_fix_verifier_retries_full_build_without_restore_after_nuget_source_failure(monkeypatch, tmp_path) -> None:
+    commands: list[str] = []
+
+    class RestoreFailedProcess:
+        returncode = 1
+        stdout = (
+            'error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json.'
+        )
+        stderr = ""
+
+    class OfflineRetryPassedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    def fake_run(command, *args, **kwargs):
+        commands.append(command)
+        if "--no-restore" in command:
+            return OfflineRetryPassedProcess()
+        return RestoreFailedProcess()
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+
+    build_passed, build_output = FixVerifier.run_local_build(
+        tmp_path,
+        'dotnet build "src/Foo.sln"',
+    )
+
+    assert build_passed is True
+    assert commands == [
+        'dotnet build "src/Foo.sln"',
+        'dotnet build "src/Foo.sln" --no-restore',
+    ]
+    assert "NuGet restore/source failure" in build_output
+    assert "--no-restore" in build_output
+    assert "build ok" in build_output
+
+
+def test_fix_verifier_does_not_short_circuit_full_build_on_missing_assets_fast_compile(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    issue = SonarIssue(
+        key="issue-missing-assets-fast-compile",
+        rule="csharpsquid:S1481",
+        message="移除未使用变量",
+        line=8,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build",),
+        scope_mode="statement",
+        validation_line_range=(8, 8),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(8,),
+            before_changed_lines=(8,),
+            after_changed_lines=(),
+            diff_text="@@ -8,1 +8,0 @@\n-        var unused = 1;\n",
+            hunk_count=1,
+        ),
+    )
+
+    commands: list[str] = []
+
+    class MissingAssetsProcess:
+        returncode = 1
+        stdout = (
+            "error NETSDK1004: 找不到资产文件"
+            "“D:\\repo\\OpenAuth.Core\\OpenAuth.App\\obj\\project.assets.json”。运行 NuGet 包还原以生成此文件。"
+        )
+        stderr = ""
+
+    class BuildPassedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    def fake_run(command, *args, **kwargs):
+        commands.append(command)
+        if "--no-restore" in command:
+            return MissingAssetsProcess()
+        return BuildPassedProcess()
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="scope",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content="\n".join(
+            [
+                "class Foo",
+                "{",
+                "    void Demo()",
+                "    {",
+                "        Run();",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+    )
+
+    assert outcome.fast_compile_invoked is True
+    assert outcome.fast_compile_passed is False
+    assert outcome.build_invoked is True
+    assert outcome.build_passed is True
+    assert outcome.build_output == "build ok"
+    assert commands == [
+        'dotnet build "src/Foo.sln" --no-restore -v:q',
+        'dotnet build "src/Foo.sln"',
+    ]
 
 
 def test_fix_verifier_quality_gate_stays_inside_touched_region(monkeypatch, tmp_path) -> None:

@@ -1,0 +1,198 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -2314,19 +2314,7 @@
+                     currentDate);
+
+ 
+
+                 // 应用调整逻辑
+
+-                if (saleOrderPlugin != null)
+
+-                {
+
+-                    if (saleOrderPlugin.AdjustOverdueAmount.HasValue)
+
+-                    {
+
+-                        overdueInfo.U_Due_Amt -= saleOrderPlugin.AdjustOverdueAmount.Value;
+
+-                        if (overdueInfo.U_Due_Amt < 0) overdueInfo.U_Due_Amt = 0;
+
+-                    }
+
+-                    if (saleOrderPlugin.AdjustOverdueDays.HasValue)
+
+-                    {
+
+-                        overdueInfo.U_OverDue_Days -= saleOrderPlugin.AdjustOverdueDays.Value;
+
+-                        if (overdueInfo.U_OverDue_Days < 0) overdueInfo.U_OverDue_Days = 0;
+
+-                    }
+
+-                }
+
++                ApplyOverdueAdjustments(saleOrderPlugin, overdueInfo);
+
+ 
+
+                 // 只有当天有逾期金额和逾期天数时才计算罚息
+
+                 if (overdueInfo.U_Due_Amt > 0 && overdueInfo.U_OverDue_Days > 0)
+
+@@ -2336,19 +2324,11 @@
+ 
+
+                     if (penaltyAmount > 0)
+
+                     {
+
+-                        // 检查逾期金额是否发生变化
+
+-                        if (overdueInfo.U_Due_Amt != previousOverdueAmount)
+
+-                        {
+
+-                            // 如果有当前事件，结束它
+
+-                            if (currentEvent != null)
+
+-                            {
+
+-                                QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
+-                            }
+
+-
+
+-                            // 创建新的PenaltyEvent
+
+-                            currentEvent = await CreateNewPenaltyEvent(order, overdueInfo, currentDate, rule, slp);
+
+-                            previousOverdueAmount = overdueInfo.U_Due_Amt;
+
+-                        }
+
++                        var (newEvent, newAmount) = await ProcessPenaltyEventChangeAsync(
+
++                            currentEvent, previousOverdueAmount, overdueInfo.U_Due_Amt,
+
++                            order, currentDate, rule, slp, pendingEventUpdates);
+
++                        currentEvent = newEvent;
+
++                        previousOverdueAmount = newAmount;
+
+ 
+
+                         // 创建当天的PenaltyLedger记录（仅在允许的生成日期范围内）
+
+                         if (currentEvent != null && (!generationStartDate.HasValue || currentDate >= generationStartDate.Value))
+
+@@ -2439,6 +2419,53 @@
+ 
+
+             // 计算罚息金额
+
+             return (overdueInfo.U_Due_Amt * dailyRate * factor,dailyRate);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 应用逾期金额和天数的调整逻辑
+
++        /// </summary>
+
++        private static void ApplyOverdueAdjustments(SaleOrderPlugin saleOrderPlugin, HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo)
+
++        {
+
++            if (saleOrderPlugin?.AdjustOverdueAmount.HasValue == true)
+
++            {
+
++                overdueInfo.U_Due_Amt -= saleOrderPlugin.AdjustOverdueAmount.Value;
+
++                if (overdueInfo.U_Due_Amt < 0) overdueInfo.U_Due_Amt = 0;
+
++            }
+
++            if (saleOrderPlugin?.AdjustOverdueDays.HasValue == true)
+
++            {
+
++                overdueInfo.U_OverDue_Days -= saleOrderPlugin.AdjustOverdueDays.Value;
+
++                if (overdueInfo.U_OverDue_Days < 0) overdueInfo.U_OverDue_Days = 0;
+
++            }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理罚息事件变化，返回新的事件和逾期金额
+
++        /// </summary>
+
++        private async Task<(PenaltyEvent CurrentEvent, decimal PreviousOverdueAmount)> ProcessPenaltyEventChangeAsync(
+
++            PenaltyEvent currentEvent,
+
++            decimal previousOverdueAmount,
+
++            decimal currentOverdueAmount,
+
++            ORDR order,
+
++            DateTime currentDate,
+
++            PenaltyRuleDefinition rule,
+
++            OSLP slp,
+
++            List<(int EventId, DateTime ResolvedDate, string Description)> pendingEventUpdates)
+
++        {
+
++            if (currentOverdueAmount == previousOverdueAmount)
+
++            {
+
++                return (currentEvent, previousOverdueAmount);
+
++            }
+
++
+
++            if (currentEvent != null)
+
++            {
+
++                QueueEventUpdate(pendingEventUpdates, currentEvent, currentDate.AddDays(-1));
+
++            }
+
++
+
++            var newEvent = await CreateNewPenaltyEvent(order,
+
++                new HistoricalOverdueCalculationService.OverDueAmountAndDays { U_Due_Amt = currentOverdueAmount },
+
++                currentDate, rule, slp);
+
++
+
++            return (newEvent, currentOverdueAmount);
+
+         }
+
+ 
+
+         /// <summary>

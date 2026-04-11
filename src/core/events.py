@@ -17,8 +17,11 @@ class EventKind(StrEnum):
 
     RUN_STARTED = "run_started"
     RUN_FINISHED = "run_finished"
+    RUN_ABORTED = "run_aborted"
+    STARTUP_FAILURE = "startup_failure"
     TARGET_STARTED = "target_started"
     TARGET_FINISHED = "target_finished"
+    TARGET_ABORTED = "target_aborted"
     ISSUE_STARTED = "issue_started"
     ISSUE_FINISHED = "issue_finished"
     ATTEMPT_STARTED = "attempt_started"

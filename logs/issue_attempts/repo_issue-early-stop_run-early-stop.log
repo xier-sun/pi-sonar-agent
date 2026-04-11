@@ -1,0 +1,930 @@
+[2026-04-10 17:22:22] Attempt 1/3 started for issue-early-stop
+[2026-04-10 17:22:22] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-10 17:22:22] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+D:\MyProjects\pi-sonar-agent\.smoke_manual\early_stop_9cb29aba\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+D:\MyProjects\pi-sonar-agent\.smoke_manual\early_stop_9cb29aba\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 17:22:22] Workspace restored to issue baseline
+[2026-04-10 17:22:22] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-10 17:22:22] Attempt 2/3 started for issue-early-stop
+[2026-04-10 17:22:22] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-10 17:22:22] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+D:\MyProjects\pi-sonar-agent\.smoke_manual\early_stop_9cb29aba\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+D:\MyProjects\pi-sonar-agent\.smoke_manual\early_stop_9cb29aba\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 17:22:22] Workspace restored to issue baseline
+[2026-04-10 17:22:22] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-10 17:22:22] Issue skipped: Retry stopped early after 2 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.
+[2026-04-10 18:45:29] Attempt 1/3 started for issue-early-stop
+[2026-04-10 18:45:29] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-10 18:45:29] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+.tmp_manual_issue_retry\case1\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+.tmp_manual_issue_retry\case1\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 18:45:29] Workspace restored to issue baseline
+[2026-04-10 18:45:29] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-10 18:45:29] Attempt 2/3 started for issue-early-stop
+[2026-04-10 18:45:29] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-10 18:45:29] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+.tmp_manual_issue_retry\case1\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+.tmp_manual_issue_retry\case1\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 18:45:29] Workspace restored to issue baseline
+[2026-04-10 18:45:29] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-10 18:45:29] Issue skipped: Retry stopped early after 2 attempt(s): repeated `build:6e4425150a07` with unchanged strategy and diff.
+[2026-04-10 23:30:36] Attempt 1/6 started for issue-early-stop
+[2026-04-10 23:30:36] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-10 23:30:36] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 23:30:36] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+[2026-04-10 23:30:36] Workspace restored to issue baseline
+[2026-04-10 23:30:36] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-10 23:30:36] Attempt 2/6 started for issue-early-stop
+[2026-04-10 23:30:36] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-10 23:30:36] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 23:30:36] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+[2026-04-10 23:30:36] Workspace restored to issue baseline
+[2026-04-10 23:30:36] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-10 23:30:36] Attempt 3/6 started for issue-early-stop
+[2026-04-10 23:30:36] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-10 23:30:36] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 23:30:36] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+[2026-04-10 23:30:37] Workspace restored to issue baseline
+[2026-04-10 23:30:37] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-10 23:30:37] Attempt 4/6 started for issue-early-stop
+[2026-04-10 23:30:37] Attempt 4 failed: Issue changes failed local build verification
+[2026-04-10 23:30:37] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 23:30:37] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+[2026-04-10 23:30:37] Workspace restored to issue baseline
+[2026-04-10 23:30:37] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-10 23:30:37] Attempt 5/6 started for issue-early-stop
+[2026-04-10 23:30:37] Attempt 5 failed: Issue changes failed local build verification
+[2026-04-10 23:30:37] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 23:30:37] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-251\test_process_issue_with_retrie3\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+[2026-04-10 23:30:37] Workspace restored to issue baseline
+[2026-04-10 23:30:37] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-10 23:30:37] Issue skipped: Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.
+[2026-04-10 23:31:25] Attempt 1/6 started for issue-early-stop
+[2026-04-10 23:31:25] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-10 23:31:25] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 23:31:25] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+[2026-04-10 23:31:26] Workspace restored to issue baseline
+[2026-04-10 23:31:26] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-10 23:31:26] Attempt 2/6 started for issue-early-stop
+[2026-04-10 23:31:26] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-10 23:31:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 23:31:26] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+[2026-04-10 23:31:26] Workspace restored to issue baseline
+[2026-04-10 23:31:26] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-10 23:31:26] Attempt 3/6 started for issue-early-stop
+[2026-04-10 23:31:26] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-10 23:31:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 23:31:26] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+[2026-04-10 23:31:26] Workspace restored to issue baseline
+[2026-04-10 23:31:26] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-10 23:31:26] Attempt 4/6 started for issue-early-stop
+[2026-04-10 23:31:26] Attempt 4 failed: Issue changes failed local build verification
+[2026-04-10 23:31:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 23:31:26] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+[2026-04-10 23:31:26] Workspace restored to issue baseline
+[2026-04-10 23:31:26] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-10 23:31:26] Attempt 5/6 started for issue-early-stop
+[2026-04-10 23:31:26] Attempt 5 failed: Issue changes failed local build verification
+[2026-04-10 23:31:26] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-10 23:31:26] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-252\test_process_issue_with_retrie3\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+[2026-04-10 23:31:26] Workspace restored to issue baseline
+[2026-04-10 23:31:26] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-10 23:31:26] Issue skipped: Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.
+[2026-04-11 11:18:58] Attempt 1/6 started for issue-early-stop
+[2026-04-11 11:18:58] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-11 11:18:58] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:18:58] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:18:58] Workspace restored to issue baseline
+[2026-04-11 11:18:58] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 11:18:58] Attempt 2/6 started for issue-early-stop
+[2026-04-11 11:18:58] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-11 11:18:58] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:18:58] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:18:58] Workspace restored to issue baseline
+[2026-04-11 11:18:58] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-11 11:18:58] Attempt 3/6 started for issue-early-stop
+[2026-04-11 11:18:58] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-11 11:18:58] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:18:58] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:18:58] Workspace restored to issue baseline
+[2026-04-11 11:18:58] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-11 11:18:58] Attempt 4/6 started for issue-early-stop
+[2026-04-11 11:18:58] Attempt 4 failed: Issue changes failed local build verification
+[2026-04-11 11:18:58] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:18:58] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:18:58] Workspace restored to issue baseline
+[2026-04-11 11:18:58] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-11 11:18:58] Attempt 5/6 started for issue-early-stop
+[2026-04-11 11:18:58] Attempt 5 failed: Issue changes failed local build verification
+[2026-04-11 11:18:58] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:18:58] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-253\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:18:58] Workspace restored to issue baseline
+[2026-04-11 11:18:58] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-11 11:18:58] Issue skipped: Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.
+[2026-04-11 11:19:58] Attempt 1/6 started for issue-early-stop
+[2026-04-11 11:19:58] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-11 11:19:58] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:19:58] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:19:58] Workspace restored to issue baseline
+[2026-04-11 11:19:58] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 11:19:58] Attempt 2/6 started for issue-early-stop
+[2026-04-11 11:19:58] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-11 11:19:58] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:19:58] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:19:58] Workspace restored to issue baseline
+[2026-04-11 11:19:58] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-11 11:19:58] Attempt 3/6 started for issue-early-stop
+[2026-04-11 11:19:58] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-11 11:19:58] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:19:58] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:19:58] Workspace restored to issue baseline
+[2026-04-11 11:19:58] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-11 11:19:58] Attempt 4/6 started for issue-early-stop
+[2026-04-11 11:19:58] Attempt 4 failed: Issue changes failed local build verification
+[2026-04-11 11:19:58] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:19:58] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:19:58] Workspace restored to issue baseline
+[2026-04-11 11:19:58] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-11 11:19:58] Attempt 5/6 started for issue-early-stop
+[2026-04-11 11:19:58] Attempt 5 failed: Issue changes failed local build verification
+[2026-04-11 11:19:58] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:19:58] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-254\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:19:58] Workspace restored to issue baseline
+[2026-04-11 11:19:58] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-11 11:19:58] Issue skipped: Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.
+[2026-04-11 11:21:24] Attempt 1/6 started for issue-early-stop
+[2026-04-11 11:21:24] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-11 11:21:24] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:21:24] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:21:24] Workspace restored to issue baseline
+[2026-04-11 11:21:24] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 11:21:24] Attempt 2/6 started for issue-early-stop
+[2026-04-11 11:21:24] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-11 11:21:24] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:21:24] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:21:24] Workspace restored to issue baseline
+[2026-04-11 11:21:24] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-11 11:21:24] Attempt 3/6 started for issue-early-stop
+[2026-04-11 11:21:24] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-11 11:21:24] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:21:24] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:21:25] Workspace restored to issue baseline
+[2026-04-11 11:21:25] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-11 11:21:25] Attempt 4/6 started for issue-early-stop
+[2026-04-11 11:21:25] Attempt 4 failed: Issue changes failed local build verification
+[2026-04-11 11:21:25] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:21:25] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:21:25] Workspace restored to issue baseline
+[2026-04-11 11:21:25] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-11 11:21:25] Attempt 5/6 started for issue-early-stop
+[2026-04-11 11:21:25] Attempt 5 failed: Issue changes failed local build verification
+[2026-04-11 11:21:25] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 11:21:25] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-257\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 11:21:25] Workspace restored to issue baseline
+[2026-04-11 11:21:25] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-11 11:21:25] Issue skipped: Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.
+[2026-04-11 14:55:50] Attempt 1/6 started for issue-early-stop
+[2026-04-11 14:55:50] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-11 14:55:50] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 14:55:50] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 14:55:50] Workspace restored to issue baseline
+[2026-04-11 14:55:50] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 14:55:50] Attempt 2/6 started for issue-early-stop
+[2026-04-11 14:55:50] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-11 14:55:50] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 14:55:50] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 14:55:50] Workspace restored to issue baseline
+[2026-04-11 14:55:50] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-11 14:55:50] Attempt 3/6 started for issue-early-stop
+[2026-04-11 14:55:50] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-11 14:55:50] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 14:55:50] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 14:55:50] Workspace restored to issue baseline
+[2026-04-11 14:55:50] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-11 14:55:50] Attempt 4/6 started for issue-early-stop
+[2026-04-11 14:55:50] Attempt 4 failed: Issue changes failed local build verification
+[2026-04-11 14:55:50] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 14:55:50] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 14:55:50] Workspace restored to issue baseline
+[2026-04-11 14:55:50] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-11 14:55:50] Attempt 5/6 started for issue-early-stop
+[2026-04-11 14:55:50] Attempt 5 failed: Issue changes failed local build verification
+[2026-04-11 14:55:50] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 14:55:50] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-263\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 14:55:50] Workspace restored to issue baseline
+[2026-04-11 14:55:50] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-11 14:55:50] Issue skipped: Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.
+[2026-04-11 14:56:45] Attempt 1/6 started for issue-early-stop
+[2026-04-11 14:56:45] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-11 14:56:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 14:56:45] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 14:56:45] Workspace restored to issue baseline
+[2026-04-11 14:56:45] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 14:56:45] Attempt 2/6 started for issue-early-stop
+[2026-04-11 14:56:45] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-11 14:56:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 14:56:45] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 14:56:45] Workspace restored to issue baseline
+[2026-04-11 14:56:45] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-11 14:56:45] Attempt 3/6 started for issue-early-stop
+[2026-04-11 14:56:45] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-11 14:56:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 14:56:45] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 14:56:45] Workspace restored to issue baseline
+[2026-04-11 14:56:45] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-11 14:56:45] Attempt 4/6 started for issue-early-stop
+[2026-04-11 14:56:45] Attempt 4 failed: Issue changes failed local build verification
+[2026-04-11 14:56:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 14:56:45] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 14:56:45] Workspace restored to issue baseline
+[2026-04-11 14:56:45] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-11 14:56:45] Attempt 5/6 started for issue-early-stop
+[2026-04-11 14:56:45] Attempt 5 failed: Issue changes failed local build verification
+[2026-04-11 14:56:45] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "tracked.sln"
+
+关键错误:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+
+构建日志:
+C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]
+[2026-04-11 14:56:45] Next retry feedback for model:
+上次尝试引入了以下关键编译错误，请先修复这些错误：
+1. CS0103 at C:\Users\neware\AppData\Local\Temp\pytest-of-neware\pytest-264\test_process_issue_with_retrie4\repo\tracked.cs:1:1
+   错误信息: name not found
+   出错代码片段:
+   1 | same bad change
+重试约束:
+- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。
+- 优先最小化修改，不要额外重写整个文件。
+- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。
+- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。
+[2026-04-11 14:56:45] Workspace restored to issue baseline
+[2026-04-11 14:56:45] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-11 14:56:45] Issue skipped: Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.

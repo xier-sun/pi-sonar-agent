@@ -62,8 +62,58 @@ from pi_sonar_agent.core.tool_surface import (
     build_fix_runtime_tools,
     controlled_bash_enabled,
 )
+from pi_sonar_agent.integrations.sonar import extract_rule_detail_texts
 
 # ============== Data Classes ==============
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _normalize_text_range(raw_range: Any) -> dict[str, int]:
+    if not isinstance(raw_range, dict):
+        return {}
+
+    normalized: dict[str, int] = {}
+    for key in ("startLine", "endLine", "startOffset", "endOffset"):
+        value = raw_range.get(key)
+        if value in (None, ""):
+            continue
+        normalized[key] = _safe_int(value)
+    return normalized
+
+
+def _normalize_issue_flows(raw_flows: Any) -> tuple[dict[str, Any], ...]:
+    if not isinstance(raw_flows, list):
+        return ()
+
+    normalized_flows: list[dict[str, Any]] = []
+    for flow in raw_flows:
+        if not isinstance(flow, dict):
+            continue
+        locations: list[dict[str, Any]] = []
+        for location in flow.get("locations", []):
+            if not isinstance(location, dict):
+                continue
+            component = str(location.get("component", "")).strip()
+            message = str(location.get("msg", "")).strip()
+            text_range = _normalize_text_range(location.get("textRange"))
+            if not component and not message and not text_range:
+                continue
+            locations.append(
+                {
+                    "component": component,
+                    "msg": message,
+                    "textRange": text_range,
+                }
+            )
+        if locations:
+            normalized_flows.append({"locations": tuple(locations)})
+    return tuple(normalized_flows)
 
 
 @dataclass
@@ -78,6 +128,8 @@ class SonarIssue:
     severity: str
     issue_type: str
     status: str = "OPEN"
+    text_range: dict[str, int] = field(default_factory=dict)
+    flows: tuple[dict[str, Any], ...] = ()
 
     @property
     def file_path(self) -> str:
@@ -86,6 +138,31 @@ class SonarIssue:
         if not component.startswith("/"):
             component = f"/{component}"
         return component
+
+    @property
+    def start_line(self) -> int:
+        return _safe_int(self.text_range.get("startLine")) or self.line
+
+    @property
+    def end_line(self) -> int:
+        return _safe_int(self.text_range.get("endLine")) or self.start_line
+
+    @classmethod
+    def from_api_payload(cls, issue_data: dict[str, Any]) -> "SonarIssue":
+        text_range = _normalize_text_range(issue_data.get("textRange"))
+        line = _safe_int(issue_data.get("line")) or _safe_int(text_range.get("startLine"))
+        return cls(
+            key=str(issue_data.get("key", "")).strip(),
+            rule=str(issue_data.get("rule", "")).strip(),
+            message=str(issue_data.get("message", "")).strip(),
+            line=line,
+            component=str(issue_data.get("component", "")).strip(),
+            severity=str(issue_data.get("severity", "")).strip(),
+            issue_type=str(issue_data.get("type", "")).strip(),
+            status=str(issue_data.get("status", "OPEN")).strip() or "OPEN",
+            text_range=text_range,
+            flows=_normalize_issue_flows(issue_data.get("flows")),
+        )
 
 
 @dataclass
@@ -530,16 +607,7 @@ class ClaudeFixAgent:
             data = response.json()
 
             for issue_data in data.get("issues", []):
-                issue = SonarIssue(
-                    key=issue_data.get("key", ""),
-                    rule=issue_data.get("rule", ""),
-                    message=issue_data.get("message", ""),
-                    line=issue_data.get("line", 0),
-                    component=issue_data.get("component", ""),
-                    severity=issue_data.get("severity", ""),
-                    issue_type=issue_data.get("type", ""),
-                    status=issue_data.get("status", "OPEN"),
-                )
+                issue = SonarIssue.from_api_payload(issue_data)
 
                 # Filter by severity if specified
                 if severities and issue.severity not in severities:
@@ -582,13 +650,14 @@ class ClaudeFixAgent:
         )
         response.raise_for_status()
         data = response.json().get("rule", {})
+        description, how_to_fix = extract_rule_detail_texts(data)
 
         return {
             "name": data.get("name", ""),
             "severity": data.get("severity", ""),
             "type": data.get("type", ""),
-            "description": data.get("mdDesc", "") or data.get("htmlDesc", ""),
-            "how_to_fix": data.get("mdNote", "") or data.get("htmlNote", ""),
+            "description": description,
+            "how_to_fix": how_to_fix,
         }
 
     @staticmethod
@@ -1150,6 +1219,34 @@ class ClaudeFixAgent:
                 continue
         return snapshot
 
+    @staticmethod
+    def _extract_invalid_write_tool_input_message(
+        attempt_events: tuple[AttemptRuntimeEvent, ...] | list[AttemptRuntimeEvent],
+    ) -> str:
+        """Detect malformed Edit/MultiEdit tool calls that ended with empty or invalid input."""
+
+        saw_empty_write_payload = False
+        for event in reversed(tuple(attempt_events or ())):
+            if event.kind == AttemptRuntimeEventKind.SDK_TRACE and str(event.stage or "") == "sdk_message:UserMessage":
+                preview = str(getattr(event, "payload", {}).get("preview", "") or "")
+                if "InputValidationError" in preview and any(
+                    marker in preview for marker in ("file_path", "old_string", "new_string", "edits")
+                ):
+                    return preview
+            if event.kind != AttemptRuntimeEventKind.TOOL_CALLED:
+                continue
+            payload = getattr(event, "payload", {}) or {}
+            tool_name = str(payload.get("tool_name", "") or "")
+            tool_payload = payload.get("tool_payload")
+            if tool_name in {"Edit", "MultiEdit"} and isinstance(tool_payload, dict) and not tool_payload:
+                saw_empty_write_payload = True
+        if saw_empty_write_payload:
+            return (
+                "Invalid write tool input: Edit/MultiEdit was called with an empty payload. "
+                "Required parameters such as file_path, old_string/new_string, or edits were missing."
+            )
+        return ""
+
     def fix_issue(
         self,
         issue: SonarIssue,
@@ -1191,8 +1288,8 @@ class ClaudeFixAgent:
             original_issue_file_content = content
             lines = list(context_cache.read_lines(file_path, encoding="utf-8"))
             source_lines = tuple(lines)
-            start_line = max(1, issue.line - 10)
-            end_line = min(len(lines), issue.line + 10)
+            start_line = max(1, issue.start_line - 10)
+            end_line = min(len(lines), issue.end_line + 10)
             code_context = context_cache.render_numbered_window(
                 file_path,
                 start_line,
@@ -1724,8 +1821,13 @@ class ClaudeFixAgent:
                 )
 
             if not changes:
-                failure_kind = "model_timeout" if model_timeout_stage else "no_change"
-                error = "Model response timed out" if model_timeout_stage else "Agent completed without modifying any files"
+                invalid_write_tool_input = self._extract_invalid_write_tool_input_message(attempt_events)
+                if invalid_write_tool_input:
+                    failure_kind = "tool_input_invalid"
+                    error = "Model emitted an invalid Edit/MultiEdit call"
+                else:
+                    failure_kind = "model_timeout" if model_timeout_stage else "no_change"
+                    error = "Model response timed out" if model_timeout_stage else "Agent completed without modifying any files"
                 self._append_attempt_event(
                     attempt_events,
                     AttemptRuntimeEventKind.ATTEMPT_FINISHED,
@@ -1740,6 +1842,7 @@ class ClaudeFixAgent:
                     error=error,
                     summary="Fixed 0 file(s)",
                     build_command=resolved_build_command,
+                    build_output=invalid_write_tool_input,
                     retryable_failure=True,
                     failure_kind=failure_kind,
                     performance_metrics=self._merge_performance_metrics(
@@ -1798,6 +1901,10 @@ class ClaudeFixAgent:
             secondary_boundary_failure_codes = verification.secondary_boundary_failure_codes
             performance_metrics = self._merge_performance_metrics(
                 runtime_performance_metrics,
+                fast_compile_invoked=verification.fast_compile_invoked,
+                fast_compile_passed=verification.fast_compile_passed,
+                fast_compile_duration_seconds=verification.fast_compile_duration_seconds,
+                fast_compile_command=verification.fast_compile_command,
                 build_duration_seconds=verification.build_duration_seconds,
                 build_invoked=verification.build_invoked,
                 validation_pipeline=tuple(edit_contract.validation_plan),
