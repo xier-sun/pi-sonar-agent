@@ -5,7 +5,7 @@
   "retry_context": {
     "source_attempt_number": 1,
     "failure_kind": "no_change",
-    "failure_detail_key": "no_change:6f465fa52174",
+    "failure_detail_key": "no_change",
     "strategy_fingerprint": "fast_path=0|plan_first=0",
     "diff_fingerprint": "no_change",
     "error": "Agent completed without modifying any files",
@@ -30,8 +30,8 @@
     "model_timeout_failed": false,
     "patch_salvaged": false
   },
-  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-272/test_process_issue_with_retrie2/repo",
-  "baseline_head_commit": "50f345be2e84a36f88803c8efe717ebda99b3b15",
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-285/test_process_issue_with_retrie2/repo",
+  "baseline_head_commit": "d459696b475243852214be9fbae01a6abf761aec",
   "guardrail_mode": "",
   "active_quality_gate_rules": [],
   "execution_profile": "full_path",

@@ -54,6 +54,7 @@ from pi_sonar_agent.fixers.build_gate import format_build_failure_report
 
 DEFAULT_MAX_BUILD_RETRIES = 5
 EARLY_RETRY_ABORT_MIN_ATTEMPTS = 5
+EARLY_RETRY_ABORT_MIN_ATTEMPTS_NO_CHANGE = 2
 
 
 def _sanitize_name(value: str) -> str:
@@ -406,6 +407,8 @@ def _build_failure_detail_key(
     review_gate_failure: ReviewGateFailureContext | None,
     plan_failure: PlanFailureContext | None,
 ) -> str:
+    if result.failure_kind == "no_change":
+        return "no_change"
     if quality_gate_failure is not None and quality_gate_failure.violations:
         return "quality_gate:" + ",".join(
             dict.fromkeys(item.rule_id for item in quality_gate_failure.violations if item.rule_id)
@@ -1190,10 +1193,15 @@ def process_issue_with_retries(
             logger.write("Workspace restored to issue baseline")
 
             should_retry = result.retryable_failure or result.build_verification_failed
+            early_abort_threshold = (
+                EARLY_RETRY_ABORT_MIN_ATTEMPTS_NO_CHANGE
+                if next_retry_context.failure_kind == "no_change"
+                else EARLY_RETRY_ABORT_MIN_ATTEMPTS
+            )
             if (
                 should_retry
                 and attempt < max_build_retries
-                and attempt >= EARLY_RETRY_ABORT_MIN_ATTEMPTS
+                and attempt >= early_abort_threshold
                 and _should_abort_retry_early(retry_context, next_retry_context)
             ):
                 should_retry = False

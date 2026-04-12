@@ -14,6 +14,8 @@ from pi_sonar_agent.agent.rule_policies import (
     DECLARATION_COMMENT_SCOPE_MODE,
     EXPRESSION_REWRITE_SCOPE_MODE,
     LOOP_REWRITE_SCOPE_MODE,
+    collect_skipped_rule_ids,
+    get_rule_policy,
 )
 from pi_sonar_agent.agent.rule_validators import validate_rule_fix
 from pi_sonar_agent.core.agent_runtime import AgentRuntimeError, AgentRuntimeResult
@@ -521,7 +523,7 @@ def test_fix_issue_classifies_empty_edit_payload_as_tool_input_invalid(monkeypat
     assert "InputValidationError" in result.build_output
 
 
-def test_fix_issue_skips_policy_managed_rule_before_running_agent(monkeypatch, tmp_path) -> None:
+def test_fix_issue_no_longer_skips_previously_policy_managed_rule(monkeypatch, tmp_path) -> None:
     agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
     issue = SonarIssue(
         key="issue-skip",
@@ -533,18 +535,68 @@ def test_fix_issue_skips_policy_managed_rule_before_running_agent(monkeypatch, t
         issue_type="CODE_SMELL",
     )
 
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    public void Save(string a, string b, string c, string d, string e, string f, string g, string h)",
+                "    {",
+                "    }",
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rule_detail_calls: list[str] = []
     monkeypatch.setattr(
         ClaudeFixAgent,
         "get_rule_details",
-        lambda self, rule_key: (_ for _ in ()).throw(AssertionError("skip rule should not read rule details")),
+        lambda self, rule_key: rule_detail_calls.append(rule_key) or {"description": "原因", "how_to_fix": "修复方法"},
     )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: []),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    def fake_runtime_run(self, request):
+        return AgentRuntimeResult(
+            runtime_events=(
+                AttemptRuntimeEvent(
+                    kind=AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    sequence=1,
+                    stage="completed",
+                    payload={"success": False},
+                ),
+            ),
+            saw_result_event=True,
+        )
+
+    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fake_runtime_run)
 
     result = agent.fix_issue(issue, tmp_path)
 
     assert result.success is False
-    assert result.skipped is True
-    assert result.failure_kind == "policy_skip"
-    assert "默认跳过" in result.skip_reason
+    assert result.skipped is False
+    assert result.failure_kind == "no_change"
+    assert rule_detail_calls == ["csharpsquid:S107"]
+
+
+def test_previously_skipped_rules_now_expose_prompt_guards_without_skip_reason() -> None:
+    for rule_id in ("csharpsquid:S107", "csharpsquid:S1172", "csharpsquid:S4136", "csharpsquid:S6960"):
+        policy = get_rule_policy(rule_id)
+        assert policy.skip_reason == ""
+        assert policy.prompt_guards
+
+
+def test_collect_skipped_rule_ids_returns_empty_set_for_current_defaults() -> None:
+    assert collect_skipped_rule_ids() == set()
 
 
 def test_fix_issue_downgrades_complex_plan_instead_of_hard_blocking(monkeypatch, tmp_path) -> None:

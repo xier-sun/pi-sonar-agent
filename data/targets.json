@@ -7,9 +7,10 @@
     "dingtalk_userid": "17556530801301497",
     "max_issues": 40,
     "issue_keys": [
-      "a22e301e-b1e0-4a1f-9bec-712001f1a11a",
-      "c8c4ea2e-fd35-40f6-a859-dc9ed80884e1"
-    ],
+      "e32e70ac-6c4d-484b-8eb2-78f115e2a23b",
+      "e5f957f4-1ab3-45d8-a7d0-21b9a4ecefcd",
+      "f2f04149-8a3d-4915-a52a-f0098f141d5a"
+],
     "solution_path": "OpenAuth.Core/OpenAuth.Core.WebApi.sln",
     "keep_workspace": false
   }

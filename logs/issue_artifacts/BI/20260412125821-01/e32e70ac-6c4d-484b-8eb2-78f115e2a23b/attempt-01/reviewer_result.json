@@ -1,0 +1,47 @@
+{
+  "status": "pass",
+  "guardrail_mode": "scope",
+  "summary": "Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit.",
+  "violations": [
+    {
+      "type": "outside_primary_region",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "reason": "This hunk changes lines outside the primary issue window 2621-2723; recorded as drift only.",
+      "symbol": "method@2621-2643",
+      "changed_lines": [
+        2349,
+        2350
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -2349 +2349,2 @@\n-                            CreateDailyPenaltyLedgerEntry(order, overdueInfo, penaltyAmount, currentDate, currentEvent,dayilRate, slp,ref penaltyLedgers);\n+                            var ledgerEntry = CreateDailyPenaltyLedgerEntry(order, overdueInfo, penaltyAmount, currentDate, currentEvent,dayilRate, slp);\n+                            if (ledgerEntry != null) penaltyLedgers.Add(ledgerEntry);\n@@ -2622 +2623 @@\n-        private static void CreateDailyPenaltyLedgerEntry(ORDR order, HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo, decimal penaltyAmount, DateTime currentDate, PenaltyEvent penaltyEvent,decimal dailyRate, OSLP slp, ref List<PenaltyLedger> penaltyLedgers)\n+        private static PenaltyLedger CreateDailyPenaltyLedgerEntry(ORDR order, HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo, decimal penaltyAmount, DateTime currentDate, PenaltyEvent penaltyEvent,decimal dailyRate, OSLP slp)\n@@ -2625,2 +2626,2 @@\n-                return;\n-            \n+                return null;\n+\n@@ -2641,2 +2642 @@\n-            penaltyLedgers.Add(ledgerEntry);\n-          \n+            return ledgerEntry;"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "e32e70ac-6c4d-484b-8eb2-78f115e2a23b",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+      "symbol": "method@2621-2643",
+      "summary": "Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs\n@@ -2349 +2349,2 @@\n-                            CreateDailyPenaltyLedgerEntry(order, overdueInfo, penaltyAmount, currentDate, currentEvent,dayilRate, slp,ref penaltyLedgers);\n+                            var ledgerEntry = CreateDailyPenaltyLedgerEntry(order, overdueInfo, penaltyAmount, currentDate, currentEvent,dayilRate, slp);\n+                            if (ledgerEntry != null) penaltyLedgers.Add(ledgerEntry);\n@@ -2622 +2623 @@\n-        private static void CreateDailyPenaltyLedgerEntry(ORDR order, HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo, decimal penaltyAmount, DateTime currentDate, PenaltyEvent penaltyEvent,decimal dailyRate, OSLP slp, ref List<PenaltyLedger> penaltyLedgers)\n+        private static PenaltyLedger CreateDailyPenaltyLedgerEntry(ORDR order, HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo, decimal penaltyAmount, DateTime currentDate, PenaltyEvent penaltyEvent,decimal dailyRate, OSLP slp)\n@@ -2625,2 +2626,2 @@\n-                return;\n-            \n+                return null;\n+\n@@ -2641,2 +2642 @@\n-            penaltyLedgers.Add(ledgerEntry);\n-          \n+            return ledgerEntry;",
+      "discovered_at": "2026-04-12T05:00:06.120854+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 4,
+    "total_changed_lines": 7,
+    "hard_boundary_violation_count": 0,
+    "soft_boundary_violation_count": 1,
+    "extra_touched_file_count": 0,
+    "outside_primary_region_line_count": 2,
+    "outside_primary_region_count": 1,
+    "scope_audit_mode": "scope_soft_audit",
+    "scope_audit_active": true,
+    "scope_expansion_count": 1,
+    "scope_expansion_reasons": [
+      "outside_primary_region"
+    ],
+    "high_drift_warning": false,
+    "drift_score": 1
+  }
+}

@@ -1,9 +1,9 @@
 {
   "attempt_number": 1,
   "status": "retrying",
-  "started_at": "2026-04-12T03:20:53.738522+00:00",
-  "finished_at": "2026-04-12T03:20:53.740030+00:00",
-  "duration_seconds": 0.002,
+  "started_at": "2026-04-12T04:52:25.572975+00:00",
+  "finished_at": "2026-04-12T04:52:25.573383+00:00",
+  "duration_seconds": 0.0,
   "failure_kind": "review_gate",
   "retry_reason": "retryable_failure",
   "retryable_failure": true,
@@ -18,7 +18,7 @@
   "issue_log_path": "logs\\issue_attempts\\repo_issue-review-gate-skip_run-review-gate.log",
   "artifact_dir": "logs/issue_artifacts/repo/run-review-gate/issue-review-gate-skip/attempt-01",
   "performance_metrics": {
-    "attempt_total_duration_seconds": 0.002
+    "attempt_total_duration_seconds": 0.0
   },
   "rollout_flags": []
 }

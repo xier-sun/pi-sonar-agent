@@ -10,8 +10,8 @@
     {
       "attempt_number": 1,
       "status": "retrying",
-      "started_at": "2026-04-12T03:20:53.147326+00:00",
-      "finished_at": "2026-04-12T03:20:53.147757+00:00",
+      "started_at": "2026-04-12T04:52:24.841924+00:00",
+      "finished_at": "2026-04-12T04:52:24.842406+00:00",
       "duration_seconds": 0.0,
       "failure_kind": "quality_gate",
       "retry_reason": "retryable_failure",
@@ -34,8 +34,8 @@
     {
       "attempt_number": 2,
       "status": "retrying",
-      "started_at": "2026-04-12T03:20:53.217283+00:00",
-      "finished_at": "2026-04-12T03:20:53.217683+00:00",
+      "started_at": "2026-04-12T04:52:24.937083+00:00",
+      "finished_at": "2026-04-12T04:52:24.937452+00:00",
       "duration_seconds": 0.0,
       "failure_kind": "no_change",
       "retry_reason": "retryable_failure",
@@ -58,8 +58,8 @@
     {
       "attempt_number": 3,
       "status": "skipped",
-      "started_at": "2026-04-12T03:20:53.301702+00:00",
-      "finished_at": "2026-04-12T03:20:53.301988+00:00",
+      "started_at": "2026-04-12T04:52:25.031096+00:00",
+      "finished_at": "2026-04-12T04:52:25.031302+00:00",
       "duration_seconds": 0.0,
       "failure_kind": "no_change",
       "retry_reason": "retryable_failure",

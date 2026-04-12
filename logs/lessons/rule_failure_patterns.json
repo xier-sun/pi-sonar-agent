@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-12T04:05:57.310425+00:00",
+  "generated_at": "2026-04-12T05:18:19.488699+00:00",
   "patterns": [
     {
       "pattern_key": "rule_failure|csharpsquid:S3776|quality_gate|method|scope|-",
@@ -1175,6 +1175,38 @@
       ]
     },
     {
+      "pattern_key": "rule_failure|csharpsquid:S107|review_gate|method|scope|-",
+      "lesson_kind": "rule_failure",
+      "issue_rule_id": "csharpsquid:S107",
+      "failure_kind": "review_gate",
+      "scope_mode": "method",
+      "guardrail_mode": "scope",
+      "boundary_failure_code": "",
+      "count": 3,
+      "first_seen_at": "2026-04-12T05:07:12.211102+00:00",
+      "last_seen_at": "2026-04-12T05:15:48.507458+00:00",
+      "latest_summary": "Fixed 1 file(s)",
+      "guidance": [],
+      "evidence": [
+        "Review gate rejected the patch after auditing the ambiguous gate findings.\nReview gate session returned an agent error; kept the original blocker conservatively.\nAudit Decisions:\n1. [confirm] quality_gate:cognitive_complexity:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:214:1 (单方法认知复杂度不超过 30): Review agent returned an execution error.\nReview Gate Error: There's an issue with the selected model (glm-5-turbo). It may not exist or you may not have access to it. Run --model to pick a different model.",
+        "Review gate rejected the patch after auditing the ambiguous gate findings.\nReview gate session returned an agent error; kept the original blocker conservatively.\nAudit Decisions:\n1. [confirm] quality_gate:cognitive_complexity:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:240:1 (单方法认知复杂度不超过 30): Review agent returned an execution error.\nReview Gate Error: There's an issue with the selected model (glm-5-turbo). It may not exist or you may not have access to it. Run --model to pick a different model.",
+        "Review gate rejected the patch after auditing the ambiguous gate findings.\nReview gate session returned an agent error; kept the original blocker conservatively.\nAudit Decisions:\n1. [confirm] quality_gate:cognitive_complexity:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:198:1 (单方法认知复杂度不超过 30): Review agent returned an execution error.\nReview Gate Error: There's an issue with the selected model (glm-5-turbo). It may not exist or you may not have access to it. Run --model to pick a different model."
+      ],
+      "quality_gate_rule_ids": [
+        "public_xml_docs",
+        "async_signature",
+        "async_requires_await",
+        "linq_method_syntax",
+        "cognitive_complexity",
+        "zero_redundant_code",
+        "static_preferred",
+        "sealed_preferred",
+        "constructor_dependency_injection",
+        "business_comments_chinese",
+        "finance_terms_chinese"
+      ]
+    },
+    {
       "pattern_key": "rule_failure|csharpsquid:S125|scope|statement|scope",
       "lesson_kind": "rule_failure",
       "issue_rule_id": "csharpsquid:S125",
@@ -1312,6 +1344,37 @@
       "latest_summary": "Fixed 0 file(s)",
       "guidance": [],
       "evidence": [],
+      "quality_gate_rule_ids": [
+        "public_xml_docs",
+        "async_signature",
+        "async_requires_await",
+        "linq_method_syntax",
+        "cognitive_complexity",
+        "zero_redundant_code",
+        "static_preferred",
+        "sealed_preferred",
+        "constructor_dependency_injection",
+        "business_comments_chinese",
+        "finance_terms_chinese"
+      ]
+    },
+    {
+      "pattern_key": "rule_failure|csharpsquid:S107|quality_gate|method|scope|-",
+      "lesson_kind": "rule_failure",
+      "issue_rule_id": "csharpsquid:S107",
+      "failure_kind": "quality_gate",
+      "scope_mode": "method",
+      "guardrail_mode": "scope",
+      "boundary_failure_code": "",
+      "count": 2,
+      "first_seen_at": "2026-04-12T05:10:24.928894+00:00",
+      "last_seen_at": "2026-04-12T05:18:19.423497+00:00",
+      "latest_summary": "Fixed 1 file(s)",
+      "guidance": [],
+      "evidence": [
+        "Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:\n1. [public_xml_docs] 公开成员 XML 文档完整: method ProcessSingleOrderSnapshot 缺少 XML 文档注释。 | location: OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:207\n   Evidence: public HistoricalOverdueCalculationService CalculationService; } /// <summary> /// 处理单个订单，生成逾期快照列表 /// </summary> private List<DailyOverdueSnapshot> ProcessSingleOrderSnapshot( ORDR order, DateTime calculationDate, OrderBatchData batchData) {\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。",
+        "Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:\n1. [public_xml_docs] 公开成员 XML 文档完整: property SaleOrders 缺少 XML 文档注释。 | location: OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:200\n   Evidence: public Dictionary<int, HistoricalOverdueCalculationService.SaleOrderForOverDue> SaleOrders { get; set; }\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n2. [public_xml_docs] 公开成员 XML 文档完整: property PayTerms 缺少 XML 文档注释。 | location: OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:201\n   Evidence: public Dictionary<int, PayTermSave> PayTerms { get; set; }\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n3. [public_xml_docs] 公开成员 XML 文档完整: property Deliveries 缺少 XML 文档注释。 | location: OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:202\n   Evidence: public Dictionary<int, List<HistoricalOverdueCalculationService.DeliveryForOverDue>> Deliveries { get; set; }\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n4. [public_xml_docs] 公开成员 XML 文档完整: property Receipts 缺少 XML 文档注释。 | location: OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:203\n   Evidence: public Dictionary<int, List<ReceiptForOrder>> Receipts { get; set; }\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n5. [public_xml_docs] 公开成员 XML 文档完整: property Returns 缺少 XML 文档注释。 | location: OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:204\n   Evidence: public Dictionary<int, List<HistoricalOverdueCalculationService.ReturnForOverDue>> Returns { get; set; }\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n6. [public_xml_docs] 公开成员 XML 文档完整: property Refunds 缺少 XML 文档注释。 | location: OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:205\n   Evidence: public Dictionary<int, List<SaleRefund>> Refunds { get; set; }\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n7. [public_xml_docs] 公开成员 XML 文档完整: property ClearRecons 缺少 XML 文档注释。 | location: OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:206\n   Evidence: public Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>> ClearRecons { get; set; }\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n8. [public_xml_docs] 公开成员 XML 文档完整: property Slps 缺少 XML 文档注释。 | location: OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:207\n   Evidence: public Dictionary<int, OSLP> Slps { get; set; }\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+      ],
       "quality_gate_rule_ids": [
         "public_xml_docs",
         "async_signature",

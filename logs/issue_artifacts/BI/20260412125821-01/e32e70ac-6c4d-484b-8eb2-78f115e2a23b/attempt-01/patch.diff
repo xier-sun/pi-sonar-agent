@@ -1,0 +1,68 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -2346,7 +2346,8 @@
+                         // 创建当天的PenaltyLedger记录（仅在允许的生成日期范围内）
+
+                         if (currentEvent != null && (!generationStartDate.HasValue || currentDate >= generationStartDate.Value))
+
+                         {
+
+-                            CreateDailyPenaltyLedgerEntry(order, overdueInfo, penaltyAmount, currentDate, currentEvent,dayilRate, slp,ref penaltyLedgers);
+
++                            var ledgerEntry = CreateDailyPenaltyLedgerEntry(order, overdueInfo, penaltyAmount, currentDate, currentEvent,dayilRate, slp);
+
++                            if (ledgerEntry != null) penaltyLedgers.Add(ledgerEntry);
+
+ 
+
+                             // 分批保存：每累积500条记录就保存一次
+
+                             if (penaltyLedgers.Count >= batchSize)
+
+@@ -2619,11 +2620,11 @@
+         /// <summary>
+
+         /// 创建当天的PenaltyLedger记录，关联到现有的PenaltyEvent
+
+         /// </summary>
+
+-        private static void CreateDailyPenaltyLedgerEntry(ORDR order, HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo, decimal penaltyAmount, DateTime currentDate, PenaltyEvent penaltyEvent,decimal dailyRate, OSLP slp, ref List<PenaltyLedger> penaltyLedgers)
+
++        private static PenaltyLedger CreateDailyPenaltyLedgerEntry(ORDR order, HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo, decimal penaltyAmount, DateTime currentDate, PenaltyEvent penaltyEvent,decimal dailyRate, OSLP slp)
+
+         {
+
+             if (penaltyEvent == null)
+
+-                return;
+
+-            
+
++                return null;
+
++
+
+             // 创建PenaltyLedger记录，关联到PenaltyEvent
+
+             var ledgerEntry = new PenaltyLedger
+
+             {
+
+@@ -2638,8 +2639,7 @@
+                 CalculationBase = overdueInfo.U_Due_Amt,
+
+                 CalculationJobRunId = Guid.NewGuid().ToString()
+
+             };
+
+-            penaltyLedgers.Add(ledgerEntry);
+
+-          
+
++            return ledgerEntry;
+
+         }
+
+ 
+
+         /// <summary>

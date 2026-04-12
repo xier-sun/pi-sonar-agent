@@ -187,6 +187,9 @@ def test_run_coordinator_filters_issues_by_configured_issue_keys(monkeypatch, tm
         def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
             self.remote_url = remote_url
 
+        def branch_exists(self, branch: str) -> bool:
+            return True
+
         def clone_branch(self, workspace_path: Path, branch: str) -> None:
             workspace_path.mkdir(parents=True, exist_ok=True)
 
@@ -563,6 +566,9 @@ def test_run_coordinator_does_not_notify_when_no_pr_created(monkeypatch, tmp_pat
         def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
             self.remote_url = remote_url
 
+        def branch_exists(self, branch: str) -> bool:
+            return True
+
         def clone_branch(self, workspace_path: Path, branch: str) -> None:
             workspace_path.mkdir(parents=True, exist_ok=True)
 
@@ -661,7 +667,147 @@ def test_run_coordinator_does_not_notify_when_no_pr_created(monkeypatch, tmp_pat
 
     assert result.pr_url == ""
     assert result.successful == 0
-    assert result.skipped == 1
+    assert result.skipped == 0
+    assert result.policy_skipped == 1
     assert notification_calls == []
     output = capsys.readouterr().out
     assert "钉钉通知发送成功" not in output
+    assert "策略排除" in output
+
+
+def test_run_target_filters_policy_skipped_rules_before_issue_limits(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    runtime_env = RuntimeEnvironment(
+        workspace_root=tmp_path / ".agent_workspaces",
+        sonar_host="https://sonar.example",
+        sonar_token="token",
+        sonar_org="org",
+        ado_base_url="https://dev.azure.com/acme",
+        ado_project="project",
+        ado_pat="pat",
+        ado_org="acme",
+    )
+    target_config = TargetConfig(
+        project_key="project-a",
+        repository="repo-a",
+        author="alice@example.com",
+        reviewer_email="",
+        dingtalk_userid="",
+        base_branch="main",
+        base_branch_source="targets.json.base_branch",
+        max_issues=1,
+        build_command="",
+        test_command="",
+        solution_path="",
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    import pi_sonar_agent.agent.rule_policies as rule_policies_module
+    import pi_sonar_agent.core.db_client as db_client_module
+    import pi_sonar_agent.core.dingtalk as dingtalk_module
+    import pi_sonar_agent.core.issue_retry as issue_retry_module
+    import pi_sonar_agent.core.model_env as model_env_module
+    import pi_sonar_agent.core.recipient_resolution as recipient_module
+    import pi_sonar_agent.integrations.ado as ado_module
+    import pi_sonar_agent.integrations.sonar as sonar_module
+
+    monkeypatch.setattr(db_client_module, "create_mysql_client_from_env", lambda: None)
+    monkeypatch.setattr(
+        recipient_module,
+        "resolve_recipients",
+        lambda **kwargs: SimpleNamespace(
+            reviewer_email="",
+            reviewer_source="author",
+            dingtalk_userid="",
+            dingtalk_source="unresolved",
+        ),
+    )
+    monkeypatch.setattr(dingtalk_module, "create_dingtalk_client_from_env", lambda: None)
+    monkeypatch.setattr(model_env_module, "build_agent_env", lambda: {})
+    monkeypatch.setattr(model_env_module, "resolve_agent_model", lambda: "fake-model")
+    monkeypatch.setattr(rule_policies_module, "collect_skipped_rule_ids", lambda: {"skip:rule"})
+
+    class FakeAdoClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_remote_url(self, repository: str) -> str:
+            return f"https://dev.azure.com/acme/project/_git/{repository}"
+
+    class FakeSonarClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_open_issues(self, project_key: str, author: str) -> list[dict]:
+            return [
+                {
+                    "key": "skip-me",
+                    "rule": "skip:rule",
+                    "message": "skip",
+                    "line": 10,
+                    "component": "project-a:src/Skip.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                },
+                {
+                    "key": "keep-me",
+                    "rule": "keep:rule",
+                    "message": "keep",
+                    "line": 12,
+                    "component": "project-a:src/Keep.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                },
+            ]
+
+    class FakeClaudeFixAgent:
+        def __init__(self, *args, **kwargs):
+            return None
+
+    class FakeGitRepositoryGateway:
+        def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
+            self.remote_url = remote_url
+
+        def branch_exists(self, branch: str) -> bool:
+            return True
+
+        def clone_branch(self, workspace_path: Path, branch: str) -> None:
+            workspace_path.mkdir(parents=True, exist_ok=True)
+
+        def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
+            raise AssertionError("publish_branch should not be called")
+
+    monkeypatch.setattr(ado_module, "AzureDevOpsClient", FakeAdoClient)
+    monkeypatch.setattr(sonar_module, "SonarQubeClient", FakeSonarClient)
+    monkeypatch.setattr(claude_agent_module, "ClaudeFixAgent", FakeClaudeFixAgent)
+    monkeypatch.setattr(run_coordinator_module, "GitRepositoryGateway", FakeGitRepositoryGateway)
+
+    seen_issue_keys: list[str] = []
+
+    monkeypatch.setattr(
+        issue_retry_module,
+        "process_issue_with_retries",
+        lambda **kwargs: seen_issue_keys.append(kwargs["issue"].key) or FixResult(
+            success=True,
+            issue_key=kwargs["issue"].key,
+            file_path=kwargs["issue"].file_path,
+            summary="fixed",
+            attempts=1,
+            changes=[{"file": kwargs["issue"].file_path, "action": "modified"}],
+            build_passed=True,
+        ),
+    )
+
+    coordinator = RunCoordinator(runtime_env)
+    result = coordinator.run_target(
+        target_config,
+        TargetRunOptions(run_label="20260412153000", show_banner=False, skip_build=True),
+    )
+
+    assert result.successful == 1
+    assert seen_issue_keys == ["keep-me"]
+    output = capsys.readouterr().out
+    assert "已排除 1 个策略跳过规则的 issues" in output

@@ -228,6 +228,7 @@ class DingTalkCorpClient:
         successful: int,
         skipped: int,
         failed: int,
+        policy_skipped: int = 0,
         pr_url: str | None = None,
         dingtalk_userid: str | None = None,
         warning_message: str | None = None,
@@ -244,6 +245,7 @@ class DingTalkCorpClient:
 - **成功修复**: {successful} ✅
 - **跳过修复**: {skipped} ⏭️
 - **修复失败**: {failed} ❌
+- **策略排除**: {policy_skipped} 🚫
 
 """
 

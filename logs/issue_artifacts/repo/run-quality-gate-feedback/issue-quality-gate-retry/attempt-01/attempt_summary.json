@@ -1,9 +1,9 @@
 {
   "attempt_number": 1,
   "status": "retrying",
-  "started_at": "2026-04-12T03:20:54.271139+00:00",
-  "finished_at": "2026-04-12T03:20:54.272650+00:00",
-  "duration_seconds": 0.002,
+  "started_at": "2026-04-12T04:52:26.159364+00:00",
+  "finished_at": "2026-04-12T04:52:26.159719+00:00",
+  "duration_seconds": 0.0,
   "failure_kind": "quality_gate",
   "retry_reason": "retryable_failure",
   "retryable_failure": true,
@@ -20,7 +20,7 @@
   "issue_log_path": "logs\\issue_attempts\\repo_issue-quality-gate-retry_run-quality-gate-feedback.log",
   "artifact_dir": "logs/issue_artifacts/repo/run-quality-gate-feedback/issue-quality-gate-retry/attempt-01",
   "performance_metrics": {
-    "attempt_total_duration_seconds": 0.002
+    "attempt_total_duration_seconds": 0.0
   },
   "rollout_flags": []
 }

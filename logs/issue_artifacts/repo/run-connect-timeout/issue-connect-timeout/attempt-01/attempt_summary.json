@@ -1,9 +1,9 @@
 {
   "attempt_number": 1,
   "status": "retrying",
-  "started_at": "2026-04-12T03:20:55.705216+00:00",
-  "finished_at": "2026-04-12T03:20:55.707012+00:00",
-  "duration_seconds": 0.002,
+  "started_at": "2026-04-12T04:52:27.718281+00:00",
+  "finished_at": "2026-04-12T04:52:27.718884+00:00",
+  "duration_seconds": 0.001,
   "failure_kind": "model_timeout",
   "retry_reason": "retryable_failure",
   "retryable_failure": true,
@@ -18,7 +18,7 @@
   "issue_log_path": "logs\\issue_attempts\\repo_issue-connect-timeout_run-connect-timeout.log",
   "artifact_dir": "logs/issue_artifacts/repo/run-connect-timeout/issue-connect-timeout/attempt-01",
   "performance_metrics": {
-    "attempt_total_duration_seconds": 0.002
+    "attempt_total_duration_seconds": 0.001
   },
   "rollout_flags": []
 }

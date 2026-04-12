@@ -284,10 +284,11 @@ def test_process_issue_with_retries_retries_when_agent_makes_no_changes(tmp_path
 
     assert result.success is False
     assert result.skipped is True
-    assert result.skip_reason == "Agent completed without modifying any files after 3 attempt(s)"
-    assert result.attempts == 3
+    assert "Retry stopped early after 2 attempt(s)" in result.skip_reason
+    assert result.attempts == 2
+    assert len(agent.retry_feedbacks) == 2
     assert "上次尝试没有实际修改任何文件" in agent.retry_feedbacks[1]
-    assert "必须对 Sonar 指向的代码真正落盘修改" in agent.retry_feedbacks[2]
+    assert "必须对 Sonar 指向的代码真正落盘修改" in agent.retry_feedbacks[1]
 
 
 def test_process_issue_with_retries_carries_last_quality_gate_context_across_no_change(tmp_path) -> None:

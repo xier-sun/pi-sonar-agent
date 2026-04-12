@@ -147,6 +147,7 @@ def build_pull_request_description(
     successful: int,
     skipped: int,
     failed: int,
+    policy_skipped: int = 0,
     build_passed: bool,
     issue_summaries: list[PullRequestIssueSummary],
 ) -> str:
@@ -170,6 +171,7 @@ def build_pull_request_description(
         f"- 成功: {successful}",
         f"- 跳过: {skipped}",
         f"- 失败: {failed}",
+        f"- 策略排除: {policy_skipped}",
         f"- 构建命令: {build_command}",
     ]
 
@@ -221,6 +223,7 @@ def build_summary_pull_request_description(
     successful: int,
     skipped: int,
     failed: int,
+    policy_skipped: int = 0,
     build_passed: bool,
     issue_summaries: list[PullRequestIssueSummary],
     report_attachment_name: str | None = None,
@@ -244,6 +247,7 @@ def build_summary_pull_request_description(
         f"- 成功: {successful}",
         f"- 跳过: {skipped}",
         f"- 失败: {failed}",
+        f"- 策略排除: {policy_skipped}",
         f"- 构建命令: {build_command}",
     ]
 

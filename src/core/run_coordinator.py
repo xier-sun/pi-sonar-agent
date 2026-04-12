@@ -47,6 +47,7 @@ class TargetRunResult:
     skipped: int
     failed: int
     build_passed: bool
+    policy_skipped: int = 0
     pr_url: str = ""
     pr_error: str = ""
     status: str = ""
@@ -70,6 +71,7 @@ class RunCoordinator:
         """Run the end-to-end fix workflow for one target."""
 
         from pi_sonar_agent.agent.claude_agent import ClaudeFixAgent, SonarIssue
+        from pi_sonar_agent.agent.rule_policies import collect_skipped_rule_ids
         from pi_sonar_agent.core.db_client import create_mysql_client_from_env
         from pi_sonar_agent.core.dingtalk import create_dingtalk_client_from_env
         from pi_sonar_agent.core.issue_retry import process_issue_with_retries
@@ -111,6 +113,7 @@ class RunCoordinator:
         successful = 0
         failed = 0
         skipped = 0
+        policy_skipped = 0
         issue_processing_started = False
 
         def finalize_target_result(result: TargetRunResult) -> TargetRunResult:
@@ -144,6 +147,7 @@ class RunCoordinator:
                 skipped=result.skipped,
                 failed=result.failed,
                 build_passed=result.build_passed,
+                policy_skipped=result.policy_skipped,
                 pr_url=result.pr_url,
                 pr_error=result.pr_error,
                 artifact_path=target_summary_path.as_posix(),
@@ -182,6 +186,7 @@ class RunCoordinator:
                     skipped=skipped,
                     failed=failed,
                     build_passed=False,
+                    policy_skipped=policy_skipped,
                     pr_error=normalized_error,
                 )
             )
@@ -300,6 +305,22 @@ class RunCoordinator:
             )
             print(f"发现 {len(issues)} 个 issues")
 
+            skipped_rule_ids = collect_skipped_rule_ids()
+            if skipped_rule_ids:
+                pre_filter_count = len(issues)
+                issues = [
+                    item
+                    for item in issues
+                    if str(item.get("rule", "")).strip() not in skipped_rule_ids
+                ]
+                policy_filtered = pre_filter_count - len(issues)
+                if policy_filtered:
+                    print(
+                        "已排除 "
+                        f"{policy_filtered} 个策略跳过规则的 issues "
+                        f"({', '.join(sorted(skipped_rule_ids))})"
+                    )
+
             if target_config.issue_keys:
                 issue_by_key = {
                     str(item.get("key", "")).strip(): item
@@ -348,6 +369,7 @@ class RunCoordinator:
                     skipped=0,
                     failed=0,
                     build_passed=True,
+                    policy_skipped=0,
                 )
             )
 
@@ -474,10 +496,11 @@ class RunCoordinator:
                 if result.issue_log_path:
                     print(f"  [ISSUE LOG] {result.issue_log_path}")
                 if result.skipped:
-                    skipped += 1
                     if result.failure_kind == "policy_skip":
+                        policy_skipped += 1
                         issue_summary_text = "该 issue 按规则策略默认跳过，建议人工处理，未纳入本 PR。"
                     else:
+                        skipped += 1
                         issue_summary_text = "达到最大重试次数后仍未通过构建校验，当前 issue 的改动已回滚，未纳入本 PR。"
                     issue_summaries.append(
                         PullRequestIssueSummary(
@@ -531,7 +554,16 @@ class RunCoordinator:
                         )
                     )
 
-        print(f"\n[INFO] 修复完成: 成功 {successful}, 跳过 {skipped}, 失败 {failed}")
+        attempted = successful + skipped + failed
+        effective_rate = (
+            f"{successful}/{attempted} ({int(successful * 100 / attempted)}%)"
+            if attempted
+            else "N/A"
+        )
+        print(
+            f"\n[INFO] 修复完成: 成功 {successful}, 跳过 {skipped}, "
+            f"失败 {failed}, 策略排除 {policy_skipped}, 有效修复率 {effective_rate}"
+        )
 
         build_passed = True
         final_build_result: dict[str, object] | None = None
@@ -573,6 +605,7 @@ class RunCoordinator:
                 successful=successful,
                 skipped=skipped,
                 failed=failed,
+                policy_skipped=policy_skipped,
                 build_passed=build_passed,
                 issue_summaries=issue_summaries,
             )
@@ -609,6 +642,7 @@ class RunCoordinator:
                 successful=successful,
                 skipped=skipped,
                 failed=failed,
+                policy_skipped=policy_skipped,
                 build_passed=build_passed,
                 issue_summaries=issue_summaries,
             )
@@ -663,6 +697,7 @@ class RunCoordinator:
                         successful=successful,
                         skipped=skipped,
                         failed=failed,
+                        policy_skipped=policy_skipped,
                         build_passed=build_passed,
                         issue_summaries=issue_summaries,
                         report_attachment_name=attachment.file_name,
@@ -690,6 +725,7 @@ class RunCoordinator:
                     successful=successful,
                     skipped=skipped,
                     failed=failed,
+                    policy_skipped=policy_skipped,
                     pr_url=pr_url,
                     dingtalk_userid=recipients.dingtalk_userid,
                     warning_message=(f"PR 创建失败：{pr_error}" if pr_error else None),
@@ -705,7 +741,8 @@ class RunCoordinator:
         print(f"\n{'=' * 50}")
         print(
             f"完成! 成功: {successful}, 跳过: {skipped}, "
-            f"失败: {failed}, 构建: {'通过' if build_passed else '失败'}"
+            f"失败: {failed}, 策略排除: {policy_skipped}, "
+            f"构建: {'通过' if build_passed else '失败'}"
         )
         if pr_url:
             print(f"PR: {pr_url}")
@@ -720,6 +757,7 @@ class RunCoordinator:
                 skipped=skipped,
                 failed=failed,
                 build_passed=build_passed,
+                policy_skipped=policy_skipped,
                 pr_url=pr_url,
                 pr_error=pr_error,
             )

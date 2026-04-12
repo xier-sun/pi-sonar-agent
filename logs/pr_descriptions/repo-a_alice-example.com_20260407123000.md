@@ -7,6 +7,7 @@
 - 成功: 1
 - 跳过: 0
 - 失败: 0
+- 策略排除: 0
 - 构建命令: dotnet build Foo.sln
 - 解决方案: Foo.sln
 

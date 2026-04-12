@@ -1,0 +1,85 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs
+@@ -2037,7 +2037,9 @@
+ 
+
+                                     if (currentEvent != null && (!generationStartDate.HasValue || currentDate >= generationStartDate.Value))
+
+                                     {
+
+-                                         CreateDailyPenaltyLedgerEntryInternal( order, overdueInfo, penaltyAmount, currentDate, currentEvent, dayilRate, slp, ref penaltyLedgers);
+
++                                         var ledgerEntry = CreateDailyPenaltyLedgerEntryInternal(order, overdueInfo, penaltyAmount, currentDate, currentEvent, dayilRate, slp);
+
++                                        if (ledgerEntry != null)
+
++                                            penaltyLedgers.Add(ledgerEntry);
+
+ 
+
+                                         // 分批保存：每累积500条记录就保存一次
+
+                                         if (penaltyLedgers.Count >= batchSize)
+
+@@ -2130,7 +2132,9 @@
+ 
+
+                                 if (currentEvent != null && (!generationStartDate.HasValue || currentDate >= generationStartDate.Value))
+
+                                 {
+
+-                                    CreateDailyPenaltyLedgerEntryInternal(order, overdueInfo, penaltyAmount, currentDate, currentEvent, dayilRate, slp, ref penaltyLedgers);
+
++                                    var ledgerEntry = CreateDailyPenaltyLedgerEntryInternal(order, overdueInfo, penaltyAmount, currentDate, currentEvent, dayilRate, slp);
+
++                                    if (ledgerEntry != null)
+
++                                        penaltyLedgers.Add(ledgerEntry);
+
+ 
+
+                                     // 分批保存：每累积500条记录就保存一次
+
+                                     if (penaltyLedgers.Count >= batchSize)
+
+@@ -2645,10 +2649,10 @@
+         /// <summary>
+
+         /// 创建当天的PenaltyLedger记录，关联到现有的PenaltyEvent（内部版本，用于并行处理）
+
+         /// </summary>
+
+-        private static void CreateDailyPenaltyLedgerEntryInternal( ORDR order, HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo, decimal penaltyAmount, DateTime currentDate, PenaltyEvent penaltyEvent,decimal dailyRate, OSLP slp,ref List<PenaltyLedger> penaltyLedgers)
+
++        private static PenaltyLedger CreateDailyPenaltyLedgerEntryInternal(ORDR order, HistoricalOverdueCalculationService.OverDueAmountAndDays overdueInfo, decimal penaltyAmount, DateTime currentDate, PenaltyEvent penaltyEvent, decimal dailyRate, OSLP slp)
+
+         {
+
+             if (penaltyEvent == null)
+
+-                return;
+
++                return null;
+
+ 
+
+             // 创建PenaltyLedger记录，关联到PenaltyEvent
+
+             var ledgerEntry = new PenaltyLedger
+
+@@ -2664,7 +2668,7 @@
+                 CalculationBase = overdueInfo.U_Due_Amt,
+
+                 CalculationJobRunId = Guid.NewGuid().ToString()
+
+             };
+
+-            penaltyLedgers.Add(ledgerEntry);
+
++            return ledgerEntry;
+
+         }
+
+         
+
+         /// <summary>

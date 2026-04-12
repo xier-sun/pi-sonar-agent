@@ -146,16 +146,42 @@ RULE_HANDLING_POLICIES: dict[str, RuleHandlingPolicy] = {
         ),
     ),
     "csharpsquid:S107": RuleHandlingPolicy(
-        skip_reason="规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+        scope_mode=METHOD_SCOPE_MODE,
+        validation_trailing_lines=80,
+        prompt_guards=(
+            "优先做最小可验证的参数收敛，不要为了压参数个数顺手重写整段业务逻辑。",
+            "如果当前方法是 public/protected、接口实现、override 或存在明显外部调用点，只有在能同步更新签名传播时才允许改参数列表。",
+            "如果无法安全联动调用点，优先尝试提取 request/options 对象、封装局部参数组或下沉到 private helper，而不是贸然破坏公开契约。",
+            "不要为了修 S107 新增无关 public DTO、property 或跨文件大范围重构。",
+        ),
     ),
     "csharpsquid:S1172": RuleHandlingPolicy(
-        skip_reason="规则 csharpsquid:S1172 默认跳过：未使用参数可能涉及公共签名或接口契约，建议人工处理。",
+        scope_mode=METHOD_SCOPE_MODE,
+        validation_trailing_lines=40,
+        prompt_guards=(
+            "只处理当前 issue 对应的未使用参数，不要顺手改同方法里的其他签名问题。",
+            "如果方法是 public/protected、接口实现、override 或被外部调用，优先保留现有公开签名，并考虑通过 discard、注释说明或局部使用来满足规则。",
+            "只有在签名传播范围明确且可以一次性同步调用点时，才允许删除参数并联动改接口/调用点。",
+            "不要为了修复未使用参数而引入新的公开成员或无关重构。",
+        ),
     ),
     "csharpsquid:S4136": RuleHandlingPolicy(
-        skip_reason="规则 csharpsquid:S4136 默认跳过：重排重载成员会产生大范围 diff，建议人工处理。",
+        scope_mode=METHOD_SCOPE_MODE,
+        validation_trailing_lines=120,
+        prompt_guards=(
+            "如果要调整重载顺序，只做同一类型内部的最小成员重排，不要修改方法体语义。",
+            "优先把同名 overload 移到相邻位置，避免同时重排其他无关成员。",
+            "不要顺手补 XML 文档、改 async 命名、改可见性或做格式化型大 diff。",
+        ),
     ),
     "csharpsquid:S6960": RuleHandlingPolicy(
-        skip_reason="规则 csharpsquid:S6960 默认跳过：Controller 职责拆分属于架构调整，建议人工处理。",
+        scope_mode=METHOD_SCOPE_MODE,
+        validation_trailing_lines=120,
+        prompt_guards=(
+            "优先用最小结构化重构降低 Controller 职责耦合，例如提取 private helper、薄封装或下沉到现有应用服务；不要直接做大规模架构改写。",
+            "保持现有路由、Action 签名和公开 API 稳定，除非当前 patch 已明确提供完整传播范围。",
+            "不要一次性新建大量文件或服务类型；先尝试当前文件内、当前类附近的最小重构。",
+        ),
     ),
 }
 
@@ -165,3 +191,13 @@ def get_rule_policy(rule_id: str | None) -> RuleHandlingPolicy:
 
     normalized = str(rule_id or "").strip()
     return RULE_HANDLING_POLICIES.get(normalized, DEFAULT_RULE_POLICY)
+
+
+def collect_skipped_rule_ids() -> set[str]:
+    """Return rule IDs that are configured for policy-level skipping."""
+
+    return {
+        rule_id
+        for rule_id, policy in RULE_HANDLING_POLICIES.items()
+        if str(policy.skip_reason or "").strip()
+    }
