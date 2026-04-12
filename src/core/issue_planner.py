@@ -883,6 +883,7 @@ class IssuePlanner:
         retry_compiler_codes = cls._retry_compiler_error_codes(retry_context)
         retry_failure_kind = str(getattr(retry_context, "failure_kind", "")).strip()
         saw_symbol_closure_failure = bool(retry_compiler_codes.intersection({"CS0103", "CS1061"}))
+        saw_contract_closure_failure = bool(retry_compiler_codes.intersection({"CS0535", "CS0738"}))
         saw_async_gate_retry = bool(
             observed_quality_gate_ids.intersection({"async_requires_await", "async_signature"})
         )
@@ -1066,6 +1067,14 @@ class IssuePlanner:
                         "prefer_inline_block_simplification",
                     )
                 )
+            if saw_contract_closure_failure:
+                risk_notes.append("最近失败出现接口/契约不同步（CS0535/CS0738）；下一轮应优先保持现有公开签名，避免半成品 rename。")
+                strategy_preferences.extend(
+                    (
+                        "avoid_partial_contract_rename",
+                        "prefer_existing_public_signature_until_propagation_is_verified",
+                    )
+                )
             if retry_failure_kind == "no_change":
                 risk_notes.append("上一轮没有产生有效补丁；下一轮必须提交具体的小范围代码修改。")
                 strategy_preferences.append("force_concrete_delta")
@@ -1181,25 +1190,41 @@ class IssuePlanner:
 
         if rule_id in {"csharpsquid:S125", "csharpsquid:S1481", "csharpsquid:S1144"}:
             return ("declaration_hygiene", "expression_simplification")
-        if requires_signature_change and requires_propagation:
-            return (
-                "bounded_signature_propagation",
-                "signature_preserving_refactor",
-                "expression_simplification",
-            )
         if METHOD_CLUSTER_DELETE_CAPABILITY in allowed_capabilities:
             return ("declaration_hygiene", "expression_simplification")
         if rule_id == "csharpsquid:S3776":
+            if requires_signature_change and requires_propagation:
+                should_downgrade_public_async_rename = bool(
+                    prefer_signature_preserving
+                    or retry_failure_kind in {"no_change", "forbidden_tool"}
+                    or retry_compiler_codes.intersection({"CS0103", "CS1061", "CS0535", "CS0738"})
+                    or observed_quality_gate_ids.intersection(
+                        {"async_requires_await", "async_signature", "public_xml_docs"}
+                    )
+                )
+                if should_downgrade_public_async_rename:
+                    return ("signature_preserving_refactor", "expression_simplification")
+                return (
+                    "bounded_signature_propagation",
+                    "signature_preserving_refactor",
+                    "expression_simplification",
+                )
             if prefer_signature_preserving:
                 return ("signature_preserving_refactor", "expression_simplification")
             if retry_compiler_codes.intersection({"CS0103", "CS1061"}) or retry_failure_kind == "no_change":
                 return ("signature_preserving_refactor", "expression_simplification")
-            if observed_quality_gate_ids.intersection({"async_requires_await", "public_xml_docs"}):
+            if observed_quality_gate_ids.intersection({"async_requires_await", "async_signature", "public_xml_docs"}):
                 return ("signature_preserving_refactor", "expression_simplification")
             if requires_signature_change:
                 return ("signature_preserving_refactor", "expression_simplification")
             return (
                 "method_decomposition",
+                "signature_preserving_refactor",
+                "expression_simplification",
+            )
+        if requires_signature_change and requires_propagation:
+            return (
+                "bounded_signature_propagation",
                 "signature_preserving_refactor",
                 "expression_simplification",
             )
@@ -1291,6 +1316,8 @@ class IssuePlanner:
             hints.append("Retry downgrade: avoid any new public/protected surface in this patch; solve the issue with private/local constructs instead.")
         if retry_compiler_codes.intersection({"CS0103", "CS1061"}):
             hints.append("Retry downgrade: avoid helper fan-out that depends on many outer locals; if extraction needs several captured values, keep the logic in the current method.")
+        if retry_compiler_codes.intersection({"CS0535", "CS0738"}):
+            hints.append("Retry downgrade: if a public method and its interface/contract are no longer aligned, either restore the existing public signature or update every verified declaration/callsite before finishing.")
         if retry_failure_kind == "no_change":
             hints.append("This retry must end with a concrete code delta; do not stop after analysis.")
         hints.append("Avoid introducing new public or protected surface area unless the contract explicitly requires it.")

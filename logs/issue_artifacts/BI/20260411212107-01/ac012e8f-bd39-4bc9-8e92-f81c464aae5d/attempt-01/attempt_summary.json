@@ -1,0 +1,24 @@
+{
+  "attempt_number": 1,
+  "status": "skipped",
+  "started_at": "2026-04-11T15:53:20.304297+00:00",
+  "finished_at": "2026-04-11T15:53:20.305286+00:00",
+  "duration_seconds": 0.001,
+  "failure_kind": "policy_skip",
+  "retry_reason": "none",
+  "retryable_failure": false,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "error": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+  "skip_reason": "规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。",
+  "summary": "Skipped by rule policy",
+  "changed_files": [],
+  "boundary_failure_code": "",
+  "secondary_boundary_failure_codes": [],
+  "issue_log_path": "logs\\issue_attempts\\BI_ac012e8f-bd39-4bc9-8e92-f81c464aae5d_20260411212107-01.log",
+  "artifact_dir": "logs/issue_artifacts/BI/20260411212107-01/ac012e8f-bd39-4bc9-8e92-f81c464aae5d/attempt-01",
+  "performance_metrics": {
+    "attempt_total_duration_seconds": 0.001
+  },
+  "rollout_flags": []
+}

@@ -24,6 +24,10 @@
       }
     ]
   },
+  "review_gate_result": {
+    "status": "not_available",
+    "reason": "Review gate result was not attached to this attempt."
+  },
   "boundary_failure_code": "",
   "boundary_failure_summary": "",
   "secondary_boundary_failure_codes": [],

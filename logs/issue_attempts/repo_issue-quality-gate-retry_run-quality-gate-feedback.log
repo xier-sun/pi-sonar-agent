@@ -361,3 +361,95 @@ Quality gate verification failed. The patch must satisfy the active C# gate rule
 - 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
 [2026-04-11 14:56:44] Workspace restored to issue baseline
 [2026-04-11 14:56:44] Issue skipped: C# quality gate verification failed after 2 attempt(s)
+[2026-04-11 23:11:33] Attempt 1/2 started for issue-quality-gate-retry
+[2026-04-11 23:11:33] Attempt 1 failed: Quality gate verification failed
+[2026-04-11 23:11:33] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "tracked.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。
+[2026-04-11 23:11:33] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:199
+   证据: private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync(...)
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+本次重改要求:
+- 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+- 如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。
+- 新提取的 helper 默认保持同步；只有 helper 体内真实含有 await 时才允许 async。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-11 23:11:33] Workspace restored to issue baseline
+[2026-04-11 23:11:33] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 23:11:33] Attempt 2/2 started for issue-quality-gate-retry
+[2026-04-11 23:11:33] Attempt 2 failed: Quality gate verification failed
+[2026-04-11 23:11:33] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "tracked.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。
+[2026-04-11 23:11:33] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:199
+   证据: private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync(...)
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+本次重改要求:
+- 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+- 如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。
+- 新提取的 helper 默认保持同步；只有 helper 体内真实含有 await 时才允许 async。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-11 23:11:33] Workspace restored to issue baseline
+[2026-04-11 23:11:33] Issue skipped: C# quality gate verification failed after 2 attempt(s)
+[2026-04-11 23:12:17] Attempt 1/2 started for issue-quality-gate-retry
+[2026-04-11 23:12:17] Attempt 1 failed: Quality gate verification failed
+[2026-04-11 23:12:17] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "tracked.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。
+[2026-04-11 23:12:17] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:199
+   证据: private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync(...)
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+本次重改要求:
+- 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+- 如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。
+- 新提取的 helper 默认保持同步；只有 helper 体内真实含有 await 时才允许 async。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-11 23:12:17] Workspace restored to issue baseline
+[2026-04-11 23:12:17] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-11 23:12:17] Attempt 2/2 started for issue-quality-gate-retry
+[2026-04-11 23:12:17] Attempt 2 failed: Quality gate verification failed
+[2026-04-11 23:12:17] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "tracked.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。
+[2026-04-11 23:12:17] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:199
+   证据: private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync(...)
+   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+本次重改要求:
+- 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。
+- 如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。
+- 新提取的 helper 默认保持同步；只有 helper 体内真实含有 await 时才允许 async。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-11 23:12:17] Workspace restored to issue baseline
+[2026-04-11 23:12:17] Issue skipped: C# quality gate verification failed after 2 attempt(s)

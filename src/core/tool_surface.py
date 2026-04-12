@@ -60,5 +60,7 @@ def render_controlled_bash_prompt_constraints(*, enabled: bool | None = None) ->
     return (
         "如果使用 shell 工具（工具名 Bash），请只写 bash 兼容命令；不要写 PowerShell 或 CMD 语法。",
         "允许使用 Bash 做搜索、查看、诊断、echo 等无害操作。",
+        "如果路径不确定，优先使用 prompt 中给出的仓库相对路径候选；不要靠手工拼接仓库根目录反复试错。",
+        "优先使用单条无副作用的诊断命令；不要把 Bash 当成源码编辑器。",
         "严禁用 shell 删除文件、创建文件、覆盖文件或通过 shell 直接改写源文件；代码落盘修改仍使用 Edit。",
     )

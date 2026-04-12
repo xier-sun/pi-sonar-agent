@@ -1,0 +1,79 @@
+{
+  "issue_key": "issue-review-gate-skip",
+  "repository": "repo",
+  "run_label": "run-review-gate",
+  "rule_id": "csharpsquid:S3776",
+  "file_path": "/tracked.cs",
+  "line": 1,
+  "status": "skipped",
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "retrying",
+      "started_at": "2026-04-11T15:12:16.570790+00:00",
+      "finished_at": "2026-04-11T15:12:16.571365+00:00",
+      "duration_seconds": 0.001,
+      "failure_kind": "review_gate",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": false,
+      "error": "Review gate verification failed",
+      "skip_reason": "",
+      "summary": "",
+      "changed_files": [],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\repo_issue-review-gate-skip_run-review-gate.log",
+      "artifact_dir": "logs/issue_artifacts/repo/run-review-gate/issue-review-gate-skip/attempt-01",
+      "performance_metrics": {
+        "attempt_total_duration_seconds": 0.001
+      },
+      "rollout_flags": []
+    },
+    {
+      "attempt_number": 2,
+      "status": "skipped",
+      "started_at": "2026-04-11T15:12:16.638198+00:00",
+      "finished_at": "2026-04-11T15:12:16.638622+00:00",
+      "duration_seconds": 0.0,
+      "failure_kind": "review_gate",
+      "retry_reason": "retryable_failure",
+      "retryable_failure": true,
+      "build_passed": false,
+      "build_verification_failed": false,
+      "error": "Review gate verification failed after 2 attempt(s)",
+      "skip_reason": "Review gate verification failed after 2 attempt(s)",
+      "summary": "",
+      "changed_files": [],
+      "boundary_failure_code": "",
+      "secondary_boundary_failure_codes": [],
+      "issue_log_path": "logs\\issue_attempts\\repo_issue-review-gate-skip_run-review-gate.log",
+      "artifact_dir": "logs/issue_artifacts/repo/run-review-gate/issue-review-gate-skip/attempt-02",
+      "performance_metrics": {
+        "attempt_total_duration_seconds": 0.0
+      },
+      "rollout_flags": []
+    }
+  ],
+  "final_failure_kind": "review_gate",
+  "final_error": "Review gate verification failed after 2 attempt(s)",
+  "final_skip_reason": "Review gate verification failed after 2 attempt(s)",
+  "final_summary": "",
+  "final_boundary_failure_code": "",
+  "final_secondary_boundary_failure_codes": [],
+  "artifact_root": "logs/issue_artifacts/repo/run-review-gate/issue-review-gate-skip",
+  "performance_summary": {
+    "issue_attempt_count": 2,
+    "issue_total_duration_seconds": 0.001,
+    "avg_attempt_duration_seconds": 0.001,
+    "model_timeout_attempts": 0,
+    "scope_reject_attempts": 0,
+    "boundary_hard_reject_attempts": 0,
+    "build_invocation_count": 0,
+    "follow_up_timeout_attempts": 0,
+    "patch_salvaged_attempts": 0,
+    "rollout_flags": []
+  },
+  "rollout_flags": []
+}

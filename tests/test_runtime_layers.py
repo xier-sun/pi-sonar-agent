@@ -147,6 +147,28 @@ def test_tool_policy_normalizes_wrapped_tool_names() -> None:
     assert multiedit_decision.allowed is True
 
 
+def test_tool_policy_allows_benign_chained_shell_diagnostics() -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit", "MultiEdit", "Bash", "Finish"],
+        mcp_tools=[],
+        forbidden_tools={"mcp__sonar-fix__git_push"},
+    )
+    policy = ToolPolicy(
+        registry,
+        build_allowed_fix_tool_rules(["Read", "Edit", "MultiEdit", "Finish"], include_controlled_bash=True),
+    )
+
+    decision = policy.classify(
+        "Bash",
+        {
+            "command": "ls \"OpenAuth.Core/OpenAuth.App/Foo.cs\" 2>&1 || echo \"---\" && ls \"OpenAuth.Core/OpenAuth.App\" 2>&1"
+        },
+    )
+
+    assert decision.allowed is True
+    assert decision.policy_violation is False
+
+
 def test_agent_runtime_runs_hooks_and_collects_tool_usage() -> None:
     registry = build_fix_tool_registry(
         builtin_tools=["Read", "Edit"],

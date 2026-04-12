@@ -1,0 +1,86 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
+@@ -237,21 +237,29 @@
+             }
+
+             else
+
+             {
+
+-                var loginInfo = _auth.GetLoginInfo();
+
+-                var loginIndicator = loginInfo.IndicateCode;
+
+-                if (loginIndicator != Define.All_IndicatorCode)
+
+-                {
+
+-                    req.Indicator = loginIndicator == Define.Non_IndicatorCode ? "N" : loginIndicator;
+
+-                    req.IndicatorList = new List<string>();
+
+-                }
+
+-                else
+
+-                {
+
+-                    req.Indicator = req.Indicator == Define.Non_IndicatorCode ? "N" : req.Indicator;
+
+-                    if (req.IndicatorList != null)
+
+-                        req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? "N" : i);
+
+-                }
+
++                ApplyDefaultIndicatorPermission(req);
+
+             }
+
+             return (false, 200, string.Empty);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 无自定义查询权限时，应用默认标识权限
+
++        /// </summary>
+
++        private void ApplyDefaultIndicatorPermission(OverdueAgingSnapshotReq req)
+
++        {
+
++            var loginInfo = _auth.GetLoginInfo();
+
++            var loginIndicator = loginInfo.IndicateCode;
+
++            if (loginIndicator != Define.All_IndicatorCode)
+
++            {
+
++                req.Indicator = loginIndicator == Define.Non_IndicatorCode ? "N" : loginIndicator;
+
++                req.IndicatorList = new List<string>();
+
++            }
+
++            else
+
++            {
+
++                req.Indicator = req.Indicator == Define.Non_IndicatorCode ? "N" : req.Indicator;
+
++                if (req.IndicatorList != null)
+
++                    req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? "N" : i);
+
++            }
+
+         }
+
+ 
+
+         /// <summary>

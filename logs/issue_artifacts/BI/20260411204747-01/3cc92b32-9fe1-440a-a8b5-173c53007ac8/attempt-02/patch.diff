@@ -1,0 +1,308 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/Employees/JobAbilityApp.cs
+@@ -1187,8 +1187,6 @@
+ 
+
+             var result = new List<AbilityChangeHistoryResp>();
+
+             List<JobAbilityChangeHistoryItem> previousItems = null;
+
+-            // 技术员 A/B/C 为初/中/高级，互斥存在
+
+-            var techLevelCodes = new HashSet<string> { "A", "B", "C" };
+
+             bool isTechnician = jobPosition == JobPosition.Technician;
+
+ 
+
+             foreach (var history in histories)
+
+@@ -1199,65 +1197,15 @@
+                 string changeContent;
+
+                 if (previousItems == null)
+
+                 {
+
+-                    // 第一条记录：显示初始状态
+
+-                    changeContent = string.Join(", ", currentItems.Select(
+
+-                        item => $"{item.AbilityRemark}：{item.AbilityCode}{item.AbilityValue}"));
+
++                    changeContent = GetInitialContent(currentItems);
+
+                 }
+
+                 else if (isTechnician)
+
+                 {
+
+-                    // 技术员特殊处理
+
+-                    var changes = new List<string>();
+
+-                    var curLevel = currentItems.Find(i => techLevelCodes.Contains(i.AbilityCode));
+
+-                    var prevLevel = previousItems.Find(i => techLevelCodes.Contains(i.AbilityCode));
+
+-
+
+-                    if (curLevel != null && prevLevel != null)
+
+-                    {
+
+-                        if (curLevel.AbilityCode != prevLevel.AbilityCode)
+
+-                        {
+
+-                            // 级别变化：初级 -> 高级
+
+-                            changes.Add($"{prevLevel.AbilityRemark} 变更为 {curLevel.AbilityRemark}，{prevLevel.AbilityCode}{prevLevel.AbilityValue} -> {curLevel.AbilityCode}{curLevel.AbilityValue}");
+
+-                        }
+
+-                        else if (curLevel.AbilityValue != prevLevel.AbilityValue)
+
+-                        {
+
+-                            // 同级等级变化
+
+-                            changes.Add($"{curLevel.AbilityRemark}：{curLevel.AbilityCode}{prevLevel.AbilityValue} -> {curLevel.AbilityCode}{curLevel.AbilityValue}");
+
+-                        }
+
+-                    }
+
+-                    else if (curLevel != null && prevLevel == null)
+
+-                    {
+
+-                        changes.Add($"{curLevel.AbilityRemark}：{curLevel.AbilityCode}{curLevel.AbilityValue}");
+
+-                    }
+
+-
+
+-                    // U(院校技能) 按通用逻辑处理
+
+-                    foreach (var item in currentItems.Where(i => !techLevelCodes.Contains(i.AbilityCode)))
+
+-                    {
+
+-                        var prevItem = previousItems.Find(p => p.AbilityCode == item.AbilityCode);
+
+-                        if (prevItem == null || prevItem.AbilityValue != item.AbilityValue)
+
+-                        {
+
+-                            var oldValue = prevItem != null
+
+-                                ? $"{item.AbilityCode}{prevItem.AbilityValue}"
+
+-                                : "无";
+
+-                            changes.Add($"{item.AbilityRemark}变更：{oldValue} -> {item.AbilityCode}{item.AbilityValue}");
+
+-                        }
+
+-                    }
+
+-                    changeContent = changes.Any() ? string.Join(", ", changes) : "无变更";
+
++                    changeContent = GetTechnicianChangeContent(currentItems, previousItems);
+
+                 }
+
+                 else
+
+                 {
+
+-                    // 销售员/研发工程师：通用逻辑
+
+-                    var changes = new List<string>();
+
+-                    foreach (var item in currentItems)
+
+-                    {
+
+-                        var prevItem = previousItems.Find(p => p.AbilityCode == item.AbilityCode);
+
+-                        if (prevItem == null || prevItem.AbilityValue != item.AbilityValue)
+
+-                        {
+
+-                            var oldValue = prevItem != null
+
+-                                ? $"{item.AbilityCode}{prevItem.AbilityValue}"
+
+-                                : "无";
+
+-                            changes.Add($"{item.AbilityRemark}变更：{oldValue} -> {item.AbilityCode}{item.AbilityValue}");
+
+-                        }
+
+-                    }
+
+-                    changeContent = changes.Any() ? string.Join(", ", changes) : "无变更";
+
++                    changeContent = GetGeneralChangeContent(currentItems, previousItems);
+
+                 }
+
+ 
+
+                 result.Add(new AbilityChangeHistoryResp
+
+@@ -1275,5 +1223,76 @@
+             result.Reverse();
+
+             return new Response<List<AbilityChangeHistoryResp>> { Code = 200, Message = "操作成功", Result = result };
+
+         }
+
++
+
++        private string GetInitialContent(List<JobAbilityChangeHistoryItem> currentItems)
+
++        {
+
++            return string.Join(", ", currentItems.Select(
+
++                item => $"{item.AbilityRemark}：{item.AbilityCode}{item.AbilityValue}"));
+
++        }
+
++
+
++        private string GetTechnicianChangeContent(List<JobAbilityChangeHistoryItem> currentItems, List<JobAbilityChangeHistoryItem> previousItems)
+
++        {
+
++            var changes = new List<string>();
+
++            var techLevelCodes = new HashSet<string> { "A", "B", "C" };
+
++
+
++            ProcessTechnicianLevelChanges(currentItems, previousItems, techLevelCodes, changes);
+
++            ProcessGeneralSkillChanges(currentItems, previousItems, techLevelCodes, changes);
+
++
+
++            return changes.Any() ? string.Join(", ", changes) : "无变更";
+
++        }
+
++
+
++        private void ProcessTechnicianLevelChanges(List<JobAbilityChangeHistoryItem> currentItems, List<JobAbilityChangeHistoryItem> previousItems, HashSet<string> techLevelCodes, List<string> changes)
+
++        {
+
++            var curLevel = currentItems.Find(i => techLevelCodes.Contains(i.AbilityCode));
+
++            var prevLevel = previousItems.Find(i => techLevelCodes.Contains(i.AbilityCode));
+
++
+
++            if (curLevel != null && prevLevel != null)
+
++            {
+
++                if (curLevel.AbilityCode != prevLevel.AbilityCode)
+
++                {
+
++                    changes.Add($"{prevLevel.AbilityRemark} 变更为 {curLevel.AbilityRemark}，{prevLevel.AbilityCode}{prevLevel.AbilityValue} -> {curLevel.AbilityCode}{curLevel.AbilityValue}");
+
++                }
+
++                else if (curLevel.AbilityValue != prevLevel.AbilityValue)
+
++                {
+
++                    changes.Add($"{curLevel.AbilityRemark}：{curLevel.AbilityCode}{prevLevel.AbilityValue} -> {curLevel.AbilityCode}{curLevel.AbilityValue}");
+
++                }
+
++            }
+
++            else if (curLevel != null && prevLevel == null)
+
++            {
+
++                changes.Add($"{curLevel.AbilityRemark}：{curLevel.AbilityCode}{curLevel.AbilityValue}");
+
++            }
+
++        }
+
++
+
++        private void ProcessGeneralSkillChanges(List<JobAbilityChangeHistoryItem> currentItems, List<JobAbilityChangeHistoryItem> previousItems, HashSet<string> techLevelCodes, List<string> changes)
+
++        {
+
++            foreach (var item in currentItems.Where(i => !techLevelCodes.Contains(i.AbilityCode)))
+
++            {
+
++                var prevItem = previousItems.Find(p => p.AbilityCode == item.AbilityCode);
+
++                if (prevItem == null || prevItem.AbilityValue != item.AbilityValue)
+
++                {
+
++                    var oldValue = prevItem != null
+
++                        ? $"{item.AbilityCode}{prevItem.AbilityValue}"
+
++                        : "无";
+
++                    changes.Add($"{item.AbilityRemark}变更：{oldValue} -> {item.AbilityCode}{item.AbilityValue}");
+
++                }
+
++            }
+
++        }
+
++
+
++        private string GetGeneralChangeContent(List<JobAbilityChangeHistoryItem> currentItems, List<JobAbilityChangeHistoryItem> previousItems)
+
++        {
+
++            var changes = new List<string>();
+
++            foreach (var item in currentItems)
+
++            {
+
++                var prevItem = previousItems.Find(p => p.AbilityCode == item.AbilityCode);
+
++                if (prevItem == null || prevItem.AbilityValue != item.AbilityValue)
+
++                {
+
++                    var oldValue = prevItem != null
+
++                        ? $"{item.AbilityCode}{prevItem.AbilityValue}"
+
++                        : "无";
+
++                    changes.Add($"{item.AbilityRemark}变更：{oldValue} -> {item.AbilityCode}{item.AbilityValue}");
+
++                }
+
++            }
+
++            return changes.Any() ? string.Join(", ", changes) : "无变更";
+
++        }
+
+     }
+
+ }

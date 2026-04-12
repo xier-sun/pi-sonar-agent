@@ -100,7 +100,9 @@ SONAR_FIX_USER_PROMPT_TEMPLATE = """请修复以下 SonarQube 代码问题：
 - 严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码
 - 外层流程会负责 build/test/retry，不要自行尝试运行构建或测试
 - 读取和编辑文件时只使用当前仓库内的相对路径，不要使用 `C:\\...` 这类绝对路径
-- 当前优先直接操作的问题文件相对路径是：{file_path}
+- 当前优先直接操作的问题文件相对路径候选：
+{file_path_candidates}
+- 如果第一个路径不存在，优先尝试更短的候选相对路径；不要用 Bash 通过拼接仓库根目录反复试错
 - 如果 Edit Contract 明确声明了额外传播目标文件，只能在这些相对路径内同步修改签名、接口声明、调用点和 `nameof(...)`
 - 保持代码风格一致
 - 确保修复后能编译通过
@@ -216,6 +218,22 @@ class IssuePromptBuilder:
         return normalized or "."
 
     @classmethod
+    def build_workspace_relative_candidates(
+        cls,
+        file_path: str,
+        workspace_path: Path | None = None,
+    ) -> tuple[str, ...]:
+        """Render stable path candidates relative to the runtime cwd."""
+
+        primary = cls.render_workspace_relative_path(file_path)
+        candidates: list[str] = [primary]
+        if workspace_path is not None:
+            workspace_name = str(workspace_path.name or "").replace("\\", "/").strip("/")
+            if workspace_name and primary.startswith(workspace_name + "/"):
+                candidates.append(primary[len(workspace_name) + 1 :])
+        return tuple(dict.fromkeys(item for item in candidates if str(item).strip()))
+
+    @classmethod
     def build_user_prompt(
         cls,
         issue: SonarIssue,
@@ -230,6 +248,7 @@ class IssuePromptBuilder:
         repair_plan_section: str = "",
         prefetched_context_section: str = "",
         execution_mode_section: str = "",
+        workspace_path: Path | None = None,
     ) -> str:
         """Build the issue-specific user prompt."""
 
@@ -260,6 +279,10 @@ class IssuePromptBuilder:
             )
 
         workspace_relative_file_path = cls.render_workspace_relative_path(issue.file_path)
+        file_path_candidates = "\n".join(
+            f"- {candidate}"
+            for candidate in cls.build_workspace_relative_candidates(issue.file_path, workspace_path)
+        )
 
         return SONAR_FIX_USER_PROMPT_TEMPLATE.format(
             issue_key=issue.key,
@@ -292,4 +315,5 @@ class IssuePromptBuilder:
             ),
             build_command=cls.normalize_prompt_text(build_command, "dotnet build"),
             retry_feedback_section=retry_feedback_section,
+            file_path_candidates=file_path_candidates,
         )

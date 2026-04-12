@@ -165,6 +165,11 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
                 "applied_rule_ids": ["public_xml_docs"],
                 "soft_findings": [],
             },
+            review_gate_result={
+                "status": "pass",
+                "summary": "Review gate waived all reviewable blockers.",
+                "decisions": [],
+            },
             repair_plan=RepairPlan(
                 repair_shape="method_rewrite_with_helpers",
                 target_symbols=("AutoPlugin",),
@@ -258,6 +263,10 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
         assert bundle.edit_contract_json.exists()
         assert bundle.prompt_context_json.exists()
         assert bundle.patch_diff.exists()
+        prompt_context = json.loads(bundle.prompt_context_json.read_text(encoding="utf-8"))
+        build_result = json.loads(bundle.build_result_json.read_text(encoding="utf-8"))
+        assert prompt_context["review_gate_result"]["status"] == "pass"
+        assert build_result["review_gate_result"]["status"] == "pass"
         assert bundle.attempt_events_jsonl.exists()
         assert bundle.reviewer_result_json.exists()
         assert bundle.build_result_json.exists()

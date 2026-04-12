@@ -126,6 +126,7 @@ class ArtifactWriter:
                 "rollout_flags": list(getattr(result, "rollout_flags", ())),
                 "repair_plan": _serialize_optional_payload(getattr(result, "repair_plan", None), None),
                 "plan_precheck": _serialize_optional_payload(getattr(result, "plan_precheck", None), None),
+                "review_gate_result": _serialize_optional_payload(getattr(result, "review_gate_result", None), None),
                 "planner_lessons": [
                     lesson.to_dict()
                     for lesson in getattr(getattr(result, "edit_contract", None), "planner_lessons", ())
@@ -175,6 +176,13 @@ class ArtifactWriter:
                     {
                         "status": "not_available",
                         "reason": "Quality gate result was not attached to this attempt.",
+                    },
+                ),
+                "review_gate_result": _serialize_optional_payload(
+                    getattr(result, "review_gate_result", None),
+                    {
+                        "status": "not_available",
+                        "reason": "Review gate result was not attached to this attempt.",
                     },
                 ),
                 "boundary_failure_code": getattr(result, "boundary_failure_code", ""),

@@ -126,8 +126,8 @@ class ToolPolicy:
         re.compile(r"(?i)\b(new-item|mkdir|ni|md)\b"),
         re.compile(r"(?i)\b(set-content|add-content|out-file|tee-object|copy-item|move-item|rename-item)\b"),
         re.compile(r"(?i)\b(copy|move|ren)\b"),
-        re.compile(r"(?i)\b(echo|write-output)\b(?:(?!\r|\n).)*(>>|>)(?!\s*(\$null|nul|/dev/null)\b)"),
-        re.compile(r"(?i)\btype\s+nul\b(?:(?!\r|\n).)*(>>|>)"),
+        re.compile(r"(?i)\b(echo|write-output)\b[^;&|\r\n]*(>>|>)(?!\s*(\$null|nul|/dev/null)\b)"),
+        re.compile(r"(?i)\btype\s+nul\b[^;&|\r\n]*(>>|>)"),
     )
 
     @classmethod

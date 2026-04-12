@@ -18,6 +18,7 @@ from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.propagation_verifier import PropagationCheckResult, PropagationVerifier
 from pi_sonar_agent.core.quality_gate import QualityGateResult
 from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
+from pi_sonar_agent.core.review_gate import ReviewGateAgent, ReviewGateResult
 from pi_sonar_agent.core.scope_guard import IssueEditScope
 
 if TYPE_CHECKING:
@@ -35,6 +36,7 @@ class VerificationOutcome:
     scope_violation: str | None
     propagation_check_result: PropagationCheckResult
     quality_gate_result: QualityGateResult
+    review_gate_result: ReviewGateResult
     combined_output: str
     rule_validation_message: str
     fast_compile_passed: bool = True
@@ -383,9 +385,32 @@ class FixVerifier:
                 issue_file_path=issue.file_path,
                 current_issue_file_content=current_issue_file_content,
             )
+        review_gate_result = ReviewGateResult(
+            status="not_applicable",
+            summary="Review gate was not evaluated for this attempt.",
+        )
+        if getattr(load_performance_flags(), "review_gate", True):
+            review_gate_result = ReviewGateAgent.review(
+                workspace_path=workspace_path,
+                issue=issue,
+                reviewed_changes=reviewed_changes,
+                edit_contract=edit_contract,
+                propagation_check_result=propagation_check_result,
+                quality_gate_result=quality_gate_result,
+                reviewer_status=reviewer_result.status,
+                rule_validation_message=rule_validation_message,
+            )
+            if review_gate_result.status == "pass":
+                propagation_check_result, quality_gate_result = ReviewGateAgent.apply_waivers(
+                    propagation_check_result=propagation_check_result,
+                    quality_gate_result=quality_gate_result,
+                    review_gate_result=review_gate_result,
+                )
         should_run_build = workspace_path.exists()
         if verification_schedule.skip_build_on_precheck_failure:
             if reviewer_result.status == "retry":
+                should_run_build = False
+            if review_gate_result.status == "retry":
                 should_run_build = False
             if propagation_check_result.status == "retry":
                 should_run_build = False
@@ -436,6 +461,13 @@ class FixVerifier:
                 for part in [combined_output.strip(), propagation_retry_message]
                 if str(part).strip()
             )
+        if review_gate_result.status == "retry":
+            review_retry_message = review_gate_result.to_retry_message()
+            combined_output = "\n\n".join(
+                part
+                for part in [combined_output.strip(), review_retry_message]
+                if str(part).strip()
+            )
         if quality_gate_result.status == "retry":
             quality_retry_message = quality_gate_result.to_retry_message()
             combined_output = "\n\n".join(
@@ -458,6 +490,7 @@ class FixVerifier:
             scope_violation=scope_violation,
             propagation_check_result=propagation_check_result,
             quality_gate_result=quality_gate_result,
+            review_gate_result=review_gate_result,
             combined_output=combined_output,
             rule_validation_message=rule_validation_message,
             fast_compile_passed=fast_compile_passed,

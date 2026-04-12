@@ -318,6 +318,124 @@ def test_build_retry_feedback_explains_invalid_edit_tool_input(tmp_path) -> None
     assert "不要发送空工具调用" in feedback
 
 
+def test_build_retry_context_captures_review_gate_feedback(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-review-gate",
+        file_path="src/Foo.cs",
+        error="Review gate verification failed",
+        build_output="Review gate rejected the patch after auditing the ambiguous gate findings.",
+        retryable_failure=True,
+        failure_kind="review_gate",
+        review_gate_result={
+            "status": "retry",
+            "summary": "审核 agent 认为传播目标仍然缺失。",
+            "findings": [
+                {
+                    "finding_id": "propagation",
+                    "source": "propagation",
+                    "title": "Signature propagation verification",
+                    "file": "src/Foo.cs",
+                    "line": 18,
+                    "evidence": "callsite still missing `FooAsync`",
+                }
+            ],
+            "decisions": [
+                {
+                    "finding_id": "propagation",
+                    "decision": "confirm",
+                    "reason": "调用点仍然保留旧方法名。",
+                }
+            ],
+            "feedback": ["同步更新 callsite 和方法定义，保持签名传播闭环。"],
+        },
+    )
+
+    retry_context = build_retry_context(repo, result)
+    feedback = build_retry_feedback(repo, result)
+
+    assert retry_context.failure_kind == "review_gate"
+    assert retry_context.failure_detail_key == "review_gate:propagation"
+    assert retry_context.review_gate_failure is not None
+    assert retry_context.review_gate_failure.decisions[0].source == "propagation"
+    assert "审核 agent" in feedback
+    assert "Signature propagation verification" in feedback
+    assert "调用点仍然保留旧方法名" in feedback
+    assert "同步更新 callsite 和方法定义" in feedback
+
+
+def test_process_issue_with_retries_uses_review_gate_skip_reason(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    issue = SonarIssue(
+        key="issue-review-gate-skip",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=1,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def fix_issue(self, issue, workspace_path, build_command, retry_feedback=""):
+            self.calls += 1
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                error="Review gate verification failed",
+                build_output="Review gate rejected the patch after auditing the ambiguous gate findings.",
+                retryable_failure=True,
+                failure_kind="review_gate",
+                review_gate_result={
+                    "status": "retry",
+                    "summary": "审核 agent 认为复杂度问题仍未解决。",
+                    "findings": [
+                        {
+                            "finding_id": "quality_gate:cognitive_complexity:tracked.cs:1:1",
+                            "source": "quality_gate",
+                            "title": "认知复杂度",
+                            "file": "tracked.cs",
+                            "line": 1,
+                            "evidence": "嵌套仍然过深。",
+                        }
+                    ],
+                    "decisions": [
+                        {
+                            "finding_id": "quality_gate:cognitive_complexity:tracked.cs:1:1",
+                            "decision": "confirm",
+                            "reason": "当前 patch 只是重排条件，没有降低嵌套层级。",
+                        }
+                    ],
+                    "feedback": ["继续减少嵌套分支，不要只做 rename。"],
+                },
+            )
+
+    result = process_issue_with_retries(
+        agent=FakeAgent(),
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-review-gate",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
+        max_build_retries=2,
+    )
+
+    assert result.skipped is True
+    assert result.attempts == 2
+    assert result.skip_reason == "Review gate verification failed after 2 attempt(s)"
+
+
 def test_build_retry_feedback_preserves_scope_violation_details(tmp_path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -499,6 +617,7 @@ def test_build_retry_feedback_includes_forbidden_tool_constraints(tmp_path) -> N
     assert "严禁使用 git_add、git_commit、git_push" in feedback
     assert "如果使用 shell 工具（工具名 Bash）" in feedback
     assert "bash 兼容命令" in feedback
+    assert "仓库相对路径候选" in feedback
     assert "严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码" in feedback
     assert "提交由外层流程统一处理" in feedback
 
@@ -606,6 +725,32 @@ def test_build_retry_feedback_includes_quality_gate_failures(tmp_path) -> None:
     assert "移除 async 并改成同步方法" in feedback
     assert "新提取的 helper 默认保持同步" in feedback
     assert "只修这些门禁问题，保留已经通过的其它改动" in feedback
+
+
+def test_build_retry_feedback_includes_contract_mismatch_guidance(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    failing_file = repo / "tracked.cs"
+    failing_file.write_text("class Foo : IFoo {}\n", encoding="utf-8")
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-contract-mismatch",
+        file_path="tracked.cs",
+        build_passed=False,
+        build_verification_failed=True,
+        error="Issue changes failed local build verification",
+        build_command='dotnet build "tracked.sln"',
+        build_output=f"{failing_file}(1,1): error CS0535: 'Foo' does not implement interface member 'IFoo.Bar()' [tracked.csproj]",
+        retryable_failure=True,
+        failure_kind="build",
+    )
+
+    feedback = build_retry_feedback(repo, result)
+
+    assert "CS0535" in feedback
+    assert "公开方法与接口/抽象契约不一致" in feedback
+    assert "同步接口声明、实现类签名、调用点和 nameof(...)" in feedback
 
 
 def test_process_issue_with_retries_passes_quality_gate_failure_to_next_attempt_and_logs_it(tmp_path) -> None:

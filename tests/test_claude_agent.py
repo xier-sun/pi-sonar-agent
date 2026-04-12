@@ -63,8 +63,39 @@ def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
     assert "【推荐构建命令】" in prompt
     assert 'dotnet build "src/Foo.sln"' in prompt
     assert "- 文件路径: src/Foo.cs" in prompt
-    assert "当前优先直接操作的问题文件相对路径是：src/Foo.cs" in prompt
+    assert "当前优先直接操作的问题文件相对路径候选：" in prompt
+    assert "- src/Foo.cs" in prompt
     assert "调用 finish 标记完成" not in prompt
+
+
+def test_build_user_prompt_includes_workspace_relative_path_candidates(tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-path-candidates",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=10,
+        component="BI:OpenAuth.Core/OpenAuth.App/Finance/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  10 | if (condition) { ... }",
+        "",
+        "- 只允许修改当前方法。",
+        {
+            "name": "Cognitive Complexity of methods should not be too high",
+            "description": "嵌套条件和循环会提高认知复杂度。",
+            "how_to_fix": "提取私有方法，减少嵌套层级。",
+        },
+        'dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"',
+        workspace_path=tmp_path / ".agent_workspaces" / "fix_BI" / "OpenAuth.Core",
+    )
+
+    assert "- OpenAuth.Core/OpenAuth.App/Finance/Foo.cs" in prompt
+    assert "- OpenAuth.App/Finance/Foo.cs" in prompt
+    assert "不要用 Bash 通过拼接仓库根目录反复试错" in prompt
 
 
 def test_build_user_prompt_renders_structured_retry_context() -> None:
@@ -1562,7 +1593,8 @@ def test_fix_issue_continues_same_issue_after_follow_up_timeout(
     assert len(seen_prompts) == 2
     assert "【继续上一轮修复，不要从头分析】" in seen_prompts[1]
     assert "绝对路径" in seen_prompts[1]
-    assert "当前优先直接操作的问题文件相对路径是：src/Foo.cs" in seen_prompts[1]
+    assert "当前优先直接操作的问题文件相对路径候选：" in seen_prompts[1]
+    assert "- src/Foo.cs" in seen_prompts[1]
     assert result.performance_metrics["continuation_retry_count"] == 1
     assert result.performance_metrics["continuation_recovered"] is True
     assert "post_read_stall" in result.performance_metrics["continuation_timeout_stages"]

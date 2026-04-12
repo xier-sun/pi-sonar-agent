@@ -1,0 +1,46 @@
+{
+  "status": "pass",
+  "guardrail_mode": "scope",
+  "summary": "Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit.",
+  "violations": [
+    {
+      "type": "outside_primary_region",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+      "reason": "This hunk changes lines outside the primary issue window 171-399; recorded as drift only.",
+      "symbol": "method@171-279",
+      "changed_lines": [
+        80
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs\n@@ -80 +80 @@\n-            await AutoPlugin(finance_inpayments.Where(x => x.OrderEntry > 0).Select(x => x.OrderEntry.Value));\n+            await AutoPluginAsync(finance_inpayments.Where(x => x.OrderEntry > 0).Select(x => x.OrderEntry.Value));\n@@ -171 +171 @@\n-        public async Task AutoPlugin(IEnumerable<int> orderIds)\n+        public async Task AutoPluginAsync(IEnumerable<int> orderIds)\n@@ -202,24 +202,4 @@\n-                    decimal paymentRate;\n-                    if (ordr.DocCur == FinanceConsts.RMB)\n-                    {\n-                        // 人民币订单：使用人民币计算回款率\n-                        paymentRate = (receiptAmountRMB - uRefundAmtRMB) / docTotalRMB;\n-                        if (balanceRMB <= 0)\n-                        {\n-                            continue;\n-                        }\n-                    }\n-                    else\n-                    {\n-                        // 外币订单：使用外币计算回款率\n-                        var docTotalFC = ordr.DocTotalFC.Value;\n-                        var receiptAmountFC = ordrStat.U_Receipt_TotalAmtFC ?? 0M;\n-                        var uRefundAmtFC = ordrStat.U_Refund_AmtFC;\n-                        if (docTotalFC <= 0)\n-                            continue;\n-                        if (docTotalFC - (receiptAmountFC - uRefundAmtFC) <= 0)\n-                        {\n-                            continue;\n-                        }\n-                        paymentRate = (receiptAmountFC - uRefundAmtFC) / docTotalFC;\n-                    }\n+                    var paymentRate = CalculatePaymentRate(ordr, ordrStat, docTotalRMB,\n+                        receiptAmountRMB, uRefundAmtRMB, balanceRMB);\n+                    if (paymentRate == null)\n+                        continue;\n@@ -231 +211 @@\n-                                       (paymentRate >= 0.98m && Math.Abs(balanceRMB) < 100m);\n+                                       (paymentRate.Value >= 0.98m && Math.Abs(balanceRMB) < 100m);"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "0fb3e377-0955-41cb-8cae-729a28012d3c",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+      "symbol": "method@171-279",
+      "summary": "Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs\n@@ -80 +80 @@\n-            await AutoPlugin(finance_inpayments.Where(x => x.OrderEntry > 0).Select(x => x.OrderEntry.Value));\n+            await AutoPluginAsync(finance_inpayments.Where(x => x.OrderEntry > 0).Select(x => x.OrderEntry.Value));\n@@ -171 +171 @@\n-        public async Task AutoPlugin(IEnumerable<int> orderIds)\n+        public async Task AutoPluginAsync(IEnumerable<int> orderIds)\n@@ -202,24 +202,4 @@\n-                    decimal paymentRate;\n-                    if (ordr.DocCur == FinanceConsts.RMB)\n-                    {\n-                        // 人民币订单：使用人民币计算回款率\n-                        paymentRate = (receiptAmountRMB - uRefundAmtRMB) / docTotalRMB;\n-                        if (balanceRMB <= 0)\n-                        {\n-                            continue;\n-                        }\n-                    }\n-                    else\n-                    {\n-                        // 外币订单：使用外币计算回款率\n-                        var docTotalFC = ordr.DocTotalFC.Value;\n-                        var receiptAmountFC = ordrStat.U_Receipt_TotalAmtFC ?? 0M;\n-                        var uRefundAmtFC = ordrStat.U_Refund_AmtFC;\n-                        if (docTotalFC <= 0)\n-                            continue;\n-                        if (docTotalFC - (receiptAmountFC - uRefundAmtFC) <= 0)\n-                        {\n-                            continue;\n-                        }\n-                        paymentRate = (receiptAmountFC - uRefundAmtFC) / docTotalFC;\n-                    }\n+                    var paymentRate = CalculatePaymentRate(ordr, ordrStat, docTotalRMB,\n+                        receiptAmountRMB, uRefundAmtRMB, balanceRMB);\n+                    if (paymentRate == null)\n+                        continue;\n@@ -231 +211 @@\n-                                       (paymentRate >= 0.98m && Math.Abs(balanceRMB) < 100m);\n+                                       (paymentRate.Value >= 0.98m && Math.Abs(balanceRMB) < 100m);",
+      "discovered_at": "2026-04-11T13:33:44.989637+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 4,
+    "total_changed_lines": 27,
+    "hard_boundary_violation_count": 0,
+    "soft_boundary_violation_count": 1,
+    "extra_touched_file_count": 0,
+    "outside_primary_region_line_count": 1,
+    "outside_primary_region_count": 1,
+    "scope_audit_mode": "scope_soft_audit",
+    "scope_audit_active": true,
+    "scope_expansion_count": 1,
+    "scope_expansion_reasons": [
+      "outside_primary_region"
+    ],
+    "high_drift_warning": false,
+    "drift_score": 1
+  }
+}

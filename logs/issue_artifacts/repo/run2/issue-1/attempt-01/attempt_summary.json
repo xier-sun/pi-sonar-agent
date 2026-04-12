@@ -1,8 +1,8 @@
 {
   "attempt_number": 1,
   "status": "retrying",
-  "started_at": "2026-04-11T06:56:42.491856+00:00",
-  "finished_at": "2026-04-11T06:56:42.492148+00:00",
+  "started_at": "2026-04-11T15:12:14.613116+00:00",
+  "finished_at": "2026-04-11T15:12:14.613561+00:00",
   "duration_seconds": 0.0,
   "failure_kind": "build",
   "retry_reason": "build_verification_failed",

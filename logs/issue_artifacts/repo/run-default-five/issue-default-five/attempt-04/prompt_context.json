@@ -1,7 +1,7 @@
 {
   "attempt_number": 4,
   "build_command": "dotnet build \"tracked.sln\"",
-  "retry_feedback": "上次尝试引入了以下关键编译错误，请先修复这些错误：\n1. CS0103 at C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-264\\test_process_issue_with_retrie1\\repo\\tracked.cs:1:1\n   错误信息: name not found\n   出错代码片段:\n   1 | previous success\n重试约束:\n- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。\n- 优先最小化修改，不要额外重写整个文件。\n- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。\n- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。",
+  "retry_feedback": "上次尝试引入了以下关键编译错误，请先修复这些错误：\n1. CS0103 at C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-270\\test_process_issue_with_retrie1\\repo\\tracked.cs:1:1\n   错误信息: name not found\n   出错代码片段:\n   1 | previous success\n重试约束:\n- 先修复这些编译错误，再确认 Sonar 问题仍然被修复。\n- 优先最小化修改，不要额外重写整个文件。\n- 不要引用未定义的变量、方法或属性名；优先复用当前作用域中已经存在的符号。\n- 如果提取 helper 需要带出多个外层局部变量，回退为原方法内重构，或把依赖显式参数化后再提取。",
   "retry_context": {
     "source_attempt_number": 3,
     "failure_kind": "build",
@@ -11,7 +11,7 @@
     "error": "Issue changes failed local build verification",
     "summary": "",
     "build_command": "dotnet build \"tracked.sln\"",
-    "raw_output": "C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-264\\test_process_issue_with_retrie1\\repo\\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]",
+    "raw_output": "C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-270\\test_process_issue_with_retrie1\\repo\\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]",
     "retryable_failure": true,
     "build_verification_failed": true,
     "changed_files": [
@@ -19,7 +19,7 @@
     ],
     "compiler_errors": [
       {
-        "file_path": "C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-264\\test_process_issue_with_retrie1\\repo\\tracked.cs",
+        "file_path": "C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-270\\test_process_issue_with_retrie1\\repo\\tracked.cs",
         "line": 1,
         "column": 1,
         "code": "CS0103",
@@ -37,6 +37,7 @@
     "scope_violation": null,
     "review_failure": null,
     "quality_gate_failure": null,
+    "review_gate_failure": null,
     "plan_failure": null,
     "model_timeout_summary": "",
     "model_timeout_stage": "",
@@ -45,8 +46,8 @@
     "model_timeout_failed": false,
     "patch_salvaged": false
   },
-  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-264/test_process_issue_with_retrie1/repo",
-  "baseline_head_commit": "7106425c1fde97b20e9b8ba504a45cee49d43142",
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-270/test_process_issue_with_retrie1/repo",
+  "baseline_head_commit": "a323bf9929ac99ef9b3a7def1eb029552526e637",
   "guardrail_mode": "",
   "active_quality_gate_rules": [],
   "execution_profile": "full_path",
@@ -55,6 +56,7 @@
   "rollout_flags": [],
   "repair_plan": null,
   "plan_precheck": null,
+  "review_gate_result": null,
   "planner_lessons": [],
   "prefetched_context": []
 }

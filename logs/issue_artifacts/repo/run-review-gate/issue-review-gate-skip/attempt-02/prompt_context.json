@@ -1,0 +1,86 @@
+{
+  "attempt_number": 2,
+  "build_command": "dotnet build \"tracked.sln\"",
+  "retry_feedback": "上次尝试经过审核 agent 复核后，仍被判定需要继续修改：\n审核 agent 认为复杂度问题仍未解决。\n1. [quality_gate/confirm] 认知复杂度 | location: tracked.cs:1\n   审核理由: 当前 patch 只是重排条件，没有降低嵌套层级。\n   证据: 嵌套仍然过深。\n审核 agent 给出的下一轮要求:\n- 继续减少嵌套分支，不要只做 rename。",
+  "retry_context": {
+    "source_attempt_number": 1,
+    "failure_kind": "review_gate",
+    "failure_detail_key": "review_gate:quality_gate:cognitive_complexity:tracked.cs:1:1",
+    "strategy_fingerprint": "fast_path=0|plan_first=0",
+    "diff_fingerprint": "no_change",
+    "error": "Review gate verification failed",
+    "summary": "",
+    "build_command": "",
+    "raw_output": "Review gate rejected the patch after auditing the ambiguous gate findings.",
+    "retryable_failure": true,
+    "build_verification_failed": false,
+    "changed_files": [],
+    "compiler_errors": [],
+    "guidance": [],
+    "boundary_failure": null,
+    "scope_violation": null,
+    "review_failure": null,
+    "quality_gate_failure": null,
+    "review_gate_failure": {
+      "summary": "审核 agent 认为复杂度问题仍未解决。",
+      "decisions": [
+        {
+          "finding_id": "quality_gate:cognitive_complexity:tracked.cs:1:1",
+          "title": "认知复杂度",
+          "source": "quality_gate",
+          "decision": "confirm",
+          "reason": "当前 patch 只是重排条件，没有降低嵌套层级。",
+          "file": "tracked.cs",
+          "line": 1,
+          "evidence": "嵌套仍然过深。"
+        }
+      ],
+      "feedback": [
+        "继续减少嵌套分支，不要只做 rename。"
+      ]
+    },
+    "plan_failure": null,
+    "model_timeout_summary": "",
+    "model_timeout_stage": "",
+    "build_tool_failed": false,
+    "forbidden_tool_failed": false,
+    "model_timeout_failed": false,
+    "patch_salvaged": false
+  },
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-270/test_process_issue_with_retrie3/repo",
+  "baseline_head_commit": "7ed8d0d1620bab07611a06978333900478fb8262",
+  "guardrail_mode": "",
+  "active_quality_gate_rules": [],
+  "execution_profile": "full_path",
+  "fast_path_enabled": false,
+  "plan_first_enabled": false,
+  "rollout_flags": [],
+  "repair_plan": null,
+  "plan_precheck": null,
+  "review_gate_result": {
+    "status": "retry",
+    "summary": "审核 agent 认为复杂度问题仍未解决。",
+    "findings": [
+      {
+        "finding_id": "quality_gate:cognitive_complexity:tracked.cs:1:1",
+        "source": "quality_gate",
+        "title": "认知复杂度",
+        "file": "tracked.cs",
+        "line": 1,
+        "evidence": "嵌套仍然过深。"
+      }
+    ],
+    "decisions": [
+      {
+        "finding_id": "quality_gate:cognitive_complexity:tracked.cs:1:1",
+        "decision": "confirm",
+        "reason": "当前 patch 只是重排条件，没有降低嵌套层级。"
+      }
+    ],
+    "feedback": [
+      "继续减少嵌套分支，不要只做 rename。"
+    ]
+  },
+  "planner_lessons": [],
+  "prefetched_context": []
+}

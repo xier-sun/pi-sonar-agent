@@ -1,0 +1,131 @@
+{
+  "issue_key": "27eed645-6b54-4c88-aeca-707ba20429d3",
+  "rule_id": "csharpsquid:S6960",
+  "message": "This controller has multiple responsibilities and could be split into 4 smaller controllers.",
+  "line": 24,
+  "text_range": {
+    "startLine": 24,
+    "endLine": 24,
+    "startOffset": 17,
+    "endOffset": 43
+  },
+  "flows": [
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+          "msg": "May belong to responsibility #1.",
+          "textRange": {
+            "startLine": 59,
+            "endLine": 59,
+            "startOffset": 44,
+            "endOffset": 87
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+          "msg": "May belong to responsibility #1.",
+          "textRange": {
+            "startLine": 252,
+            "endLine": 252,
+            "startOffset": 97,
+            "endOffset": 142
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+          "msg": "May belong to responsibility #2.",
+          "textRange": {
+            "startLine": 100,
+            "endLine": 100,
+            "startOffset": 44,
+            "endOffset": 78
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+          "msg": "May belong to responsibility #2.",
+          "textRange": {
+            "startLine": 79,
+            "endLine": 79,
+            "startOffset": 44,
+            "endOffset": 86
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+          "msg": "May belong to responsibility #2.",
+          "textRange": {
+            "startLine": 181,
+            "endLine": 181,
+            "startOffset": 44,
+            "endOffset": 89
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+          "msg": "May belong to responsibility #2.",
+          "textRange": {
+            "startLine": 144,
+            "endLine": 144,
+            "startOffset": 44,
+            "endOffset": 97
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+          "msg": "May belong to responsibility #3.",
+          "textRange": {
+            "startLine": 122,
+            "endLine": 122,
+            "startOffset": 44,
+            "endOffset": 82
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+          "msg": "May belong to responsibility #4.",
+          "textRange": {
+            "startLine": 216,
+            "endLine": 216,
+            "startOffset": 44,
+            "endOffset": 81
+          }
+        }
+      ]
+    }
+  ],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/HistoricalImportController.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

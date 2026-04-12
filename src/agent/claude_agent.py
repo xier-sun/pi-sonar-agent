@@ -192,6 +192,7 @@ class FixResult:
     plan_precheck: Any | None = None
     reviewer_result: Any | None = None
     quality_gate_result: Any | None = None
+    review_gate_result: Any | None = None
     follow_ups: tuple[Any, ...] = ()
     guardrail_mode: str = ""
     follow_up_log_path: str = ""
@@ -777,6 +778,7 @@ class ClaudeFixAgent:
         repair_plan_section: str = "",
         prefetched_context_section: str = "",
         execution_mode_section: str = "",
+        workspace_path: Path | None = None,
     ) -> str:
         """Build the issue-specific user prompt."""
 
@@ -793,6 +795,7 @@ class ClaudeFixAgent:
             repair_plan_section=repair_plan_section,
             prefetched_context_section=prefetched_context_section,
             execution_mode_section=execution_mode_section,
+            workspace_path=workspace_path,
         )
 
     @staticmethod
@@ -1379,6 +1382,7 @@ class ClaudeFixAgent:
             repair_plan_section=self._build_repair_plan_section(edit_contract),
             prefetched_context_section=self._build_prefetched_context_section(edit_contract),
             execution_mode_section=self._build_execution_mode_section(edit_contract),
+            workspace_path=workspace_path,
         )
 
         tool_policy = self._build_fix_tool_policy(edit_contract)
@@ -1896,9 +1900,45 @@ class ClaudeFixAgent:
             build_output = verification.build_output
             scope_violation = verification.scope_violation
             quality_gate_result = verification.quality_gate_result
+            review_gate_result = verification.review_gate_result
             boundary_failure_code = verification.boundary_failure_code
             boundary_failure_summary = verification.boundary_failure_summary
             secondary_boundary_failure_codes = verification.secondary_boundary_failure_codes
+            if getattr(performance_flags, "review_gate", True):
+                review_gate_summary = str(getattr(review_gate_result, "summary", "")).strip()
+                print(
+                    "  [TRACE] Review gate: "
+                    f"status={getattr(review_gate_result, 'status', '')}, "
+                    f"invoked={bool(getattr(review_gate_result, 'invoked', False))}, "
+                    f"findings={len(getattr(review_gate_result, 'findings', ()) or ())}, "
+                    f"decisions={len(getattr(review_gate_result, 'decisions', ()) or ())}",
+                    flush=True,
+                )
+                if review_gate_summary:
+                    print(f"  [TRACE] Review gate summary: {review_gate_summary}", flush=True)
+                review_gate_model = str(getattr(review_gate_result, "model_display", "")).strip()
+                if review_gate_model:
+                    print(f"  [TRACE] Review gate model: {review_gate_model}", flush=True)
+                if getattr(review_gate_result, "invoked", False):
+                    waived_count = sum(
+                        1
+                        for item in (getattr(review_gate_result, "decisions", ()) or ())
+                        if str(getattr(item, "decision", "")).strip().lower() == "waive"
+                    )
+                    confirmed_count = sum(
+                        1
+                        for item in (getattr(review_gate_result, "decisions", ()) or ())
+                        if str(getattr(item, "decision", "")).strip().lower() != "waive"
+                    )
+                    print(
+                        "  [TRACE] Review gate verdict: "
+                        f"waived={waived_count}, confirmed={confirmed_count}",
+                        flush=True,
+                    )
+                    for item in tuple(getattr(review_gate_result, "feedback", ()) or ())[:3]:
+                        text = str(item).strip()
+                        if text:
+                            print(f"  [TRACE] Review gate feedback: {text}", flush=True)
             performance_metrics = self._merge_performance_metrics(
                 runtime_performance_metrics,
                 fast_compile_invoked=verification.fast_compile_invoked,
@@ -1974,6 +2014,42 @@ class ClaudeFixAgent:
                     failure_kind="reviewer",
                     reviewer_result=reviewer_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
+                    review_gate_result=review_gate_result.to_dict(),
+                    follow_ups=reviewer_result.follow_ups,
+                    boundary_failure_code=boundary_failure_code,
+                    boundary_failure_summary=boundary_failure_summary,
+                    secondary_boundary_failure_codes=secondary_boundary_failure_codes,
+                    performance_metrics=performance_metrics,
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=patch_salvaged,
+                    attempt_events=tuple(attempt_events),
+                    **result_metadata,
+                )
+
+            if review_gate_result.status == "retry":
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    stage="review_gate",
+                    payload={"success": False, "failure_kind": "review_gate"},
+                    runtime_result=runtime_result,
+                )
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=str(file_path),
+                    changes=changes,
+                    build_passed=build_passed,
+                    build_verification_failed=False,
+                    error="Review gate verification failed",
+                    summary=f"Fixed {len(changes)} file(s)",
+                    build_command=resolved_build_command,
+                    build_output=review_gate_result.to_retry_message(),
+                    retryable_failure=True,
+                    failure_kind="review_gate",
+                    reviewer_result=reviewer_result.to_dict(),
+                    quality_gate_result=quality_gate_result.to_dict(),
+                    review_gate_result=review_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
                     boundary_failure_code=boundary_failure_code,
                     boundary_failure_summary=boundary_failure_summary,
@@ -2015,6 +2091,7 @@ class ClaudeFixAgent:
                     failure_kind="quality_gate",
                     reviewer_result=reviewer_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
+                    review_gate_result=review_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
                     boundary_failure_code=boundary_failure_code,
                     boundary_failure_summary=boundary_failure_summary,
@@ -2050,6 +2127,7 @@ class ClaudeFixAgent:
                     failure_kind="rule_validation",
                     reviewer_result=reviewer_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
+                    review_gate_result=review_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
                     boundary_failure_code=boundary_failure_code,
                     boundary_failure_summary=boundary_failure_summary,
@@ -2084,6 +2162,7 @@ class ClaudeFixAgent:
                     failure_kind="build",
                     reviewer_result=reviewer_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
+                    review_gate_result=review_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
                     boundary_failure_code=boundary_failure_code,
                     boundary_failure_summary=boundary_failure_summary,
@@ -2113,6 +2192,7 @@ class ClaudeFixAgent:
                 build_output=build_output,
                 reviewer_result=reviewer_result.to_dict(),
                 quality_gate_result=quality_gate_result.to_dict(),
+                review_gate_result=review_gate_result.to_dict(),
                 follow_ups=reviewer_result.follow_ups,
                 boundary_failure_code=boundary_failure_code,
                 boundary_failure_summary=boundary_failure_summary,

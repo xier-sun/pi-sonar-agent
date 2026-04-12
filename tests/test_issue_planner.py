@@ -557,6 +557,89 @@ def test_issue_planner_downgrades_s3776_after_async_quality_gate_retry() -> None
     )
 
 
+def test_issue_planner_downgrades_public_async_rename_after_async_gate_retry(tmp_path) -> None:
+    workspace = tmp_path / ".agent_workspaces" / "fix_issue"
+    issue_file = workspace / "OpenAuth.Core" / "OpenAuth.App" / "Finance" / "FinanceHanlerApp.cs"
+    interface_file = (
+        workspace
+        / "OpenAuth.Core"
+        / "OpenAuth.App"
+        / "Finance"
+        / "Interfaces"
+        / "IFinanceHanlerApp.cs"
+    )
+    issue_file.parent.mkdir(parents=True, exist_ok=True)
+    interface_file.parent.mkdir(parents=True, exist_ok=True)
+
+    issue_file.write_text(
+        "\n".join(
+            [
+                "public class FinanceHanlerApp : IFinanceHanlerApp",
+                "{",
+                "    public async Task AutoPlugin(IEnumerable<int> orderIds)",
+                "    {",
+                "        await SaveAsync(orderIds);",
+                "    }",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    interface_file.write_text(
+        "\n".join(
+            [
+                "public interface IFinanceHanlerApp",
+                "{",
+                "    Task AutoPlugin(IEnumerable<int> orderIds);",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    retry_context = RetryContext(
+        source_attempt_number=2,
+        failure_kind="quality_gate",
+        quality_gate_failure=QualityGateFailureContext(
+            violations=(
+                QualityGateViolationContext(
+                    rule_id="async_signature",
+                    title="异步签名规范",
+                    message="async method missing Async suffix",
+                ),
+            )
+        ),
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-PROP-ASYNC-RETRY",
+        rule_id="csharpsquid:S3776",
+        file_path="OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+        issue_line=3,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=3,
+        scope_end_line=6,
+        validation_start_line=3,
+        validation_end_line=6,
+        retry_context=retry_context,
+        source_lines=tuple(issue_file.read_text(encoding="utf-8").splitlines()),
+        workspace_path=workspace,
+    )
+
+    assert plan.edit_contract.repair_plan is not None
+    assert plan.edit_contract.repair_plan.requires_signature_change is True
+    assert plan.edit_contract.repair_plan.requires_propagation is True
+    assert plan.edit_contract.repair_plan.selected_archetype == "signature_preserving_refactor"
+    assert "avoid_async_rename_churn" in plan.edit_contract.repair_plan.strategy_preferences
+    assert any(
+        "externally visible api stable" in hint.lower() or "keep the externally visible api stable" in hint.lower()
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+
+
 def test_issue_planner_keeps_async_gate_downgrade_from_lessons_across_build_retry(tmp_path) -> None:
     store = LessonsStore(tmp_path / "lessons")
     store.record_failure(

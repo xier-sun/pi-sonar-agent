@@ -7,11 +7,15 @@
   "error": "Build verification failed after 5 attempt(s)",
   "skip_reason": "Build verification failed after 5 attempt(s)",
   "build_command": "dotnet build \"tracked.sln\"",
-  "build_output": "C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-264\\test_process_issue_with_retrie1\\repo\\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]",
+  "build_output": "C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-270\\test_process_issue_with_retrie1\\repo\\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]",
   "guardrail_mode": "",
   "quality_gate_result": {
     "status": "not_available",
     "reason": "Quality gate result was not attached to this attempt."
+  },
+  "review_gate_result": {
+    "status": "not_available",
+    "reason": "Review gate result was not attached to this attempt."
   },
   "boundary_failure_code": "",
   "boundary_failure_summary": "",

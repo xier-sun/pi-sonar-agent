@@ -1,0 +1,40 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -86,14 +86,14 @@
+                 // 合并：有 U_DevEntry 的直接用，没有的用回溯结果
+
+                 var returnItemsWithDevEntry = returnItems.Select(x =>
+
+                 {
+
+-                    int resolvedDevEntry;
+
++                    int resolvedDevEntry = 0;
+
+                     if (!string.IsNullOrEmpty(x.U_DevEntry))
+
+                     {
+
+-                        resolvedDevEntry = int.TryParse(x.U_DevEntry, out var parsed) ? parsed : 0;
+
++                        int.TryParse(x.U_DevEntry, out resolvedDevEntry);
+
+                     }
+
+-                    else
+
+-                    {
+
+-                        resolvedDevEntry = (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved)) ? resolved : 0;
+
++                    else if (x.DocEntry.HasValue && resolvedDevEntryMap.TryGetValue(x.DocEntry.Value, out var resolved))
+
++                    {
+
++                        resolvedDevEntry = resolved;
+
+                     }
+
+                     return new
+
+                     {

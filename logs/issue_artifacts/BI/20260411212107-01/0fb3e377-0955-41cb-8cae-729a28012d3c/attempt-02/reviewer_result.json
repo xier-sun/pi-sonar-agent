@@ -1,0 +1,65 @@
+{
+  "status": "pass",
+  "guardrail_mode": "scope",
+  "summary": "Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit.",
+  "violations": [
+    {
+      "type": "outside_primary_region",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+      "reason": "This hunk changes lines outside the primary issue window 171-399; recorded as drift only.",
+      "symbol": "method@171-279",
+      "changed_lines": [
+        80
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs\n@@ -80 +80 @@\n-            await AutoPlugin(finance_inpayments.Where(x => x.OrderEntry > 0).Select(x => x.OrderEntry.Value));\n+            await AutoPluginAsync(finance_inpayments.Where(x => x.OrderEntry > 0).Select(x => x.OrderEntry.Value));\n@@ -171 +171 @@\n-        public async Task AutoPlugin(IEnumerable<int> orderIds)\n+        public async Task AutoPluginAsync(IEnumerable<int> orderIds)\n@@ -192,9 +192 @@\n-                    decimal balanceRMB;\n-                    if (ordr.DocStatus == \"C\")\n-                    {\n-                        balanceRMB = ( ordrStat.U_Delivery_TotalAmt ?? 0 )- (receiptAmountRMB - uRefundAmtRMB);\n-                    }\n-                    else\n-                    {\n-                        balanceRMB = docTotalRMB - (receiptAmountRMB - uRefundAmtRMB);\n-                    }\n+                    var balanceRMB = CalculateBalanceRMB(ordr.DocStatus, ordrStat.U_Delivery_TotalAmt, docTotalRMB, receiptAmountRMB, uRefundAmtRMB);\n@@ -236 +228 @@\n-                        orderId, docTotalRMB, balanceRMB, paymentRate * 100),nameof(FinanceHanlerApp),nameof(AutoPlugin));\n+                        orderId, docTotalRMB, balanceRMB, paymentRate * 100),nameof(FinanceHanlerApp),nameof(AutoPluginAsync));\n@@ -277,4 +269,14 @@\n-                LogHelper.Error(e, \"订单自动可清单执行失败\", nameof(FinanceHanlerApp), nameof(AutoPlugin));\n-            }\n-        }\n-    \n+                LogHelper.Error(e, \"订单自动可清单执行失败\", nameof(FinanceHanlerApp), nameof(AutoPluginAsync));\n+            }\n+        }\n+\n+        /// <summary>\n+        /// 计算人民币应收余额\n+        /// </summary>\n+        private static decimal CalculateBalanceRMB(string docStatus, decimal? deliveryTotalAmt, decimal docTotalRMB, decimal receiptAmountRMB, decimal refundAmtRMB)\n+        {\n+            if (docStatus == \"C\")\n+                return (deliveryTotalAmt ?? 0) - (receiptAmountRMB - refundAmtRMB);\n+            return docTotalRMB - (receiptAmountRMB - refundAmtRMB);\n+        }\n+"
+    },
+    {
+      "type": "outside_primary_region",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IFinanceHanlerApp.cs",
+      "reason": "This hunk changes lines outside the primary issue window 171-399; recorded as drift only.",
+      "symbol": "method@171-279",
+      "changed_lines": [
+        20
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IFinanceHanlerApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IFinanceHanlerApp.cs\n@@ -20 +20 @@\n-        Task AutoPlugin(IEnumerable<int> orderIds);\n+        Task AutoPluginAsync(IEnumerable<int> orderIds);"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "0fb3e377-0955-41cb-8cae-729a28012d3c",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+      "symbol": "method@171-279",
+      "summary": "Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs\n@@ -80 +80 @@\n-            await AutoPlugin(finance_inpayments.Where(x => x.OrderEntry > 0).Select(x => x.OrderEntry.Value));\n+            await AutoPluginAsync(finance_inpayments.Where(x => x.OrderEntry > 0).Select(x => x.OrderEntry.Value));\n@@ -171 +171 @@\n-        public async Task AutoPlugin(IEnumerable<int> orderIds)\n+        public async Task AutoPluginAsync(IEnumerable<int> orderIds)\n@@ -192,9 +192 @@\n-                    decimal balanceRMB;\n-                    if (ordr.DocStatus == \"C\")\n-                    {\n-                        balanceRMB = ( ordrStat.U_Delivery_TotalAmt ?? 0 )- (receiptAmountRMB - uRefundAmtRMB);\n-                    }\n-                    else\n-                    {\n-                        balanceRMB = docTotalRMB - (receiptAmountRMB - uRefundAmtRMB);\n-                    }\n+                    var balanceRMB = CalculateBalanceRMB(ordr.DocStatus, ordrStat.U_Delivery_TotalAmt, docTotalRMB, receiptAmountRMB, uRefundAmtRMB);\n@@ -236 +228 @@\n-                        orderId, docTotalRMB, balanceRMB, paymentRate * 100),nameof(FinanceHanlerApp),nameof(AutoPlugin));\n+                        orderId, docTotalRMB, balanceRMB, paymentRate * 100),nameof(FinanceHanlerApp),nameof(AutoPluginAsync));\n@@ -277,4 +269,14 @@\n-                LogHelper.Error(e, \"订单自动可清单执行失败\", nameof(FinanceHanlerApp), nameof(AutoPlugin));\n-            }\n-        }\n-    \n+                LogHelper.Error(e, \"订单自动可清单执行失败\", nameof(FinanceHanlerApp), nameof(AutoPluginAsync));\n+            }\n+        }\n+\n+        /// <summary>\n+        /// 计算人民币应收余额\n+        /// </summary>\n+        private static decimal CalculateBalanceRMB(string docStatus, decimal? deliveryTotalAmt, decimal docTotalRMB, decimal receiptAmountRMB, decimal refundAmtRMB)\n+        {\n+            if (docStatus == \"C\")\n+                return (deliveryTotalAmt ?? 0) - (receiptAmountRMB - refundAmtRMB);\n+            return docTotalRMB - (receiptAmountRMB - refundAmtRMB);\n+        }\n+",
+      "discovered_at": "2026-04-11T13:34:54.054487+00:00",
+      "discovered_by": "diff_reviewer"
+    },
+    {
+      "source_issue_key": "0fb3e377-0955-41cb-8cae-729a28012d3c",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IFinanceHanlerApp.cs",
+      "symbol": "method@171-279",
+      "summary": "Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IFinanceHanlerApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IFinanceHanlerApp.cs\n@@ -20 +20 @@\n-        Task AutoPlugin(IEnumerable<int> orderIds);\n+        Task AutoPluginAsync(IEnumerable<int> orderIds);",
+      "discovered_at": "2026-04-11T13:34:54.054505+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 2,
+    "hunk_count": 6,
+    "total_changed_lines": 18,
+    "hard_boundary_violation_count": 0,
+    "soft_boundary_violation_count": 2,
+    "extra_touched_file_count": 0,
+    "outside_primary_region_line_count": 2,
+    "outside_primary_region_count": 2,
+    "scope_audit_mode": "scope_soft_audit",
+    "scope_audit_active": true,
+    "scope_expansion_count": 2,
+    "scope_expansion_reasons": [
+      "outside_primary_region"
+    ],
+    "high_drift_warning": false,
+    "drift_score": 2
+  }
+}

@@ -31,6 +31,8 @@ from pi_sonar_agent.core.retry_context import (
     QualityGateFailureContext,
     QualityGateViolationContext,
     RetryContext,
+    ReviewGateDecisionContext,
+    ReviewGateFailureContext,
     ReviewFailureContext,
     ReviewViolationContext,
     ScopeViolationContext,
@@ -150,6 +152,9 @@ def _build_retry_guidance(errors: list[CompilerErrorContext]) -> list[str]:
     if "CS1061" in codes:
         guidance.append("不要留下不完整的成员重命名或类型迁移；先修复调用点与定义的成员名/类型不一致。")
         guidance.append("如果新的 helper 或中间类型导致成员访问链断裂，回退为更小的原方法内重构。")
+    if codes.intersection({"CS0535", "CS0738"}):
+        guidance.append("不要留下公开方法与接口/抽象契约不一致的半成品重命名；如果传播闭包不完整，优先恢复现有公开签名。")
+        guidance.append("如果必须保留 Async 重命名，必须同步接口声明、实现类签名、调用点和 nameof(...)。")
     return guidance
 
 
@@ -290,6 +295,58 @@ def _extract_quality_gate_failure_context(result: FixResult) -> QualityGateFailu
     )
 
 
+def _extract_review_gate_failure_context(result: FixResult) -> ReviewGateFailureContext | None:
+    """Extract structured model-reviewed gate rejections from a FixResult."""
+
+    payload = getattr(result, "review_gate_result", None)
+    if not isinstance(payload, dict):
+        return None
+    if str(payload.get("status", "")).strip().lower() != "retry":
+        return None
+
+    findings_by_id: dict[str, dict[str, str | int]] = {}
+    for item in payload.get("findings", []):
+        if not isinstance(item, dict):
+            continue
+        finding_id = str(item.get("finding_id", "")).strip()
+        if not finding_id:
+            continue
+        findings_by_id[finding_id] = {
+            "title": str(item.get("title", "")).strip(),
+            "source": str(item.get("source", "")).strip(),
+            "file": str(item.get("file", "")).strip(),
+            "line": int(item.get("line", 0) or 0),
+            "evidence": str(item.get("evidence", "")).strip(),
+        }
+
+    decisions = tuple(
+        ReviewGateDecisionContext(
+            finding_id=finding_id,
+            title=str(findings_by_id.get(finding_id, {}).get("title", "")).strip(),
+            source=str(findings_by_id.get(finding_id, {}).get("source", "")).strip(),
+            decision=str(item.get("decision", "")).strip().lower() or "confirm",
+            reason=str(item.get("reason", "")).strip(),
+            file=str(findings_by_id.get(finding_id, {}).get("file", "")).strip(),
+            line=int(findings_by_id.get(finding_id, {}).get("line", 0) or 0),
+            evidence=str(findings_by_id.get(finding_id, {}).get("evidence", "")).strip(),
+        )
+        for item in payload.get("decisions", [])
+        if isinstance(item, dict)
+        for finding_id in [str(item.get("finding_id", "")).strip()]
+        if finding_id
+    )
+
+    return ReviewGateFailureContext(
+        summary=str(payload.get("summary", "")).strip() or "Review gate rejected the patch.",
+        decisions=decisions,
+        feedback=tuple(
+            str(item).strip()
+            for item in payload.get("feedback", [])
+            if str(item).strip()
+        ),
+    )
+
+
 def _extract_plan_failure_context(result: FixResult) -> PlanFailureContext | None:
     """Extract structured plan-first precheck conflicts from a FixResult."""
 
@@ -345,12 +402,22 @@ def _build_failure_detail_key(
     compiler_errors: tuple[CompilerErrorContext, ...],
     boundary_failure: BoundaryFailureContext | None,
     quality_gate_failure: QualityGateFailureContext | None,
+    review_gate_failure: ReviewGateFailureContext | None,
     plan_failure: PlanFailureContext | None,
 ) -> str:
     if quality_gate_failure is not None and quality_gate_failure.violations:
         return "quality_gate:" + ",".join(
             dict.fromkeys(item.rule_id for item in quality_gate_failure.violations if item.rule_id)
         )
+    if review_gate_failure is not None:
+        confirmed_findings = tuple(
+            item.finding_id
+            for item in review_gate_failure.decisions
+            if item.finding_id and item.decision != "waive"
+        )
+        if confirmed_findings:
+            return "review_gate:" + ",".join(dict.fromkeys(confirmed_findings))
+        return "review_gate"
     if plan_failure is not None and plan_failure.code:
         return f"plan:{plan_failure.code}"
     if boundary_failure is not None and boundary_failure.code:
@@ -449,6 +516,7 @@ def build_retry_context(
     scope_violation = _extract_scope_violation_context(raw_output, issue)
     review_failure = _extract_review_failure_context(result)
     quality_gate_failure = _extract_quality_gate_failure_context(result)
+    review_gate_failure = _extract_review_gate_failure_context(result)
     plan_failure = _extract_plan_failure_context(result)
     return RetryContext(
         source_attempt_number=source_attempt_number,
@@ -458,6 +526,7 @@ def build_retry_context(
             compiler_errors=compiler_errors,
             boundary_failure=boundary_failure,
             quality_gate_failure=quality_gate_failure,
+            review_gate_failure=review_gate_failure,
             plan_failure=plan_failure,
         ),
         strategy_fingerprint=_build_strategy_fingerprint(result),
@@ -475,6 +544,7 @@ def build_retry_context(
         scope_violation=scope_violation,
         review_failure=review_failure,
         quality_gate_failure=quality_gate_failure,
+        review_gate_failure=review_gate_failure,
         plan_failure=plan_failure,
         model_timeout_summary=(
             _summarize_model_timeout(raw_output, getattr(result, "model_timeout_stage", ""))
@@ -535,6 +605,8 @@ def _build_final_skip_reason(result: FixResult, attempts: int) -> str:
         return f"Diff reviewer rejected the patch after {attempts} attempt(s)"
     if result.failure_kind == "quality_gate":
         return f"C# quality gate verification failed after {attempts} attempt(s)"
+    if result.failure_kind == "review_gate":
+        return f"Review gate verification failed after {attempts} attempt(s)"
     if result.failure_kind == "plan_conflict":
         return f"Plan precheck rejected the edit after {attempts} attempt(s)"
     if result.failure_kind == "tool_input_invalid":
@@ -546,6 +618,8 @@ def _build_final_skip_reason(result: FixResult, attempts: int) -> str:
     if result.failure_kind == "build_tool":
         return f"Build tool execution failed after {attempts} attempt(s)"
     if result.failure_kind == "forbidden_tool":
+        if result.build_verification_failed:
+            return f"Build verification failed after {attempts} attempt(s) (attempt also used a forbidden tool)"
         return f"Forbidden tool usage polluted the issue attempt after {attempts} attempt(s)"
     if result.failure_kind == "model_timeout":
         return f"Model response timed out after {attempts} attempt(s)"

@@ -6,9 +6,11 @@ from pi_sonar_agent.agent.claude_agent import SonarIssue
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange, ReviewedLineOperation
 from pi_sonar_agent.core.fix_verifier import FixVerifier
 from pi_sonar_agent.core.issue_contract import EditContract
-from pi_sonar_agent.core.quality_gate import QualityGateRule
+from pi_sonar_agent.core.propagation_verifier import PropagationCheckResult
+from pi_sonar_agent.core.quality_gate import QualityGateResult, QualityGateRule, QualityGateViolation
 from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
 from pi_sonar_agent.core.repair_plan import RepairPlan, RepairPropagationTarget
+from pi_sonar_agent.core.review_gate import ReviewGateDecision, ReviewGateFinding, ReviewGateResult
 from pi_sonar_agent.core.scope_guard import IssueEditScope
 
 
@@ -61,6 +63,13 @@ def test_fix_verifier_records_soft_drift_without_blocking_build(monkeypatch, tmp
         return FakeCompletedProcess()
 
     monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.ReviewGateAgent.review",
+        lambda **kwargs: ReviewGateResult(
+            status="not_applicable",
+            summary="Review gate disabled for this deterministic propagation regression test.",
+        ),
+    )
 
     outcome = FixVerifier.evaluate_attempt(
         issue=issue,
@@ -999,3 +1008,202 @@ def test_quality_gate_verifier_accepts_tuple_and_nested_generic_task_return_type
 
     assert result.status == "pass"
     assert result.violations == ()
+
+
+def test_fix_verifier_runs_build_when_review_gate_waives_propagation(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-review-gate-pass",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=8,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        repair_plan=RepairPlan(
+            repair_shape="method_decomposition",
+            primary_file="src/Foo.cs",
+            primary_method_name="Foo",
+            proposed_method_name="FooAsync",
+            requires_signature_change=True,
+            verification_targets=(
+                RepairPropagationTarget(
+                    file="src/Foo.cs",
+                    symbol="method@8-16",
+                    kind="definition",
+                    start_line=8,
+                    end_line=16,
+                ),
+            ),
+        ),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(8, 10),
+            before_changed_lines=(8, 10),
+            after_changed_lines=(8, 10),
+            diff_text="@@ -8,1 +8,1 @@\n-public async Task Foo()\n+public async Task FooAsync()\n",
+            hunk_count=1,
+        ),
+    )
+
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.PropagationVerifier.review",
+        lambda **kwargs: PropagationCheckResult(
+            status="retry",
+            summary="Propagation still looks stale.",
+            residual_targets=("src/Foo.cs:8-16 (definition) still missing `FooAsync`",),
+        ),
+    )
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.ReviewGateAgent.review",
+        lambda **kwargs: ReviewGateResult(
+            status="pass",
+            summary="Review gate waived the propagation finding.",
+            findings=(
+                ReviewGateFinding(
+                    finding_id="propagation",
+                    source="propagation",
+                    title="Signature propagation verification",
+                    message="Propagation still looks stale.",
+                ),
+            ),
+            decisions=(
+                ReviewGateDecision(
+                    finding_id="propagation",
+                    decision="waive",
+                    reason="The remaining declaration is a wrapper and should not block.",
+                ),
+            ),
+        ),
+    )
+
+    build_calls: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    def fake_run(*args, **kwargs):
+        build_calls.append(str(args[0] if args else kwargs.get("args", "")))
+        return FakeCompletedProcess()
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="contract_review",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content="class Foo {}\n",
+    )
+
+    assert outcome.review_gate_result.status == "pass"
+    assert outcome.propagation_check_result.status == "pass"
+    assert outcome.build_passed is True
+    assert len(build_calls) == 2
+
+
+def test_fix_verifier_stops_before_build_when_review_gate_retries(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-review-gate-retry",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=22,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(22,),
+            before_changed_lines=(22,),
+            after_changed_lines=(22,),
+            diff_text="@@ -22,1 +22,1 @@\n-if (a && b && c)\n+if (a && (b || c))\n",
+            hunk_count=1,
+        ),
+    )
+
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.ReviewGateAgent.review",
+        lambda **kwargs: ReviewGateResult(
+            status="retry",
+            summary="Review gate confirmed the cognitive complexity blocker.",
+            findings=(
+                ReviewGateFinding(
+                    finding_id="quality_gate:cognitive_complexity:src/Foo.cs:22:1",
+                    source="quality_gate",
+                    title="认知复杂度",
+                    message="复杂度仍然偏高。",
+                ),
+            ),
+            decisions=(
+                ReviewGateDecision(
+                    finding_id="quality_gate:cognitive_complexity:src/Foo.cs:22:1",
+                    decision="confirm",
+                    reason="The new branch structure is still deeply nested.",
+                ),
+            ),
+            feedback=("继续减少嵌套层级，不要只改条件顺序。",),
+        ),
+    )
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.QualityGateVerifier.review",
+        lambda **kwargs: QualityGateResult(
+            status="retry",
+            summary="Quality gate still sees cognitive complexity issues.",
+            applied_rule_ids=("cognitive_complexity",),
+            violations=(
+                QualityGateViolation(
+                    rule_id="cognitive_complexity",
+                    title="认知复杂度",
+                    message="复杂度仍然偏高。",
+                    file="src/Foo.cs",
+                    line=22,
+                ),
+            ),
+        ),
+    )
+
+    build_calls: list[str] = []
+
+    def fake_run(*args, **kwargs):
+        build_calls.append("build")
+        raise AssertionError("build should not run when review gate requests retry")
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="contract_review",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content="class Foo {}\n",
+    )
+
+    assert outcome.review_gate_result.status == "retry"
+    assert "Review gate rejected the patch" in outcome.combined_output
+    assert outcome.build_passed is False
+    assert build_calls == []

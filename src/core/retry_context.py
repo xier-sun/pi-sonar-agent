@@ -112,6 +112,35 @@ class QualityGateFailureContext:
 
 
 @dataclass(frozen=True)
+class ReviewGateDecisionContext:
+    """Structured review-gate decision for retry analysis."""
+
+    finding_id: str
+    title: str
+    source: str
+    decision: str
+    reason: str
+    file: str = ""
+    line: int = 0
+    evidence: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
+
+
+@dataclass(frozen=True)
+class ReviewGateFailureContext:
+    """Structured model-audited gate rejection details for retry analysis."""
+
+    summary: str = ""
+    decisions: tuple[ReviewGateDecisionContext, ...] = ()
+    feedback: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
+
+
+@dataclass(frozen=True)
 class PlanFailureContext:
     """Structured plan-first precheck conflict for retry analysis."""
 
@@ -146,6 +175,7 @@ class RetryContext:
     scope_violation: ScopeViolationContext | None = None
     review_failure: ReviewFailureContext | None = None
     quality_gate_failure: QualityGateFailureContext | None = None
+    review_gate_failure: ReviewGateFailureContext | None = None
     plan_failure: PlanFailureContext | None = None
     model_timeout_summary: str = ""
     model_timeout_stage: str = ""
@@ -239,10 +269,12 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
     scope_violation = retry_context.scope_violation
     review_failure = retry_context.review_failure
     quality_gate_failure = retry_context.quality_gate_failure
+    review_gate_failure = retry_context.review_gate_failure
     plan_failure = retry_context.plan_failure
     has_scope_violation = scope_violation is not None
     has_review_failure = review_failure is not None
     has_quality_gate_failure = quality_gate_failure is not None
+    has_review_gate_failure = review_gate_failure is not None
     has_plan_failure = plan_failure is not None
     compiler_errors = list(retry_context.compiler_errors)
 
@@ -295,6 +327,7 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                     "重试约束:",
                     "- 严禁使用 git_add、git_commit、git_push 或任何自行提交/推送动作。",
                     "- 如果使用 shell 工具（工具名 Bash），只写 bash 兼容命令；允许搜索、查看、诊断、echo 等无害操作。",
+                    "- 优先使用 prompt 中给出的仓库相对路径候选，不要靠 Bash 拼接仓库根目录反复试错。",
                     "- 严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码。",
                     "- 修复阶段只能直接编辑代码并运行推荐构建命令，提交由外层流程统一处理。",
                     "- 先根据下面的本地构建输出修复问题，再重新运行推荐构建命令验证。",
@@ -345,6 +378,25 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                 sections = ["上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁："]
                 _append_quality_gate_details(sections, quality_gate_failure)
                 return "\n".join(sections)
+            if has_review_gate_failure:
+                sections = ["上次尝试经过审核 agent 复核后，仍被判定需要继续修改："]
+                sections.append(review_gate_failure.summary)
+                for index, item in enumerate(review_gate_failure.decisions, start=1):
+                    detail = f"{index}. [{item.source}/{item.decision}] {item.title or item.finding_id}"
+                    if item.file:
+                        location = item.file
+                        if item.line > 0:
+                            location = f"{location}:{item.line}"
+                        detail += f" | location: {location}"
+                    sections.append(detail)
+                    if item.reason:
+                        sections.append(f"   审核理由: {item.reason}")
+                    if item.evidence:
+                        sections.append(f"   证据: {item.evidence}")
+                if review_gate_failure.feedback:
+                    sections.append("审核 agent 给出的下一轮要求:")
+                    sections.extend(f"- {item}" for item in review_gate_failure.feedback)
+                return "\n".join(sections)
             return raw_output
         if has_plan_failure:
             lines = [
@@ -381,6 +433,7 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
         sections.append("上次尝试使用了被禁止的工具，或污染了当前 issue 的 Git 基线。")
         sections.append("这次严禁使用 git_add、git_commit、git_push；只允许直接编辑代码并运行推荐构建命令。")
         sections.append("如果使用 shell 工具（工具名 Bash），只写 bash 兼容命令；允许无害操作。")
+        sections.append("优先使用 prompt 中给出的仓库相对路径候选，不要靠 Bash 拼接仓库根目录反复试错。")
         sections.append("严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码。")
     if retry_context.build_tool_failed:
         sections.append("上次尝试在运行构建工具时异常退出；已附加本地回退构建结果。")
@@ -430,5 +483,21 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
     if has_quality_gate_failure:
         sections.append("另外，上次 patch 还没有通过 C# 质量门禁：")
         _append_quality_gate_details(sections, quality_gate_failure)
+    if has_review_gate_failure:
+        sections.append("另外，上次 patch 经过审核 agent 复核后仍未通过：")
+        sections.append(review_gate_failure.summary)
+        for index, item in enumerate(review_gate_failure.decisions, start=1):
+            detail = f"{index}. [{item.source}/{item.decision}] {item.title or item.finding_id}"
+            if item.file:
+                location = item.file
+                if item.line > 0:
+                    location = f"{location}:{item.line}"
+                detail += f" | location: {location}"
+            sections.append(detail)
+            if item.reason:
+                sections.append(f"   审核理由: {item.reason}")
+        if review_gate_failure.feedback:
+            sections.append("审核 agent 给出的下一轮要求:")
+            sections.extend(f"- {item}" for item in review_gate_failure.feedback)
 
     return "\n".join(sections)

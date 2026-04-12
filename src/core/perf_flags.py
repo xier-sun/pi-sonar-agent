@@ -35,6 +35,7 @@ class PerformanceFlags:
     repair_archetype_strategy_selection: bool = True
     layered_verification: bool = True
     propagation_lifecycle: bool = True
+    review_gate: bool = True
     fast_compile: bool = True
     patch_salvage: bool = True
     continuation_retry: bool = True
@@ -58,6 +59,8 @@ class PerformanceFlags:
             flags.append("perf.layered_verification")
         if self.propagation_lifecycle:
             flags.append("verifier.propagation_lifecycle")
+        if self.review_gate:
+            flags.append("verifier.review_gate")
         if self.fast_compile:
             flags.append("verifier.fast_compile")
         if self.patch_salvage:
@@ -88,6 +91,7 @@ def load_performance_flags() -> PerformanceFlags:
         ),
         layered_verification=_env_flag("PI_SONAR_PERF_LAYERED_VERIFICATION", True),
         propagation_lifecycle=_env_flag("PI_SONAR_VERIFIER_PROPAGATION_LIFECYCLE", True),
+        review_gate=_env_flag("PI_SONAR_REVIEW_GATE_ENABLED", True),
         fast_compile=_env_flag("PI_SONAR_VERIFIER_FAST_COMPILE", True),
         patch_salvage=_env_flag("PI_SONAR_PERF_PATCH_SALVAGE", True),
         continuation_retry=_env_flag("PI_SONAR_PERF_CONTINUATION_RETRY", True),

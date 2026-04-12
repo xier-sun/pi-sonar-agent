@@ -1,0 +1,243 @@
+{
+  "issue_key": "ea97b5e2-bca2-42b2-b678-a91347eca09d",
+  "rule_id": "csharpsquid:S3776",
+  "message": "Refactor this method to reduce its Cognitive Complexity from 38 to the 30 allowed.",
+  "line": 51,
+  "text_range": {
+    "startLine": 51,
+    "endLine": 51,
+    "startOffset": 26,
+    "endOffset": 43
+  },
+  "flows": [
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 59,
+            "endLine": 59,
+            "startOffset": 12,
+            "endOffset": 19
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 63,
+            "endLine": 63,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 70,
+            "endLine": 70,
+            "startOffset": 20,
+            "endOffset": 27
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 74,
+            "endLine": 74,
+            "startOffset": 77,
+            "endOffset": 79
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 76,
+            "endLine": 76,
+            "startOffset": 61,
+            "endOffset": 63
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 79,
+            "endLine": 79,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 100,
+            "endLine": 100,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 106,
+            "endLine": 106,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 109,
+            "endLine": 109,
+            "startOffset": 110,
+            "endOffset": 112
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 110,
+            "endLine": 110,
+            "startOffset": 24,
+            "endOffset": 31
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 122,
+            "endLine": 122,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 125,
+            "endLine": 125,
+            "startOffset": 110,
+            "endOffset": 112
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 126,
+            "endLine": 126,
+            "startOffset": 24,
+            "endOffset": 31
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 135,
+            "endLine": 135,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 141,
+            "endLine": 141,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 150,
+            "endLine": 150,
+            "startOffset": 20,
+            "endOffset": 24
+          }
+        }
+      ]
+    }
+  ],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/PenaltyCalculationService.cs",
+  "severity": "CRITICAL",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

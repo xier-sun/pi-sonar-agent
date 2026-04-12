@@ -1,0 +1,20 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs
+@@ -58,8 +58,7 @@
+                         x => x.SlpCode,
+
+                         x => x.SlpName
+
+                     );
+
+-                // 排除售后
+
+-                //var csOrders = UnitWork.Find<sale_ordr>(x => x.U_ERPFrom == "4" && x.sbo_id == Define.SBO_ID).Select(x => x.DocEntry.Value).ToHashSet();
+
++
+
+                 //首先要找到已结算的单据，已结算的单据退货，才需要重新关联新单据
+
+                 //U_DevEntry 为关联的要退的订单号，U_New_OrdrID为关联的新订单号,
+
+                 //若 U_New_OrdrID 没有值，且价格>0的物料全部退完，则说明这个单里的有价物料全退掉了，要计算罚息
