@@ -528,18 +528,29 @@ class ReviewGateAgent:
             raw = re.sub(r"\s*```$", "", raw)
         return raw.strip()
 
+    @staticmethod
+    def _normalize_payload_sequence(value: Any) -> tuple[Any, ...]:
+        if value is None:
+            return ()
+        if isinstance(value, (list, tuple)):
+            return tuple(value)
+        return ()
+
     @classmethod
     def _parse_response_payload(cls, raw_response: str) -> dict[str, Any]:
         text = cls._strip_json_fence(raw_response)
         if not text:
             raise ValueError("empty review response")
         try:
-            return json.loads(text)
+            payload = json.loads(text)
         except json.JSONDecodeError:
             match = re.search(r"\{.*\}", text, re.DOTALL)
             if not match:
                 raise
-            return json.loads(match.group(0))
+            payload = json.loads(match.group(0))
+        if not isinstance(payload, dict):
+            raise ValueError("review response must be a JSON object")
+        return payload
 
     @classmethod
     def _build_result_from_payload(
@@ -550,9 +561,10 @@ class ReviewGateAgent:
         raw_response: str,
         payload: dict[str, Any],
     ) -> ReviewGateResult:
+        payload = payload if isinstance(payload, dict) else {}
         finding_map = {item.finding_id: item for item in findings}
         decisions_by_id: dict[str, ReviewGateDecision] = {}
-        for item in payload.get("decisions", []):
+        for item in cls._normalize_payload_sequence(payload.get("decisions")):
             if not isinstance(item, dict):
                 continue
             finding_id = str(item.get("finding_id", "")).strip()
@@ -584,7 +596,7 @@ class ReviewGateAgent:
         status = "pass" if overall_decision == "pass" and all_waived else "retry"
         feedback = tuple(
             str(item).strip()
-            for item in payload.get("feedback", [])
+            for item in cls._normalize_payload_sequence(payload.get("feedback"))
             if str(item).strip()
         )
         summary = str(payload.get("summary", "")).strip()

@@ -1,0 +1,492 @@
+{
+  "attempt_number": 4,
+  "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+  "retry_feedback": "上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：\nQuality gate rejected the patch with 11 hard violation(s).\n1. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ProcessAsync 缺少参数 matchedRules 的 <param> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41\n   证据: ///<summary>\n/// 处理器方法\n/// </summary>\n   原始提示: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n2. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ProcessAsync 有返回值但缺少 <returns> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41\n   证据: ///<summary>\n/// 处理器方法\n/// </summary>\n   原始提示: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n3. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:181\n   证据: return newEvents; } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {\n   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n4. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:83\n   证据: var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)\n   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n5. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:84\n   证据: join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry\n   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n6. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:85\n   证据: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode\n   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n7. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:114\n   证据: var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)\n   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n8. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:115\n   证据: join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId\n   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n9. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:125\n   证据: var delivrdItems = await (from r1 in UnitWork.Find<RDR1>(null)\n   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n10. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:126\n   证据: join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry\n   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n11. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:127\n   证据: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode\n   原始提示: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n本次重改要求:\n- 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n- 只为当前触达的公开成员补齐 XML 文档，包括 <summary>/<param>/<returns>；不要顺手补无关公开成员。\n- 如果这次修复只是为了降低复杂度或删除无用代码，不要新增 public/protected helper、DTO、property 来制造更多 XML 文档负担。\n- 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n- 如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。\n- 新提取的 helper 默认保持同步；只有 helper 体内真实含有 await 时才允许 async。\n- 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。",
+  "retry_context": {
+    "source_attempt_number": 3,
+    "failure_kind": "quality_gate",
+    "failure_detail_key": "quality_gate:public_xml_docs,async_requires_await,linq_method_syntax",
+    "strategy_fingerprint": "profile=plan_first_full_path|fast_path=0|plan_first=1|caps=method_rewrite,helper_extract|shape=method_rewrite_with_helpers|archetype=signature_preserving_refactor|fallback=expression_simplification|archetype_chain=signature_preserving_refactor>expression_simplification",
+    "diff_fingerprint": "35b22e33e20c5cc3",
+    "error": "Quality gate verification failed",
+    "summary": "Fixed 1 file(s)",
+    "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+    "raw_output": "Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:\n1. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ProcessAsync 缺少参数 matchedRules 的 <param> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41\n   Evidence: ///<summary>\n/// 处理器方法\n/// </summary>\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n2. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 ProcessAsync 有返回值但缺少 <returns> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:41\n   Evidence: ///<summary>\n/// 处理器方法\n/// </summary>\n   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。\n3. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:181\n   Evidence: return newEvents; } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {\n   Retry Hint: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n4. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:83\n   Evidence: var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n5. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:84\n   Evidence: join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n6. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:85\n   Evidence: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n7. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:114\n   Evidence: var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n8. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:115\n   Evidence: join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n9. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:125\n   Evidence: var delivrdItems = await (from r1 in UnitWork.Find<RDR1>(null)\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n10. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:126\n   Evidence: join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。\n11. [linq_method_syntax] LINQ 优先方法语法: 当前 patch 引入了 query syntax，请改成方法语法。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:127\n   Evidence: join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode\n   Retry Hint: 把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。",
+    "retryable_failure": true,
+    "build_verification_failed": false,
+    "changed_files": [
+      "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs"
+    ],
+    "compiler_errors": [],
+    "guidance": [],
+    "boundary_failure": null,
+    "scope_violation": null,
+    "review_failure": null,
+    "quality_gate_failure": {
+      "summary": "Quality gate rejected the patch with 11 hard violation(s).",
+      "violations": [
+        {
+          "rule_id": "public_xml_docs",
+          "title": "公开成员 XML 文档完整",
+          "message": "公开方法 ProcessAsync 缺少参数 matchedRules 的 <param> 文档。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 41,
+          "symbol": "ProcessAsync@41-60",
+          "evidence": "///<summary>\n/// 处理器方法\n/// </summary>",
+          "retry_hint": "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+        },
+        {
+          "rule_id": "public_xml_docs",
+          "title": "公开成员 XML 文档完整",
+          "message": "公开方法 ProcessAsync 有返回值但缺少 <returns> 文档。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 41,
+          "symbol": "ProcessAsync@41-60",
+          "evidence": "///<summary>\n/// 处理器方法\n/// </summary>",
+          "retry_hint": "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+        },
+        {
+          "rule_id": "async_requires_await",
+          "title": "异步方法必须真正 await",
+          "message": "异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 181,
+          "symbol": "ResolveOrderDocEntryFromReturnChainAsync@181-194",
+          "evidence": "return newEvents; } /// <summary> /// U_DevEntry 为空时，通过 RIN1 → INV1 → DLN1 链路回溯原始订单号 /// </summary> private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync( List<(int OrinDocEntry, int BaseEntry, int BaseType)> traceItems) {",
+          "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+        },
+        {
+          "rule_id": "linq_method_syntax",
+          "title": "LINQ 优先方法语法",
+          "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 83,
+          "symbol": "",
+          "evidence": "var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)",
+          "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+        },
+        {
+          "rule_id": "linq_method_syntax",
+          "title": "LINQ 优先方法语法",
+          "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 84,
+          "symbol": "",
+          "evidence": "join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry",
+          "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+        },
+        {
+          "rule_id": "linq_method_syntax",
+          "title": "LINQ 优先方法语法",
+          "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 85,
+          "symbol": "",
+          "evidence": "join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode",
+          "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+        },
+        {
+          "rule_id": "linq_method_syntax",
+          "title": "LINQ 优先方法语法",
+          "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 114,
+          "symbol": "",
+          "evidence": "var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)",
+          "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+        },
+        {
+          "rule_id": "linq_method_syntax",
+          "title": "LINQ 优先方法语法",
+          "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 115,
+          "symbol": "",
+          "evidence": "join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId",
+          "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+        },
+        {
+          "rule_id": "linq_method_syntax",
+          "title": "LINQ 优先方法语法",
+          "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 125,
+          "symbol": "",
+          "evidence": "var delivrdItems = await (from r1 in UnitWork.Find<RDR1>(null)",
+          "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+        },
+        {
+          "rule_id": "linq_method_syntax",
+          "title": "LINQ 优先方法语法",
+          "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 126,
+          "symbol": "",
+          "evidence": "join r in UnitWork.Find<ORDR>(null) on r1.DocEntry equals r.DocEntry",
+          "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+        },
+        {
+          "rule_id": "linq_method_syntax",
+          "title": "LINQ 优先方法语法",
+          "message": "当前 patch 引入了 query syntax，请改成方法语法。",
+          "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+          "line": 127,
+          "symbol": "",
+          "evidence": "join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode",
+          "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+        }
+      ]
+    },
+    "review_gate_failure": null,
+    "plan_failure": null,
+    "model_timeout_summary": "",
+    "model_timeout_stage": "",
+    "build_tool_failed": false,
+    "forbidden_tool_failed": false,
+    "model_timeout_failed": false,
+    "patch_salvaged": false
+  },
+  "workspace_path": ".agent_workspaces/fix_BI_20260412093523-01",
+  "baseline_head_commit": "bc0cade3490a84beed25b339df7e0e9240792947",
+  "guardrail_mode": "scope",
+  "active_quality_gate_rules": [
+    {
+      "rule_id": "public_xml_docs",
+      "title": "公开成员 XML 文档完整",
+      "summary": "本次新增或改写的公开类、公开方法、公开属性、公开实体必须有完整 XML 文档注释。",
+      "enforcement": "hard",
+      "validation_scope": "changed_public_symbol",
+      "prompt_hint": "如果本次触达公开 API，必须补齐完整 XML 文档；不要顺手补无关公开成员。",
+      "retry_hint": "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。",
+      "file_extensions": [
+        ".cs"
+      ]
+    },
+    {
+      "rule_id": "async_signature",
+      "title": "异步签名规范",
+      "summary": "异步方法必须以 Async 结尾，返回 Task/Task<T>，严禁 async void（事件处理器除外）。",
+      "enforcement": "hard",
+      "validation_scope": "changed_method",
+      "prompt_hint": "如果当前修改触达异步方法，优先保持 Async 命名、Task 返回值和 async/await 配套。",
+      "retry_hint": "异步方法请改成合法签名：方法名以 Async 结尾，返回 Task/Task<T>，不要使用 async void。",
+      "file_extensions": [
+        ".cs"
+      ]
+    },
+    {
+      "rule_id": "async_requires_await",
+      "title": "异步方法必须真正 await",
+      "summary": "异步方法内部如果没有 await，应改为同步方法或直接返回 Task。",
+      "enforcement": "hard",
+      "validation_scope": "changed_method",
+      "prompt_hint": "不要保留没有 await 的 async 方法。",
+      "retry_hint": "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。",
+      "file_extensions": [
+        ".cs"
+      ]
+    },
+    {
+      "rule_id": "linq_method_syntax",
+      "title": "LINQ 优先方法语法",
+      "summary": "新增或改写的 LINQ 表达式优先使用方法语法，不要引入 query syntax。",
+      "enforcement": "hard",
+      "validation_scope": "changed_lines",
+      "prompt_hint": "当前 patch 不要引入 query syntax（from/select/group）。",
+      "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。",
+      "file_extensions": [
+        ".cs"
+      ]
+    },
+    {
+      "rule_id": "cognitive_complexity",
+      "title": "单方法认知复杂度不超过 30",
+      "summary": "触达的方法应通过提取子方法、提前返回等方式控制认知复杂度。",
+      "enforcement": "hard",
+      "validation_scope": "changed_method",
+      "prompt_hint": "如果当前 patch 触达的方法仍然过于复杂，优先做局部提取而不是继续堆嵌套。",
+      "retry_hint": "把当前触达的方法进一步拆小或提前返回，避免保留超过 30 的高认知复杂度结构。",
+      "file_extensions": [
+        ".cs"
+      ]
+    },
+    {
+      "rule_id": "zero_redundant_code",
+      "title": "零冗余代码",
+      "summary": "不要在当前 patch 中留下未使用变量、方法、类或 using。",
+      "enforcement": "soft",
+      "validation_scope": "changed_region",
+      "prompt_hint": "当前 patch 不要引入明显的冗余代码。",
+      "retry_hint": "清理当前 patch 中新增的未使用代码或无效 using。",
+      "file_extensions": [
+        ".cs"
+      ]
+    },
+    {
+      "rule_id": "static_preferred",
+      "title": "新增纯辅助方法优先 static",
+      "summary": "如果新增方法不依赖实例状态，优先标记为 static。",
+      "enforcement": "soft",
+      "validation_scope": "changed_method",
+      "prompt_hint": "新增的纯辅助方法如果不依赖实例状态，优先使用 static。",
+      "retry_hint": "如果当前新增 helper 不依赖实例状态，请考虑改成 static。",
+      "file_extensions": [
+        ".cs"
+      ]
+    },
+    {
+      "rule_id": "sealed_preferred",
+      "title": "新增不继承的类优先 sealed",
+      "summary": "如果新增类不打算被继承，优先使用 sealed。",
+      "enforcement": "soft",
+      "validation_scope": "changed_type",
+      "prompt_hint": "新增 concrete class 如果没有继承意图，优先 sealed。",
+      "retry_hint": "如果当前新增类没有继承意图，请考虑加 sealed。",
+      "file_extensions": [
+        ".cs"
+      ]
+    },
+    {
+      "rule_id": "constructor_dependency_injection",
+      "title": "优先构造函数注入",
+      "summary": "依赖注入优先通过构造函数注入接口，并保持当前仓库既有注册模式一致。",
+      "enforcement": "soft",
+      "validation_scope": "changed_type",
+      "prompt_hint": "不要破坏当前仓库既有 DI 模式；新增依赖时优先构造函数注入。",
+      "retry_hint": "如果当前 patch 引入新依赖，请优先构造函数注入并保持仓库既有 DI 约定。",
+      "file_extensions": [
+        ".cs"
+      ]
+    },
+    {
+      "rule_id": "business_comments_chinese",
+      "title": "业务注释优先中文",
+      "summary": "新增业务逻辑注释优先使用专业中文表达。",
+      "enforcement": "soft",
+      "validation_scope": "changed_comments",
+      "prompt_hint": "新增业务注释优先中文，不要写成含糊的英文业务说明。",
+      "retry_hint": "把当前 patch 新增的业务注释改成简洁专业的中文。",
+      "file_extensions": [
+        ".cs"
+      ]
+    },
+    {
+      "rule_id": "finance_terms_chinese",
+      "title": "财务术语保持专业中文",
+      "summary": "财务及核心业务术语应保持专业中文表达，例如罚息、应收账款、账务、呆滞库存、订单取消。",
+      "enforcement": "soft",
+      "validation_scope": "changed_comments",
+      "prompt_hint": "Finance/账务相关文件里的新增业务注释要尽量使用专业中文术语。",
+      "retry_hint": "把当前 patch 中的财务英文术语改成准确的中文业务表达。",
+      "file_extensions": [
+        ".cs"
+      ]
+    }
+  ],
+  "execution_profile": "plan_first_full_path",
+  "fast_path_enabled": false,
+  "plan_first_enabled": true,
+  "rollout_flags": [
+    "perf.short_form_prompt",
+    "perf.fast_path",
+    "perf.plan_first_complex_rules",
+    "planner.repair_archetypes.constraint_injection",
+    "planner.repair_archetypes.strategy_selection",
+    "perf.layered_verification",
+    "verifier.propagation_lifecycle",
+    "verifier.review_gate",
+    "verifier.fast_compile",
+    "perf.patch_salvage",
+    "perf.continuation_retry",
+    "runtime.edit_failure_context_feedback",
+    "perf.fast_path_max_turns=6",
+    "perf.continuation_retry_limit=2"
+  ],
+  "repair_plan": {
+    "repair_shape": "method_rewrite_with_helpers",
+    "primary_file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+    "primary_method_name": "ProcessAsync",
+    "proposed_method_name": "",
+    "selected_archetype": "signature_preserving_refactor",
+    "fallback_archetype": "expression_simplification",
+    "archetype_chain": [
+      "signature_preserving_refactor",
+      "expression_simplification"
+    ],
+    "constraint_hints": [
+      "Prefer refactoring inside the existing method body and preserve the externally visible signature when possible.",
+      "If helper extraction would depend on many outer locals, fall back to local block simplification inside the current method.",
+      "New helpers should default to private methods unless the contract explicitly requires broader visibility.",
+      "Any touched async method must use an Async suffix and a Task/Task<T> return type.",
+      "Do not keep async on helpers or methods that no longer contain a real await.",
+      "For S3776, keep the externally visible API stable unless the plan explicitly provides verified propagation targets.",
+      "Retry downgrade: new helpers and extracted phases must stay synchronous unless their bodies contain a real await.",
+      "Retry downgrade: do not rename helpers to *Async unless they are truly async; keep async naming changes tightly bounded.",
+      "Retry downgrade: avoid any new public/protected surface in this patch; solve the issue with private/local constructs instead.",
+      "Avoid introducing new public or protected surface area unless the contract explicitly requires it."
+    ],
+    "target_symbols": [
+      "ProcessAsync",
+      "method@41-171"
+    ],
+    "new_helpers": [
+      "private helper(s) extracted from the target method"
+    ],
+    "helper_async_map": [
+      {
+        "name": "extracted_private_helper",
+        "is_async": false,
+        "reason": "Only keep helpers async when they contain a real await.",
+        "await_source": "Prefer sync helper extraction unless the helper owns an awaited call."
+      }
+    ],
+    "auto_upgraded_capabilities": [],
+    "propagation_budget": 0,
+    "impact_summary": "Keep the fix centered on the primary file and avoid unnecessary propagation.",
+    "strategy_preferences": [
+      "prefer_signature_preserving_refactor",
+      "prefer_private_sync_helpers",
+      "avoid_new_public_surface",
+      "avoid_new_types_for_state_transport",
+      "helper_budget<=2",
+      "retry_sync_first",
+      "avoid_async_helper_expansion",
+      "avoid_async_rename_churn",
+      "forbid_new_public_surface_on_retry",
+      "prefer_private_or_local_state_carriers"
+    ],
+    "verification_targets": [],
+    "requires_signature_change": false,
+    "requires_propagation": false,
+    "requires_new_type": false,
+    "propagation_targets": [],
+    "expected_boundary_capabilities": [
+      "method_rewrite",
+      "helper_extract"
+    ],
+    "expected_quality_gates": [
+      "public_xml_docs",
+      "async_signature",
+      "async_requires_await",
+      "linq_method_syntax",
+      "cognitive_complexity",
+      "zero_redundant_code",
+      "static_preferred",
+      "sealed_preferred",
+      "constructor_dependency_injection",
+      "business_comments_chinese",
+      "finance_terms_chinese"
+    ],
+    "risk_notes": [
+      "S3776 默认优先保留现有公开签名和可见性，除非 propagation 闭包已经明确。",
+      "提取 helper 时，只有真实包含 await 的 helper 才保留 async；否则改为同步 helper。",
+      "最近失败集中在 async 门禁；下一轮默认采用 sync-first helper / body-only 重构。",
+      "最近失败触发 public_xml_docs；下一轮禁止新增 public/protected helper、DTO 或属性。"
+    ]
+  },
+  "plan_precheck": {
+    "status": "pass",
+    "blocking": false,
+    "code": "plan_precheck_passed",
+    "summary": "Plan 预检通过，可以进入 edit 阶段。",
+    "details": [
+      "Plan 与当前 contract/quality gate 的显式前置约束没有发现直接冲突。"
+    ],
+    "guidance": []
+  },
+  "review_gate_result": {
+    "status": "not_applicable",
+    "summary": "No reviewable verifier findings were present for this attempt.",
+    "invoked": false,
+    "model_display": "",
+    "findings": [],
+    "decisions": [],
+    "feedback": [],
+    "raw_response": "",
+    "error": ""
+  },
+  "planner_lessons": [
+    {
+      "source": "rule_pattern",
+      "summary": "Fixed 1 file(s)",
+      "guidance": [],
+      "issue_rule_id": "csharpsquid:S3776",
+      "failure_kind": "quality_gate",
+      "scope_mode": "method",
+      "guardrail_mode": "scope",
+      "boundary_failure_code": "",
+      "quality_gate_rule_ids": [
+        "public_xml_docs",
+        "async_signature",
+        "async_requires_await",
+        "linq_method_syntax",
+        "cognitive_complexity",
+        "zero_redundant_code",
+        "static_preferred",
+        "sealed_preferred",
+        "constructor_dependency_injection",
+        "business_comments_chinese",
+        "finance_terms_chinese"
+      ],
+      "count": 127
+    },
+    {
+      "source": "quality_gate_lesson",
+      "summary": "公开方法 ProcessAsync 缺少参数 matchedRules 的 <param> 文档。",
+      "guidance": [
+        "只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。"
+      ],
+      "issue_rule_id": "csharpsquid:S3776",
+      "failure_kind": "quality_gate",
+      "scope_mode": "method",
+      "guardrail_mode": "scope",
+      "boundary_failure_code": "",
+      "quality_gate_rule_ids": [
+        "public_xml_docs"
+      ],
+      "count": 1
+    },
+    {
+      "source": "quality_gate_lesson",
+      "summary": "异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。",
+      "guidance": [
+        "如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。"
+      ],
+      "issue_rule_id": "csharpsquid:S3776",
+      "failure_kind": "quality_gate",
+      "scope_mode": "method",
+      "guardrail_mode": "scope",
+      "boundary_failure_code": "",
+      "quality_gate_rule_ids": [
+        "async_requires_await"
+      ],
+      "count": 1
+    },
+    {
+      "source": "quality_gate_lesson",
+      "summary": "当前 patch 引入了 query syntax，请改成方法语法。",
+      "guidance": [
+        "把当前 patch 里新增的 query syntax 改成方法语法，只改本次修改触达的那一段。"
+      ],
+      "issue_rule_id": "csharpsquid:S3776",
+      "failure_kind": "quality_gate",
+      "scope_mode": "method",
+      "guardrail_mode": "scope",
+      "boundary_failure_code": "",
+      "quality_gate_rule_ids": [
+        "linq_method_syntax"
+      ],
+      "count": 1
+    }
+  ],
+  "prefetched_context": [
+    {
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "label": "issue_window",
+      "reason": "Primary issue window around the Sonar line.",
+      "start_line": 39,
+      "end_line": 43,
+      "content": "  39 |         /// 处理器方法\n  40 |         /// </summary>\n  41 |         public async Task<(List<PenaltyEventData> NewEvents, List<ResolvedEventData> ResolvedEvents, List<CanceledEventData> CanceledEvents)> ProcessAsync(IEnumerable<PenaltyRuleDefinition> matchedRules)\n  42 |         {\n  43 |             var newEvents = new List<PenaltyEventData>();"
+    }
+  ]
+}

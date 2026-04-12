@@ -290,6 +290,83 @@ def test_process_issue_with_retries_retries_when_agent_makes_no_changes(tmp_path
     assert "必须对 Sonar 指向的代码真正落盘修改" in agent.retry_feedbacks[2]
 
 
+def test_process_issue_with_retries_carries_last_quality_gate_context_across_no_change(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    issue = SonarIssue(
+        key="issue-no-change-after-gate",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=10,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+            self.retry_feedbacks: list[str] = []
+
+        def fix_issue(self, issue, workspace_path, build_command, retry_feedback=""):
+            self.calls += 1
+            self.retry_feedbacks.append(retry_feedback)
+            if self.calls == 1:
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=issue.file_path,
+                    error="Quality gate verification failed",
+                    build_output="Quality gate verification failed.",
+                    retryable_failure=True,
+                    failure_kind="quality_gate",
+                    quality_gate_result={
+                        "status": "retry",
+                        "summary": "Quality gate rejected the patch with 1 hard violation(s).",
+                        "violations": [
+                            {
+                                "rule_id": "async_requires_await",
+                                "title": "异步方法必须真正 await",
+                                "message": "异步方法 FooAsync 没有实际 await。",
+                                "file": "tracked.cs",
+                                "line": 10,
+                                "retry_hint": "如果当前方法没有实际 await，就移除 async。",
+                            }
+                        ],
+                    },
+                )
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                error="Agent completed without modifying any files",
+                retryable_failure=True,
+                failure_kind="no_change",
+            )
+
+    agent = FakeAgent()
+
+    result = process_issue_with_retries(
+        agent=agent,
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-no-change-after-gate",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
+        max_build_retries=3,
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.attempts == 3
+    assert "没有实际修改任何文件" in agent.retry_feedbacks[2]
+    assert "async_requires_await" in agent.retry_feedbacks[2]
+    assert "如果当前方法没有实际 await，就移除 async" in agent.retry_feedbacks[2]
+
+
 def test_build_retry_feedback_explains_invalid_edit_tool_input(tmp_path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()

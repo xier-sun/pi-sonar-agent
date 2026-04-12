@@ -25,6 +25,7 @@ class TargetConfig:
     test_command: str | None
     solution_path: str | None
     max_issues: int
+    issue_keys: tuple[str, ...] = ()
 
 
 def resolve_cli_target_config(
@@ -88,6 +89,7 @@ def resolve_cli_target_config(
             or _text_value(target_defaults.get("solution_path"))
         ),
         max_issues=max_issues,
+        issue_keys=_normalize_issue_keys(target_defaults.get("issue_keys")),
     )
 
 
@@ -119,6 +121,7 @@ def resolve_batch_target_config(
         test_command=_none_if_empty(_text_value(target.get("test_command"))),
         solution_path=_none_if_empty(_text_value(target.get("solution_path"))),
         max_issues=max_issues,
+        issue_keys=_normalize_issue_keys(target.get("issue_keys")),
     )
 
 
@@ -145,3 +148,20 @@ def _text_value(value: Any) -> str:
 
 def _none_if_empty(value: str) -> str | None:
     return value or None
+
+
+def _normalize_issue_keys(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        items = [item.strip() for item in value.split(",")]
+        return tuple(dict.fromkeys(item for item in items if item))
+    if isinstance(value, (list, tuple, set)):
+        return tuple(
+            dict.fromkeys(
+                str(item).strip()
+                for item in value
+                if str(item).strip()
+            )
+        )
+    return ()

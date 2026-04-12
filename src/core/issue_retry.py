@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import hashlib
 import re
 import shutil
@@ -569,6 +570,37 @@ def build_retry_feedback(
     return render_retry_context(build_retry_context(workspace_path, result, issue))
 
 
+def _carry_forward_blocker_context(
+    previous_retry_context: RetryContext | None,
+    next_retry_context: RetryContext,
+) -> RetryContext:
+    """Preserve the last concrete blocker when the new attempt never produced a patch."""
+
+    if previous_retry_context is None:
+        return next_retry_context
+    if next_retry_context.failure_kind not in {"no_change", "tool_input_invalid"}:
+        return next_retry_context
+
+    guidance = tuple(
+        dict.fromkeys(
+            item
+            for item in (
+                *next_retry_context.guidance,
+                *previous_retry_context.guidance,
+            )
+            if str(item).strip()
+        )
+    )
+
+    return replace(
+        next_retry_context,
+        guidance=guidance,
+        quality_gate_failure=next_retry_context.quality_gate_failure or previous_retry_context.quality_gate_failure,
+        review_gate_failure=next_retry_context.review_gate_failure or previous_retry_context.review_gate_failure,
+        plan_failure=next_retry_context.plan_failure or previous_retry_context.plan_failure,
+    )
+
+
 def _summarize_model_timeout(raw_output: str, timeout_stage: str = "") -> str:
     """Summarize the timeout mode for retry feedback."""
 
@@ -1121,6 +1153,7 @@ def process_issue_with_retries(
                 issue,
                 source_attempt_number=attempt,
             )
+            next_retry_context = _carry_forward_blocker_context(retry_context, next_retry_context)
             lessons_store.record_failure(
                 repository=repository,
                 run_label=run_label,

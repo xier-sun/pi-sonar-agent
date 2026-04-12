@@ -630,12 +630,18 @@ def test_issue_planner_downgrades_public_async_rename_after_async_gate_retry(tmp
     )
 
     assert plan.edit_contract.repair_plan is not None
-    assert plan.edit_contract.repair_plan.requires_signature_change is True
-    assert plan.edit_contract.repair_plan.requires_propagation is True
+    assert plan.edit_contract.repair_plan.requires_signature_change is False
+    assert plan.edit_contract.repair_plan.requires_propagation is False
+    assert plan.edit_contract.repair_plan.proposed_method_name == ""
     assert plan.edit_contract.repair_plan.selected_archetype == "signature_preserving_refactor"
     assert "avoid_async_rename_churn" in plan.edit_contract.repair_plan.strategy_preferences
+    assert "preserve_existing_signature_in_this_attempt" in plan.edit_contract.repair_plan.strategy_preferences
     assert any(
         "externally visible api stable" in hint.lower() or "keep the externally visible api stable" in hint.lower()
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+    assert any(
+        "do not rename the existing public async method" in hint.lower()
         for hint in plan.edit_contract.repair_plan.constraint_hints
     )
 

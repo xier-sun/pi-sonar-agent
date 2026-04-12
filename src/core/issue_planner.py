@@ -1108,6 +1108,29 @@ class IssuePlanner:
             if archetype_chain:
                 selected_archetype = archetype_chain[0]
                 fallback_archetype = archetype_chain[1] if len(archetype_chain) > 1 else ""
+        if selected_archetype == "signature_preserving_refactor" and requires_signature_change:
+            if proposed_method_name:
+                risk_notes.append(
+                    "当前 attempt 已降级为保签名重构；本轮不要推动公开签名改名或传播验证。"
+                )
+            if method_descriptor is not None:
+                method_descriptor["proposed_name"] = ""
+            requires_signature_change = False
+            requires_propagation = False
+            proposed_method_name = ""
+            propagation_targets = ()
+            verification_targets = []
+            strategy_preferences.extend(
+                (
+                    "preserve_existing_signature_in_this_attempt",
+                    "skip_signature_propagation_for_this_attempt",
+                )
+            )
+            stable_name = method_name or str(target_symbol.symbol or "").strip() or "the current method"
+            impact_summary = (
+                f"Keep `{stable_name}` stable in this attempt and reduce complexity inside the current body "
+                "with private/local synchronous refactors."
+            )
         if enable_constraint_injection:
             constraint_hints = cls._build_repair_constraint_hints(
                 rule_id=normalized_rule_id,
@@ -1300,6 +1323,8 @@ class IssuePlanner:
             hints.append("Any touched async method must use an Async suffix and a Task/Task<T> return type.")
         if "async_requires_await" in expected_quality_gates:
             hints.append("Do not keep async on helpers or methods that no longer contain a real await.")
+        if "linq_method_syntax" in expected_quality_gates:
+            hints.append("Preserve LINQ method syntax in changed code; do not introduce query syntax while reducing complexity.")
         if METHOD_CLUSTER_DELETE_CAPABILITY in allowed_capabilities:
             hints.append("When cleaning unused members, stop at the declared private helper cluster instead of deleting adjacent but unrelated members.")
         if requires_signature_change and not requires_propagation:
@@ -1308,6 +1333,8 @@ class IssuePlanner:
             hints.append("Propagation is only complete when declaration, interface, callsite, and nameof(...) targets stay in sync.")
         if rule_id == "csharpsquid:S3776":
             hints.append("For S3776, keep the externally visible API stable unless the plan explicitly provides verified propagation targets.")
+            if selected_archetype == "signature_preserving_refactor":
+                hints.append("For this attempt, do not rename the existing public async method; keep the current signature line untouched and reduce complexity inside the body/private helpers.")
         if "async_requires_await" in observed_quality_gate_ids:
             hints.append("Retry downgrade: new helpers and extracted phases must stay synchronous unless their bodies contain a real await.")
         if "async_signature" in observed_quality_gate_ids:

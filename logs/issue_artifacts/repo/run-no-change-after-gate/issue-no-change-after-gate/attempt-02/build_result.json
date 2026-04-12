@@ -1,0 +1,41 @@
+{
+  "success": false,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "retryable_failure": true,
+  "failure_kind": "no_change",
+  "error": "Agent completed without modifying any files",
+  "skip_reason": "",
+  "build_command": "dotnet build \"tracked.sln\"",
+  "build_output": "",
+  "guardrail_mode": "",
+  "quality_gate_result": {
+    "status": "not_available",
+    "reason": "Quality gate result was not attached to this attempt."
+  },
+  "review_gate_result": {
+    "status": "not_available",
+    "reason": "Review gate result was not attached to this attempt."
+  },
+  "boundary_failure_code": "",
+  "boundary_failure_summary": "",
+  "secondary_boundary_failure_codes": [],
+  "performance_metrics": {},
+  "model_timeout_stage": "",
+  "patch_salvaged": false,
+  "compliance_summary": {
+    "status": "not_applicable",
+    "summary": "No active quality gates were declared for this attempt.",
+    "source_path": "D:/MyProjects/pi-sonar-agent/data/csharp-quality-gate.md",
+    "hard_rule_count": 0,
+    "soft_rule_count": 0,
+    "passed_rule_count": 0,
+    "failed_rule_count": 0,
+    "soft_finding_count": 0,
+    "not_applicable_count": 0,
+    "checks": []
+  },
+  "follow_up_log_path": "",
+  "repair_plan": null,
+  "plan_precheck": null
+}

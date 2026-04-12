@@ -74,6 +74,7 @@ def test_resolve_batch_target_config_uses_target_defaults() -> None:
             "build_command": "dotnet build Foo.sln",
             "test_command": "dotnet test Foo.sln",
             "solution_path": "Foo.sln",
+            "issue_keys": ["issue-1", "issue-2", "issue-1"],
         },
         default_base_branch="develop",
         default_max_issues=3,
@@ -88,6 +89,35 @@ def test_resolve_batch_target_config_uses_target_defaults() -> None:
     assert config.test_command == "dotnet test Foo.sln"
     assert config.solution_path == "Foo.sln"
     assert config.max_issues == 3
+    assert config.issue_keys == ("issue-1", "issue-2")
+
+
+def test_resolve_cli_target_config_preserves_issue_keys_from_target_defaults() -> None:
+    args = Namespace(
+        project_key="",
+        repository="",
+        author="",
+        max_issues=None,
+        base_branch="",
+        build_command="",
+        test_command="",
+        solution_path="",
+    )
+
+    config = resolve_cli_target_config(
+        args,
+        {
+            "project_key": "project-a",
+            "repository": "repo-a",
+            "author": "alice@example.com",
+            "issue_keys": ["issue-a", "issue-b"],
+        },
+        environ={},
+        default_base_branch="develop",
+        default_max_issues=0,
+    )
+
+    assert config.issue_keys == ("issue-a", "issue-b")
 
 
 def test_missing_required_target_fields_reports_empty_values() -> None:

@@ -10,9 +10,9 @@
     {
       "attempt_number": 1,
       "status": "retrying",
-      "started_at": "2026-04-11T15:12:15.958319+00:00",
-      "finished_at": "2026-04-11T15:12:15.958683+00:00",
-      "duration_seconds": 0.0,
+      "started_at": "2026-04-12T03:20:52.589644+00:00",
+      "finished_at": "2026-04-12T03:20:52.591154+00:00",
+      "duration_seconds": 0.002,
       "failure_kind": "no_change",
       "retry_reason": "retryable_failure",
       "retryable_failure": true,
@@ -27,15 +27,15 @@
       "issue_log_path": "logs\\issue_attempts\\repo_issue-no-change_run-no-change.log",
       "artifact_dir": "logs/issue_artifacts/repo/run-no-change/issue-no-change/attempt-01",
       "performance_metrics": {
-        "attempt_total_duration_seconds": 0.0
+        "attempt_total_duration_seconds": 0.002
       },
       "rollout_flags": []
     },
     {
       "attempt_number": 2,
       "status": "retrying",
-      "started_at": "2026-04-11T15:12:16.037600+00:00",
-      "finished_at": "2026-04-11T15:12:16.038084+00:00",
+      "started_at": "2026-04-12T03:20:52.659154+00:00",
+      "finished_at": "2026-04-12T03:20:52.659338+00:00",
       "duration_seconds": 0.0,
       "failure_kind": "no_change",
       "retry_reason": "retryable_failure",
@@ -58,8 +58,8 @@
     {
       "attempt_number": 3,
       "status": "skipped",
-      "started_at": "2026-04-11T15:12:16.125381+00:00",
-      "finished_at": "2026-04-11T15:12:16.125697+00:00",
+      "started_at": "2026-04-12T03:20:52.732251+00:00",
+      "finished_at": "2026-04-12T03:20:52.732743+00:00",
       "duration_seconds": 0.0,
       "failure_kind": "no_change",
       "retry_reason": "retryable_failure",
@@ -89,8 +89,8 @@
   "artifact_root": "logs/issue_artifacts/repo/run-no-change/issue-no-change",
   "performance_summary": {
     "issue_attempt_count": 3,
-    "issue_total_duration_seconds": 0.0,
-    "avg_attempt_duration_seconds": 0.0,
+    "issue_total_duration_seconds": 0.002,
+    "avg_attempt_duration_seconds": 0.001,
     "model_timeout_attempts": 0,
     "scope_reject_attempts": 0,
     "boundary_hard_reject_attempts": 0,

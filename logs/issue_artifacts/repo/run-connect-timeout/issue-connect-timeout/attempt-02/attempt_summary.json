@@ -1,8 +1,8 @@
 {
   "attempt_number": 2,
   "status": "retrying",
-  "started_at": "2026-04-11T15:12:18.521576+00:00",
-  "finished_at": "2026-04-11T15:12:18.521985+00:00",
+  "started_at": "2026-04-12T03:20:55.781645+00:00",
+  "finished_at": "2026-04-12T03:20:55.781913+00:00",
   "duration_seconds": 0.0,
   "failure_kind": "model_timeout",
   "retry_reason": "retryable_failure",

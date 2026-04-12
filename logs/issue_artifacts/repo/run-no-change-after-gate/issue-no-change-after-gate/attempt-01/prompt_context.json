@@ -1,0 +1,19 @@
+{
+  "attempt_number": 1,
+  "build_command": "dotnet build \"tracked.sln\"",
+  "retry_feedback": "",
+  "retry_context": null,
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-272/test_process_issue_with_retrie3/repo",
+  "baseline_head_commit": "50f345be2e84a36f88803c8efe717ebda99b3b15",
+  "guardrail_mode": "",
+  "active_quality_gate_rules": [],
+  "execution_profile": "full_path",
+  "fast_path_enabled": false,
+  "plan_first_enabled": false,
+  "rollout_flags": [],
+  "repair_plan": null,
+  "plan_precheck": null,
+  "review_gate_result": null,
+  "planner_lessons": [],
+  "prefetched_context": []
+}

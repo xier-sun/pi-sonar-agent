@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(awk '/\\\\[20\\\\/40\\\\]/{found=1} found{print NR\": \"$0} /Agent completed without modifying/{if\\(found\\) exit}' \"D:/MyProjects/pi-sonar-agent/logs/runs/batch_20260411212107.log\")"
+    ]
+  }
+}

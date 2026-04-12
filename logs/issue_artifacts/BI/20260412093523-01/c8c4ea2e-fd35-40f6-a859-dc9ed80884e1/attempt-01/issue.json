@@ -1,0 +1,243 @@
+{
+  "issue_key": "c8c4ea2e-fd35-40f6-a859-dc9ed80884e1",
+  "rule_id": "csharpsquid:S3776",
+  "message": "Refactor this method to reduce its Cognitive Complexity from 32 to the 30 allowed.",
+  "line": 195,
+  "text_range": {
+    "startLine": 195,
+    "endLine": 195,
+    "startOffset": 70,
+    "endOffset": 91
+  },
+  "flows": [
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 204,
+            "endLine": 204,
+            "startOffset": 12,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 210,
+            "endLine": 210,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 214,
+            "endLine": 214,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 223,
+            "endLine": 223,
+            "startOffset": 12,
+            "endOffset": 14
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 226,
+            "endLine": 226,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 226,
+            "endLine": 226,
+            "startOffset": 46,
+            "endOffset": 48
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 226,
+            "endLine": 226,
+            "startOffset": 76,
+            "endOffset": 78
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 230,
+            "endLine": 230,
+            "startOffset": 16,
+            "endOffset": 20
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 236,
+            "endLine": 236,
+            "startOffset": 100,
+            "endOffset": 101
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 238,
+            "endLine": 238,
+            "startOffset": 12,
+            "endOffset": 16
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 242,
+            "endLine": 242,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 244,
+            "endLine": 244,
+            "startOffset": 79,
+            "endOffset": 80
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 247,
+            "endLine": 247,
+            "startOffset": 16,
+            "endOffset": 20
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 249,
+            "endLine": 249,
+            "startOffset": 78,
+            "endOffset": 79
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 250,
+            "endLine": 250,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+          "msg": "+5 (incl 4 for nesting)",
+          "textRange": {
+            "startLine": 251,
+            "endLine": 251,
+            "startOffset": 108,
+            "endOffset": 109
+          }
+        }
+      ]
+    }
+  ],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs",
+  "severity": "CRITICAL",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

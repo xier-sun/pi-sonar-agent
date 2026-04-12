@@ -1,0 +1,24 @@
+{
+  "attempt_number": 1,
+  "status": "retrying",
+  "started_at": "2026-04-12T03:20:53.147326+00:00",
+  "finished_at": "2026-04-12T03:20:53.147757+00:00",
+  "duration_seconds": 0.0,
+  "failure_kind": "quality_gate",
+  "retry_reason": "retryable_failure",
+  "retryable_failure": true,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "error": "Quality gate verification failed",
+  "skip_reason": "",
+  "summary": "",
+  "changed_files": [],
+  "boundary_failure_code": "",
+  "secondary_boundary_failure_codes": [],
+  "issue_log_path": "logs\\issue_attempts\\repo_issue-no-change-after-gate_run-no-change-after-gate.log",
+  "artifact_dir": "logs/issue_artifacts/repo/run-no-change-after-gate/issue-no-change-after-gate/attempt-01",
+  "performance_metrics": {
+    "attempt_total_duration_seconds": 0.0
+  },
+  "rollout_flags": []
+}

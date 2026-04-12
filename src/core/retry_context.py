@@ -410,16 +410,36 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                 lines.extend(f"- {item}" for item in plan_failure.guidance if str(item).strip())
             return "\n".join(lines)
         if retry_context.failure_kind == "no_change" or retry_context.error == "Agent completed without modifying any files":
-            return "\n".join(
+            sections = [
+                "上次尝试没有实际修改任何文件。",
+                "这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。",
+            ]
+            if has_quality_gate_failure:
+                sections.append("而且前一轮已经明确暴露了这些 C# 质量门禁问题，不能继续忽略：")
+                _append_quality_gate_details(sections, quality_gate_failure)
+            if has_review_gate_failure:
+                sections.append("而且审核 agent 已经给出过这些待处理结论：")
+                sections.append(review_gate_failure.summary)
+                for index, item in enumerate(review_gate_failure.decisions, start=1):
+                    detail = f"{index}. [{item.source}/{item.decision}] {item.title or item.finding_id}"
+                    if item.file:
+                        location = item.file
+                        if item.line > 0:
+                            location = f"{location}:{item.line}"
+                        detail += f" | location: {location}"
+                    sections.append(detail)
+                    if item.reason:
+                        sections.append(f"   审核理由: {item.reason}")
+            sections.extend(
                 [
-                    "上次尝试没有实际修改任何文件。",
-                    "这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。",
                     "重试约束:",
                     "- 不要只做分析或解释，必须提交实际代码修改。",
+                    "- 优先直接修掉上面已经明确指出的门禁/审核问题，不要重新大改整段逻辑。",
                     "- 修改后立即使用推荐构建命令验证。",
                     "- 如果这是行级问题，只修改 Sonar 指向的那条语句。",
                 ]
             )
+            return "\n".join(sections)
         return retry_context.error or ""
 
     sections: list[str] = []

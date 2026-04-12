@@ -57,7 +57,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_default_target() -> dict[str, str]:
+def load_default_target() -> dict[str, object]:
     """Load first target from data/targets.json for zero-arg runs."""
     from pathlib import Path
 
@@ -82,6 +82,7 @@ def load_default_target() -> dict[str, str]:
                     "test_command": str(item.get("test_command", "")).strip(),
                     "solution_path": str(item.get("solution_path", "")).strip(),
                     "max_issues": str(item.get("max_issues", "")).strip(),
+                    "issue_keys": item.get("issue_keys", ()),
                 }
     except Exception:
         return {}

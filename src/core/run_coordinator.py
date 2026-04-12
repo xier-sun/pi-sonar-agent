@@ -300,6 +300,30 @@ class RunCoordinator:
             )
             print(f"发现 {len(issues)} 个 issues")
 
+            if target_config.issue_keys:
+                issue_by_key = {
+                    str(item.get("key", "")).strip(): item
+                    for item in issues
+                    if str(item.get("key", "")).strip()
+                }
+                filtered_issues = [
+                    issue_by_key[key]
+                    for key in target_config.issue_keys
+                    if key in issue_by_key
+                ]
+                missing_issue_keys = [
+                    key
+                    for key in target_config.issue_keys
+                    if key not in issue_by_key
+                ]
+                issues = filtered_issues
+                print(f"按 issue_keys 过滤后保留 {len(issues)} 个")
+                if missing_issue_keys:
+                    preview = ", ".join(missing_issue_keys[:5])
+                    if len(missing_issue_keys) > 5:
+                        preview += f" ... (+{len(missing_issue_keys) - 5} more)"
+                    print(f"[WARN] issue_keys 中有 {len(missing_issue_keys)} 个未命中当前 Sonar issues: {preview}")
+
             if target_config.max_issues > 0:
                 issues = issues[:target_config.max_issues]
                 print(f"限制处理 {len(issues)} 个")

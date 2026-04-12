@@ -158,7 +158,22 @@ class ClaudeGatewaySession(ModelGatewaySession):
             response_stream = self._controller.bind_response_stream(self._client.receive_response())
             async for message in response_stream:
                 if isinstance(message, self._dependencies.assistant_message_cls):
-                    for block in message.content:
+                    content_blocks = getattr(message, "content", ()) or ()
+                    if isinstance(content_blocks, (str, bytes)):
+                        content_iterable = (content_blocks,)
+                    else:
+                        try:
+                            content_iterable = tuple(content_blocks)
+                        except TypeError:
+                            payload = _extract_trace_payload(message)
+                            payload["content_error"] = "assistant message content was not iterable"
+                            yield TraceEvent(
+                                message_type=type(message).__name__,
+                                payload=payload,
+                                preview=_build_preview_from_payload(payload),
+                            )
+                            continue
+                    for block in content_iterable:
                         if isinstance(block, self._dependencies.tool_use_block_cls):
                             payload = _extract_tool_payload(block)
                             raw_payload = _extract_raw_tool_payload(block)
@@ -273,7 +288,7 @@ class ClaudeGatewaySession(ModelGatewaySession):
         if result and str(result).strip():
             details.append(str(result).strip())
 
-        errors = getattr(message, "errors", ())
+        errors = getattr(message, "errors", ()) or ()
         details.extend(str(item).strip() for item in errors if str(item).strip())
 
         if not details:

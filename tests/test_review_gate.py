@@ -114,3 +114,37 @@ def test_review_gate_apply_waivers_turns_reviewable_blockers_into_pass() -> None
     assert effective_propagation.status == "pass"
     assert effective_quality_gate.status == "pass"
     assert effective_quality_gate.violations == ()
+
+
+def test_review_gate_result_builder_tolerates_null_decisions_and_feedback() -> None:
+    findings = (
+        ReviewGateFinding(
+            finding_id="propagation",
+            source="propagation",
+            title="Signature propagation verification",
+            message="Propagation still looks stale.",
+        ),
+    )
+
+    result = ReviewGateAgent._build_result_from_payload(
+        findings=findings,
+        model_display="kimi-k2.5",
+        raw_response='{"overall_decision":"retry","summary":"need retry","decisions":null,"feedback":null}',
+        payload={
+            "overall_decision": "retry",
+            "summary": "need retry",
+            "decisions": None,
+            "feedback": None,
+        },
+    )
+
+    assert result.status == "retry"
+    assert result.invoked is True
+    assert result.feedback == ()
+    assert result.decisions == (
+        ReviewGateDecision(
+            finding_id="propagation",
+            decision="confirm",
+            reason="Review agent did not explicitly waive this finding.",
+        ),
+    )

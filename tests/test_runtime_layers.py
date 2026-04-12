@@ -455,6 +455,73 @@ def test_claude_adapter_session_normalizes_wrapped_tool_name() -> None:
     assert events[0].payload["command"] == "pwd"
 
 
+def test_claude_adapter_session_tolerates_none_assistant_content_and_none_error_list() -> None:
+    class FakeAssistantMessage:
+        def __init__(self) -> None:
+            self.content = None
+
+    class FakeResultMessage:
+        def __init__(self) -> None:
+            self.total_cost_usd = 0.1
+            self.is_error = True
+            self.result = "agent failed"
+            self.errors = None
+
+    async def fake_receive_response():
+        yield FakeAssistantMessage()
+        yield FakeResultMessage()
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def query(self, prompt: str) -> None:
+            return None
+
+        def receive_response(self):
+            return fake_receive_response()
+
+    adapter = ClaudeAdapter(
+        ClaudeSDKDependencies(
+            client_cls=lambda options: FakeClient(),
+            options_cls=lambda **kwargs: kwargs,
+            assistant_message_cls=FakeAssistantMessage,
+            result_message_cls=FakeResultMessage,
+            text_block_cls=object,
+            tool_use_block_cls=object,
+        )
+    )
+
+    session = adapter.create_session(
+        GatewayRequest(
+            system_prompt="system",
+            user_prompt="user",
+            cwd="workspace",
+            tools=("Read",),
+            allowed_tools=("Read",),
+            max_turns=2,
+            max_budget_usd=1.0,
+            env={},
+        )
+    )
+
+    async def collect_events():
+        await session.connect(1)
+        await session.send("user")
+        events = [event async for event in session.stream_events()]
+        await session.close()
+        return events
+
+    events = asyncio.run(collect_events())
+
+    assert len(events) == 1
+    assert isinstance(events[0], ResultEvent)
+    assert events[0].agent_error == "agent failed"
+
+
 def test_claude_gateway_timeout_probe_keeps_env_driven_model_for_third_party_provider(
     monkeypatch,
 ) -> None:

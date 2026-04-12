@@ -1,9 +1,9 @@
 {
   "attempt_number": 4,
   "status": "retrying",
-  "started_at": "2026-04-11T15:12:17.915493+00:00",
-  "finished_at": "2026-04-11T15:12:17.916000+00:00",
-  "duration_seconds": 0.001,
+  "started_at": "2026-04-12T03:20:55.186389+00:00",
+  "finished_at": "2026-04-12T03:20:55.186840+00:00",
+  "duration_seconds": 0.0,
   "failure_kind": "build",
   "retry_reason": "build_verification_failed",
   "retryable_failure": true,
@@ -20,7 +20,7 @@
   "issue_log_path": "logs\\issue_attempts\\repo_issue-early-stop_run-early-stop.log",
   "artifact_dir": "logs/issue_artifacts/repo/run-early-stop/issue-early-stop/attempt-04",
   "performance_metrics": {
-    "attempt_total_duration_seconds": 0.001
+    "attempt_total_duration_seconds": 0.0
   },
   "rollout_flags": []
 }

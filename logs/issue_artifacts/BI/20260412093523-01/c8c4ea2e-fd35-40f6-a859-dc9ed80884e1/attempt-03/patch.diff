@@ -1,0 +1,154 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotApp.cs
+@@ -192,7 +192,9 @@
+         /// <summary>
+
+         /// 快照报表权限校验（复用salereceivable模块权限）
+
+         /// </summary>
+
+-        public async Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermission(OverdueAgingSnapshotReq req)
+
++        /// <param name="req">逾期账龄快照查询参数</param>
+
++        /// <returns>权限校验结果：IsNoRight为true表示无权限</returns>
+
++        public async Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermissionAsync(OverdueAgingSnapshotReq req)
+
+         {
+
+             var loginContext = _auth.GetCurrentUser() ?? throw new CommonException(Define.LoginHasExpired, Define.INVALID_TOKEN);
+
+             var loginUser = loginContext.User;
+
+@@ -218,6 +220,18 @@
+             }
+
+ 
+
+             // 处理公司主体标识权限
+
++            var indicatorResult = await ApplyIndicatorFilterAsync(req, moduleElements);
+
++            if (indicatorResult.HasError) return indicatorResult.Result;
+
++
+
++            return (false, 200, string.Empty);
+
++        }
+
++
+
++        /// <summary>
+
++        /// 处理公司主体标识权限过滤
+
++        /// </summary>
+
++        private async Task<(bool HasError, (bool, int, string) Result)> ApplyIndicatorFilterAsync(
+
++            OverdueAgingSnapshotReq req, List<ModuleElement> moduleElements)
+
++        {
+
+             var customQryCategory = await UnitWork.Find<Category>(x => x.TypeId == FinanceConsts.FICO_Custom_Query_Filter).ToListAsync();
+
+             var haveCustomQueryRight = customQryCategory.Select(x => x.DtCode).Intersect(moduleElements.Select(x => x.DomId)).Distinct().ToList();
+
+             if (haveCustomQueryRight.Count > 0)
+
+@@ -231,7 +245,7 @@
+                 {
+
+                     var invalidItems = req.IndicatorList.Where(x => !indicators.Contains(x)).ToList();
+
+                     var idcinfo = await UnitWork.Find<crm_oidc>(x => x.sbo_id == Define.SBO_ID).Where(x => invalidItems.Contains(x.Code)).Select(x => x.Name).ToListAsync();
+
+-                    return (true, 500, $"无查看{string.Join("，", idcinfo)}标识的权限");
+
++                    return (true, (true, 500, $"无查看{string.Join("，", idcinfo)}标识的权限"));
+
+                 }
+
+                 req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? "N" : i);
+
+             }
+
+@@ -251,7 +265,7 @@
+                         req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? "N" : i);
+
+                 }
+
+             }
+
+-            return (false, 200, string.Empty);
+
++            return (false, default);
+
+         }
+
+ 
+
+         /// <summary>
+
+--- a/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IDailyOverdueSnapshotApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IDailyOverdueSnapshotApp.cs
+@@ -26,8 +26,8 @@
+         /// <summary>
+
+         /// 获取逾期快照权限（根据用户ID和查询参数判断是否有权限访问逾期快照数据）
+
+         /// </summary>
+
+-        /// <param name="req"></param>
+
+-        /// <returns></returns>
+
+-        Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermission(OverdueAgingSnapshotReq req);
+
++        /// <param name="req">逾期账龄快照查询参数</param>
+
++        /// <returns>权限校验结果：IsNoRight为true表示无权限</returns>
+
++        Task<(bool IsNoRight, int Code, string Message)> GetSnapshotPermissionAsync(OverdueAgingSnapshotReq req);
+
+     }
+
+ }
+
+--- a/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/FinanceHomeController.cs
++++ b/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/FinanceHomeController.cs
+@@ -261,7 +261,7 @@
+             var result = new TableData<OverdueAgingChartWrapper>();
+
+             try
+
+             {
+
+-                var (isNoRight, code, message) = await _dailyOverdueSnapshotApp.GetSnapshotPermission(req);
+
++                var (isNoRight, code, message) = await _dailyOverdueSnapshotApp.GetSnapshotPermissionAsync(req);
+
+                 if (!isNoRight)
+
+                 {
+
+                     result.Data = await _dailyOverdueSnapshotApp.GetOverdueAgingSnapshotChart(req);
+
+@@ -289,7 +289,7 @@
+             var result = new TableData<OverdueAgingDetailWrapper>();
+
+             try
+
+             {
+
+-                var (isNoRight, code, message) = await _dailyOverdueSnapshotApp.GetSnapshotPermission(req);
+
++                var (isNoRight, code, message) = await _dailyOverdueSnapshotApp.GetSnapshotPermissionAsync(req);
+
+                 if (isNoRight)
+
+                     return new TableData<OverdueAgingDetailWrapper> { Code = code, Message = message, Data = new OverdueAgingDetailWrapper { ColumnHeaders = new List<ColumnHeader>(), Data = new List<OverdueAgingDetailResp>() } };
+
+                 result.Data = await _dailyOverdueSnapshotApp.GetOverdueAgingSnapshotDetail(req);

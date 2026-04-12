@@ -7,7 +7,7 @@
   "error": "Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.",
   "skip_reason": "Retry stopped early after 5 attempt(s): repeated `compiler:CS0103` with unchanged strategy and diff.",
   "build_command": "dotnet build \"tracked.sln\"",
-  "build_output": "C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-270\\test_process_issue_with_retrie5\\repo\\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]",
+  "build_output": "C:\\Users\\neware\\AppData\\Local\\Temp\\pytest-of-neware\\pytest-272\\test_process_issue_with_retrie6\\repo\\tracked.cs(1,1): error CS0103: name not found [tracked.csproj]",
   "guardrail_mode": "",
   "quality_gate_result": {
     "status": "not_available",

@@ -1,7 +1,7 @@
 {
   "attempt_number": 3,
   "build_command": "dotnet build \"tracked.sln\"",
-  "retry_feedback": "上次尝试没有实际修改任何文件。\n这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。\n重试约束:\n- 不要只做分析或解释，必须提交实际代码修改。\n- 修改后立即使用推荐构建命令验证。\n- 如果这是行级问题，只修改 Sonar 指向的那条语句。",
+  "retry_feedback": "上次尝试没有实际修改任何文件。\n这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。\n重试约束:\n- 不要只做分析或解释，必须提交实际代码修改。\n- 优先直接修掉上面已经明确指出的门禁/审核问题，不要重新大改整段逻辑。\n- 修改后立即使用推荐构建命令验证。\n- 如果这是行级问题，只修改 Sonar 指向的那条语句。",
   "retry_context": {
     "source_attempt_number": 2,
     "failure_kind": "no_change",
@@ -30,8 +30,8 @@
     "model_timeout_failed": false,
     "patch_salvaged": false
   },
-  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-270/test_process_issue_with_retrie2/repo",
-  "baseline_head_commit": "a323bf9929ac99ef9b3a7def1eb029552526e637",
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-272/test_process_issue_with_retrie2/repo",
+  "baseline_head_commit": "50f345be2e84a36f88803c8efe717ebda99b3b15",
   "guardrail_mode": "",
   "active_quality_gate_rules": [],
   "execution_profile": "full_path",

@@ -30,8 +30,8 @@
     "model_timeout_failed": true,
     "patch_salvaged": false
   },
-  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-270/test_process_issue_with_retrie6/repo",
-  "baseline_head_commit": "e080da673c181b45fc793dfe3aaf6447fddd7b52",
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-272/test_process_issue_with_retrie7/repo",
+  "baseline_head_commit": "2e148aa695008a0cdd7407319567078f6fed05a0",
   "guardrail_mode": "",
   "active_quality_gate_rules": [],
   "execution_profile": "full_path",
