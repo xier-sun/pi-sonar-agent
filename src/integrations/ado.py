@@ -5,6 +5,7 @@ Compatible with Windows and Unix systems.
 """
 
 import base64
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,9 @@ class AzureDevOpsRequestError(RuntimeError):
 class AzureDevOpsClient:
     """Client for Azure DevOps REST API."""
 
+    DEFAULT_NETWORK_RETRY_ATTEMPTS = 3
+    DEFAULT_RETRY_BACKOFF_SECONDS = 1.0
+
     def __init__(
         self,
         base_url: str,
@@ -59,14 +63,63 @@ class AzureDevOpsClient:
         self.project = project
         self.organization = organization
         self.timeout = timeout
+        self._auth_header = f"Basic {base64.b64encode(f':{pat}'.encode()).decode()}"
+        self.session = self._build_session()
 
-        # For REST API calls
-        self.session = requests.Session()
-        auth = base64.b64encode(f":{pat}".encode()).decode()
-        self.session.headers.update({
-            "Authorization": f"Basic {auth}",
-            "Accept": "application/json",
-        })
+    def _build_session(self) -> requests.Session:
+        """Create a fresh requests session for ADO API calls."""
+
+        session = requests.Session()
+        session.headers.update(
+            {
+                "Authorization": self._auth_header,
+                "Accept": "application/json",
+                "Connection": "close",
+                "User-Agent": "pi-sonar-agent/1.0",
+            }
+        )
+        return session
+
+    def _reset_session(self) -> None:
+        """Drop the current HTTP session and rebuild it from scratch."""
+
+        try:
+            self.session.close()
+        except Exception:
+            pass
+        self.session = self._build_session()
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        **kwargs,
+    ) -> requests.Response:
+        """Issue a request with lightweight retry for transient transport failures."""
+
+        retryable_exceptions = (
+            requests.ConnectionError,
+            requests.Timeout,
+            requests.exceptions.ChunkedEncodingError,
+        )
+        attempts = max(1, self.DEFAULT_NETWORK_RETRY_ATTEMPTS)
+        last_error: Exception | None = None
+
+        for attempt in range(1, attempts + 1):
+            try:
+                return self.session.request(method, url, timeout=self.timeout, **kwargs)
+            except retryable_exceptions as exc:
+                last_error = exc
+                if attempt >= attempts:
+                    break
+                self._reset_session()
+                time.sleep(self.DEFAULT_RETRY_BACKOFF_SECONDS * attempt)
+
+        message = (
+            f"ADO 请求失败: {method.upper()} {url} 在 {attempts} 次尝试后仍未成功，"
+            f"最后错误: {last_error}"
+        )
+        raise AzureDevOpsRequestError(message) from last_error
 
     @property
     def _api_url(self) -> str:
@@ -78,7 +131,7 @@ class AzureDevOpsClient:
     def get_repository(self, repository: str) -> dict[str, Any]:
         """Get repository details."""
         url = f"{self._api_url}/_apis/git/repositories/{repository}"
-        response = self.session.get(url, timeout=self.timeout)
+        response = self._request("get", url)
         self._raise_for_status_with_details(response, action=f"获取仓库信息失败: {repository}")
         return response.json()
 
@@ -110,9 +163,7 @@ class AzureDevOpsClient:
             url += "?api-version=7.0"
             body["repositoryId"] = repository
 
-        response = self.session.post(
-            url, json=body, timeout=self.timeout
-        )
+        response = self._request("post", url, json=body)
         self._raise_for_status_with_details(
             response,
             action=(
@@ -155,10 +206,10 @@ class AzureDevOpsClient:
             f"{self._api_url}/_apis/git/repositories/{repository}/pullrequests/{pull_request_id}"
             "?api-version=7.1"
         )
-        response = self.session.patch(
+        response = self._request(
+            "patch",
             url,
             json={"description": description},
-            timeout=self.timeout,
         )
         self._raise_for_status_with_details(response, action=f"更新 PR 描述失败: PR {pull_request_id}")
         data = response.json()
@@ -194,7 +245,8 @@ class AzureDevOpsClient:
             f"{self._api_url}/_apis/git/repositories/{repository}/pullRequests/"
             f"{pull_request_id}/attachments"
         )
-        response = self.session.post(
+        response = self._request(
+            "post",
             url,
             params={
                 "fileName": normalized_name,
@@ -202,7 +254,6 @@ class AzureDevOpsClient:
             },
             data=payload,
             headers={"Content-Type": content_type},
-            timeout=self.timeout,
         )
         self._raise_for_status_with_details(
             response,
@@ -242,7 +293,7 @@ class AzureDevOpsClient:
                 "queryMembership": "None",
                 "api-version": "7.1",
             }
-            response = self.session.get(url, params=params, timeout=self.timeout)
+            response = self._request("get", url, params=params)
             self._raise_for_status_with_details(response, action=f"解析 ADO 身份失败: {candidate}")
             identities = response.json().get("value", [])
             if not identities:
@@ -298,7 +349,7 @@ class AzureDevOpsClient:
             "id": reviewer_id,
             "isRequired": is_required,
         }
-        response = self.session.put(url, params=params, json=body, timeout=self.timeout)
+        response = self._request("put", url, params=params, json=body)
         self._raise_for_status_with_details(response, action=f"添加 PR 审阅人失败: PR {pull_request_id}")
         return response.json()
 
@@ -355,7 +406,7 @@ class AzureDevOpsClient:
             "$top": 50,
         }
 
-        response = self.session.get(url, params=params, timeout=self.timeout)
+        response = self._request("get", url, params=params)
         response.raise_for_status()
         return response.json().get("value", [])
 

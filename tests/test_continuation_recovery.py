@@ -41,3 +41,20 @@ def test_continuation_recovery_builds_compact_resume_prompt() -> None:
     assert "绝对路径" in prompt
     assert "先确认问题所在" in prompt
     assert "class Foo" in prompt
+
+
+def test_continuation_recovery_builds_no_change_prompt() -> None:
+    context = ContinuationRecovery.build_context(
+        events=(),
+        timeout_stage="no_change",
+        continuation_index=1,
+        last_progress_stage="assistant_text",
+        last_tool_name="Read",
+        changed_files=(),
+    )
+
+    prompt = ContinuationRecovery.build_no_change_prompt("base prompt", context)
+
+    assert "你还没有真正修改代码" in prompt
+    assert "不要再重复读取相同文件" in prompt
+    assert "使用 Edit 或 MultiEdit 落盘修改" in prompt

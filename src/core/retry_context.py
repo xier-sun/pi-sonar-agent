@@ -158,6 +158,7 @@ class RetryContext:
     """Structured retry memory for the next issue attempt."""
 
     source_attempt_number: int = 0
+    issue_rule_id: str = ""
     failure_kind: str = ""
     failure_detail_key: str = ""
     strategy_fingerprint: str = ""
@@ -204,11 +205,19 @@ def _dedupe_ordered(items: list[str]) -> list[str]:
 
 def _build_quality_gate_guidance(
     quality_gate_failure: QualityGateFailureContext | None,
+    *,
+    issue_rule_id: str = "",
 ) -> tuple[str, ...]:
     if quality_gate_failure is None:
         return ()
 
     guidance: list[str] = []
+    normalized_issue_rule = str(issue_rule_id or "").strip()
+    violation_rule_ids = {
+        str(item.rule_id or "").strip()
+        for item in quality_gate_failure.violations
+        if str(item.rule_id or "").strip()
+    }
     for item in quality_gate_failure.violations:
         if item.retry_hint:
             guidance.append(item.retry_hint)
@@ -228,13 +237,20 @@ def _build_quality_gate_guidance(
             guidance.append("如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。")
             guidance.append("新提取的 helper 默认保持同步；只有 helper 体内真实含有 await 时才允许 async。")
 
-    guidance.append("只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。")
+    if normalized_issue_rule == "csharpsquid:S3776" and "cognitive_complexity" not in violation_rule_ids:
+        guidance.append("当前 issue 的原始目标仍然是降低 Sonar 指向方法的认知复杂度；补这些门禁时不要把补丁收缩成只修 XML、async 或 LINQ 语法的卫生修复。")
+        guidance.append("保留并继续完成已经开始的复杂度重构，优先收口到目标方法的热点分支、嵌套和循环，而不是回退成纯文档或纯语法调整。")
+        guidance.append("先修当前门禁，但不要丢掉原始的 S3776 目标；避免完全重写整段逻辑，也不要把复杂度改造整体撤回。")
+    else:
+        guidance.append("只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。")
     return tuple(_dedupe_ordered(guidance))
 
 
 def _append_quality_gate_details(
     sections: list[str],
     quality_gate_failure: QualityGateFailureContext | None,
+    *,
+    issue_rule_id: str = "",
 ) -> None:
     if quality_gate_failure is None:
         return
@@ -253,7 +269,10 @@ def _append_quality_gate_details(
         if item.retry_hint:
             sections.append(f"   原始提示: {item.retry_hint}")
 
-    guidance = _build_quality_gate_guidance(quality_gate_failure)
+    guidance = _build_quality_gate_guidance(
+        quality_gate_failure,
+        issue_rule_id=issue_rule_id,
+    )
     if guidance:
         sections.append("本次重改要求:")
         sections.extend(f"- {item}" for item in guidance)
@@ -376,7 +395,11 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                 )
             if has_quality_gate_failure:
                 sections = ["上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁："]
-                _append_quality_gate_details(sections, quality_gate_failure)
+                _append_quality_gate_details(
+                    sections,
+                    quality_gate_failure,
+                    issue_rule_id=retry_context.issue_rule_id,
+                )
                 return "\n".join(sections)
             if has_review_gate_failure:
                 sections = ["上次尝试经过审核 agent 复核后，仍被判定需要继续修改："]
@@ -416,7 +439,11 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
             ]
             if has_quality_gate_failure:
                 sections.append("而且前一轮已经明确暴露了这些 C# 质量门禁问题，不能继续忽略：")
-                _append_quality_gate_details(sections, quality_gate_failure)
+                _append_quality_gate_details(
+                    sections,
+                    quality_gate_failure,
+                    issue_rule_id=retry_context.issue_rule_id,
+                )
             if has_review_gate_failure:
                 sections.append("而且审核 agent 已经给出过这些待处理结论：")
                 sections.append(review_gate_failure.summary)
@@ -502,7 +529,11 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
         )
     if has_quality_gate_failure:
         sections.append("另外，上次 patch 还没有通过 C# 质量门禁：")
-        _append_quality_gate_details(sections, quality_gate_failure)
+        _append_quality_gate_details(
+            sections,
+            quality_gate_failure,
+            issue_rule_id=retry_context.issue_rule_id,
+        )
     if has_review_gate_failure:
         sections.append("另外，上次 patch 经过审核 agent 复核后仍未通过：")
         sections.append(review_gate_failure.summary)

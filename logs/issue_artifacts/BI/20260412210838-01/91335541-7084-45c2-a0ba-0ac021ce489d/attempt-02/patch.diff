@@ -1,0 +1,32 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs
+@@ -134,6 +134,15 @@
+         /// <summary>
+
+         /// 内存计算指定日期的逾期金额和天数（不查库，带收款记录、退货记录和清账记录参数）
+
+         /// </summary>
+
++        /// <param name="saleOrder">销售订单信息</param>
+
++        /// <param name="payTerm">付款条件</param>
+
++        /// <param name="deliveryList">交货记录列表</param>
+
++        /// <param name="receiptList">收款记录列表</param>
+
++        /// <param name="returnList">退货记录列表</param>
+
++        /// <param name="refundList">退货退款记录列表</param>
+
++        /// <param name="clearReconList">清账记录列表</param>
+
++        /// <param name="calculationDate">计算截止日期</param>
+
++        /// <returns>逾期金额和天数</returns>
+
+         public OverDueAmountAndDays CalculateHistoricalOverdueInMemory(
+
+             SaleOrderForOverDue saleOrder,
+
+             PayTermSave payTerm,

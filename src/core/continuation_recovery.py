@@ -42,6 +42,46 @@ class ContinuationRecovery:
     """Build compact continuation prompts from runtime events."""
 
     @staticmethod
+    def _build_prompt_sections(
+        context: ContinuationContext,
+        *,
+        title: str,
+        first_fact: str,
+        action_guidance: tuple[str, ...],
+    ) -> list[str]:
+        sections = [
+            title,
+            f"- 这是同一 issue 的 continuation 第 {context.continuation_index} 次。",
+            first_fact,
+        ]
+        if context.last_progress_stage:
+            sections.append(f"- 上一轮最后进度阶段: {context.last_progress_stage}。")
+        if context.last_tool_name:
+            sections.append(f"- 上一轮最后工具: {context.last_tool_name}。")
+        if context.changed_files:
+            sections.append(
+                "- 当前工作区已检测到变更文件: "
+                + ", ".join(context.changed_files)
+                + "。"
+            )
+        sections.extend(action_guidance)
+        sections.append("- 只使用仓库相对路径，不要使用 C:\\ 或其他绝对路径。")
+        if context.saw_absolute_workspace_path:
+            sections.append(
+                "- 上一轮出现了绝对路径读文件失败；这次只允许使用仓库相对路径继续。"
+            )
+        if context.recent_tool_summaries:
+            sections.append("最近工具轨迹:")
+            sections.extend(f"- {item}" for item in context.recent_tool_summaries)
+        if context.recent_assistant_summaries:
+            sections.append("最近模型输出摘要:")
+            sections.extend(f"- {item}" for item in context.recent_assistant_summaries)
+        if context.recent_read_previews:
+            sections.append("最近已读取的关键代码片段:")
+            sections.extend(context.recent_read_previews)
+        return sections
+
+    @staticmethod
     def build_context(
         *,
         events: tuple[AttemptRuntimeEvent, ...] | list[AttemptRuntimeEvent],
@@ -119,42 +159,32 @@ class ContinuationRecovery:
     def build_prompt(base_user_prompt: str, context: ContinuationContext) -> str:
         """Append a compact continuation section to the original user prompt."""
 
-        sections = [
-            "【继续上一轮修复，不要从头分析】",
-            f"- 这是同一 issue 的 continuation 第 {context.continuation_index} 次。",
-            f"- 上一轮超时阶段: {context.timeout_stage or 'follow_up_response_timeout'}。",
-        ]
-        if context.last_progress_stage:
-            sections.append(f"- 上一轮最后进度阶段: {context.last_progress_stage}。")
-        if context.last_tool_name:
-            sections.append(f"- 上一轮最后工具: {context.last_tool_name}。")
-        if context.changed_files:
-            sections.append(
-                "- 当前工作区已检测到变更文件: "
-                + ", ".join(context.changed_files)
-                + "。"
-            )
-        sections.extend(
-            [
+        sections = ContinuationRecovery._build_prompt_sections(
+            context,
+            title="【继续上一轮修复，不要从头分析】",
+            first_fact=f"- 上一轮超时阶段: {context.timeout_stage or 'follow_up_response_timeout'}。",
+            action_guidance=(
                 "- 不要重头分析，不要重复长篇解释，直接基于当前工作区状态继续。",
                 "- 如果修复其实已经完成，请直接结束，不要再补冗长总结。",
-                "- 只使用仓库相对路径，不要使用 C:\\ 或其他绝对路径。",
-            ]
+            ),
         )
-        if context.saw_absolute_workspace_path:
-            sections.append(
-                "- 上一轮出现了绝对路径读文件失败；这次只允许使用仓库相对路径继续。"
-            )
-        if context.recent_tool_summaries:
-            sections.append("最近工具轨迹:")
-            sections.extend(f"- {item}" for item in context.recent_tool_summaries)
-        if context.recent_assistant_summaries:
-            sections.append("最近模型输出摘要:")
-            sections.extend(f"- {item}" for item in context.recent_assistant_summaries)
-        if context.recent_read_previews:
-            sections.append("最近已读取的关键代码片段:")
-            sections.extend(context.recent_read_previews)
 
+        return f"{base_user_prompt.rstrip()}\n\n" + "\n".join(sections).strip() + "\n"
+
+    @staticmethod
+    def build_no_change_prompt(base_user_prompt: str, context: ContinuationContext) -> str:
+        """Append a compact continuation section for no-change retries."""
+
+        sections = ContinuationRecovery._build_prompt_sections(
+            context,
+            title="【继续上一轮修复：你还没有真正修改代码】",
+            first_fact="- 上一轮没有产生任何代码修改，当前必须进入编辑阶段。",
+            action_guidance=(
+                "- 不要再重复读取相同文件或继续做大范围搜索。",
+                "- 请直接基于你刚才已经拿到的上下文，使用 Edit 或 MultiEdit 落盘修改。",
+                "- 如果你确认当前约束下无法安全修复，请直接明确说明原因，不要再停留在分析状态。",
+            ),
+        )
         return f"{base_user_prompt.rstrip()}\n\n" + "\n".join(sections).strip() + "\n"
 
     @staticmethod

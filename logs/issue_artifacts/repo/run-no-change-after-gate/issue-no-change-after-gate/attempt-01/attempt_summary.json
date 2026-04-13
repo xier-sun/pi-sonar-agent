@@ -1,9 +1,9 @@
 {
   "attempt_number": 1,
   "status": "retrying",
-  "started_at": "2026-04-12T04:52:24.841924+00:00",
-  "finished_at": "2026-04-12T04:52:24.842406+00:00",
-  "duration_seconds": 0.0,
+  "started_at": "2026-04-12T15:44:24.667273+00:00",
+  "finished_at": "2026-04-12T15:44:24.668596+00:00",
+  "duration_seconds": 0.001,
   "failure_kind": "quality_gate",
   "retry_reason": "retryable_failure",
   "retryable_failure": true,
@@ -18,7 +18,7 @@
   "issue_log_path": "logs\\issue_attempts\\repo_issue-no-change-after-gate_run-no-change-after-gate.log",
   "artifact_dir": "logs/issue_artifacts/repo/run-no-change-after-gate/issue-no-change-after-gate/attempt-01",
   "performance_metrics": {
-    "attempt_total_duration_seconds": 0.0
+    "attempt_total_duration_seconds": 0.001
   },
   "rollout_flags": []
 }

@@ -374,6 +374,86 @@ def test_build_user_prompt_includes_rule_specific_guards() -> None:
     assert "不要为了满足规则把简单循环改成更难读" in prompt
 
 
+def test_build_user_prompt_splits_s3776_retry_guards_between_first_attempt_and_retry() -> None:
+    issue = SonarIssue(
+        key="issue-s3776-guards",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    first_prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  18 | if (condition) { ... }",
+        "",
+        "- 只允许修改当前方法。",
+        {
+            "name": "Cognitive Complexity of methods should not be too high",
+            "description": "嵌套条件和循环会提高认知复杂度。",
+            "how_to_fix": "提取私有方法，减少嵌套层级。",
+        },
+        'dotnet build "src/Foo.sln"',
+    )
+    retry_prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  18 | if (condition) { ... }",
+        "",
+        "- 只允许修改当前方法。",
+        {
+            "name": "Cognitive Complexity of methods should not be too high",
+            "description": "嵌套条件和循环会提高认知复杂度。",
+            "how_to_fix": "提取私有方法，减少嵌套层级。",
+        },
+        'dotnet build "src/Foo.sln"',
+        retry_context=RetryContext(source_attempt_number=1, failure_kind="quality_gate"),
+    )
+
+    assert "不要改动公开签名或新增公开成员" in first_prompt
+    assert "只有 helper 体内真实包含 await 时才允许 async" not in first_prompt
+    assert "只有 helper 体内真实包含 await 时才允许 async" in retry_prompt
+    assert "一次性同步接口声明、调用点和 nameof(...)" in retry_prompt
+
+
+def test_build_user_prompt_externalizes_reference_when_prompt_is_large(tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-large-prompt",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    large_gate = "\n".join(f"- rule {index}: keep patch small" for index in range(600))
+
+    prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  18 | if (condition) { ... }",
+        large_gate,
+        "- 只允许修改当前方法。",
+        {
+            "name": "Cognitive Complexity of methods should not be too high",
+            "description": "嵌套条件和循环会提高认知复杂度。",
+            "how_to_fix": "提取私有方法，减少嵌套层级。",
+        },
+        'dotnet build "src/Foo.sln"',
+        edit_contract_section="【Edit Contract】\n" + ("- 最小修改\n" * 200),
+        repair_plan_section="【Repair Plan】\n" + ("- 先在原方法内收口\n" * 200),
+        workspace_path=workspace,
+    )
+
+    reference_file = workspace / ".pi-sonar-agent-runtime" / "sonar_fix_reference.md"
+
+    assert reference_file.exists()
+    assert "详细约束已写入 `.pi-sonar-agent-runtime/sonar_fix_reference.md`" in prompt
+    assert "Sonar Fix Reference" in reference_file.read_text(encoding="utf-8")
+
+
 def test_rule_validator_rejects_unresolved_nested_ternary() -> None:
     message = validate_rule_fix(
         validator_name="nested_ternary_removed",
@@ -443,6 +523,64 @@ def test_fix_issue_fails_when_agent_makes_no_changes(monkeypatch, tmp_path) -> N
     assert result.error == "Agent completed without modifying any files"
     assert result.retryable_failure is True
     assert result.failure_kind == "no_change"
+
+
+def test_fix_issue_uses_same_attempt_no_change_continuation_before_failing(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-no-change-cont",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=3,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: []),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    requests: list[object] = []
+
+    def fake_runtime_run(self, request):
+        requests.append(request)
+        return AgentRuntimeResult(
+            tool_uses=("Read",),
+            last_tool_name="Read",
+            runtime_events=(
+                AttemptRuntimeEvent(
+                    kind=AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    sequence=1,
+                    stage="completed",
+                    payload={"success": False},
+                ),
+            ),
+            saw_result_event=True,
+        )
+
+    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fake_runtime_run)
+
+    result = agent.fix_issue(issue, tmp_path)
+
+    assert result.success is False
+    assert result.failure_kind == "no_change"
+    assert len(requests) == 2
+    assert "你还没有真正修改代码" in requests[1].user_prompt
+    assert result.performance_metrics["continuation_retry_count"] == 1
 
 
 def test_fix_issue_classifies_empty_edit_payload_as_tool_input_invalid(monkeypatch, tmp_path) -> None:
@@ -593,6 +731,14 @@ def test_previously_skipped_rules_now_expose_prompt_guards_without_skip_reason()
         policy = get_rule_policy(rule_id)
         assert policy.skip_reason == ""
         assert policy.prompt_guards
+
+
+def test_s3776_policy_requires_preserving_nullable_types_when_extracting_helpers() -> None:
+    policy = get_rule_policy("csharpsquid:S3776")
+
+    assert any("nullable" in guard for guard in policy.prompt_guards)
+    assert any("decimal?" in guard for guard in policy.prompt_guards)
+    assert any("DateTime?" in guard for guard in policy.prompt_guards)
 
 
 def test_collect_skipped_rule_ids_returns_empty_set_for_current_defaults() -> None:

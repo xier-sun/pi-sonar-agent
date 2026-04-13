@@ -273,6 +273,9 @@ class IssuePlanner:
         *,
         normalized_path: str,
         issue_line: int,
+        scope_mode: str,
+        scope_start_line: int,
+        scope_end_line: int,
         source_lines: list[str],
         source_file_map: dict[str, list[str]] | None,
         validation_line_range: tuple[int, int],
@@ -285,6 +288,29 @@ class IssuePlanner:
 
         snippets: list[ContractContextSnippet] = []
         snippet_budget = 6 if fast_path_enabled else 4
+
+        if (
+            scope_mode == METHOD_SCOPE_MODE
+            and scope_start_line > 0
+            and scope_end_line >= scope_start_line
+            and (scope_end_line - scope_start_line + 1) <= 300
+        ):
+            full_method_content = cls._format_numbered_snippet(
+                source_lines,
+                scope_start_line,
+                scope_end_line,
+            )
+            if full_method_content:
+                snippets.append(
+                    ContractContextSnippet(
+                        file=normalized_path,
+                        label="target_method_full",
+                        reason="Full target method body for method-scope fixes; prefer this over repeated Read calls.",
+                        start_line=scope_start_line,
+                        end_line=scope_end_line,
+                        content=full_method_content,
+                    )
+                )
 
         issue_window_start = max(1, issue_line - 2)
         issue_window_end = min(len(source_lines), issue_line + 2)
@@ -1081,11 +1107,22 @@ class IssuePlanner:
 
         if normalized_rule_id in {"csharpsquid:S1144", "csharpsquid:S1481", "csharpsquid:S125"}:
             risk_notes.append("当前规则应保持删除/清理型最小补丁，不应引入签名调整、helper 提取或新的公开成员。")
+            if proposed_method_name:
+                risk_notes.append("删除/清理型规则不应通过 async 重命名解决；如成员未删除成功，也应保持现有签名稳定。")
+            if method_descriptor is not None:
+                method_descriptor["proposed_name"] = ""
+            requires_signature_change = False
+            requires_propagation = False
+            proposed_method_name = ""
+            propagation_targets = ()
+            verification_targets = []
+            impact_summary = "Remove or tighten the unused declaration/member cluster with a minimal local cleanup patch."
             strategy_preferences.extend(
                 (
                     "prefer_minimal_deletion_patch",
                     "avoid_async_or_signature_churn",
                     "avoid_unrelated_public_member_edits",
+                    "skip_signature_propagation_for_this_attempt",
                 )
             )
             if retry_failure_kind == "no_change":
@@ -1924,6 +1961,9 @@ class IssuePlanner:
         prefetched_context = cls._build_prefetched_context(
             normalized_path=normalized_path,
             issue_line=issue_line,
+            scope_mode=normalized_scope_mode,
+            scope_start_line=scope_start_line,
+            scope_end_line=scope_end_line,
             source_lines=normalized_source_lines,
             source_file_map=source_file_map,
             validation_line_range=validation_line_range,

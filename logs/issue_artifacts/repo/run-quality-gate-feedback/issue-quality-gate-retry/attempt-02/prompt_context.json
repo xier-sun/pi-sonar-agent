@@ -4,6 +4,7 @@
   "retry_feedback": "上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：\nQuality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:\n1. [async_requires_await] 异步方法必须真正 await: 异步方法 ResolveOrderDocEntryFromReturnChainAsync 没有实际 await。 | location: OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs:199\n   证据: private async Task<Dictionary<int, int>> ResolveOrderDocEntryFromReturnChainAsync(...)\n   原始提示: 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n本次重改要求:\n- 如果方法标了 async，就必须真正 await；否则请移除 async 并直接返回 Task 或改成同步方法。\n- 如果当前方法没有实际 await，就移除 async 并改成同步方法，或直接返回 Task；不要保留空 async。\n- 新提取的 helper 默认保持同步；只有 helper 体内真实含有 await 时才允许 async。\n- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。",
   "retry_context": {
     "source_attempt_number": 1,
+    "issue_rule_id": "csharpsquid:S6562",
     "failure_kind": "quality_gate",
     "failure_detail_key": "quality_gate:async_requires_await",
     "strategy_fingerprint": "fast_path=0|plan_first=0",
@@ -46,8 +47,8 @@
     "model_timeout_failed": false,
     "patch_salvaged": false
   },
-  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-285/test_process_issue_with_retrie5/repo",
-  "baseline_head_commit": "931fb62c9e8bdcc1a60d305c309caf4cc40e189e",
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-289/test_process_issue_with_retrie5/repo",
+  "baseline_head_commit": "ef471b210fdbe4ff972410f44b0b3345efa7b251",
   "guardrail_mode": "",
   "active_quality_gate_rules": [],
   "execution_profile": "full_path",

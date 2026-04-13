@@ -4,6 +4,7 @@
   "retry_feedback": "上次尝试在初始化模型客户端时超时，请先确认当前模型网关或 provider 可正常返回工具调用响应：\nClaude SDK Client 在 60 秒内未完成初始化\n重试约束:\n- 不要更换构建命令，先确认模型能稳定返回工具调用响应。\n- 如果连续超时，优先检查 .env 中的模型 endpoint、token 和 provider 兼容性。",
   "retry_context": {
     "source_attempt_number": 1,
+    "issue_rule_id": "csharpsquid:S3776",
     "failure_kind": "model_timeout",
     "failure_detail_key": "timeout:client_connect_timeout",
     "strategy_fingerprint": "fast_path=0|plan_first=0",
@@ -30,8 +31,8 @@
     "model_timeout_failed": true,
     "patch_salvaged": false
   },
-  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-285/test_process_issue_with_retrie7/repo",
-  "baseline_head_commit": "e5f7398e3b02de73fe7c003305d7307b61df3445",
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-289/test_process_issue_with_retrie7/repo",
+  "baseline_head_commit": "2f0a7ffae5a4f8b413895803f7f169366c591687",
   "guardrail_mode": "",
   "active_quality_gate_rules": [],
   "execution_profile": "full_path",

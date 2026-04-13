@@ -1,0 +1,104 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs
+@@ -1028,51 +1028,6 @@
+             return new TableData<List<ReceiptReLoadResp>> { Data = pagedData, Count = count, Code = 200 };
+
+         }
+
+         /// <summary>
+
+-        /// 递归/双向收集所有相关的订单ID（向上追溯主单，向下扩展子单）
+
+-        /// </summary>
+
+-        /// <param name="saleDocEntries"></param>
+
+-        /// <param name="saleOrderInfos"></param>
+
+-        /// <param name="orderRelations"></param>
+
+-        /// <returns></returns>
+
+-        private async Task<HashSet<int>> CollectAllRelatedOrderIds(List<int> saleDocEntries, dynamic saleOrderInfos, Dictionary<int, string> orderRelations)
+
+-        {
+
+-            var allRelatedOrderIds = new HashSet<int>(saleDocEntries);
+
+-
+
+-            // 向上追溯主单
+
+-            foreach (var order in saleOrderInfos)
+
+-            {
+
+-                if (!string.IsNullOrEmpty(order.RelevanceOrderNos))
+
+-                {
+
+-                    var mainIds = ParseOrderIds(order.RelevanceOrderNos);
+
+-                    foreach (var mainId in mainIds)
+
+-                    {
+
+-                        allRelatedOrderIds.Add(mainId);
+
+-                    }
+
+-                }
+
+-            }
+
+-
+
+-            // 向下扩展子单
+
+-            var mainOrderIds = allRelatedOrderIds.ToList();
+
+-            var allSubOrderInfos = await UnitWork.Find<SaleOrderInfo>(
+
+-                x => !string.IsNullOrEmpty(x.RelevanceOrderNos) && !x.IsDeleted)
+
+-                .Select(x => new { x.OrderId, x.RelevanceOrderNos })
+
+-                .ToListAsync();
+
+-
+
+-            foreach (var subOrder in allSubOrderInfos)
+
+-            {
+
+-                var mainIds = ParseOrderIds(subOrder.RelevanceOrderNos);
+
+-                if (mainIds.Any(mainId => mainOrderIds.Contains(mainId)))
+
+-                {
+
+-                    allRelatedOrderIds.Add(subOrder.OrderId);
+
+-                    if (!orderRelations.ContainsKey(subOrder.OrderId))
+
+-                    {
+
+-                        orderRelations[subOrder.OrderId] = subOrder.RelevanceOrderNos;
+
+-                    }
+
+-                }
+
+-            }
+
+-            return allRelatedOrderIds;
+
+-        }
+
+-        /// <summary>
+
+         /// 找出并补充那些有子单收款但主单没收款记录的主单数据
+
+         /// </summary>
+
+         /// <param name="allReceipts"></param>

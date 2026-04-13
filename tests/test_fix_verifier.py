@@ -6,7 +6,7 @@ from pi_sonar_agent.agent.claude_agent import SonarIssue
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange, ReviewedLineOperation
 from pi_sonar_agent.core.fix_verifier import FixVerifier
 from pi_sonar_agent.core.issue_contract import EditContract
-from pi_sonar_agent.core.propagation_verifier import PropagationCheckResult
+from pi_sonar_agent.core.propagation_verifier import PropagationCheckResult, PropagationVerifier
 from pi_sonar_agent.core.quality_gate import QualityGateResult, QualityGateRule, QualityGateViolation
 from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
 from pi_sonar_agent.core.repair_plan import RepairPlan, RepairPropagationTarget
@@ -935,6 +935,61 @@ def test_quality_gate_verifier_ignores_delete_only_lines_outside_current_file() 
     assert "No post-edit changed lines" in result.summary
 
 
+def test_propagation_verifier_ignores_stale_signature_plan_for_declaration_hygiene(tmp_path) -> None:
+    issue_file = tmp_path / "src" / "Foo.cs"
+    issue_file.parent.mkdir(parents=True, exist_ok=True)
+    issue_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    private async Task CollectAllRelatedOrderIds()",
+                "    {",
+                "        await LoadAsync();",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    contract = EditContract(
+        issue_key="issue-delete-propagation",
+        rule_id="csharpsquid:S1144",
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build",),
+        repair_plan=RepairPlan(
+            repair_shape="member_cluster_delete",
+            primary_file="src/Foo.cs",
+            primary_method_name="CollectAllRelatedOrderIds",
+            proposed_method_name="CollectAllRelatedOrderIdsAsync",
+            selected_archetype="declaration_hygiene",
+            requires_signature_change=True,
+            requires_propagation=False,
+            verification_targets=(
+                RepairPropagationTarget(
+                    file="src/Foo.cs",
+                    symbol="definition@3-6",
+                    kind="definition",
+                    start_line=3,
+                    end_line=6,
+                ),
+            ),
+        ),
+    )
+
+    result = PropagationVerifier.review(
+        workspace_path=tmp_path,
+        edit_contract=contract,
+        issue_file_path="src/Foo.cs",
+        current_issue_file_content=issue_file.read_text(encoding="utf-8"),
+    )
+
+    assert result.status == "pass"
+    assert "Declaration-hygiene cleanup" in result.summary
+
+
 def test_quality_gate_verifier_accepts_tuple_and_nested_generic_task_return_types() -> None:
     contract = EditContract(
         issue_key="issue-async-signature-generic",
@@ -1008,6 +1063,182 @@ def test_quality_gate_verifier_accepts_tuple_and_nested_generic_task_return_type
 
     assert result.status == "pass"
     assert result.violations == ()
+
+
+def test_quality_gate_verifier_ignores_public_properties_inside_private_nested_type() -> None:
+    contract = EditContract(
+        issue_key="issue-private-nested-xml",
+        rule_id="csharpsquid:S107",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        quality_gate_rules=(
+            QualityGateRule(
+                rule_id="public_xml_docs",
+                title="公开成员 XML 文档完整",
+                summary="公开成员要有 XML。",
+                enforcement="hard",
+            ),
+        ),
+    )
+    change = ReviewedFileChange(
+        file="src/Foo.cs",
+        changed_lines=(6, 7),
+        before_changed_lines=(6, 7),
+        after_changed_lines=(6, 7),
+        diff_text=(
+            "@@ -6,0 +6,2 @@\n"
+            "+        public string Name { get; set; }\n"
+            "+        public int Count { get; set; }\n"
+        ),
+        hunk_count=1,
+    )
+    current_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    private sealed class BatchData",
+            "    {",
+            "        /// <summary>内部名称</summary>",
+            "        public string Name { get; set; }",
+            "        public int Count { get; set; }",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+
+    result = QualityGateVerifier.review(
+        issue_file_path="src/Foo.cs",
+        edit_contract=contract,
+        reviewed_changes=(change,),
+        original_issue_file_content=None,
+        current_issue_file_content=current_issue_file_content,
+    )
+
+    assert result.status == "pass"
+    assert result.violations == ()
+
+
+def test_quality_gate_verifier_rejects_s3776_when_patch_only_touches_helper_and_leaves_target_method_unchanged() -> None:
+    contract = EditContract(
+        issue_key="issue-s3776-target-method",
+        rule_id="csharpsquid:S3776",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        quality_gate_rules=(
+            QualityGateRule(
+                rule_id="cognitive_complexity",
+                title="单方法认知复杂度不超过 30",
+                summary="触达的方法应通过提取子方法、提前返回等方式控制认知复杂度。",
+                enforcement="hard",
+            ),
+        ),
+    )
+    change = ReviewedFileChange(
+        file="src/Foo.cs",
+        changed_lines=(33, 34, 35, 36),
+        before_changed_lines=(),
+        after_changed_lines=(33, 34, 35, 36),
+        diff_text=(
+            "@@ -33,0 +33,4 @@\n"
+            "+    private int Helper()\n"
+            "+    {\n"
+            "+        return 1;\n"
+            "+    }\n"
+        ),
+        hunk_count=1,
+    )
+    original_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    public int Process(bool a, bool b, bool c, bool d, bool e, bool f, bool g, bool h)",
+            "    {",
+            "        if (a)",
+            "        {",
+            "            if (b)",
+            "            {",
+            "                if (c)",
+            "                {",
+            "                    if (d)",
+            "                    {",
+            "                        if (e)",
+            "                        {",
+            "                            if (f)",
+            "                            {",
+            "                                if (g)",
+            "                                {",
+            "                                    if (h)",
+            "                                    {",
+            "                                        return 1;",
+            "                                    }",
+            "                                }",
+            "                            }",
+            "                        }",
+            "                    }",
+            "                }",
+            "            }",
+            "        }",
+            "        return 0;",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+    current_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    public int Process(bool a, bool b, bool c, bool d, bool e, bool f, bool g, bool h)",
+            "    {",
+            "        if (a)",
+            "        {",
+            "            if (b)",
+            "            {",
+            "                if (c)",
+            "                {",
+            "                    if (d)",
+            "                    {",
+            "                        if (e)",
+            "                        {",
+            "                            if (f)",
+            "                            {",
+            "                                if (g)",
+            "                                {",
+            "                                    if (h)",
+            "                                    {",
+            "                                        return 1;",
+            "                                    }",
+            "                                }",
+            "                            }",
+            "                        }",
+            "                    }",
+            "                }",
+            "            }",
+            "        }",
+            "        return 0;",
+            "    }",
+            "",
+            "    private int Helper()",
+            "    {",
+            "        return 1;",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+
+    result = QualityGateVerifier.review(
+        issue_file_path="src/Foo.cs",
+        edit_contract=contract,
+        reviewed_changes=(change,),
+        original_issue_file_content=original_issue_file_content,
+        current_issue_file_content=current_issue_file_content,
+        issue_line=4,
+    )
+
+    assert result.status == "retry"
+    assert any(item.rule_id == "cognitive_complexity" for item in result.violations)
+    assert any("没有下降" in item.message or "没有稳定触达" in item.message for item in result.violations)
 
 
 def test_fix_verifier_runs_build_when_review_gate_waives_propagation(monkeypatch, tmp_path) -> None:
@@ -1206,4 +1437,94 @@ def test_fix_verifier_stops_before_build_when_review_gate_retries(monkeypatch, t
     assert outcome.review_gate_result.status == "retry"
     assert "Review gate rejected the patch" in outcome.combined_output
     assert outcome.build_passed is False
+    assert build_calls == []
+
+
+def test_fix_verifier_falls_back_to_quality_gate_when_review_gate_is_unavailable(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-review-gate-unavailable",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=22,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(22,),
+            before_changed_lines=(22,),
+            after_changed_lines=(22,),
+            diff_text="@@ -22,1 +22,1 @@\n-if (a && b && c)\n+if (a && (b || c))\n",
+            hunk_count=1,
+        ),
+    )
+
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.ReviewGateAgent.review",
+        lambda **kwargs: ReviewGateResult(
+            status="not_applicable",
+            summary="Review gate session returned an agent error; fell back to deterministic verifier blockers.",
+            invoked=True,
+            model_display="kimi-k2.5",
+            findings=(
+                ReviewGateFinding(
+                    finding_id="quality_gate:cognitive_complexity:src/Foo.cs:22:1",
+                    source="quality_gate",
+                    title="认知复杂度",
+                    message="复杂度仍然偏高。",
+                ),
+            ),
+            error="selected model is unavailable",
+        ),
+    )
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.QualityGateVerifier.review",
+        lambda **kwargs: QualityGateResult(
+            status="retry",
+            summary="Quality gate still sees cognitive complexity issues.",
+            applied_rule_ids=("cognitive_complexity",),
+            violations=(
+                QualityGateViolation(
+                    rule_id="cognitive_complexity",
+                    title="认知复杂度",
+                    message="复杂度仍然偏高。",
+                    file="src/Foo.cs",
+                    line=22,
+                ),
+            ),
+        ),
+    )
+
+    build_calls: list[str] = []
+
+    def fake_run(*args, **kwargs):
+        build_calls.append("build")
+        raise AssertionError("build should not run when deterministic quality gate already requests retry")
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="contract_review",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content="class Foo {}\n",
+    )
+
+    assert outcome.review_gate_result.status == "not_applicable"
+    assert outcome.quality_gate_result.status == "retry"
+    assert "Review gate rejected the patch" not in outcome.combined_output
+    assert "Quality gate verification failed" in outcome.combined_output
     assert build_calls == []

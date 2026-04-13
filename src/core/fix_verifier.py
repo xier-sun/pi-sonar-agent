@@ -368,6 +368,7 @@ class FixVerifier:
             reviewed_changes=reviewed_changes,
             original_issue_file_content=original_issue_file_content,
             current_issue_file_content=current_issue_file_content,
+            issue_line=issue.line,
         )
         rule_validation_message = ""
         if current_issue_file_content is not None:

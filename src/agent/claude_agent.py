@@ -865,7 +865,76 @@ class ClaudeFixAgent:
             "continuation_timeout_stages": list(
                 getattr(runtime_result, "continuation_timeout_stages", ()) or ()
             ),
+            "warning_tool_uses": list(getattr(runtime_result, "warning_tool_uses", ()) or ()),
+            "edit_nudge_count": int(getattr(runtime_result, "edit_nudge_count", 0) or 0),
         }
+
+    @staticmethod
+    def _merge_runtime_results(
+        first_result: AgentRuntimeResult,
+        second_result: AgentRuntimeResult,
+        *,
+        merged_events: list[AttemptRuntimeEvent],
+        continuation_retry_count: int,
+        continuation_recovered: bool,
+        continuation_timeout_stages: tuple[str, ...] = (),
+    ) -> AgentRuntimeResult:
+        """Merge two runtime results produced inside the same logical attempt."""
+
+        first_tool_uses = tuple(getattr(first_result, "tool_uses", ()) or ())
+        second_tool_uses = tuple(getattr(second_result, "tool_uses", ()) or ())
+        first_forbidden = tuple(getattr(first_result, "forbidden_tool_uses", ()) or ())
+        second_forbidden = tuple(getattr(second_result, "forbidden_tool_uses", ()) or ())
+        first_warnings = tuple(getattr(first_result, "warning_tool_uses", ()) or ())
+        second_warnings = tuple(getattr(second_result, "warning_tool_uses", ()) or ())
+        first_first_response = float(getattr(first_result, "time_to_first_model_content_seconds", 0.0) or 0.0)
+        second_first_response = float(getattr(second_result, "time_to_first_model_content_seconds", 0.0) or 0.0)
+        return AgentRuntimeResult(
+            agent_error=str(getattr(second_result, "agent_error", "") or "").strip()
+            or str(getattr(first_result, "agent_error", "") or "").strip()
+            or None,
+            tool_uses=first_tool_uses + second_tool_uses,
+            forbidden_tool_uses=first_forbidden + second_forbidden,
+            warning_tool_uses=first_warnings + second_warnings,
+            last_tool_name=str(getattr(second_result, "last_tool_name", "") or "").strip()
+            or str(getattr(first_result, "last_tool_name", "") or "").strip()
+            or None,
+            saw_build_tool=bool(getattr(first_result, "saw_build_tool", False))
+            or bool(getattr(second_result, "saw_build_tool", False)),
+            total_duration_seconds=round(
+                float(getattr(first_result, "total_duration_seconds", 0.0) or 0.0)
+                + float(getattr(second_result, "total_duration_seconds", 0.0) or 0.0),
+                3,
+            ),
+            time_to_first_model_content_seconds=round(first_first_response or second_first_response, 3),
+            time_after_first_edit_to_finalize_seconds=round(
+                float(getattr(first_result, "time_after_first_edit_to_finalize_seconds", 0.0) or 0.0)
+                + float(getattr(second_result, "time_after_first_edit_to_finalize_seconds", 0.0) or 0.0),
+                3,
+            ),
+            tool_call_count=int(getattr(first_result, "tool_call_count", 0) or 0)
+            + int(getattr(second_result, "tool_call_count", 0) or 0),
+            read_call_count=int(getattr(first_result, "read_call_count", 0) or 0)
+            + int(getattr(second_result, "read_call_count", 0) or 0),
+            edit_call_count=int(getattr(first_result, "edit_call_count", 0) or 0)
+            + int(getattr(second_result, "edit_call_count", 0) or 0),
+            assistant_text_events=int(getattr(first_result, "assistant_text_events", 0) or 0)
+            + int(getattr(second_result, "assistant_text_events", 0) or 0),
+            assistant_text_chars=int(getattr(first_result, "assistant_text_chars", 0) or 0)
+            + int(getattr(second_result, "assistant_text_chars", 0) or 0),
+            timeout_stage=str(getattr(second_result, "timeout_stage", "") or "").strip()
+            or str(getattr(first_result, "timeout_stage", "") or "").strip(),
+            last_progress_stage=str(getattr(second_result, "last_progress_stage", "") or "").strip()
+            or str(getattr(first_result, "last_progress_stage", "") or "").strip(),
+            saw_result_event=bool(getattr(first_result, "saw_result_event", False))
+            or bool(getattr(second_result, "saw_result_event", False)),
+            continuation_retry_count=continuation_retry_count,
+            continuation_recovered=continuation_recovered,
+            continuation_timeout_stages=continuation_timeout_stages,
+            edit_nudge_count=int(getattr(first_result, "edit_nudge_count", 0) or 0)
+            + int(getattr(second_result, "edit_nudge_count", 0) or 0),
+            runtime_events=tuple(merged_events),
+        )
 
     @staticmethod
     def _merge_attempt_events(
@@ -1020,6 +1089,68 @@ class ClaudeFixAgent:
                     continuation_timeout_stages=tuple(continuation_timeout_stages),
                 )
                 raise AgentRuntimeError(exc.cause, final_partial) from exc
+
+    @classmethod
+    def _run_no_change_continuation(
+        cls,
+        *,
+        runtime: AgentRuntime,
+        gateway_request,
+        initial_result: AgentRuntimeResult,
+        workspace_path: Path,
+    ) -> AgentRuntimeResult:
+        """Give no-change attempts one same-context push before falling back to a full retry."""
+
+        merged_events = cls._merge_attempt_events(
+            [],
+            tuple(getattr(initial_result, "runtime_events", ()) or ()),
+        )
+        changed_files = tuple(dict.fromkeys(cls._collect_modified_files(workspace_path)))
+        context = ContinuationRecovery.build_context(
+            events=tuple(merged_events),
+            timeout_stage="no_change",
+            continuation_index=1,
+            last_progress_stage=str(getattr(initial_result, "last_progress_stage", "") or "").strip(),
+            last_tool_name=str(getattr(initial_result, "last_tool_name", "") or "").strip(),
+            changed_files=changed_files,
+        )
+        cls._append_attempt_event(
+            merged_events,
+            AttemptRuntimeEventKind.CONTINUATION_REQUESTED,
+            stage="no_change",
+            payload={**context.to_dict(), "reason": "no_change"},
+            runtime_result=initial_result,
+        )
+        print("  [TRACE] no_change continuation: reuse current context and force an edit decision", flush=True)
+        continuation_request = replace(
+            gateway_request,
+            user_prompt=ContinuationRecovery.build_no_change_prompt(
+                gateway_request.user_prompt,
+                context,
+            ),
+            max_turns=max(2, min(gateway_request.max_turns, 4)),
+            metadata={
+                **dict(gateway_request.metadata),
+                "continuation_index": "1",
+                "continuation_stage": "no_change",
+            },
+        )
+        continuation_result = runtime.run(continuation_request)
+        merged_events = cls._merge_attempt_events(
+            merged_events,
+            tuple(getattr(continuation_result, "runtime_events", ()) or ()),
+        )
+        return cls._merge_runtime_results(
+            initial_result,
+            continuation_result,
+            merged_events=merged_events,
+            continuation_retry_count=1,
+            continuation_recovered=bool(getattr(continuation_result, "tool_uses", ()) or ())
+            and (
+                int(getattr(continuation_result, "edit_call_count", 0) or 0) > 0
+                or bool(getattr(continuation_result, "saw_result_event", False))
+            ),
+        )
 
     @staticmethod
     def _merge_performance_metrics(
@@ -1754,6 +1885,41 @@ class ClaudeFixAgent:
                 patch_salvaged=patch_salvaged,
                 model_timeout_stage=model_timeout_stage,
             )
+            if (
+                not changes
+                and not patch_salvaged
+                and not model_timeout_stage
+                and not runtime_result.agent_error
+                and int(getattr(runtime_result, "continuation_retry_count", 0) or 0) == 0
+                and bool(getattr(execution_schedule, "continuation_retry_enabled", False))
+            ):
+                invalid_write_tool_input = self._extract_invalid_write_tool_input_message(attempt_events)
+                if not invalid_write_tool_input:
+                    runtime_result = self._run_no_change_continuation(
+                        runtime=runtime,
+                        gateway_request=gateway_request,
+                        initial_result=runtime_result,
+                        workspace_path=workspace_path,
+                    )
+                    attempt_events = list(getattr(runtime_result, "runtime_events", ()) or ())
+                    runtime_performance_metrics = self._merge_performance_metrics(
+                        self._build_runtime_performance_metrics(runtime_result),
+                        execution_profile=str(getattr(edit_contract, "execution_profile", "full_path")),
+                        fast_path_enabled=bool(getattr(edit_contract, "fast_path_enabled", False)),
+                        effective_max_turns=effective_max_turns,
+                        patch_salvaged=patch_salvaged,
+                        model_timeout_stage=model_timeout_stage,
+                    )
+                    changed_files = tuple(dict.fromkeys(self._collect_modified_files(workspace_path)))
+                    changes = [{"file": modified_file, "action": "modified"} for modified_file in changed_files]
+                    if changes:
+                        self._append_attempt_event(
+                            attempt_events,
+                            AttemptRuntimeEventKind.PATCH_DETECTED,
+                            stage="post_no_change_continuation_diff",
+                            payload={"changed_files": list(changed_files)},
+                            runtime_result=runtime_result,
+                        )
             used_forbidden_tool = bool(runtime_result.forbidden_tool_uses) or self._attempt_head_changed(workspace_path)
 
             if used_forbidden_tool:

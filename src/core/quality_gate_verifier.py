@@ -99,6 +99,7 @@ class QualityGateVerifier:
         reviewed_changes: tuple[ReviewedFileChange, ...],
         original_issue_file_content: str | None,
         current_issue_file_content: str | None,
+        issue_line: int = 0,
     ) -> QualityGateResult:
         """Validate the current patch against the structured C# quality gate."""
 
@@ -188,6 +189,9 @@ class QualityGateVerifier:
                         issue_file,
                         lines,
                         touched_methods,
+                        original_issue_file_content=original_issue_file_content,
+                        issue_rule_id=str(getattr(edit_contract, "rule_id", "")).strip(),
+                        issue_line=issue_line,
                         retry_hint=rule.retry_hint,
                     )
                 )
@@ -315,6 +319,24 @@ class QualityGateVerifier:
         for candidate_line in range(min(target_line, total_lines), start_limit - 1, -1):
             method = cls._build_method_window(lines, candidate_line)
             if method is not None and method.start_line <= target_line <= method.end_line:
+                return method
+        return None
+
+    @classmethod
+    def _find_method_by_name(
+        cls,
+        lines: list[str],
+        method_name: str,
+    ) -> _MethodWindow | None:
+        normalized_name = str(method_name or "").strip()
+        if not normalized_name:
+            return None
+
+        for candidate_line, raw_line in enumerate(lines, start=1):
+            if normalized_name not in raw_line:
+                continue
+            method = cls._build_method_window(lines, candidate_line)
+            if method is not None and method.name == normalized_name:
                 return method
         return None
 
@@ -600,8 +622,23 @@ class QualityGateVerifier:
             )
         return None
 
-    @staticmethod
+    @classmethod
+    def _find_enclosing_type_declaration(
+        cls,
+        lines: list[str],
+        line_number: int,
+    ) -> _TypeDeclaration | None:
+        for candidate_line in range(min(line_number, len(lines)), 0, -1):
+            declaration = cls._find_nearby_type_declaration(lines, candidate_line)
+            if declaration is None:
+                continue
+            if declaration.start_line <= line_number <= declaration.end_line:
+                return declaration
+        return None
+
+    @classmethod
     def _find_public_property_declaration(
+        cls,
         lines: list[str],
         line_number: int,
     ) -> dict[str, object] | None:
@@ -613,6 +650,9 @@ class QualityGateVerifier:
         if "(" in stripped:
             return None
         if "{ get;" not in stripped and "{get;" not in stripped and "=>" not in stripped:
+            return None
+        containing_type = cls._find_enclosing_type_declaration(lines, line_number)
+        if containing_type is not None and containing_type.access != "public":
             return None
         match = re.search(r"\bpublic\b.+?\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:\{|=>)", stripped)
         if match is None:
@@ -878,14 +918,19 @@ class QualityGateVerifier:
         lines: list[str],
         touched_methods: tuple[_MethodWindow, ...],
         *,
+        original_issue_file_content: str | None,
+        issue_rule_id: str,
+        issue_line: int,
         retry_hint: str,
     ) -> list[QualityGateViolation]:
         violations: list[QualityGateViolation] = []
+        seen_symbols: set[str] = set()
         for method in touched_methods:
             body_text = "\n".join(lines[method.start_line - 1:method.end_line])
             complexity = cls._estimate_cognitive_complexity(body_text)
             if complexity <= 30:
                 continue
+            seen_symbols.add(method.symbol)
             violations.append(
                 QualityGateViolation(
                     rule_id="cognitive_complexity",
@@ -898,6 +943,68 @@ class QualityGateVerifier:
                     retry_hint=retry_hint,
                 )
             )
+
+        normalized_issue_rule = str(issue_rule_id or "").strip()
+        if normalized_issue_rule != "csharpsquid:S3776":
+            return violations
+        if not original_issue_file_content or issue_line <= 0:
+            return violations
+
+        original_lines = original_issue_file_content.splitlines()
+        original_method = cls._find_enclosing_method(original_lines, issue_line)
+        if original_method is None:
+            return violations
+
+        current_target_method = next(
+            (item for item in touched_methods if item.name == original_method.name),
+            None,
+        )
+        if current_target_method is None:
+            current_target_method = cls._find_method_by_name(lines, original_method.name)
+        if current_target_method is None:
+            violations.append(
+                QualityGateViolation(
+                    rule_id="cognitive_complexity",
+                    title="单方法认知复杂度不超过 30",
+                    message=(
+                        f"当前 patch 没有稳定触达 Sonar 指向的方法 {original_method.name}，"
+                        "无法确认认知复杂度已经下降。"
+                    ),
+                    file=file_path,
+                    line=original_method.declaration_line,
+                    symbol=original_method.symbol,
+                    evidence=original_method.signature,
+                    retry_hint=retry_hint,
+                )
+            )
+            return violations
+
+        original_body = "\n".join(original_lines[original_method.start_line - 1:original_method.end_line])
+        current_body = "\n".join(lines[current_target_method.start_line - 1:current_target_method.end_line])
+        original_complexity = cls._estimate_cognitive_complexity(original_body)
+        current_complexity = cls._estimate_cognitive_complexity(current_body)
+        if original_complexity <= 30:
+            return violations
+        if current_complexity < original_complexity:
+            return violations
+        if current_target_method.symbol in seen_symbols:
+            return violations
+
+        violations.append(
+            QualityGateViolation(
+                rule_id="cognitive_complexity",
+                title="单方法认知复杂度不超过 30",
+                message=(
+                    f"当前目标方法 {current_target_method.name} 的估算认知复杂度没有下降，"
+                    f"原始约为 {original_complexity}，当前约为 {current_complexity}。"
+                ),
+                file=file_path,
+                line=current_target_method.declaration_line,
+                symbol=current_target_method.symbol,
+                evidence=current_target_method.signature,
+                retry_hint=retry_hint,
+            )
+        )
         return violations
 
     @staticmethod

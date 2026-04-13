@@ -95,6 +95,66 @@ def _read_error_snippet(file_path: Path, line: int, radius: int = 2) -> str:
     return "\n".join(f"{index:4d} | {lines[index - 1]}" for index in range(start, end + 1))
 
 
+def _find_callee_declaration_snippet(
+    file_path: Path,
+    call_line: int,
+    *,
+    radius: int = 4,
+) -> str:
+    """Find the local declaration of a method referenced on the failing call line."""
+
+    if not file_path.exists():
+        return ""
+    try:
+        lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        return ""
+
+    if call_line < 1 or call_line > len(lines):
+        return ""
+
+    call_text = lines[call_line - 1]
+    if not call_text.strip():
+        return ""
+
+    ignored_names = {
+        "if",
+        "for",
+        "foreach",
+        "while",
+        "switch",
+        "catch",
+        "using",
+        "lock",
+        "return",
+        "new",
+    }
+    candidate_names: list[str] = []
+    for match in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", call_text):
+        method_name = match.group(1)
+        if method_name.lower() in ignored_names:
+            continue
+        if method_name not in candidate_names:
+            candidate_names.append(method_name)
+
+    if not candidate_names:
+        return ""
+
+    for method_name in candidate_names:
+        declaration_pattern = re.compile(
+            rf"\b(?:private|public|internal|protected)\b.*\b{re.escape(method_name)}\s*\(",
+            re.IGNORECASE,
+        )
+        for index, line_text in enumerate(lines, start=1):
+            if index == call_line:
+                continue
+            if method_name not in line_text:
+                continue
+            if declaration_pattern.search(line_text):
+                return _read_error_snippet(file_path, index, radius=radius)
+    return ""
+
+
 def _extract_compiler_errors(workspace_path: Path, build_output: str) -> list[CompilerErrorContext]:
     """Extract unique compiler errors and local snippets from build output."""
 
@@ -122,6 +182,16 @@ def _extract_compiler_errors(workspace_path: Path, build_output: str) -> list[Co
             continue
         seen.add(key)
 
+        snippet = _read_error_snippet(Path(file_path), line)
+        if code in {"CS1503", "CS0029"}:
+            callee_snippet = _find_callee_declaration_snippet(Path(file_path), line)
+            if callee_snippet:
+                snippet = (
+                    f"{snippet}\n\n--- 被调方法声明 ---\n{callee_snippet}"
+                    if snippet
+                    else callee_snippet
+                )
+
         errors.append(
             CompilerErrorContext(
                 file_path=file_path,
@@ -129,7 +199,7 @@ def _extract_compiler_errors(workspace_path: Path, build_output: str) -> list[Co
                 column=column,
                 code=code,
                 message=message,
-                snippet=_read_error_snippet(Path(file_path), line),
+                snippet=snippet,
             )
         )
 
@@ -157,7 +227,31 @@ def _build_retry_guidance(errors: list[CompilerErrorContext]) -> list[str]:
     if codes.intersection({"CS0535", "CS0738"}):
         guidance.append("不要留下公开方法与接口/抽象契约不一致的半成品重命名；如果传播闭包不完整，优先恢复现有公开签名。")
         guidance.append("如果必须保留 Async 重命名，必须同步接口声明、实现类签名、调用点和 nameof(...)。")
-    return guidance
+    if codes.intersection({"CS1503", "CS0029"}):
+        guidance.append(
+            "提取 helper 方法时，参数类型和返回值类型必须与调用点实际变量类型完全一致，尤其要保留 nullable 标注。"
+        )
+        guidance.append(
+            "不要把 decimal? 写成 decimal，不要把 DateTime? 写成 DateTime，也不要把包含 nullable 成员的 ValueTuple 简化成 non-nullable。"
+        )
+        guidance.append(
+            "请先用 Read 工具检查调用点变量的声明类型，再修正 helper 方法的参数签名和返回值类型。"
+        )
+    if "CS0029" in codes:
+        guidance.append("类型转换错误通常意味着 helper 返回值类型或赋值目标类型不一致；先对齐两边的完整类型。")
+
+    file_counts: dict[str, int] = {}
+    for item in errors:
+        normalized_path = str(item.file_path or "").strip().lower()
+        if not normalized_path:
+            continue
+        file_counts[normalized_path] = file_counts.get(normalized_path, 0) + 1
+    if any(count >= 2 for count in file_counts.values()):
+        guidance.append(
+            "如果你提取了新的 private helper 方法，请用 Read 工具检查该 helper 的完整签名，确认每个参数类型和返回值类型都与调用点完全匹配。"
+        )
+
+    return list(dict.fromkeys(item for item in guidance if str(item).strip()))
 
 
 def _build_scope_retry_constraints(issue: SonarIssue | None) -> list[str]:
@@ -524,6 +618,7 @@ def build_retry_context(
     plan_failure = _extract_plan_failure_context(result)
     return RetryContext(
         source_attempt_number=source_attempt_number,
+        issue_rule_id=issue.rule if issue is not None else "",
         failure_kind=result.failure_kind,
         failure_detail_key=_build_failure_detail_key(
             result,

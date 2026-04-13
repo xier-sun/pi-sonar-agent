@@ -4,6 +4,7 @@
   "retry_feedback": "上次尝试经过审核 agent 复核后，仍被判定需要继续修改：\n审核 agent 认为复杂度问题仍未解决。\n1. [quality_gate/confirm] 认知复杂度 | location: tracked.cs:1\n   审核理由: 当前 patch 只是重排条件，没有降低嵌套层级。\n   证据: 嵌套仍然过深。\n审核 agent 给出的下一轮要求:\n- 继续减少嵌套分支，不要只做 rename。",
   "retry_context": {
     "source_attempt_number": 1,
+    "issue_rule_id": "csharpsquid:S3776",
     "failure_kind": "review_gate",
     "failure_detail_key": "review_gate:quality_gate:cognitive_complexity:tracked.cs:1:1",
     "strategy_fingerprint": "fast_path=0|plan_first=0",
@@ -47,8 +48,8 @@
     "model_timeout_failed": false,
     "patch_salvaged": false
   },
-  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-285/test_process_issue_with_retrie4/repo",
-  "baseline_head_commit": "931fb62c9e8bdcc1a60d305c309caf4cc40e189e",
+  "workspace_path": "C:/Users/neware/AppData/Local/Temp/pytest-of-neware/pytest-289/test_process_issue_with_retrie4/repo",
+  "baseline_head_commit": "ef471b210fdbe4ff972410f44b0b3345efa7b251",
   "guardrail_mode": "",
   "active_quality_gate_rules": [],
   "execution_profile": "full_path",

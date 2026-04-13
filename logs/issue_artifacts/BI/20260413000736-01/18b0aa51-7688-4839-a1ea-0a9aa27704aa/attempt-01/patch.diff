@@ -1,0 +1,16 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs
+@@ -704,6 +704,7 @@
+         /// 重新发起
+
+         /// </summary>
+
+         /// <param name="req"></param>
+
++        /// <param name="formFiles"></param>
+
+         /// <returns></returns>
+
+         /// <exception cref="CommonException"></exception>
+
+         public async Task ReApply(UserContractUpdateReq req, List<IFormFile> formFiles = null)

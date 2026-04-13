@@ -147,6 +147,22 @@ def test_tool_policy_normalizes_wrapped_tool_names() -> None:
     assert multiedit_decision.allowed is True
 
 
+def test_tool_policy_downgrades_harmless_disallowed_shell_to_warning() -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit", "Bash", "Finish"],
+        mcp_tools=[],
+        forbidden_tools={"mcp__sonar-fix__git_push"},
+    )
+    policy = ToolPolicy(registry, ["Read", "Edit", "Finish"])
+
+    decision = policy.classify("Bash", {"command": "pwd"})
+
+    assert decision.allowed is False
+    assert decision.policy_violation is False
+    assert decision.severity == "warning"
+    assert policy.is_forbidden_tool("Bash", {"command": "pwd"}) is False
+
+
 def test_tool_policy_allows_benign_chained_shell_diagnostics() -> None:
     registry = build_fix_tool_registry(
         builtin_tools=["Read", "Edit", "MultiEdit", "Bash", "Finish"],
@@ -822,3 +838,75 @@ def test_agent_runtime_appends_closest_edit_snippet_for_string_not_found(tmp_pat
     assert "String to replace not found" in (result.agent_error or "")
     assert "Closest snippet for retry: Foo.cs:5-5" in (result.agent_error or "")
     assert "return value;" in (result.agent_error or "")
+
+
+def test_agent_runtime_sends_edit_nudge_after_repeated_non_edit_calls() -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit"],
+        mcp_tools=[],
+        forbidden_tools={"Bash"},
+    )
+    policy = ToolPolicy(registry, ["Read", "Edit"])
+    sent_prompts: list[str] = []
+
+    class FakeSession:
+        async def connect(self, timeout_seconds: float) -> None:
+            return None
+
+        async def send(self, user_prompt: str) -> None:
+            sent_prompts.append(user_prompt)
+
+        def stream_events(self):
+            async def iterate():
+                for _ in range(4):
+                    yield ToolCallEvent("Read")
+                    yield TraceEvent("UserMessage", preview="已读取文件")
+                yield ResultEvent(total_cost_usd=0.1, agent_error=None)
+
+            return iterate()
+
+        async def abort(self, reason: str):
+            raise AssertionError("abort should not be called")
+
+        async def close(self):
+            class Result:
+                reason = "normal_shutdown"
+                actions = ("disconnect",)
+                errors = ()
+
+            return Result()
+
+    class FakeGateway:
+        def create_session(self, request: GatewayRequest):
+            return FakeSession()
+
+    runtime = AgentRuntime(
+        gateway=FakeGateway(),
+        tool_policy=policy,
+        timeouts=RuntimeTimeouts(
+            client_connect_seconds=1,
+            first_response_seconds=1,
+            follow_up_seconds=1,
+            issue_hard_timeout_seconds=5,
+            heartbeat_interval_seconds=10,
+        ),
+    )
+
+    result = runtime.run(
+        GatewayRequest(
+            system_prompt="system",
+            user_prompt="user",
+            cwd="workspace",
+            tools=("Read", "Edit"),
+            allowed_tools=("Read", "Edit"),
+            max_turns=4,
+            max_budget_usd=1.0,
+            env={},
+        )
+    )
+
+    assert sent_prompts[0] == "user"
+    assert len(sent_prompts) == 2
+    assert "立即使用 Edit 或 MultiEdit" in sent_prompts[1]
+    assert result.edit_nudge_count == 1
+    assert any(event.kind == AttemptRuntimeEventKind.EDIT_NUDGE_SENT for event in result.runtime_events)

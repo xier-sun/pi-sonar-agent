@@ -10,9 +10,9 @@
     {
       "attempt_number": 1,
       "status": "retrying",
-      "started_at": "2026-04-12T04:52:24.841924+00:00",
-      "finished_at": "2026-04-12T04:52:24.842406+00:00",
-      "duration_seconds": 0.0,
+      "started_at": "2026-04-12T15:44:24.667273+00:00",
+      "finished_at": "2026-04-12T15:44:24.668596+00:00",
+      "duration_seconds": 0.001,
       "failure_kind": "quality_gate",
       "retry_reason": "retryable_failure",
       "retryable_failure": true,
@@ -27,15 +27,15 @@
       "issue_log_path": "logs\\issue_attempts\\repo_issue-no-change-after-gate_run-no-change-after-gate.log",
       "artifact_dir": "logs/issue_artifacts/repo/run-no-change-after-gate/issue-no-change-after-gate/attempt-01",
       "performance_metrics": {
-        "attempt_total_duration_seconds": 0.0
+        "attempt_total_duration_seconds": 0.001
       },
       "rollout_flags": []
     },
     {
       "attempt_number": 2,
       "status": "retrying",
-      "started_at": "2026-04-12T04:52:24.937083+00:00",
-      "finished_at": "2026-04-12T04:52:24.937452+00:00",
+      "started_at": "2026-04-12T15:44:24.740376+00:00",
+      "finished_at": "2026-04-12T15:44:24.740568+00:00",
       "duration_seconds": 0.0,
       "failure_kind": "no_change",
       "retry_reason": "retryable_failure",
@@ -58,8 +58,8 @@
     {
       "attempt_number": 3,
       "status": "skipped",
-      "started_at": "2026-04-12T04:52:25.031096+00:00",
-      "finished_at": "2026-04-12T04:52:25.031302+00:00",
+      "started_at": "2026-04-12T15:44:24.816775+00:00",
+      "finished_at": "2026-04-12T15:44:24.816967+00:00",
       "duration_seconds": 0.0,
       "failure_kind": "no_change",
       "retry_reason": "retryable_failure",
@@ -89,7 +89,7 @@
   "artifact_root": "logs/issue_artifacts/repo/run-no-change-after-gate/issue-no-change-after-gate",
   "performance_summary": {
     "issue_attempt_count": 3,
-    "issue_total_duration_seconds": 0.0,
+    "issue_total_duration_seconds": 0.001,
     "avg_attempt_duration_seconds": 0.0,
     "model_timeout_attempts": 0,
     "scope_reject_attempts": 0,

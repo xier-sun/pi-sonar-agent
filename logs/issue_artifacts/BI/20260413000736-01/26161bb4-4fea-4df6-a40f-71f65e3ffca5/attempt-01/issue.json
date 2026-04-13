@@ -1,0 +1,18 @@
+{
+  "issue_key": "26161bb4-4fea-4df6-a40f-71f65e3ffca5",
+  "rule_id": "csharpsquid:S6608",
+  "message": "Indexing at Count-1 should be used instead of the \"Enumerable\" extension method \"Last\"",
+  "line": 1273,
+  "text_range": {
+    "startLine": 1273,
+    "endLine": 1273,
+    "startOffset": 53,
+    "endOffset": 57
+  },
+  "flows": [],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/MisconductReportApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/MisconductReportApp.cs",
+  "severity": "MINOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

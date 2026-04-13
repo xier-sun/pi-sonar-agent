@@ -33,6 +33,7 @@ class RuleHandlingPolicy:
     validation_leading_lines: int = 0
     validation_trailing_lines: int = 0
     prompt_guards: tuple[str, ...] = ()
+    retry_prompt_guards: tuple[str, ...] = ()
     local_validator: str = ""
     skip_reason: str = ""
 
@@ -45,7 +46,10 @@ RULE_HANDLING_POLICIES: dict[str, RuleHandlingPolicy] = {
         scope_mode=METHOD_SCOPE_MODE,
         validation_trailing_lines=120,
         prompt_guards=(
-            "默认优先在原方法体内重构；只有确实需要时才提取少量 private helper。",
+            "优先在原方法体内重构；只有确实需要时才提取少量 private helper，不要改动公开签名或新增公开成员。",
+            "提取 helper 方法时，参数和返回值类型必须与原代码中的实际变量类型完全一致，包括 nullable 标注；不要把 decimal?、DateTime? 或包含 nullable 成员的 ValueTuple 简化成 non-nullable。",
+        ),
+        retry_prompt_guards=(
             "新提取的 helper 默认保持 private 且同步；只有 helper 体内真实包含 await 时才允许 async。",
             "不要为了降低复杂度新增 public/protected helper、DTO、property 或其他公开面。",
             "如果必须联动改名公开 async 方法，必须一次性同步接口声明、调用点和 nameof(...)；否则保持现有签名不变。",

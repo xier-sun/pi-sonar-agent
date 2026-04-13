@@ -1,0 +1,90 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
+@@ -2093,7 +2093,7 @@
+             // 处理社保信息
+
+             if (requestType == SocialsecurityTypeEnums.Socialsecurity)
+
+             {
+
+-                ProcessSocialSecurityItem(changes, updateRequest, currentSecuritiesForUser, systemUserId, account, userName, loginUser, hasSubstantiveChange);
+
++                ProcessSocialSecurityItem(changes, updateRequest, currentSecuritiesForUser, systemUserId, (account, userName), loginUser, hasSubstantiveChange);
+
+             }
+
+ 
+
+             // 处理公积金信息
+
+@@ -2162,22 +2162,20 @@
+             });
+
+         }
+
+         /// <summary>
+
+-        /// 
+
++        ///
+
+         /// </summary>
+
+         /// <param name="changes"></param>
+
+         /// <param name="updateRequest"></param>
+
+         /// <param name="currentSecuritiesForUser"></param>
+
+         /// <param name="systemUserId"></param>
+
+-        /// <param name="account"></param>
+
+-        /// <param name="userName"></param>
+
++        /// <param name="userIdentifier"></param>
+
+         /// <param name="loginUser"></param>
+
+         private void ProcessSocialSecurityItem(
+
+             DatabaseChangeLists changes,
+
+             UpdateSocialFundRequest updateRequest,
+
+             List<UserSocialsecurity> currentSecuritiesForUser,
+
+             string systemUserId,
+
+-            string account,
+
+-            string userName,
+
++            (string Account, string UserName) userIdentifier,
+
+             User loginUser,
+
+             bool hasSubstantiveChange)
+
+         {
+
+@@ -2187,8 +2185,8 @@
+                 Type = SocialsecurityTypeEnums.Socialsecurity,
+
+                 UpdateId = updateRequest.UpdateId,
+
+                 UserId = systemUserId,
+
+-                Account = account,
+
+-                Name = userName,
+
++                Account = userIdentifier.Account,
+
++                Name = userIdentifier.UserName,
+
+                 UpdateAction = (ss) => {
+
+                     if (!string.IsNullOrEmpty(updateRequest.SocialSecurityAccount))
+
+                         ss.SocialsecurityAccount = updateRequest.SocialSecurityAccount;

@@ -1,0 +1,18 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/MisconductReportApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/MisconductReportApp.cs
+@@ -1270,7 +1270,7 @@
+                 orderedCategories.Add(category);
+
+             }
+
+ 
+
+-            var selectedCategory = orderedCategories.Last();
+
++            var selectedCategory = orderedCategories[orderedCategories.Count - 1];
+
+             return new BehaviorCategorySelection
+
+             {
+
+                 CategoryIds = orderedCategories.Select(x => x.Id).ToList(),

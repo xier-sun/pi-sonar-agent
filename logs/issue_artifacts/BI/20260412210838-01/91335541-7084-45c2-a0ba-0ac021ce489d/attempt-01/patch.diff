@@ -1,0 +1,48 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs
+@@ -132,18 +132,20 @@
+         }
+
+ 
+
+         /// <summary>
+
+-        /// 内存计算指定日期的逾期金额和天数（不查库，带收款记录、退货记录和清账记录参数）
+
++        /// 内存计算指定日期的逾期金额和天数（不查库，带收款记录、退货退款记录和清账记录参数）
+
+         /// </summary>
+
+         public OverDueAmountAndDays CalculateHistoricalOverdueInMemory(
+
+             SaleOrderForOverDue saleOrder,
+
+             PayTermSave payTerm,
+
+             List<DeliveryForOverDue> deliveryList,
+
+             List<ReceiptForOrder> receiptList,
+
+-            List<ReturnForOverDue> returnList,
+
+-            List<SaleRefund> refundList,
+
++            (List<ReturnForOverDue> returnList, List<SaleRefund> refundList) creditAdjustments,
+
+             List<ClearReconForOverDue> clearReconList,
+
+             DateTime calculationDate)
+
+         {
+
++            var returnList = creditAdjustments.returnList;
+
++            var refundList = creditAdjustments.refundList;
+
++
+
+             // 计算截至指定日期的累计收款金额
+
+             // ReceiptForOrder 在构建时已过滤掉已冲销记录（Canceled != "Y"），此处为防御性检查
+
+             decimal accumulatedReceipt = receiptList

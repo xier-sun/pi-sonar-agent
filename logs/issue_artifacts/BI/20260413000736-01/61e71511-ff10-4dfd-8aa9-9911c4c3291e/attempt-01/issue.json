@@ -1,0 +1,18 @@
+{
+  "issue_key": "61e71511-ff10-4dfd-8aa9-9911c4c3291e",
+  "rule_id": "external_roslyn:CS1573",
+  "message": "参数“referenceFileLookup”在“UserContractApp.SyncReferenceAttachments(long, List<UserContractReferenceAttachmentReq>, Dictionary<string, Queue<IFormFile>>)”的 XML 注释中没有匹配的 param 标记(但其他参数有)",
+  "line": 819,
+  "text_range": {
+    "startLine": 819,
+    "endLine": 819,
+    "startOffset": 160,
+    "endOffset": 179
+  },
+  "flows": [],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/UserContractApp.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

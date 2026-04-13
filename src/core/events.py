@@ -33,6 +33,7 @@ class AttemptRuntimeEventKind(StrEnum):
 
     ATTEMPT_STARTED = "attempt_runtime_started"
     USER_MESSAGE_SENT = "user_message_sent"
+    EDIT_NUDGE_SENT = "edit_nudge_sent"
     TOOL_CALLED = "tool_called"
     TOOL_RESULT_RECEIVED = "tool_result_received"
     ASSISTANT_TEXT_DELTA = "assistant_text_delta"

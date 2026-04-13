@@ -50,6 +50,11 @@ class PropagationVerifier:
                 status="pass",
                 summary="No signature propagation verification was required for this attempt.",
             )
+        if str(getattr(repair_plan, "selected_archetype", "") or "").strip() == "declaration_hygiene":
+            return PropagationCheckResult(
+                status="pass",
+                summary="Declaration-hygiene cleanup does not require signature propagation verification.",
+            )
 
         proposed_method_name = str(getattr(repair_plan, "proposed_method_name", "") or "").strip()
         verification_targets = tuple(getattr(repair_plan, "verification_targets", ()) or ())

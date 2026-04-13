@@ -1,0 +1,318 @@
+{
+  "success": false,
+  "build_passed": false,
+  "build_verification_failed": false,
+  "retryable_failure": true,
+  "failure_kind": "review_gate",
+  "error": "Review gate verification failed",
+  "skip_reason": "",
+  "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
+  "build_output": "Review gate rejected the patch after auditing the ambiguous gate findings.\nReview gate session returned an agent error; kept the original blocker conservatively.\nAudit Decisions:\n1. [confirm] quality_gate:cognitive_complexity:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:199:1 (单方法认知复杂度不超过 30): Review agent returned an execution error.\nReview Gate Error: There's an issue with the selected model (glm-5-turbo). It may not exist or you may not have access to it. Run --model to pick a different model.",
+  "guardrail_mode": "scope",
+  "quality_gate_result": {
+    "status": "retry",
+    "summary": "Quality gate rejected the patch with 1 hard violation(s).",
+    "applied_rule_ids": [
+      "public_xml_docs",
+      "async_signature",
+      "async_requires_await",
+      "linq_method_syntax",
+      "cognitive_complexity",
+      "zero_redundant_code",
+      "static_preferred",
+      "sealed_preferred",
+      "constructor_dependency_injection",
+      "business_comments_chinese",
+      "finance_terms_chinese"
+    ],
+    "violations": [
+      {
+        "rule_id": "cognitive_complexity",
+        "title": "单方法认知复杂度不超过 30",
+        "message": "当前触达的方法 ProcessSingleOrderSnapshot 估算认知复杂度为 43，超过 30。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs",
+        "line": 199,
+        "symbol": "ProcessSingleOrderSnapshot@199-297",
+        "evidence": "private List<DailyOverdueSnapshot> ProcessSingleOrderSnapshot( ORDR order, DateTime calculationDate, OrderBatchData batchData, HistoricalOverdueCalculationService calculationService) {",
+        "retry_hint": "把当前触达的方法进一步拆小或提前返回，避免保留超过 30 的高认知复杂度结构。"
+      }
+    ],
+    "soft_findings": [
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "message": "私有方法 ProcessSingleOrderSnapshot 看起来不依赖实例状态，可考虑标记为 static。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs",
+        "line": 199,
+        "symbol": "ProcessSingleOrderSnapshot@199-297",
+        "evidence": "private List<DailyOverdueSnapshot> ProcessSingleOrderSnapshot( ORDR order, DateTime calculationDate, OrderBatchData batchData, HistoricalOverdueCalculationService calculationService) {"
+      }
+    ]
+  },
+  "review_gate_result": {
+    "status": "retry",
+    "summary": "Review gate session returned an agent error; kept the original blocker conservatively.",
+    "invoked": true,
+    "model_display": "kimi-k2.5",
+    "findings": [
+      {
+        "finding_id": "quality_gate:cognitive_complexity:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:199:1",
+        "source": "quality_gate",
+        "title": "单方法认知复杂度不超过 30",
+        "message": "当前触达的方法 ProcessSingleOrderSnapshot 估算认知复杂度为 43，超过 30。",
+        "file": "OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs",
+        "line": 199,
+        "symbol": "ProcessSingleOrderSnapshot@199-297",
+        "evidence": "private List<DailyOverdueSnapshot> ProcessSingleOrderSnapshot( ORDR order, DateTime calculationDate, OrderBatchData batchData, HistoricalOverdueCalculationService calculationService) {",
+        "context_snippets": [
+          "193 |             }\n194 |         }\n195 | \n196 |         /// <summary>\n197 |         /// 处理单个订单，生成逾期快照列表\n198 |         /// </summary>\n199 |         private List<DailyOverdueSnapshot> ProcessSingleOrderSnapshot(\n200 |             ORDR order,\n201 |             DateTime calculationDate,\n202 |             OrderBatchData batchData,\n203 |             HistoricalOverdueCalculationService calculationService)\n204 |         {\n205 |             var snapshots = new List<DailyOverdueSnapshot>();\n206 | \n207 |             // 1. 获取预加载数据\n208 |             if (!batchData.SaleOrders.TryGetValue(order.DocEntry, out var saleOrderForCalc))\n209 |                 return snapshots;\n210 | \n211 |             PayTermSave payTerm = null;\n212 |             if (saleOrderForCalc.GroupNum.HasValue)\n213 |                 batchData.PayTerms?.TryGetValue(saleOrderForCalc.GroupNum.Value, out payTerm);\n214 | \n215 |             if (!batchData.Deliveries.TryGetValue(order.DocEntry, out var deliveryList))\n216 |                 deliveryList = new List<HistoricalOverdueCalculationService.DeliveryForOverDue>();\n217 | \n218 |             if (!batchData.Receipts.TryGetValue(order.DocEntry, out var allReceipts))\n219 |                 allReceipts = new List<ReceiptForOrder>();\n220 | \n221 |             if (!batchData.Returns.TryGetValue(order.DocEntry, out var allReturns))\n222 |                 allReturns = new List<HistoricalOverdueCalculationService.ReturnForOverDue>();\n223 | \n224 |             if (batchData.Refunds == null || !batchData.Refunds.TryGetValue(order.DocEntry, out var allRefunds))\n225 |                 allRefunds = new List<SaleRefund>();\n226 | \n227 |             if (!batchClearRecons.TryGetValue(order.DocEntry, out var allClearRecons))\n228 |                 allClearRecons = new List<HistoricalOverdueCalculationService.ClearReconForOverDue>();\n229 | \n230 |             OSLP slp = null;\n231 |             if (order.SlpCode.HasValue)\n232 |                 batchSlps?.TryGetValue(order.SlpCode.Value, out slp);\n233 | \n234 |             // 2. 借用样机处理\n235 |             HistoricalOverdueImportService.SetBorrowTypeDeliveryDocDate(deliveryList, saleOrderForCalc);\n236 | \n237 |             // 3. 构建事件列表（不含可清账事件）\n238 |             var events = new List<HistoricalOverdueImportService.OrderEvent>();\n239 | \n240 |             foreach (var receipt in allReceipts)\n241 |             {\n242 |                 if (!re..."
+        ]
+      }
+    ],
+    "decisions": [
+      {
+        "finding_id": "quality_gate:cognitive_complexity:OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs:199:1",
+        "decision": "confirm",
+        "reason": "Review agent returned an execution error."
+      }
+    ],
+    "feedback": [],
+    "raw_response": "There's an issue with the selected model (glm-5-turbo). It may not exist or you may not have access to it. Run --model to pick a different model.",
+    "error": "There's an issue with the selected model (glm-5-turbo). It may not exist or you may not have access to it. Run --model to pick a different model."
+  },
+  "boundary_failure_code": "",
+  "boundary_failure_summary": "",
+  "secondary_boundary_failure_codes": [],
+  "performance_metrics": {
+    "runtime_total_duration_seconds": 159.891,
+    "time_to_first_model_content_seconds": 0.558,
+    "time_after_first_edit_to_finalize_seconds": 34.078,
+    "tool_call_count": 10,
+    "read_call_count": 2,
+    "edit_call_count": 8,
+    "assistant_text_events": 3,
+    "assistant_text_chars": 215,
+    "model_timeout_stage": "",
+    "last_progress_stage": "result_message",
+    "saw_result_event": true,
+    "continuation_retry_count": 0,
+    "continuation_recovered": false,
+    "continuation_timeout_stages": [],
+    "warning_tool_uses": [],
+    "edit_nudge_count": 0,
+    "execution_profile": "plan_first_full_path",
+    "fast_path_enabled": false,
+    "effective_max_turns": 10,
+    "patch_salvaged": false,
+    "fast_compile_invoked": false,
+    "fast_compile_passed": true,
+    "fast_compile_duration_seconds": 0.0,
+    "fast_compile_command": "",
+    "build_duration_seconds": 0.0,
+    "build_invoked": false,
+    "validation_pipeline": [
+      "build",
+      "scope_review",
+      "diff_review"
+    ],
+    "verification_schedule": {
+      "run_boundary_first": true,
+      "run_propagation_check_before_build": true,
+      "run_quality_gate_before_build": true,
+      "run_rule_validation_before_build": true,
+      "run_fast_compile_before_build": true,
+      "skip_build_on_precheck_failure": true,
+      "rollout_flags": [
+        "perf.short_form_prompt",
+        "perf.fast_path",
+        "perf.plan_first_complex_rules",
+        "planner.repair_archetypes.constraint_injection",
+        "planner.repair_archetypes.strategy_selection",
+        "perf.layered_verification",
+        "verifier.propagation_lifecycle",
+        "verifier.review_gate",
+        "verifier.fast_compile",
+        "perf.patch_salvage",
+        "perf.continuation_retry",
+        "runtime.edit_failure_context_feedback",
+        "perf.fast_path_max_turns=6",
+        "perf.continuation_retry_limit=2"
+      ]
+    }
+  },
+  "model_timeout_stage": "",
+  "patch_salvaged": false,
+  "compliance_summary": {
+    "status": "retry",
+    "summary": "Quality gate rejected the patch with 1 hard violation(s).",
+    "source_path": "D:/MyProjects/pi-sonar-agent/data/csharp-quality-gate.md",
+    "hard_rule_count": 5,
+    "soft_rule_count": 6,
+    "passed_rule_count": 9,
+    "failed_rule_count": 1,
+    "soft_finding_count": 1,
+    "not_applicable_count": 0,
+    "checks": [
+      {
+        "rule_id": "public_xml_docs",
+        "title": "公开成员 XML 文档完整",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "本次新增或改写的公开类、公开方法、公开属性、公开实体必须有完整 XML 文档注释。",
+        "message": ""
+      },
+      {
+        "rule_id": "async_signature",
+        "title": "异步签名规范",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "异步方法必须以 Async 结尾，返回 Task/Task<T>，严禁 async void（事件处理器除外）。",
+        "message": ""
+      },
+      {
+        "rule_id": "async_requires_await",
+        "title": "异步方法必须真正 await",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "异步方法内部如果没有 await，应改为同步方法或直接返回 Task。",
+        "message": ""
+      },
+      {
+        "rule_id": "linq_method_syntax",
+        "title": "LINQ 优先方法语法",
+        "enforcement": "hard",
+        "status": "passed",
+        "summary": "新增或改写的 LINQ 表达式优先使用方法语法，不要引入 query syntax。",
+        "message": ""
+      },
+      {
+        "rule_id": "cognitive_complexity",
+        "title": "单方法认知复杂度不超过 30",
+        "enforcement": "hard",
+        "status": "failed",
+        "summary": "触达的方法应通过提取子方法、提前返回等方式控制认知复杂度。",
+        "message": "当前触达的方法 ProcessSingleOrderSnapshot 估算认知复杂度为 43，超过 30。"
+      },
+      {
+        "rule_id": "zero_redundant_code",
+        "title": "零冗余代码",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "不要在当前 patch 中留下未使用变量、方法、类或 using。",
+        "message": ""
+      },
+      {
+        "rule_id": "static_preferred",
+        "title": "新增纯辅助方法优先 static",
+        "enforcement": "soft",
+        "status": "soft_finding",
+        "summary": "如果新增方法不依赖实例状态，优先标记为 static。",
+        "message": "私有方法 ProcessSingleOrderSnapshot 看起来不依赖实例状态，可考虑标记为 static。"
+      },
+      {
+        "rule_id": "sealed_preferred",
+        "title": "新增不继承的类优先 sealed",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "如果新增类不打算被继承，优先使用 sealed。",
+        "message": ""
+      },
+      {
+        "rule_id": "constructor_dependency_injection",
+        "title": "优先构造函数注入",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "依赖注入优先通过构造函数注入接口，并保持当前仓库既有注册模式一致。",
+        "message": ""
+      },
+      {
+        "rule_id": "business_comments_chinese",
+        "title": "业务注释优先中文",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "新增业务逻辑注释优先使用专业中文表达。",
+        "message": ""
+      },
+      {
+        "rule_id": "finance_terms_chinese",
+        "title": "财务术语保持专业中文",
+        "enforcement": "soft",
+        "status": "passed",
+        "summary": "财务及核心业务术语应保持专业中文表达，例如罚息、应收账款、账务、呆滞库存、订单取消。",
+        "message": ""
+      }
+    ]
+  },
+  "follow_up_log_path": "logs/follow_ups/BI/20260412203458-01/f2f04149-8a3d-4915-a52a-f0098f141d5a.jsonl",
+  "repair_plan": {
+    "repair_shape": "method_rewrite_with_helpers",
+    "primary_file": "OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs",
+    "primary_method_name": "Any",
+    "proposed_method_name": "",
+    "selected_archetype": "method_decomposition",
+    "fallback_archetype": "signature_preserving_refactor",
+    "archetype_chain": [
+      "method_decomposition",
+      "signature_preserving_refactor",
+      "expression_simplification"
+    ],
+    "constraint_hints": [
+      "Prefer extracting small private helpers instead of rewriting the whole method in one patch.",
+      "Keep each helper focused on one branch/phase so follow-up edits can land incrementally.",
+      "Extract at most two small helpers in one attempt and keep the rest of the logic in the original method.",
+      "Default every extracted helper to private and synchronous unless the helper body itself contains a real await.",
+      "Do not introduce public/protected helper methods, DTOs, or properties just to carry extracted state.",
+      "New helpers should default to private methods unless the contract explicitly requires broader visibility.",
+      "Any touched async method must use an Async suffix and a Task/Task<T> return type.",
+      "Do not keep async on helpers or methods that no longer contain a real await.",
+      "Preserve LINQ method syntax in changed code; do not introduce query syntax while reducing complexity.",
+      "Retry downgrade: new helpers and extracted phases must stay synchronous unless their bodies contain a real await.",
+      "Retry downgrade: do not rename helpers to *Async unless they are truly async; keep async naming changes tightly bounded.",
+      "Retry downgrade: avoid any new public/protected surface in this patch; solve the issue with private/local constructs instead.",
+      "Avoid introducing new public or protected surface area unless the contract explicitly requires it."
+    ],
+    "target_symbols": [
+      "Any",
+      "method@179-182"
+    ],
+    "new_helpers": [],
+    "helper_async_map": [],
+    "auto_upgraded_capabilities": [],
+    "propagation_budget": 0,
+    "impact_summary": "Keep the fix centered on the primary file and avoid unnecessary propagation.",
+    "strategy_preferences": [],
+    "verification_targets": [],
+    "requires_signature_change": false,
+    "requires_propagation": false,
+    "requires_new_type": false,
+    "propagation_targets": [],
+    "expected_boundary_capabilities": [
+      "method_rewrite",
+      "helper_extract"
+    ],
+    "expected_quality_gates": [
+      "public_xml_docs",
+      "async_signature",
+      "async_requires_await",
+      "linq_method_syntax",
+      "cognitive_complexity",
+      "zero_redundant_code",
+      "static_preferred",
+      "sealed_preferred",
+      "constructor_dependency_injection",
+      "business_comments_chinese",
+      "finance_terms_chinese"
+    ],
+    "risk_notes": []
+  },
+  "plan_precheck": {
+    "status": "pass",
+    "blocking": false,
+    "code": "plan_precheck_passed",
+    "summary": "Plan 预检通过，可以进入 edit 阶段。",
+    "details": [
+      "Plan 与当前 contract/quality gate 的显式前置约束没有发现直接冲突。"
+    ],
+    "guidance": []
+  }
+}

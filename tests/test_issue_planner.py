@@ -797,6 +797,76 @@ def test_issue_planner_keeps_s1144_on_minimal_deletion_strategy_after_no_change(
     assert "force_direct_local_edit" in plan.edit_contract.repair_plan.strategy_preferences
 
 
+def test_issue_planner_does_not_schedule_async_rename_for_s1144_private_async_method() -> None:
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-S1144-ASYNC-DELETE",
+        rule_id="csharpsquid:S1144",
+        file_path="src/Foo.cs",
+        issue_line=3,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=3,
+        scope_end_line=7,
+        validation_start_line=3,
+        validation_end_line=7,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private async Task CollectAllRelatedOrderIds()",
+            "    {",
+            "        await LoadAsync();",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert plan.edit_contract.repair_plan is not None
+    assert plan.edit_contract.repair_plan.selected_archetype == "declaration_hygiene"
+    assert plan.edit_contract.repair_plan.requires_signature_change is False
+    assert plan.edit_contract.repair_plan.requires_propagation is False
+    assert plan.edit_contract.repair_plan.proposed_method_name == ""
+    assert plan.edit_contract.repair_plan.verification_targets == ()
+    assert plan.edit_contract.repair_plan.propagation_budget == 0
+    assert "skip_signature_propagation_for_this_attempt" in plan.edit_contract.repair_plan.strategy_preferences
+    assert "minimal local cleanup patch" in plan.edit_contract.repair_plan.impact_summary
+
+
+def test_issue_planner_prefetches_full_method_for_method_scope_rules() -> None:
+    source_lines = tuple(
+        [
+            "class Foo",
+            "{",
+            "    public async Task DemoAsync()",
+            "    {",
+        ]
+        + [f"        Step({index});" for index in range(1, 9)]
+        + [
+            "        await SaveAsync();",
+            "    }",
+            "}",
+        ]
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-FULL-METHOD",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=7,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=3,
+        scope_end_line=14,
+        validation_start_line=3,
+        validation_end_line=14,
+        source_lines=source_lines,
+    )
+
+    assert plan.edit_contract.prefetched_context
+    assert plan.edit_contract.prefetched_context[0].label == "target_method_full"
+    assert "DemoAsync" in plan.edit_contract.prefetched_context[0].content
+    assert "await SaveAsync();" in plan.edit_contract.prefetched_context[0].content
+
+
 def test_issue_planner_signature_propagation_scans_real_agent_workspace_layout(tmp_path) -> None:
     workspace = tmp_path / ".agent_workspaces" / "fix_BI_20260409171247-01"
     issue_file = workspace / "OpenAuth.Core" / "OpenAuth.App" / "Finance" / "FinanceHanlerApp.cs"

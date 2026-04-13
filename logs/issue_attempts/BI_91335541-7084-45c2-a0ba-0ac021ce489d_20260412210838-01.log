@@ -1,0 +1,41 @@
+[2026-04-12 21:15:34] Attempt 1/5 started for 91335541-7084-45c2-a0ba-0ac021ce489d
+[2026-04-12 21:18:00] Attempt 1 failed: Quality gate verification failed
+[2026-04-12 21:18:00] Build failure report:
+错误: Quality gate verification failed
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Quality gate verification failed. The patch must satisfy the active C# gate rules before it can pass:
+1. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 CalculateHistoricalOverdueInMemory 缺少参数 saleOrder 的 <param> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs:137
+   Evidence: /// <summary>
+/// 内存计算指定日期的逾期金额和天数（不查库，带收款记录、退货退款记录和清账记录参数）
+/// </summary>
+   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+2. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 CalculateHistoricalOverdueInMemory 有返回值但缺少 <returns> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs:137
+   Evidence: /// <summary>
+/// 内存计算指定日期的逾期金额和天数（不查库，带收款记录、退货退款记录和清账记录参数）
+/// </summary>
+   Retry Hint: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+[2026-04-12 21:18:00] Next retry feedback for model:
+上次尝试通过了 build 和范围审查，但没有通过 C# 质量门禁：
+Quality gate rejected the patch with 2 hard violation(s).
+1. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 CalculateHistoricalOverdueInMemory 缺少参数 saleOrder 的 <param> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs:137
+   证据: /// <summary>
+/// 内存计算指定日期的逾期金额和天数（不查库，带收款记录、退货退款记录和清账记录参数）
+/// </summary>
+   原始提示: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+2. [public_xml_docs] 公开成员 XML 文档完整: 公开方法 CalculateHistoricalOverdueInMemory 有返回值但缺少 <returns> 文档。 | location: OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs:137
+   证据: /// <summary>
+/// 内存计算指定日期的逾期金额和天数（不查库，带收款记录、退货退款记录和清账记录参数）
+/// </summary>
+   原始提示: 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+本次重改要求:
+- 只补当前 patch 触达的公开成员 XML 文档，至少补齐 <summary>，方法参数补 <param>，有返回值补 <returns>。
+- 只为当前触达的公开成员补齐 XML 文档，包括 <summary>/<param>/<returns>；不要顺手补无关公开成员。
+- 如果这次修复只是为了降低复杂度或删除无用代码，不要新增 public/protected helper、DTO、property 来制造更多 XML 文档负担。
+- 只修这些门禁问题，保留已经通过的其它改动，不要重新大改整段逻辑。
+[2026-04-12 21:18:00] Workspace restored to issue baseline
+[2026-04-12 21:18:00] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-12 21:18:00] Attempt 2/5 started for 91335541-7084-45c2-a0ba-0ac021ce489d
+[2026-04-12 21:19:47] Attempt 2 succeeded: Fixed 1 file(s)

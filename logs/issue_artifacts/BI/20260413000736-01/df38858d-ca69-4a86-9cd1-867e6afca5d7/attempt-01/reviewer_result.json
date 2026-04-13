@@ -1,0 +1,46 @@
+{
+  "status": "pass",
+  "guardrail_mode": "scope",
+  "summary": "Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit.",
+  "violations": [
+    {
+      "type": "outside_primary_region",
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "reason": "This hunk changes lines outside the primary issue window 2902-2912; recorded as drift only.",
+      "symbol": "statement@2902-2912",
+      "changed_lines": [
+        2926
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n@@ -2926,0 +2927 @@\n+        /// <param name=\"hasSubstantiveChange\"></param>"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "df38858d-ca69-4a86-9cd1-867e6afca5d7",
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "symbol": "statement@2902-2912",
+      "summary": "Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n@@ -2926,0 +2927 @@\n+        /// <param name=\"hasSubstantiveChange\"></param>",
+      "discovered_at": "2026-04-12T16:52:15.742210+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 1,
+    "total_changed_lines": 1,
+    "hard_boundary_violation_count": 0,
+    "soft_boundary_violation_count": 1,
+    "extra_touched_file_count": 0,
+    "outside_primary_region_line_count": 1,
+    "outside_primary_region_count": 1,
+    "scope_audit_mode": "scope_soft_audit",
+    "scope_audit_active": true,
+    "scope_expansion_count": 1,
+    "scope_expansion_reasons": [
+      "outside_primary_region"
+    ],
+    "high_drift_warning": false,
+    "drift_score": 1
+  }
+}

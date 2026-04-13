@@ -1,0 +1,579 @@
+--- a/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs
++++ b/OpenAuth.Core/OpenAuth.App/Finance/DailyOverdueSnapshotImportService.cs
+@@ -157,15 +157,25 @@
+             }
+
+ 
+
+             // 3. 逐单生成快照
+
++            var batchData = new OrderBatchData
+
++            {
+
++                SaleOrders = batchSaleOrders,
+
++                PayTerms = batchPayTerms,
+
++                Deliveries = batchDeliveries,
+
++                Receipts = batchReceipts,
+
++                Returns = batchReturns,
+
++                Refunds = batchRefunds,
+
++                ClearRecons = batchClearRecons,
+
++                SalesPersons = batchSlps
+
++            };
+
++
+
+             var allSnapshots = new List<DailyOverdueSnapshot>();
+
+             foreach (var order in orders)
+
+             {
+
+                 try
+
+                 {
+
+                     var snapshots = ProcessSingleOrderSnapshot(
+
+-                        order, endDate,
+
+-                        batchSaleOrders, batchPayTerms, batchDeliveries,
+
+-                        batchReceipts, batchReturns, batchRefunds, batchClearRecons, batchSlps, calculationService);
+
++                        order, endDate, batchData, calculationService);
+
+                     allSnapshots.AddRange(snapshots);
+
+                 }
+
+                 catch (Exception ex)
+
+@@ -180,6 +190,29 @@
+                 await unitWork.BatchAddAsync<DailyOverdueSnapshot, int>(allSnapshots.ToArray());
+
+                 await unitWork.SaveAsync();
+
+             }
+
++        }
+
++
+
++        /// <summary>
+
++        /// 批量预加载数据容器
+
++        /// </summary>
+
++        private sealed class OrderBatchData
+
++        {
+
++            /// <summary>销售订单数据</summary>
+
++            public Dictionary<int, HistoricalOverdueCalculationService.SaleOrderForOverDue> SaleOrders;
+
++            /// <summary>付款条件</summary>
+
++            public Dictionary<int, PayTermSave> PayTerms;
+
++            /// <summary>发货数据</summary>
+
++            public Dictionary<int, List<HistoricalOverdueCalculationService.DeliveryForOverDue>> Deliveries;
+
++            /// <summary>收款记录</summary>
+
++            public Dictionary<int, List<ReceiptForOrder>> Receipts;
+
++            /// <summary>退货记录</summary>
+
++            public Dictionary<int, List<HistoricalOverdueCalculationService.ReturnForOverDue>> Returns;
+
++            /// <summary>退款记录</summary>
+
++            public Dictionary<int, List<SaleRefund>> Refunds;
+
++            /// <summary>核销记录</summary>
+
++            public Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>> ClearRecons;
+
++            /// <summary>销售员数据</summary>
+
++            public Dictionary<int, OSLP> SalesPersons;
+
+         }
+
+ 
+
+         /// <summary>
+
+@@ -188,126 +221,48 @@
+         private List<DailyOverdueSnapshot> ProcessSingleOrderSnapshot(
+
+             ORDR order,
+
+             DateTime calculationDate,
+
+-            Dictionary<int, HistoricalOverdueCalculationService.SaleOrderForOverDue> batchSaleOrders,
+
+-            Dictionary<int, PayTermSave> batchPayTerms,
+
+-            Dictionary<int, List<HistoricalOverdueCalculationService.DeliveryForOverDue>> batchDeliveries,
+
+-            Dictionary<int, List<ReceiptForOrder>> batchReceipts,
+
+-            Dictionary<int, List<HistoricalOverdueCalculationService.ReturnForOverDue>> batchReturns,
+
+-            Dictionary<int, List<SaleRefund>> batchRefunds,
+
+-            Dictionary<int, List<HistoricalOverdueCalculationService.ClearReconForOverDue>> batchClearRecons,
+
+-            Dictionary<int, OSLP> batchSlps,
+
++            OrderBatchData batchData,
+
+             HistoricalOverdueCalculationService calculationService)
+
+         {
+
+             var snapshots = new List<DailyOverdueSnapshot>();
+
+ 
+
+             // 1. 获取预加载数据
+
+-            if (!batchSaleOrders.TryGetValue(order.DocEntry, out var saleOrderForCalc))
+
++            if (!batchData.SaleOrders.TryGetValue(order.DocEntry, out var saleOrderForCalc))
+
+                 return snapshots;
+
+ 
+
+             PayTermSave payTerm = null;
+
+             if (saleOrderForCalc.GroupNum.HasValue)
+
+-                batchPayTerms?.TryGetValue(saleOrderForCalc.GroupNum.Value, out payTerm);
+
+-
+
+-            if (!batchDeliveries.TryGetValue(order.DocEntry, out var deliveryList))
+
++                batchData.PayTerms?.TryGetValue(saleOrderForCalc.GroupNum.Value, out payTerm);
+
++
+
++            if (!batchData.Deliveries.TryGetValue(order.DocEntry, out var deliveryList))
+
+                 deliveryList = new List<HistoricalOverdueCalculationService.DeliveryForOverDue>();
+
+ 
+
+-            if (!batchReceipts.TryGetValue(order.DocEntry, out var allReceipts))
+
++            if (!batchData.Receipts.TryGetValue(order.DocEntry, out var allReceipts))
+
+                 allReceipts = new List<ReceiptForOrder>();
+
+ 
+
+-            if (!batchReturns.TryGetValue(order.DocEntry, out var allReturns))
+
++            if (!batchData.Returns.TryGetValue(order.DocEntry, out var allReturns))
+
+                 allReturns = new List<HistoricalOverdueCalculationService.ReturnForOverDue>();
+
+ 
+
+-            if (batchRefunds == null || !batchRefunds.TryGetValue(order.DocEntry, out var allRefunds))
+
++            if (batchData.Refunds == null || !batchData.Refunds.TryGetValue(order.DocEntry, out var allRefunds))
+
+                 allRefunds = new List<SaleRefund>();
+
+ 
+
+-            if (!batchClearRecons.TryGetValue(order.DocEntry, out var allClearRecons))
+
++            if (!batchData.ClearRecons.TryGetValue(order.DocEntry, out var allClearRecons))
+
+                 allClearRecons = new List<HistoricalOverdueCalculationService.ClearReconForOverDue>();
+
+ 
+
+             OSLP slp = null;
+
+             if (order.SlpCode.HasValue)
+
+-                batchSlps?.TryGetValue(order.SlpCode.Value, out slp);
+
++                batchData.SalesPersons?.TryGetValue(order.SlpCode.Value, out slp);
+
+ 
+
+             // 2. 借用样机处理
+
+             HistoricalOverdueImportService.SetBorrowTypeDeliveryDocDate(deliveryList, saleOrderForCalc);
+
+ 
+
+-            // 3. 构建事件列表（不含可清账事件）
+
+-            var events = new List<HistoricalOverdueImportService.OrderEvent>();
+
+-
+
+-            foreach (var receipt in allReceipts)
+
+-            {
+
+-                if (!receipt.DocDate.HasValue) continue;
+
+-                events.Add(new HistoricalOverdueImportService.OrderEvent
+
+-                {
+
+-                    EventDate = receipt.DocDate.Value,
+
+-                    EventType = HistoricalOverdueImportService.OrderEventType.Payment,
+
+-                    ReferenceId = receipt.DocEntry.ToString(),
+
+-                    Amount = receipt.AppliedAmount
+
+-                });
+
+-            }
+
+-
+
+-            foreach (var delivery in deliveryList)
+
+-            {
+
+-                if (!delivery.DocDate.HasValue) continue;
+
+-                events.Add(new HistoricalOverdueImportService.OrderEvent
+
+-                {
+
+-                    EventDate = delivery.DocDate.Value,
+
+-                    EventType = HistoricalOverdueImportService.OrderEventType.Delivery,
+
+-                    ReferenceId = delivery.DocEntry.ToString(),
+
+-                    Amount = delivery.DocTotal ?? 0m
+
+-                });
+
+-            }
+
+-
+
+-            foreach (var returnOrder in allReturns)
+
+-            {
+
+-                if (!returnOrder.DocDate.HasValue) continue;
+
+-                events.Add(new HistoricalOverdueImportService.OrderEvent
+
+-                {
+
+-                    EventDate = returnOrder.DocDate.Value,
+
+-                    EventType = HistoricalOverdueImportService.OrderEventType.Return,
+
+-                    ReferenceId = returnOrder.DocEntry.ToString(),
+
+-                    Amount = returnOrder.DocTotal ?? 0m
+
+-                });
+
+-            }
+
+-
+
+-            foreach (var refund in allRefunds)
+
+-            {
+
+-                if (!refund.DocDate.HasValue) continue;
+
+-                events.Add(new HistoricalOverdueImportService.OrderEvent
+
+-                {
+
+-                    EventDate = refund.DocDate.Value.Date,
+
+-                    EventType = HistoricalOverdueImportService.OrderEventType.Refund,
+
+-                    ReferenceId = refund.Id.ToString(),
+
+-                    Amount = refund.ApplyAmount
+
+-                });
+
+-            }
+
+-
+
+-            events.Add(new HistoricalOverdueImportService.OrderEvent
+
+-            {
+
+-                EventDate = calculationDate,
+
+-                EventType = HistoricalOverdueImportService.OrderEventType.CalculationEnd,
+
+-                ReferenceId = "CalculationEnd",
+
+-                Amount = 0
+
+-            });
+
+-
+
+-            // 4. 排序 + 合并同日同类型事件
+
+-            events = events.OrderBy(e => e.EventDate).ToList();
+
+-
+
+-            events = events
+
+-                .GroupBy(e => new { e.EventDate.Date, e.EventType })
+
+-                .Select(g => new HistoricalOverdueImportService.OrderEvent
+
+-                {
+
+-                    EventDate = g.Key.Date,
+
+-                    EventType = g.Key.EventType,
+
+-                    ReferenceId = string.Join(",", g.Select(e => e.ReferenceId)),
+
+-                    Amount = g.Sum(e => e.Amount)
+
+-                })
+
+-                .OrderBy(e => e.EventDate)
+
+-                .ToList();
+
++            // 3. 构建事件列表（收款、发货、退货、退款、计算截止）
+
++            var events = BuildOrderEvents(allReceipts, deliveryList, allReturns, allRefunds, calculationDate);
+
+ 
+
+             if (events.Count == 0)
+
+                 return snapshots;
+
+ 
+
+-            // 5. 遍历事件期间，逐日计算逾期，检测金额变化
+
++            // 4. 遍历事件期间，逐日计算逾期，检测金额变化
+
+             DateTime currentPeriodStart = order.DocDate ?? calculationDate;
+
+             decimal previousOverdueAmount = 0;
+
+ 
+
+@@ -346,5 +301,91 @@
+ 
+
+             return snapshots;
+
+         }
+
++
+
++        /// <summary>
+
++        /// 构建订单事件列表（收款、发货、退货、退款、计算截止），排序并合并同日同类型事件
+
++        /// </summary>
+
++        private static List<HistoricalOverdueImportService.OrderEvent> BuildOrderEvents(
+
++            List<ReceiptForOrder> allReceipts,
+
++            List<HistoricalOverdueCalculationService.DeliveryForOverDue> deliveryList,
+
++            List<HistoricalOverdueCalculationService.ReturnForOverDue> allReturns,
+
++            List<SaleRefund> allRefunds,
+
++            DateTime calculationDate)
+
++        {
+
++            var events = new List<HistoricalOverdueImportService.OrderEvent>();
+
++
+
++            foreach (var receipt in allReceipts)
+
++            {
+
++                if (!receipt.DocDate.HasValue) continue;
+
++                events.Add(new HistoricalOverdueImportService.OrderEvent
+
++                {
+
++                    EventDate = receipt.DocDate.Value,
+
++                    EventType = HistoricalOverdueImportService.OrderEventType.Payment,
+
++                    ReferenceId = receipt.DocEntry.ToString(),
+
++                    Amount = receipt.AppliedAmount
+
++                });
+
++            }
+
++
+
++            foreach (var delivery in deliveryList)
+
++            {
+
++                if (!delivery.DocDate.HasValue) continue;
+
++                events.Add(new HistoricalOverdueImportService.OrderEvent
+
++                {
+
++                    EventDate = delivery.DocDate.Value,
+
++                    EventType = HistoricalOverdueImportService.OrderEventType.Delivery,
+
++                    ReferenceId = delivery.DocEntry.ToString(),
+
++                    Amount = delivery.DocTotal ?? 0m
+
++                });
+
++            }
+
++
+
++            foreach (var returnOrder in allReturns)
+
++            {
+
++                if (!returnOrder.DocDate.HasValue) continue;
+
++                events.Add(new HistoricalOverdueImportService.OrderEvent
+
++                {
+
++                    EventDate = returnOrder.DocDate.Value,
+
++                    EventType = HistoricalOverdueImportService.OrderEventType.Return,
+
++                    ReferenceId = returnOrder.DocEntry.ToString(),
+
++                    Amount = returnOrder.DocTotal ?? 0m
+
++                });
+
++            }
+
++
+
++            foreach (var refund in allRefunds)
+
++            {
+
++                if (!refund.DocDate.HasValue) continue;
+
++                events.Add(new HistoricalOverdueImportService.OrderEvent
+
++                {
+
++                    EventDate = refund.DocDate.Value.Date,
+
++                    EventType = HistoricalOverdueImportService.OrderEventType.Refund,
+
++                    ReferenceId = refund.Id.ToString(),
+
++                    Amount = refund.ApplyAmount
+
++                });
+
++            }
+
++
+
++            events.Add(new HistoricalOverdueImportService.OrderEvent
+
++            {
+
++                EventDate = calculationDate,
+
++                EventType = HistoricalOverdueImportService.OrderEventType.CalculationEnd,
+
++                ReferenceId = "CalculationEnd",
+
++                Amount = 0
+
++            });
+
++
+
++            // 排序 + 合并同日同类型事件
+
++            events = events.OrderBy(e => e.EventDate).ToList();
+
++
+
++            events = events
+
++                .GroupBy(e => new { e.EventDate.Date, e.EventType })
+
++                .Select(g => new HistoricalOverdueImportService.OrderEvent
+
++                {
+
++                    EventDate = g.Key.Date,
+
++                    EventType = g.Key.EventType,
+
++                    ReferenceId = string.Join(",", g.Select(e => e.ReferenceId)),
+
++                    Amount = g.Sum(e => e.Amount)
+
++                })
+
++                .OrderBy(e => e.EventDate)
+
++                .ToList();
+
++
+
++            return events;
+
++        }
+
+     }
+
+ }

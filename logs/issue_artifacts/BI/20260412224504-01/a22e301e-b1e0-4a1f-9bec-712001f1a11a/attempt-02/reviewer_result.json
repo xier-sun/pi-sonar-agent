@@ -1,0 +1,47 @@
+{
+  "status": "pass",
+  "guardrail_mode": "scope",
+  "summary": "Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit.",
+  "violations": [
+    {
+      "type": "outside_primary_region",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "reason": "This hunk changes lines outside the primary issue window 41-250; recorded as drift only.",
+      "symbol": "method@41-171",
+      "changed_lines": [
+        38,
+        40
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n@@ -38 +38 @@\n-        ///<summary>\n+        /// <summary>\n@@ -40,0 +41,2 @@\n+        /// <param name=\"matchedRules\">匹配的罚息规则定义列表</param>\n+        /// <returns>包含新增事件、已解决事件和取消事件的元组</returns>\n@@ -68,5 +70,6 @@\n-                var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)\n-                                            join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry\n-                                            join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode\n-                                            where r.CANCELED == \"N\" && (r.U_New_ORDRID == null || r.U_New_ORDRID == \"\")\n-                                            select new { r.DocEntry, r.U_New_ORDRID, r1.ItemCode, r1.Price, r.U_DevEntry, r1.Quantity, r1.StockValue, m.LastPurPrc, r.CreateDate, r1.BaseEntry, r1.BaseType }).ToListAsync();\n+                var returnItems = await UnitWork.Find<RIN1>(null)\n+                    .Join(UnitWork.Find<ORIN>(null), r1 => r1.DocEntry, r => r.DocEntry, (r1, r) => new { r1, r })\n+                    .Join(UnitWork.Find<OITM>(null), x => x.r1.ItemCode, m => m.ItemCode, (x, m) => new { x.r, x.r1, m })\n+                    .Where(x => x.r.CANCELED == \"N\" && (x.r.U_New_ORDRID == null || x.r.U_New_ORDRID == \"\"))\n+                    .Select(x => new { x.r.DocEntry, x.r.U_New_ORDRID, x.r1.ItemCode, x.r1.Price, x.r.U_DevEntry, x.r1.Quantity, x.r1.StockValue, x.m.LastPurPrc, x.r.CreateDate, x.r1.BaseEntry, x.r1.BaseType })\n+                    .ToListAsync();\n@@ -99,4 +102,5 @@\n-                var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)\n-                                              join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId\n-                                              where pd.RuleHandlerCode == HandlerCode\n-                                              select Convert.ToInt32(r.TriggerDocEntry)).ToListAsync()).ToHashSet();\n+                var hadPenaltyOrdrs = (await UnitWork.Find<PenaltyRuleDefinition>(null)\n+                    .Join(UnitWork.Find<PenaltyEvent>(null), pd => pd.Id, r => r.RuleDefinitionId, (pd, r) => new { pd, r })\n+                    .Where(x => x.pd.RuleHandlerCode == HandlerCode)\n+                    .Select(x => Convert.ToInt32(x.r.TriggerDocEntry))\n+                    .ToListAsync()).ToHashSet();"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "a22e301e-b1e0-4a1f-9bec-712001f1a11a",
+      "file": "OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+      "symbol": "method@41-171",
+      "summary": "Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n+++ b/OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs\n@@ -38 +38 @@\n-        ///<summary>\n+        /// <summary>\n@@ -40,0 +41,2 @@\n+        /// <param name=\"matchedRules\">匹配的罚息规则定义列表</param>\n+        /// <returns>包含新增事件、已解决事件和取消事件的元组</returns>\n@@ -68,5 +70,6 @@\n-                var returnItems = await (from r1 in UnitWork.Find<RIN1>(null)\n-                                            join r in UnitWork.Find<ORIN>(null) on r1.DocEntry equals r.DocEntry\n-                                            join m in UnitWork.Find<OITM>(null) on r1.ItemCode equals m.ItemCode\n-                                            where r.CANCELED == \"N\" && (r.U_New_ORDRID == null || r.U_New_ORDRID == \"\")\n-                                            select new { r.DocEntry, r.U_New_ORDRID, r1.ItemCode, r1.Price, r.U_DevEntry, r1.Quantity, r1.StockValue, m.LastPurPrc, r.CreateDate, r1.BaseEntry, r1.BaseType }).ToListAsync();\n+                var returnItems = await UnitWork.Find<RIN1>(null)\n+                    .Join(UnitWork.Find<ORIN>(null), r1 => r1.DocEntry, r => r.DocEntry, (r1, r) => new { r1, r })\n+                    .Join(UnitWork.Find<OITM>(null), x => x.r1.ItemCode, m => m.ItemCode, (x, m) => new { x.r, x.r1, m })\n+                    .Where(x => x.r.CANCELED == \"N\" && (x.r.U_New_ORDRID == null || x.r.U_New_ORDRID == \"\"))\n+                    .Select(x => new { x.r.DocEntry, x.r.U_New_ORDRID, x.r1.ItemCode, x.r1.Price, x.r.U_DevEntry, x.r1.Quantity, x.r1.StockValue, x.m.LastPurPrc, x.r.CreateDate, x.r1.BaseEntry, x.r1.BaseType })\n+                    .ToListAsync();\n@@ -99,4 +102,5 @@\n-                var hadPenaltyOrdrs = (await (from pd in UnitWork.Find<PenaltyRuleDefinition>(null)\n-                                              join r in UnitWork.Find<PenaltyEvent>(null) on pd.Id equals r.RuleDefinitionId\n-                                              where pd.RuleHandlerCode == HandlerCode\n-                                              select Convert.ToInt32(r.TriggerDocEntry)).ToListAsync()).ToHashSet();\n+                var hadPenaltyOrdrs = (await UnitWork.Find<PenaltyRuleDefinition>(null)\n+                    .Join(UnitWork.Find<PenaltyEvent>(null), pd => pd.Id, r => r.RuleDefinitionId, (pd, r) => new { pd, r })\n+                    .Where(x => x.pd.RuleHandlerCode == HandlerCode)\n+                    .Select(x => Convert.ToInt32(x.r.TriggerDocEntry))\n+                    .ToListAsync()).ToHashSet();",
+      "discovered_at": "2026-04-12T14:55:51.492445+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 4,
+    "total_changed_lines": 13,
+    "hard_boundary_violation_count": 0,
+    "soft_boundary_violation_count": 1,
+    "extra_touched_file_count": 0,
+    "outside_primary_region_line_count": 2,
+    "outside_primary_region_count": 1,
+    "scope_audit_mode": "scope_soft_audit",
+    "scope_audit_active": true,
+    "scope_expansion_count": 1,
+    "scope_expansion_reasons": [
+      "outside_primary_region"
+    ],
+    "high_drift_warning": false,
+    "drift_score": 1
+  }
+}

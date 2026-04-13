@@ -1,0 +1,277 @@
+--- a/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/FinanceHomeController.cs
++++ b/OpenAuth.Core/OpenAuth.WebApi/Controllers/Finance/FinanceHomeController.cs
+@@ -19,22 +19,14 @@
+     public class FinanceHomeController : ControllerBase
+
+     {
+
+         private readonly IFinanceHomeApp _financeHomeApp;
+
+-        private readonly IFreightApp _freightApp;
+
+-        private readonly IDailyOverdueSnapshotApp _dailyOverdueSnapshotApp;
+
+-        private readonly DailyOverdueSnapshotImportService _dailyOverdueSnapshotImportService;
+
+         /// <summary>
+
+         /// 构造函数
+
+         /// </summary>
+
+-        /// <param name="financeHomeApp"></param>
+
+-        /// <param name="freightApp"></param>
+
+-        /// <param name="dailyOverdueSnapshotApp"></param>
+
+-        /// <param name="dailyOverdueSnapshotImportService"></param>
+
+-        public FinanceHomeController(IFinanceHomeApp financeHomeApp, IFreightApp freightApp, IDailyOverdueSnapshotApp dailyOverdueSnapshotApp, DailyOverdueSnapshotImportService dailyOverdueSnapshotImportService)
+
++        /// <param name="financeHomeApp">FICO主页应用服务</param>
+
++        /// <returns></returns>
+
++        public FinanceHomeController(IFinanceHomeApp financeHomeApp)
+
+         {
+
+             _financeHomeApp = financeHomeApp;
+
+-            _freightApp = freightApp;
+
+-            _dailyOverdueSnapshotApp = dailyOverdueSnapshotApp;
+
+-            _dailyOverdueSnapshotImportService = dailyOverdueSnapshotImportService;
+
+         }
+
+         /// <summary>
+
+         /// 获取FICO审批工作数据
+
+@@ -165,13 +157,14 @@
+         /// <summary>
+
+         /// 按创建者统计每月运费
+
+         /// </summary>
+
+-        /// <param name="req"></param>
+
+-        /// <returns></returns>
+
++        /// <param name="req">查询参数</param>
+
++        /// <param name="freightApp">运费应用服务</param>
+
++        /// <returns>每月运费统计结果</returns>
+
+         [HttpPost]
+
+         [Route("GetMonthlyFreightStatistics")]
+
+-        public async Task<MonthlyFreightStatisticsResp> GetMonthlyFreightStatistics(FreightStatisticsReq req)
+
+-        {
+
+-            var result = await _freightApp.GetMonthlyFreightStatistics(req);
+
++        public async Task<MonthlyFreightStatisticsResp> GetMonthlyFreightStatisticsAsync(FreightStatisticsReq req, [FromServices] IFreightApp freightApp)
+
++        {
+
++            var result = await freightApp.GetMonthlyFreightStatistics(req);
+
+             return result;
+
+         }
+
+ 
+
+@@ -253,20 +246,21 @@
+         /// 逾期快照柱状图数据（按销售员分组汇总）
+
+         /// </summary>
+
+         /// <param name="req">查询参数</param>
+
++        /// <param name="dailyOverdueSnapshotApp">逾期快照应用服务</param>
+
+         /// <returns>包含列头和销售员账龄汇总数据</returns>
+
+         [HttpPost]
+
+         [Route("GetOverdueAgingSnapshotChart")]
+
+-        public async Task<TableData<OverdueAgingChartWrapper>> GetOverdueAgingSnapshotChart(OverdueAgingSnapshotReq req)
+
++        public async Task<TableData<OverdueAgingChartWrapper>> GetOverdueAgingSnapshotChartAsync(OverdueAgingSnapshotReq req, [FromServices] IDailyOverdueSnapshotApp dailyOverdueSnapshotApp)
+
+         {
+
+             var result = new TableData<OverdueAgingChartWrapper>();
+
+             try
+
+             {
+
+-                var (isNoRight, code, message) = await _dailyOverdueSnapshotApp.GetSnapshotPermission(req);
+
++                var (isNoRight, code, message) = await dailyOverdueSnapshotApp.GetSnapshotPermission(req);
+
+                 if (!isNoRight)
+
+                 {
+
+-                    result.Data = await _dailyOverdueSnapshotApp.GetOverdueAgingSnapshotChart(req);
+
++                    result.Data = await dailyOverdueSnapshotApp.GetOverdueAgingSnapshotChart(req);
+
+                 }
+
+-                else 
+
++                else
+
+                     return new TableData<OverdueAgingChartWrapper> { Code = code, Message = message, Data = new OverdueAgingChartWrapper { ColumnHeaders = new List<ColumnHeader>(), Data = new List<OverdueAgingChartResp>() } };
+
+             }
+
+             catch (Exception ex)
+
+@@ -281,18 +275,19 @@
+         /// 逾期快照详情数据（按销售员+客户分组，分页）
+
+         /// </summary>
+
+         /// <param name="req">查询参数</param>
+
++        /// <param name="dailyOverdueSnapshotApp">逾期快照应用服务</param>
+
+         /// <returns>包含列头和分页明细数据</returns>
+
+         [HttpPost]
+
+         [Route("GetOverdueAgingSnapshotDetail")]
+
+-        public async Task<TableData<OverdueAgingDetailWrapper>> GetOverdueAgingSnapshotDetail(OverdueAgingSnapshotDetailReq req)
+
++        public async Task<TableData<OverdueAgingDetailWrapper>> GetOverdueAgingSnapshotDetailAsync(OverdueAgingSnapshotDetailReq req, [FromServices] IDailyOverdueSnapshotApp dailyOverdueSnapshotApp)
+
+         {
+
+             var result = new TableData<OverdueAgingDetailWrapper>();
+
+             try
+
+             {
+
+-                var (isNoRight, code, message) = await _dailyOverdueSnapshotApp.GetSnapshotPermission(req);
+
++                var (isNoRight, code, message) = await dailyOverdueSnapshotApp.GetSnapshotPermission(req);
+
+                 if (isNoRight)
+
+                     return new TableData<OverdueAgingDetailWrapper> { Code = code, Message = message, Data = new OverdueAgingDetailWrapper { ColumnHeaders = new List<ColumnHeader>(), Data = new List<OverdueAgingDetailResp>() } };
+
+-                result.Data = await _dailyOverdueSnapshotApp.GetOverdueAgingSnapshotDetail(req);
+
++                result.Data = await dailyOverdueSnapshotApp.GetOverdueAgingSnapshotDetail(req);
+
+             }
+
+             catch (Exception ex)
+
+             {
+
+@@ -305,14 +300,16 @@
+         /// <summary>
+
+         /// 导入所有订单逾期快照数据
+
+         /// </summary>
+
++        /// <param name="dailyOverdueSnapshotImportService">逾期快照导入服务</param>
+
++        /// <returns>导入结果</returns>
+
+         [HttpPost]
+
+         [Route("ImportOverdueSnapshot")]
+
+-        public async Task<TableData> ImportOverdueSnapshot()
+
+-        {
+
+-            var result = new TableData();
+
+-            try
+
+-            {
+
+-                await _dailyOverdueSnapshotImportService.ImportOverdueSnapshots();
+
++        public async Task<TableData> ImportOverdueSnapshotAsync([FromServices] DailyOverdueSnapshotImportService dailyOverdueSnapshotImportService)
+
++        {
+
++            var result = new TableData();
+
++            try
+
++            {
+
++                await dailyOverdueSnapshotImportService.ImportOverdueSnapshots();
+
+                 result.Message = "导入成功";
+
+             }
+
+             catch (Exception ex)
+
+@@ -327,14 +324,16 @@
+         /// 导入指定订单的逾期快照数据
+
+         /// </summary>
+
+         /// <param name="docEntries">订单DocEntry列表</param>
+
++        /// <param name="dailyOverdueSnapshotImportService">逾期快照导入服务</param>
+
++        /// <returns>导入结果</returns>
+
+         [HttpPost]
+
+         [Route("ImportOverdueSnapshotForOrders")]
+
+-        public async Task<TableData> ImportOverdueSnapshotForOrders([FromBody] List<int> docEntries)
+
+-        {
+
+-            var result = new TableData();
+
+-            try
+
+-            {
+
+-                await _dailyOverdueSnapshotImportService.ImportOverdueSnapshotsForOrders(docEntries);
+
++        public async Task<TableData> ImportOverdueSnapshotForOrdersAsync([FromBody] List<int> docEntries, [FromServices] DailyOverdueSnapshotImportService dailyOverdueSnapshotImportService)
+
++        {
+
++            var result = new TableData();
+
++            try
+
++            {
+
++                await dailyOverdueSnapshotImportService.ImportOverdueSnapshotsForOrders(docEntries);
+
+                 result.Message = "导入成功";
+
+             }
+
+             catch (Exception ex)

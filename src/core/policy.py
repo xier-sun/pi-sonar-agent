@@ -42,6 +42,7 @@ class ToolDecision:
     reason: str = ""
     matched_rule: str = ""
     policy_violation: bool = False
+    severity: str = "none"
 
 
 @dataclass
@@ -50,15 +51,17 @@ class ToolUsageTracker:
 
     tool_uses: list[str] = field(default_factory=list)
     forbidden_tool_uses: list[str] = field(default_factory=list)
+    warning_tool_uses: list[str] = field(default_factory=list)
     last_tool_name: str | None = None
     saw_build_tool: bool = False
 
-    def snapshot(self) -> tuple[tuple[str, ...], tuple[str, ...], str | None, bool]:
+    def snapshot(self) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], str | None, bool]:
         """Return an immutable snapshot for runtime results."""
 
         return (
             tuple(self.tool_uses),
             tuple(self.forbidden_tool_uses),
+            tuple(self.warning_tool_uses),
             self.last_tool_name,
             self.saw_build_tool,
         )
@@ -129,6 +132,23 @@ class ToolPolicy:
         re.compile(r"(?i)\b(echo|write-output)\b[^;&|\r\n]*(>>|>)(?!\s*(\$null|nul|/dev/null)\b)"),
         re.compile(r"(?i)\btype\s+nul\b[^;&|\r\n]*(>>|>)"),
     )
+    _HARMLESS_SHELL_COMMANDS = frozenset(
+        {
+            "cd",
+            "ls",
+            "dir",
+            "pwd",
+            "cat",
+            "type",
+            "rg",
+            "grep",
+            "find",
+            "where",
+            "echo",
+            "get-childitem",
+            "get-location",
+        }
+    )
 
     @classmethod
     def _is_high_risk_shell_command(cls, command: str) -> bool:
@@ -136,6 +156,23 @@ class ToolPolicy:
         if not normalized_command:
             return True
         return any(pattern.search(normalized_command) for pattern in cls._HIGH_RISK_SHELL_PATTERNS)
+
+    @classmethod
+    def _is_harmless_shell_command(cls, command: str) -> bool:
+        normalized_command = str(command or "").strip()
+        if not normalized_command:
+            return False
+        if cls._is_high_risk_shell_command(normalized_command):
+            return False
+        segments = re.split(r"&&|\|\||[;|]", normalized_command)
+        meaningful_segments = [segment.strip() for segment in segments if segment.strip()]
+        if not meaningful_segments:
+            return False
+        for segment in meaningful_segments:
+            token = segment.split(None, 1)[0].strip().lower()
+            if token not in cls._HARMLESS_SHELL_COMMANDS:
+                return False
+        return True
 
     def classify(self, tool_name: str, payload: dict[str, object] | None = None) -> ToolDecision:
         """Return the classification/allowance decision for a tool."""
@@ -149,16 +186,7 @@ class ToolPolicy:
                 kind=ToolKind.UNKNOWN,
                 reason="Tool is not registered for the issue-fix runtime.",
                 policy_violation=True,
-            )
-
-        if spec.kind == ToolKind.FORBIDDEN:
-            return ToolDecision(
-                tool_name=normalized_tool_name,
-                allowed=False,
-                kind=spec.kind,
-                tags=spec.tags,
-                reason="Tool is explicitly forbidden during issue fixing.",
-                policy_violation=True,
+                severity="critical",
             )
 
         if normalized_tool_name == CONTROLLED_BASH_TOOL:
@@ -172,6 +200,7 @@ class ToolPolicy:
                         tags=spec.tags,
                         reason="Bash command would mutate the filesystem or create/delete files.",
                         policy_violation=True,
+                        severity="critical",
                     )
                 return ToolDecision(
                     tool_name=normalized_tool_name,
@@ -180,6 +209,16 @@ class ToolPolicy:
                     tags=spec.tags,
                     matched_rule="windows-shell-safe",
                 )
+            if self._is_harmless_shell_command(command):
+                return ToolDecision(
+                    tool_name=normalized_tool_name,
+                    allowed=False,
+                    kind=spec.kind,
+                    tags=spec.tags,
+                    reason="Shell tool is not enabled, but the attempted command is read-only/diagnostic.",
+                    policy_violation=False,
+                    severity="warning",
+                )
             return ToolDecision(
                 tool_name=normalized_tool_name,
                 allowed=False,
@@ -187,6 +226,18 @@ class ToolPolicy:
                 tags=spec.tags,
                 reason="Shell tool is not enabled for the current issue-fix runtime.",
                 policy_violation=True,
+                severity="critical",
+            )
+
+        if spec.kind == ToolKind.FORBIDDEN:
+            return ToolDecision(
+                tool_name=normalized_tool_name,
+                allowed=False,
+                kind=spec.kind,
+                tags=spec.tags,
+                reason="Tool is explicitly forbidden during issue fixing.",
+                policy_violation=True,
+                severity="critical",
             )
 
         if normalized_tool_name in self._allowed_lookup:
@@ -204,6 +255,7 @@ class ToolPolicy:
                 kind=spec.kind,
                 tags=spec.tags,
                 reason="Tool is controlled by the outer workflow, not the model runtime.",
+                severity="warning",
             )
 
         return ToolDecision(
@@ -213,6 +265,7 @@ class ToolPolicy:
             tags=spec.tags,
             reason="Tool is registered but not in the current allowlist.",
             policy_violation=True,
+            severity="critical",
         )
 
     def is_forbidden_tool(self, tool_name: str, payload: dict[str, object] | None = None) -> bool:
@@ -253,6 +306,8 @@ class ToolPolicyHook(RuntimeHook):
         self.tracker.last_tool_name = tool_name
         if context.decision.policy_violation:
             self.tracker.forbidden_tool_uses.append(self._format_policy_violation_label(context))
+        elif context.decision.severity == "warning":
+            self.tracker.warning_tool_uses.append(self._format_policy_violation_label(context))
         if context.decision.kind == ToolKind.CONTROLLED and "build" in context.decision.tags:
             self.tracker.saw_build_tool = True
 

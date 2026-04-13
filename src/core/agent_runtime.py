@@ -29,6 +29,9 @@ from pi_sonar_agent.core.model_gateway import (
 from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.policy import ToolPolicy, ToolPolicyHook, ToolUsageTracker, normalize_tool_name
 
+EDIT_NUDGE_THRESHOLD = 4
+MAX_EDIT_NUDGES = 2
+
 
 @dataclass(frozen=True)
 class RuntimeTimeouts:
@@ -48,6 +51,7 @@ class AgentRuntimeResult:
     agent_error: str | None = None
     tool_uses: tuple[str, ...] = ()
     forbidden_tool_uses: tuple[str, ...] = ()
+    warning_tool_uses: tuple[str, ...] = ()
     last_tool_name: str | None = None
     saw_build_tool: bool = False
     total_duration_seconds: float = 0.0
@@ -64,6 +68,7 @@ class AgentRuntimeResult:
     continuation_retry_count: int = 0
     continuation_recovered: bool = False
     continuation_timeout_stages: tuple[str, ...] = ()
+    edit_nudge_count: int = 0
     runtime_events: tuple[Any, ...] = ()
 
 
@@ -271,6 +276,9 @@ class AgentRuntime:
         pending_tool_result_name: str | None = None
         last_edit_tool_name = ""
         last_edit_raw_payload: dict[str, Any] = {}
+        consecutive_non_edit_calls = 0
+        pending_edit_nudge = False
+        edit_nudge_count = 0
 
         def format_preview(value: str, *, max_chars: int = 1200) -> str:
             text = str(value or "").replace("\r\n", "\n").strip()
@@ -322,7 +330,7 @@ class AgentRuntime:
             return format_preview(numbered, max_chars=2400)
 
         def build_result() -> AgentRuntimeResult:
-            tool_uses, forbidden_tool_uses, last_tool_name, saw_build_tool = tracker.snapshot()
+            tool_uses, forbidden_tool_uses, warning_tool_uses, last_tool_name, saw_build_tool = tracker.snapshot()
             total_duration_seconds = max(0.0, time.monotonic() - run_started_at)
             time_to_first_model_content_seconds = 0.0
             if first_response_at is not None:
@@ -336,6 +344,7 @@ class AgentRuntime:
                 agent_error=agent_error,
                 tool_uses=tool_uses,
                 forbidden_tool_uses=forbidden_tool_uses,
+                warning_tool_uses=warning_tool_uses,
                 last_tool_name=last_tool_name,
                 saw_build_tool=saw_build_tool,
                 total_duration_seconds=round(total_duration_seconds, 3),
@@ -349,6 +358,7 @@ class AgentRuntime:
                 timeout_stage=timeout_stage,
                 last_progress_stage=last_progress_stage,
                 saw_result_event=saw_result_event,
+                edit_nudge_count=edit_nudge_count,
                 runtime_events=event_stream.snapshot(),
             )
 
@@ -453,7 +463,7 @@ class AgentRuntime:
         )
 
         async def run_once() -> AgentRuntimeResult:
-            nonlocal agent_error, assistant_text_chars, assistant_text_events, captured_exception, first_edit_at, saw_result_event, timeout_stage, pending_tool_result_name, last_edit_tool_name, last_edit_raw_payload
+            nonlocal agent_error, assistant_text_chars, assistant_text_events, captured_exception, first_edit_at, saw_result_event, timeout_stage, pending_tool_result_name, last_edit_tool_name, last_edit_raw_payload, edit_nudge_count, consecutive_non_edit_calls, pending_edit_nudge
 
             print("  [TRACE] 正在初始化 Claude SDK Client...", flush=True)
             update_status("client_connecting")
@@ -497,6 +507,37 @@ class AgentRuntime:
                 await session.send(request.user_prompt)
                 print("  [TRACE] 请求已发送，等待模型首响应...", flush=True)
                 update_status("waiting_for_first_response")
+
+                async def maybe_send_edit_nudge(trigger_stage: str) -> None:
+                    nonlocal pending_edit_nudge, edit_nudge_count
+                    if not pending_edit_nudge or first_edit_at is not None:
+                        return
+                    if edit_nudge_count >= MAX_EDIT_NUDGES:
+                        pending_edit_nudge = False
+                        return
+                    nudge_message = (
+                        "你已经连续多次只做读取/搜索，还没有任何代码修改。"
+                        "现在请立即使用 Edit 或 MultiEdit 对当前 Sonar issue 落盘修改。"
+                        "不要继续扩展读取范围；如果你确认当前约束下无法安全修复，请直接明确说明原因。"
+                    )
+                    pending_edit_nudge = False
+                    edit_nudge_count += 1
+                    print(
+                        "  [TRACE] Edit nudge 已发送: "
+                        f"index={edit_nudge_count}, stage={trigger_stage}",
+                        flush=True,
+                    )
+                    event_stream.emit(
+                        AttemptRuntimeEventKind.EDIT_NUDGE_SENT,
+                        stage=trigger_stage,
+                        payload={
+                            "index": edit_nudge_count,
+                            "threshold": EDIT_NUDGE_THRESHOLD,
+                            "message": nudge_message,
+                        },
+                    )
+                    update_status("edit_nudge", first_response=True)
+                    await session.send(nudge_message)
 
                 response_stream = session.stream_events()
                 while True:
@@ -542,6 +583,14 @@ class AgentRuntime:
                         if tool_name in {"Edit", "MultiEdit", "Write"} and first_edit_at is None:
                             first_edit_at = time.monotonic()
                         if tool_name in {"Edit", "MultiEdit"}:
+                            consecutive_non_edit_calls = 0
+                            pending_edit_nudge = False
+                        elif first_edit_at is None:
+                            consecutive_non_edit_calls += 1
+                            if consecutive_non_edit_calls >= EDIT_NUDGE_THRESHOLD:
+                                pending_edit_nudge = True
+                                consecutive_non_edit_calls = 0
+                        if tool_name in {"Edit", "MultiEdit"}:
                             last_edit_tool_name = tool_name
                             last_edit_raw_payload = dict(event.raw_payload or {})
                         pending_tool_result_name = tool_name
@@ -586,6 +635,7 @@ class AgentRuntime:
                                 payload={"tool_name": pending_tool_result_name},
                             )
                             pending_tool_result_name = None
+                            await maybe_send_edit_nudge("tool_result")
                         assistant_text_events += 1
                         assistant_text_chars += len(event.text or "")
                         print(f"  Claude: {event.text[:200]}...", flush=True)
@@ -607,6 +657,7 @@ class AgentRuntime:
                                 payload={"tool_name": pending_tool_result_name},
                             )
                             pending_tool_result_name = None
+                            await maybe_send_edit_nudge("tool_result")
                         saw_result_event = True
                         print(f"  Done. Cost: ${event.total_cost_usd:.4f}", flush=True)
                         agent_error = event.agent_error
@@ -626,6 +677,7 @@ class AgentRuntime:
                                 payload={"tool_name": pending_tool_result_name},
                             )
                             pending_tool_result_name = None
+                            await maybe_send_edit_nudge("tool_result")
                         trace_label = "THINKING" if "Thinking" in event.message_type else "TRACE"
                         print(f"  [{trace_label}] 收到 SDK 消息类型: {event.message_type}", flush=True)
                         if event.preview:
@@ -646,7 +698,7 @@ class AgentRuntime:
             finally:
                 await session.close()
 
-            tool_uses, forbidden_tool_uses, last_tool_name, saw_build_tool = tracker.snapshot()
+            tool_uses, forbidden_tool_uses, warning_tool_uses, last_tool_name, saw_build_tool = tracker.snapshot()
             finalize_context = AttemptFinalizeContext(
                 agent_error=agent_error,
                 tool_uses=tool_uses,
@@ -664,6 +716,8 @@ class AgentRuntime:
                     "agent_error": agent_error or "",
                     "tool_call_count": len(tool_uses),
                     "saw_result_event": saw_result_event,
+                    "edit_nudge_count": edit_nudge_count,
+                    "warning_tool_uses": list(warning_tool_uses),
                 },
             )
             return build_result()

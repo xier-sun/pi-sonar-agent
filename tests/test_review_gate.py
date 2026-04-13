@@ -148,3 +148,27 @@ def test_review_gate_result_builder_tolerates_null_decisions_and_feedback() -> N
             reason="Review agent did not explicitly waive this finding.",
         ),
     )
+
+
+def test_review_gate_unavailable_result_is_not_applicable() -> None:
+    findings = (
+        ReviewGateFinding(
+            finding_id="quality_gate:cognitive_complexity:src/Foo.cs:10:1",
+            source="quality_gate",
+            title="认知复杂度",
+            message="复杂度仍然偏高。",
+        ),
+    )
+
+    result = ReviewGateAgent._build_unavailable_result(
+        findings=findings,
+        model_display="kimi-k2.5",
+        summary="Review gate session returned an agent error; fell back to deterministic verifier blockers.",
+        error="selected model is unavailable",
+    )
+
+    assert result.status == "not_applicable"
+    assert result.invoked is True
+    assert result.findings == findings
+    assert result.decisions == ()
+    assert "fell back to deterministic verifier blockers" in result.summary

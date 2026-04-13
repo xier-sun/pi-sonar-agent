@@ -1,0 +1,18 @@
+{
+  "issue_key": "7df7fe85-b963-4c91-b06c-850694223ea7",
+  "rule_id": "external_roslyn:CS1573",
+  "message": "参数“misconductReportApp”在“HumanResourceApprovalApp.HumanResourceApprovalApp(IUnitWork, IAuth, IServiceProvider, RevelanceManagerApp, IConfiguration, MisconductReportApp)”的 XML 注释中没有匹配的 param 标记(但其他参数有)",
+  "line": 65,
+  "text_range": {
+    "startLine": 65,
+    "endLine": 65,
+    "startOffset": 32,
+    "endOffset": 51
+  },
+  "flows": [],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/HumanResourceApprovalApp.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

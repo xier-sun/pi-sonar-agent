@@ -92,13 +92,16 @@ def test_upload_pull_request_attachment_posts_binary_payload() -> None:
         def __init__(self) -> None:
             self.headers: dict[str, str] = {}
 
-        def post(self, url: str, *, params=None, data=None, headers=None, timeout=None):
+        def request(self, method: str, url: str, timeout=None, **kwargs):
             captured["url"] = url
-            captured["params"] = params
-            captured["data"] = data
-            captured["headers"] = headers
+            captured["params"] = kwargs.get("params")
+            captured["data"] = kwargs.get("data")
+            captured["headers"] = kwargs.get("headers")
             captured["timeout"] = timeout
             return FakeResponse()
+
+        def close(self) -> None:
+            return None
 
     client = ado_module.AzureDevOpsClient(
         "https://dev.azure.com/acme",
@@ -125,3 +128,103 @@ def test_upload_pull_request_attachment_posts_binary_payload() -> None:
         "headers": {"Content-Type": "application/octet-stream"},
         "timeout": 15,
     }
+
+
+def test_create_pull_request_retries_after_connection_reset(monkeypatch) -> None:
+    calls: list[tuple[str, str, object]] = []
+
+    class FakeResponse:
+        status_code = 200
+        text = ""
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "pullRequestId": 42,
+                "title": "Fix PR",
+                "description": "summary",
+                "status": "active",
+                "_links": {"web": {"href": "https://dev.azure.com/acme/project/_git/repo/pullrequest/42"}},
+            }
+
+    class FakeSession:
+        def __init__(self, should_fail: bool = False) -> None:
+            self.headers: dict[str, str] = {}
+            self.should_fail = should_fail
+
+        def request(self, method: str, url: str, timeout=None, **kwargs):
+            calls.append((method, url, timeout))
+            if self.should_fail:
+                raise ado_module.requests.ConnectionError(
+                    ConnectionResetError(10054, "远程主机强迫关闭了一个现有的连接。")
+                )
+            return FakeResponse()
+
+        def close(self) -> None:
+            return None
+
+    sessions = [FakeSession(should_fail=True), FakeSession(should_fail=False)]
+
+    def fake_build_session(self):
+        return sessions.pop(0)
+
+    monkeypatch.setattr(ado_module.AzureDevOpsClient, "_build_session", fake_build_session)
+    monkeypatch.setattr(ado_module.time, "sleep", lambda seconds: None)
+
+    client = ado_module.AzureDevOpsClient(
+        "https://dev.azure.com/acme",
+        "project",
+        "ado-token",
+        organization="acme",
+        timeout=15,
+    )
+
+    pr = client.create_pull_request(
+        repository="repo",
+        title="Fix PR",
+        description="summary",
+        source_branch="feature/pr-retry",
+    )
+
+    assert pr.pr_id == 42
+    assert len(calls) == 2
+    assert calls[0][0] == "post"
+    assert calls[1][0] == "post"
+
+
+def test_create_pull_request_raises_after_exhausting_transport_retries(monkeypatch) -> None:
+    class FakeSession:
+        def __init__(self) -> None:
+            self.headers: dict[str, str] = {}
+
+        def request(self, method: str, url: str, timeout=None, **kwargs):
+            raise ado_module.requests.ConnectionError(
+                ConnectionResetError(10054, "远程主机强迫关闭了一个现有的连接。")
+            )
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(ado_module.AzureDevOpsClient, "_build_session", lambda self: FakeSession())
+    monkeypatch.setattr(ado_module.time, "sleep", lambda seconds: None)
+
+    client = ado_module.AzureDevOpsClient(
+        "https://dev.azure.com/acme",
+        "project",
+        "ado-token",
+        organization="acme",
+        timeout=15,
+    )
+
+    try:
+        client.create_pull_request(
+            repository="repo",
+            title="Fix PR",
+            description="summary",
+            source_branch="feature/pr-retry-fail",
+        )
+        raise AssertionError("expected AzureDevOpsRequestError")
+    except ado_module.AzureDevOpsRequestError as exc:
+        assert "3 次尝试后仍未成功" in str(exc)

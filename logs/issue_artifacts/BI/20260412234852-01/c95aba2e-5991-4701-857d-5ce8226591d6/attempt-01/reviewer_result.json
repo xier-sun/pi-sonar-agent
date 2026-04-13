@@ -1,0 +1,46 @@
+{
+  "status": "pass",
+  "guardrail_mode": "scope",
+  "summary": "Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit.",
+  "violations": [
+    {
+      "type": "outside_primary_region",
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "reason": "This hunk changes lines outside the primary issue window 2144-2233; recorded as drift only.",
+      "symbol": "method@2144-2153",
+      "changed_lines": [
+        2096
+      ],
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n@@ -2096 +2096 @@\n-                ProcessSocialSecurityItem(changes, updateRequest, currentSecuritiesForUser, systemUserId, account, userName, loginUser, hasSubstantiveChange);\n+                ProcessSocialSecurityItem(changes, updateRequest, currentSecuritiesForUser, (systemUserId, account, userName), loginUser, hasSubstantiveChange);\n@@ -2168,3 +2168 @@\n-        /// <param name=\"systemUserId\"></param>\n-        /// <param name=\"account\"></param>\n-        /// <param name=\"userName\"></param>\n+        /// <param name=\"userInfo\"></param>\n@@ -2176,3 +2174 @@\n-            string systemUserId,\n-            string account,\n-            string userName,\n+            (string systemUserId, string account, string userName) userInfo,\n@@ -2187,3 +2183,3 @@\n-                UserId = systemUserId,\n-                Account = account,\n-                Name = userName,\n+                UserId = userInfo.systemUserId,\n+                Account = userInfo.account,\n+                Name = userInfo.userName,"
+    }
+  ],
+  "follow_ups": [
+    {
+      "source_issue_key": "c95aba2e-5991-4701-857d-5ce8226591d6",
+      "file": "OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+      "symbol": "method@2144-2153",
+      "summary": "Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
+      "evidence_hunk": "--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n+++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs\n@@ -2096 +2096 @@\n-                ProcessSocialSecurityItem(changes, updateRequest, currentSecuritiesForUser, systemUserId, account, userName, loginUser, hasSubstantiveChange);\n+                ProcessSocialSecurityItem(changes, updateRequest, currentSecuritiesForUser, (systemUserId, account, userName), loginUser, hasSubstantiveChange);\n@@ -2168,3 +2168 @@\n-        /// <param name=\"systemUserId\"></param>\n-        /// <param name=\"account\"></param>\n-        /// <param name=\"userName\"></param>\n+        /// <param name=\"userInfo\"></param>\n@@ -2176,3 +2174 @@\n-            string systemUserId,\n-            string account,\n-            string userName,\n+            (string systemUserId, string account, string userName) userInfo,\n@@ -2187,3 +2183,3 @@\n-                UserId = systemUserId,\n-                Account = account,\n-                Name = userName,\n+                UserId = userInfo.systemUserId,\n+                Account = userInfo.account,\n+                Name = userInfo.userName,",
+      "discovered_at": "2026-04-12T15:58:30.917590+00:00",
+      "discovered_by": "diff_reviewer"
+    }
+  ],
+  "metrics": {
+    "changed_file_count": 1,
+    "hunk_count": 4,
+    "total_changed_lines": 10,
+    "hard_boundary_violation_count": 0,
+    "soft_boundary_violation_count": 1,
+    "extra_touched_file_count": 0,
+    "outside_primary_region_line_count": 1,
+    "outside_primary_region_count": 1,
+    "scope_audit_mode": "scope_soft_audit",
+    "scope_audit_active": true,
+    "scope_expansion_count": 1,
+    "scope_expansion_reasons": [
+      "outside_primary_region"
+    ],
+    "high_drift_warning": false,
+    "drift_score": 1
+  }
+}

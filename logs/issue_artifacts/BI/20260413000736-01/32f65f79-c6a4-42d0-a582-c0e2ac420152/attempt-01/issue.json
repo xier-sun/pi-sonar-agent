@@ -1,0 +1,18 @@
+{
+  "issue_key": "32f65f79-c6a4-42d0-a582-c0e2ac420152",
+  "rule_id": "external_roslyn:CS1573",
+  "message": "参数“hasSubstantiveChange”在“SocialSecurityApp.ProcessHousingFundItem(SocialSecurityApp.DatabaseChangeLists, UpdateSocialFundRequest, List<UserSocialsecurity>, string, string, string, User, bool)”的 XML 注释中没有匹配的 param 标记(但其他参数有)",
+  "line": 2116,
+  "text_range": {
+    "startLine": 2116,
+    "endLine": 2116,
+    "startOffset": 17,
+    "endOffset": 37
+  },
+  "flows": [],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+  "severity": "MAJOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

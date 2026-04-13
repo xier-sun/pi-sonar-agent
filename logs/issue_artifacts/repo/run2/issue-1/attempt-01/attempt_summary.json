@@ -1,9 +1,9 @@
 {
   "attempt_number": 1,
   "status": "retrying",
-  "started_at": "2026-04-12T04:52:22.771800+00:00",
-  "finished_at": "2026-04-12T04:52:22.772106+00:00",
-  "duration_seconds": 0.0,
+  "started_at": "2026-04-12T15:44:22.702787+00:00",
+  "finished_at": "2026-04-12T15:44:22.704153+00:00",
+  "duration_seconds": 0.001,
   "failure_kind": "build",
   "retry_reason": "build_verification_failed",
   "retryable_failure": true,
@@ -20,7 +20,7 @@
   "issue_log_path": "logs\\issue_attempts\\repo_issue-1_run2.log",
   "artifact_dir": "logs/issue_artifacts/repo/run2/issue-1/attempt-01",
   "performance_metrics": {
-    "attempt_total_duration_seconds": 0.0
+    "attempt_total_duration_seconds": 0.001
   },
   "rollout_flags": []
 }

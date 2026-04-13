@@ -1,0 +1,313 @@
+{
+  "issue_key": "941f6101-03f0-4509-9ff2-6281f2e2028f",
+  "rule_id": "csharpsquid:S3776",
+  "message": "Refactor this method to reduce its Cognitive Complexity from 45 to the 30 allowed.",
+  "line": 1619,
+  "text_range": {
+    "startLine": 1619,
+    "endLine": 1619,
+    "startOffset": 12,
+    "endOffset": 43
+  },
+  "flows": [
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1628,
+            "endLine": 1628,
+            "startOffset": 12,
+            "endOffset": 17
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 1631,
+            "endLine": 1631,
+            "startOffset": 16,
+            "endOffset": 21
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 1634,
+            "endLine": 1634,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 1640,
+            "endLine": 1640,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1644,
+            "endLine": 1644,
+            "startOffset": 58,
+            "endOffset": 60
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 1648,
+            "endLine": 1648,
+            "startOffset": 16,
+            "endOffset": 23
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 1653,
+            "endLine": 1653,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 1656,
+            "endLine": 1656,
+            "startOffset": 24,
+            "endOffset": 31
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+5 (incl 4 for nesting)",
+          "textRange": {
+            "startLine": 1659,
+            "endLine": 1659,
+            "startOffset": 28,
+            "endOffset": 30
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1670,
+            "endLine": 1670,
+            "startOffset": 64,
+            "endOffset": 66
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1675,
+            "endLine": 1675,
+            "startOffset": 12,
+            "endOffset": 19
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 1678,
+            "endLine": 1678,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 1683,
+            "endLine": 1683,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 1688,
+            "endLine": 1688,
+            "startOffset": 16,
+            "endOffset": 23
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 1690,
+            "endLine": 1690,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1700,
+            "endLine": 1700,
+            "startOffset": 12,
+            "endOffset": 17
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 1703,
+            "endLine": 1703,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 1708,
+            "endLine": 1708,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 1713,
+            "endLine": 1713,
+            "startOffset": 16,
+            "endOffset": 23
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 1715,
+            "endLine": 1715,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 1715,
+            "endLine": 1715,
+            "startOffset": 59,
+            "endOffset": 61
+          }
+        }
+      ]
+    }
+  ],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+  "severity": "CRITICAL",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

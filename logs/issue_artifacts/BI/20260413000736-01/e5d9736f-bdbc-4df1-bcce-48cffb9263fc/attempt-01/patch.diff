@@ -1,0 +1,16 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
+@@ -2073,6 +2073,7 @@
+         /// <param name="account"></param>
+
+         /// <param name="userName"></param>
+
+         /// <param name="loginUser"></param>
+
++        /// <param name="hasSubstantiveChange"></param>
+
+         private void ProcessSocialFundUpdate(
+
+             DatabaseChangeLists changes,
+
+             UpdateSocialFundRequest updateRequest,

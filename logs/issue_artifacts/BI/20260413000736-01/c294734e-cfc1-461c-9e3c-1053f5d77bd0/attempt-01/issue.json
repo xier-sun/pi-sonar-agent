@@ -1,0 +1,229 @@
+{
+  "issue_key": "c294734e-cfc1-461c-9e3c-1053f5d77bd0",
+  "rule_id": "csharpsquid:S3776",
+  "message": "Refactor this method to reduce its Cognitive Complexity from 31 to the 30 allowed.",
+  "line": 3156,
+  "text_range": {
+    "startLine": 3156,
+    "endLine": 3156,
+    "startOffset": 21,
+    "endOffset": 48
+  },
+  "flows": [
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 3165,
+            "endLine": 3165,
+            "startOffset": 12,
+            "endOffset": 14
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 3165,
+            "endLine": 3165,
+            "startOffset": 46,
+            "endOffset": 48
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 3169,
+            "endLine": 3169,
+            "startOffset": 129,
+            "endOffset": 131
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 3170,
+            "endLine": 3170,
+            "startOffset": 16,
+            "endOffset": 18
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 3170,
+            "endLine": 3170,
+            "startOffset": 54,
+            "endOffset": 56
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 3205,
+            "endLine": 3205,
+            "startOffset": 12,
+            "endOffset": 16
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+2 (incl 1 for nesting)",
+          "textRange": {
+            "startLine": 3208,
+            "endLine": 3208,
+            "startOffset": 16,
+            "endOffset": 23
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+3 (incl 2 for nesting)",
+          "textRange": {
+            "startLine": 3213,
+            "endLine": 3213,
+            "startOffset": 20,
+            "endOffset": 22
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 3213,
+            "endLine": 3213,
+            "startOffset": 47,
+            "endOffset": 49
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 3215,
+            "endLine": 3215,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 3219,
+            "endLine": 3219,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 3224,
+            "endLine": 3224,
+            "startOffset": 20,
+            "endOffset": 24
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+1",
+          "textRange": {
+            "startLine": 3224,
+            "endLine": 3224,
+            "startOffset": 52,
+            "endOffset": 54
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 3226,
+            "endLine": 3226,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    },
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+          "msg": "+4 (incl 3 for nesting)",
+          "textRange": {
+            "startLine": 3230,
+            "endLine": 3230,
+            "startOffset": 24,
+            "endOffset": 26
+          }
+        }
+      ]
+    }
+  ],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs",
+  "severity": "CRITICAL",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

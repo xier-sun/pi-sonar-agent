@@ -1,0 +1,33 @@
+{
+  "issue_key": "2bfba801-1e9f-4995-88dd-b2a8e5e244ca",
+  "rule_id": "csharpsquid:S4136",
+  "message": "All 'ApplySorting' method overloads should be adjacent.",
+  "line": 2121,
+  "text_range": {
+    "startLine": 2121,
+    "endLine": 2121,
+    "startOffset": 47,
+    "endOffset": 59
+  },
+  "flows": [
+    {
+      "locations": [
+        {
+          "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+          "msg": "Non-adjacent overload",
+          "textRange": {
+            "startLine": 5238,
+            "endLine": 5238,
+            "startOffset": 53,
+            "endOffset": 65
+          }
+        }
+      ]
+    }
+  ],
+  "component": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0:OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+  "file_path": "/OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs",
+  "severity": "MINOR",
+  "issue_type": "CODE_SMELL",
+  "status": "OPEN"
+}

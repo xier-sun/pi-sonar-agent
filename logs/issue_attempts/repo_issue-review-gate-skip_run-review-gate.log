@@ -338,3 +338,71 @@ Review gate rejected the patch after auditing the ambiguous gate findings.
 - 继续减少嵌套分支，不要只做 rename。
 [2026-04-12 12:52:25] Workspace restored to issue baseline
 [2026-04-12 12:52:25] Issue skipped: Review gate verification failed after 2 attempt(s)
+[2026-04-12 22:41:43] Attempt 1/2 started for issue-review-gate-skip
+[2026-04-12 22:41:43] Attempt 1 failed: Review gate verification failed
+[2026-04-12 22:41:43] Build failure report:
+错误: Review gate verification failed
+
+构建日志:
+Review gate rejected the patch after auditing the ambiguous gate findings.
+[2026-04-12 22:41:43] Next retry feedback for model:
+上次尝试经过审核 agent 复核后，仍被判定需要继续修改：
+审核 agent 认为复杂度问题仍未解决。
+1. [quality_gate/confirm] 认知复杂度 | location: tracked.cs:1
+   审核理由: 当前 patch 只是重排条件，没有降低嵌套层级。
+   证据: 嵌套仍然过深。
+审核 agent 给出的下一轮要求:
+- 继续减少嵌套分支，不要只做 rename。
+[2026-04-12 22:41:43] Workspace restored to issue baseline
+[2026-04-12 22:41:43] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-12 22:41:43] Attempt 2/2 started for issue-review-gate-skip
+[2026-04-12 22:41:43] Attempt 2 failed: Review gate verification failed
+[2026-04-12 22:41:43] Build failure report:
+错误: Review gate verification failed
+
+构建日志:
+Review gate rejected the patch after auditing the ambiguous gate findings.
+[2026-04-12 22:41:43] Next retry feedback for model:
+上次尝试经过审核 agent 复核后，仍被判定需要继续修改：
+审核 agent 认为复杂度问题仍未解决。
+1. [quality_gate/confirm] 认知复杂度 | location: tracked.cs:1
+   审核理由: 当前 patch 只是重排条件，没有降低嵌套层级。
+   证据: 嵌套仍然过深。
+审核 agent 给出的下一轮要求:
+- 继续减少嵌套分支，不要只做 rename。
+[2026-04-12 22:41:43] Workspace restored to issue baseline
+[2026-04-12 22:41:43] Issue skipped: Review gate verification failed after 2 attempt(s)
+[2026-04-12 23:44:25] Attempt 1/2 started for issue-review-gate-skip
+[2026-04-12 23:44:25] Attempt 1 failed: Review gate verification failed
+[2026-04-12 23:44:25] Build failure report:
+错误: Review gate verification failed
+
+构建日志:
+Review gate rejected the patch after auditing the ambiguous gate findings.
+[2026-04-12 23:44:25] Next retry feedback for model:
+上次尝试经过审核 agent 复核后，仍被判定需要继续修改：
+审核 agent 认为复杂度问题仍未解决。
+1. [quality_gate/confirm] 认知复杂度 | location: tracked.cs:1
+   审核理由: 当前 patch 只是重排条件，没有降低嵌套层级。
+   证据: 嵌套仍然过深。
+审核 agent 给出的下一轮要求:
+- 继续减少嵌套分支，不要只做 rename。
+[2026-04-12 23:44:25] Workspace restored to issue baseline
+[2026-04-12 23:44:25] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-12 23:44:25] Attempt 2/2 started for issue-review-gate-skip
+[2026-04-12 23:44:25] Attempt 2 failed: Review gate verification failed
+[2026-04-12 23:44:25] Build failure report:
+错误: Review gate verification failed
+
+构建日志:
+Review gate rejected the patch after auditing the ambiguous gate findings.
+[2026-04-12 23:44:25] Next retry feedback for model:
+上次尝试经过审核 agent 复核后，仍被判定需要继续修改：
+审核 agent 认为复杂度问题仍未解决。
+1. [quality_gate/confirm] 认知复杂度 | location: tracked.cs:1
+   审核理由: 当前 patch 只是重排条件，没有降低嵌套层级。
+   证据: 嵌套仍然过深。
+审核 agent 给出的下一轮要求:
+- 继续减少嵌套分支，不要只做 rename。
+[2026-04-12 23:44:25] Workspace restored to issue baseline
+[2026-04-12 23:44:25] Issue skipped: Review gate verification failed after 2 attempt(s)

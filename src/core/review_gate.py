@@ -553,6 +553,29 @@ class ReviewGateAgent:
         return payload
 
     @classmethod
+    def _build_unavailable_result(
+        cls,
+        *,
+        findings: tuple[ReviewGateFinding, ...],
+        model_display: str,
+        summary: str,
+        error: str,
+        raw_response: str = "",
+        invoked: bool = True,
+    ) -> ReviewGateResult:
+        return ReviewGateResult(
+            status="not_applicable",
+            summary=summary,
+            invoked=invoked,
+            model_display=model_display,
+            findings=findings,
+            decisions=(),
+            feedback=(),
+            raw_response=raw_response,
+            error=error,
+        )
+
+    @classmethod
     def _build_result_from_payload(
         cls,
         *,
@@ -668,42 +691,22 @@ class ReviewGateAgent:
 
         raw_response = "".join(text_parts).strip()
         if agent_error:
-            return ReviewGateResult(
-                status="retry",
-                summary="Review gate session returned an agent error; kept the original blocker conservatively.",
-                invoked=True,
-                model_display=str(request.metadata.get("model_display", "")),
+            return cls._build_unavailable_result(
                 findings=findings,
-                decisions=tuple(
-                    ReviewGateDecision(
-                        finding_id=item.finding_id,
-                        decision="confirm",
-                        reason="Review agent returned an execution error.",
-                    )
-                    for item in findings
-                ),
-                raw_response=raw_response,
+                model_display=str(request.metadata.get("model_display", "")),
+                summary="Review gate session returned an agent error; fell back to deterministic verifier blockers.",
                 error=agent_error,
+                raw_response=raw_response,
             )
         try:
             payload = cls._parse_response_payload(raw_response)
         except Exception as exc:
-            return ReviewGateResult(
-                status="retry",
-                summary="Review gate did not return valid JSON; kept the original blocker conservatively.",
-                invoked=True,
-                model_display=str(request.metadata.get("model_display", "")),
+            return cls._build_unavailable_result(
                 findings=findings,
-                decisions=tuple(
-                    ReviewGateDecision(
-                        finding_id=item.finding_id,
-                        decision="confirm",
-                        reason="Review agent response was invalid or unparsable.",
-                    )
-                    for item in findings
-                ),
-                raw_response=raw_response,
+                model_display=str(request.metadata.get("model_display", "")),
+                summary="Review gate returned invalid JSON; fell back to deterministic verifier blockers.",
                 error=str(exc),
+                raw_response=raw_response,
             )
         return cls._build_result_from_payload(
             findings=findings,
@@ -784,19 +787,9 @@ class ReviewGateAgent:
                 )
             )
         except Exception as exc:
-            return ReviewGateResult(
-                status="retry",
-                summary="Review gate invocation failed; kept the original blocker conservatively.",
-                invoked=True,
-                model_display=str(explicit_model or ""),
+            return cls._build_unavailable_result(
                 findings=findings,
-                decisions=tuple(
-                    ReviewGateDecision(
-                        finding_id=item.finding_id,
-                        decision="confirm",
-                        reason="Review gate invocation failed before a verdict was produced.",
-                    )
-                    for item in findings
-                ),
+                model_display=str(explicit_model or ""),
+                summary="Review gate invocation failed; fell back to deterministic verifier blockers.",
                 error=str(exc),
             )

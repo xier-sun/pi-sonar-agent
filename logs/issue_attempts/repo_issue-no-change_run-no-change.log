@@ -1496,3 +1496,53 @@
 [2026-04-12 12:52:24] Workspace restored to issue baseline
 [2026-04-12 12:52:24] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
 [2026-04-12 12:52:24] Issue skipped: Retry stopped early after 2 attempt(s): repeated `no_change` with unchanged strategy and diff.
+[2026-04-12 22:41:42] Attempt 1/3 started for issue-no-change
+[2026-04-12 22:41:42] Attempt 1 failed: Agent completed without modifying any files
+[2026-04-12 22:41:42] Next retry feedback for model:
+上次尝试没有实际修改任何文件。
+这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。
+重试约束:
+- 不要只做分析或解释，必须提交实际代码修改。
+- 优先直接修掉上面已经明确指出的门禁/审核问题，不要重新大改整段逻辑。
+- 修改后立即使用推荐构建命令验证。
+- 如果这是行级问题，只修改 Sonar 指向的那条语句。
+[2026-04-12 22:41:42] Workspace restored to issue baseline
+[2026-04-12 22:41:42] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-12 22:41:42] Attempt 2/3 started for issue-no-change
+[2026-04-12 22:41:42] Attempt 2 failed: Agent completed without modifying any files
+[2026-04-12 22:41:42] Next retry feedback for model:
+上次尝试没有实际修改任何文件。
+这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。
+重试约束:
+- 不要只做分析或解释，必须提交实际代码修改。
+- 优先直接修掉上面已经明确指出的门禁/审核问题，不要重新大改整段逻辑。
+- 修改后立即使用推荐构建命令验证。
+- 如果这是行级问题，只修改 Sonar 指向的那条语句。
+[2026-04-12 22:41:42] Workspace restored to issue baseline
+[2026-04-12 22:41:42] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-12 22:41:42] Issue skipped: Retry stopped early after 2 attempt(s): repeated `no_change` with unchanged strategy and diff.
+[2026-04-12 23:44:24] Attempt 1/3 started for issue-no-change
+[2026-04-12 23:44:24] Attempt 1 failed: Agent completed without modifying any files
+[2026-04-12 23:44:24] Next retry feedback for model:
+上次尝试没有实际修改任何文件。
+这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。
+重试约束:
+- 不要只做分析或解释，必须提交实际代码修改。
+- 优先直接修掉上面已经明确指出的门禁/审核问题，不要重新大改整段逻辑。
+- 修改后立即使用推荐构建命令验证。
+- 如果这是行级问题，只修改 Sonar 指向的那条语句。
+[2026-04-12 23:44:24] Workspace restored to issue baseline
+[2026-04-12 23:44:24] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-12 23:44:24] Attempt 2/3 started for issue-no-change
+[2026-04-12 23:44:24] Attempt 2 failed: Agent completed without modifying any files
+[2026-04-12 23:44:24] Next retry feedback for model:
+上次尝试没有实际修改任何文件。
+这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。
+重试约束:
+- 不要只做分析或解释，必须提交实际代码修改。
+- 优先直接修掉上面已经明确指出的门禁/审核问题，不要重新大改整段逻辑。
+- 修改后立即使用推荐构建命令验证。
+- 如果这是行级问题，只修改 Sonar 指向的那条语句。
+[2026-04-12 23:44:24] Workspace restored to issue baseline
+[2026-04-12 23:44:24] Retry stopped early because failure detail, strategy fingerprint, and diff fingerprint did not change.
+[2026-04-12 23:44:24] Issue skipped: Retry stopped early after 2 attempt(s): repeated `no_change` with unchanged strategy and diff.

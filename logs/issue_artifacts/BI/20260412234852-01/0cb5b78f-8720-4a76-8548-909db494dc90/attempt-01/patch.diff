@@ -1,0 +1,70 @@
+--- a/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
++++ b/OpenAuth.Core/OpenAuth.App/HumanResource/SocialSecurityApp.cs
+@@ -1988,9 +1988,7 @@
+                     request.Type,
+
+                     currentIdentification,
+
+                     currentSecuritiesForUser,
+
+-                    systemUserId,
+
+-                    account,
+
+-                    userName,
+
++                    (systemUserId, account, userName),
+
+                     loginUser);
+
+ 
+
+                 // 处理身份证更新
+
+@@ -2215,9 +2213,7 @@
+         /// <param name="requestType"></param>
+
+         /// <param name="currentIdentification"></param>
+
+         /// <param name="currentSecuritiesForUser"></param>
+
+-        /// <param name="systemUserId"></param>
+
+-        /// <param name="account"></param>
+
+-        /// <param name="userName"></param>
+
++        /// <param name="userInfo"></param>
+
+         /// <param name="loginUser"></param>
+
+         /// <returns></returns>
+
+         private bool HasSubstantiveFundChange(
+
+@@ -2225,11 +2221,10 @@
+             SocialsecurityTypeEnums? requestType,
+
+             UserIdentification currentIdentification,
+
+             List<UserSocialsecurity> currentSecuritiesForUser,
+
+-            string systemUserId,
+
+-            string account,
+
+-            string userName,
+
++            (string systemUserId, string account, string userName) userInfo,
+
+             User loginUser)
+
+         {
+
++            var (systemUserId, account, userName) = userInfo;
+
+             var beforeData = new
+
+             {
+
+                 Identification = DeepClone(currentIdentification),

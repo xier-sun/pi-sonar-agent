@@ -805,6 +805,62 @@ def test_build_retry_feedback_includes_quality_gate_failures(tmp_path) -> None:
     assert "只修这些门禁问题，保留已经通过的其它改动" in feedback
 
 
+def test_build_retry_feedback_for_s3776_keeps_primary_complexity_goal(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue = SonarIssue(
+        key="issue-s3776-quality-gate",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=41,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-s3776-quality-gate",
+        file_path="tracked.cs",
+        build_passed=True,
+        build_verification_failed=False,
+        error="Quality gate verification failed",
+        build_command='dotnet build "tracked.sln"',
+        build_output="Quality gate verification failed.",
+        retryable_failure=True,
+        failure_kind="quality_gate",
+        quality_gate_result={
+            "status": "retry",
+            "summary": "Quality gate rejected the patch with 2 hard violation(s).",
+            "violations": [
+                {
+                    "rule_id": "public_xml_docs",
+                    "title": "公开成员 XML 文档完整",
+                    "message": "公开方法 ProcessAsync 缺少 <param> 文档。",
+                    "file": "tracked.cs",
+                    "line": 41,
+                    "retry_hint": "只补当前 patch 触达的公开成员 XML 文档。",
+                },
+                {
+                    "rule_id": "linq_method_syntax",
+                    "title": "LINQ 优先方法语法",
+                    "message": "当前 patch 引入了 query syntax。",
+                    "file": "tracked.cs",
+                    "line": 83,
+                    "retry_hint": "把当前 patch 里新增的 query syntax 改成方法语法。",
+                },
+            ],
+        },
+    )
+
+    feedback = build_retry_feedback(repo, result, issue)
+
+    assert "当前 issue 的原始目标仍然是降低 Sonar 指向方法的认知复杂度" in feedback
+    assert "不要把补丁收缩成只修 XML、async 或 LINQ 语法的卫生修复" in feedback
+    assert "先修当前门禁，但不要丢掉原始的 S3776 目标" in feedback
+    assert "只修这些门禁问题，保留已经通过的其它改动" not in feedback
+
+
 def test_build_retry_feedback_includes_contract_mismatch_guidance(tmp_path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -829,6 +885,68 @@ def test_build_retry_feedback_includes_contract_mismatch_guidance(tmp_path) -> N
     assert "CS0535" in feedback
     assert "公开方法与接口/抽象契约不一致" in feedback
     assert "同步接口声明、实现类签名、调用点和 nameof(...)" in feedback
+
+
+def test_build_retry_feedback_includes_callee_signature_context_for_type_mismatches(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    failing_file = repo / "tracked.cs"
+    failing_file.write_text(
+        "\n".join(
+            [
+                "using System.Collections.Generic;",
+                "class Foo",
+                "{",
+                "    void Run(Dictionary<string, (decimal? TotalDelivrdQty, decimal? LastPurPrc)> delivrdByItem, Dictionary<string, decimal?> returnedQtyByItem, int value)",
+                "    {",
+                "        var fixedPenaltyAmount = CalculateFixedPenaltyAmount(delivrdByItem, returnedQtyByItem);",
+                "        int penaltyCode = BuildPenaltyCode(value);",
+                "    }",
+                "",
+                "    private decimal CalculateFixedPenaltyAmount(",
+                "        Dictionary<string, (decimal TotalDelivrdQty, decimal LastPurPrc)> delivrdByItem,",
+                "        Dictionary<string, decimal> returnedQtyByItem)",
+                "    {",
+                "        return 0m;",
+                "    }",
+                "",
+                "    private string BuildPenaltyCode(int value)",
+                "    {",
+                "        return value.ToString();",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-type-mismatch",
+        file_path="tracked.cs",
+        build_passed=False,
+        build_verification_failed=True,
+        error="Issue changes failed local build verification",
+        build_command='dotnet build "tracked.sln"',
+        build_output=(
+            f"{failing_file}(6,60): error CS1503: 参数 1: 无法从“System.Collections.Generic.Dictionary<string, (decimal? TotalDelivrdQty, decimal? LastPurPrc)>”转换为“System.Collections.Generic.Dictionary<string, (decimal TotalDelivrdQty, decimal LastPurPrc)>” [tracked.csproj]\n"
+            f"{failing_file}(7,27): error CS0029: 无法将类型“string”隐式转换为“int” [tracked.csproj]"
+        ),
+        retryable_failure=True,
+        failure_kind="build",
+    )
+
+    feedback = build_retry_feedback(repo, result)
+
+    assert "CS1503" in feedback
+    assert "CS0029" in feedback
+    assert "decimal? 写成 decimal" in feedback
+    assert "DateTime? 写成 DateTime" in feedback
+    assert "被调方法声明" in feedback
+    assert "private decimal CalculateFixedPenaltyAmount(" in feedback
+    assert "private string BuildPenaltyCode(int value)" in feedback
+    assert "检查该 helper 的完整签名" in feedback
 
 
 def test_process_issue_with_retries_passes_quality_gate_failure_to_next_attempt_and_logs_it(tmp_path) -> None:

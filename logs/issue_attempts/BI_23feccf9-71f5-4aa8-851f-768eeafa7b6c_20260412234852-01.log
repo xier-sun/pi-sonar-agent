@@ -1,0 +1,95 @@
+[2026-04-12 23:49:52] Attempt 1/5 started for 23feccf9-71f5-4aa8-851f-768eeafa7b6c
+[2026-04-12 23:50:10] Attempt 1 failed: Issue changes failed local build verification
+[2026-04-12 23:50:10] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `CollectAllRelatedOrderIdsAsync` to appear in 1 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs:1035-1074 (definition) still missing `CollectAllRelatedOrderIdsAsync`
+[2026-04-12 23:50:10] Next retry feedback for model:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `CollectAllRelatedOrderIdsAsync` to appear in 1 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs:1035-1074 (definition) still missing `CollectAllRelatedOrderIdsAsync`
+[2026-04-12 23:50:10] Workspace restored to issue baseline
+[2026-04-12 23:50:10] Retrying issue after recoverable failure, next attempt: 2
+[2026-04-12 23:50:10] Attempt 2/5 started for 23feccf9-71f5-4aa8-851f-768eeafa7b6c
+[2026-04-12 23:50:29] Attempt 2 failed: Issue changes failed local build verification
+[2026-04-12 23:50:29] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `CollectAllRelatedOrderIdsAsync` to appear in 1 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs:1035-1074 (definition) still missing `CollectAllRelatedOrderIdsAsync`
+[2026-04-12 23:50:29] Next retry feedback for model:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `CollectAllRelatedOrderIdsAsync` to appear in 1 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs:1035-1074 (definition) still missing `CollectAllRelatedOrderIdsAsync`
+[2026-04-12 23:50:29] Workspace restored to issue baseline
+[2026-04-12 23:50:29] Retrying issue after recoverable failure, next attempt: 3
+[2026-04-12 23:50:29] Attempt 3/5 started for 23feccf9-71f5-4aa8-851f-768eeafa7b6c
+[2026-04-12 23:50:40] Attempt 3 failed: Issue changes failed local build verification
+[2026-04-12 23:50:40] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `CollectAllRelatedOrderIdsAsync` to appear in 1 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs:1035-1074 (definition) still missing `CollectAllRelatedOrderIdsAsync`
+[2026-04-12 23:50:40] Next retry feedback for model:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `CollectAllRelatedOrderIdsAsync` to appear in 1 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs:1035-1074 (definition) still missing `CollectAllRelatedOrderIdsAsync`
+[2026-04-12 23:50:40] Workspace restored to issue baseline
+[2026-04-12 23:50:40] Retrying issue after recoverable failure, next attempt: 4
+[2026-04-12 23:50:40] Attempt 4/5 started for 23feccf9-71f5-4aa8-851f-768eeafa7b6c
+[2026-04-12 23:50:52] Attempt 4 failed: Issue changes failed local build verification
+[2026-04-12 23:50:52] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `CollectAllRelatedOrderIdsAsync` to appear in 1 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs:1035-1074 (definition) still missing `CollectAllRelatedOrderIdsAsync`
+[2026-04-12 23:50:52] Next retry feedback for model:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `CollectAllRelatedOrderIdsAsync` to appear in 1 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs:1035-1074 (definition) still missing `CollectAllRelatedOrderIdsAsync`
+[2026-04-12 23:50:52] Workspace restored to issue baseline
+[2026-04-12 23:50:52] Retrying issue after recoverable failure, next attempt: 5
+[2026-04-12 23:50:52] Attempt 5/5 started for 23feccf9-71f5-4aa8-851f-768eeafa7b6c
+[2026-04-12 23:51:04] Attempt 5 failed: Issue changes failed local build verification
+[2026-04-12 23:51:04] Build failure report:
+错误: Issue changes failed local build verification
+
+构建命令: dotnet build "OpenAuth.Core/OpenAuth.Core.WebApi.sln"
+
+构建日志:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `CollectAllRelatedOrderIdsAsync` to appear in 1 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs:1035-1074 (definition) still missing `CollectAllRelatedOrderIdsAsync`
+[2026-04-12 23:51:04] Next retry feedback for model:
+Propagation verifier rejected the patch because signature updates are incomplete.
+Expected `CollectAllRelatedOrderIdsAsync` to appear in 1 verification target(s), but 1 target(s) still look stale.
+Residual Targets:
+1. OpenAuth.Core/OpenAuth.App/Finance/ReceiptApp.cs:1035-1074 (definition) still missing `CollectAllRelatedOrderIdsAsync`
+[2026-04-12 23:51:04] Workspace restored to issue baseline
+[2026-04-12 23:51:04] Issue skipped: Build verification failed after 5 attempt(s)

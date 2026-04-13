@@ -112,6 +112,9 @@ SONAR_FIX_USER_PROMPT_TEMPLATE = """请修复以下 SonarQube 代码问题：
 class IssuePromptBuilder:
     """Compose the system and user prompts for single-issue fix attempts."""
 
+    PROMPT_INLINE_THRESHOLD = 12000
+    REFERENCE_DOC_RELATIVE_PATH = ".git/pi-sonar-agent-runtime/sonar_fix_reference.md"
+
     @staticmethod
     def _safe_int(value: Any) -> int:
         try:
@@ -188,16 +191,124 @@ class IssuePromptBuilder:
         return "\n".join(lines)
 
     @staticmethod
-    def build_rule_guard_section(rule_id: str) -> str:
+    def build_rule_guard_section(
+        rule_id: str,
+        *,
+        retry_context: RetryContext | None = None,
+    ) -> str:
         """Render rule-specific prompt guards when configured."""
 
-        guards = get_rule_policy(rule_id).prompt_guards
+        policy = get_rule_policy(rule_id)
+        guards = list(policy.prompt_guards)
+        if retry_context is not None:
+            guards.extend(policy.retry_prompt_guards)
         if not guards:
             return ""
 
         lines = ["【当前规则的额外约束】"]
         lines.extend(f"- {item}" for item in guards)
         return "\n".join(lines)
+
+    @classmethod
+    def _estimate_prompt_chars(cls, sections: tuple[str, ...] | list[str]) -> int:
+        return sum(len(str(section or "")) for section in sections)
+
+    @classmethod
+    def _reference_doc_path(cls, workspace_path: Path) -> Path:
+        git_dir = workspace_path / ".git"
+        if git_dir.is_dir():
+            return workspace_path / cls.REFERENCE_DOC_RELATIVE_PATH
+        return workspace_path / ".pi-sonar-agent-runtime" / "sonar_fix_reference.md"
+
+    @classmethod
+    def _build_reference_document(
+        cls,
+        *,
+        quality_gate_section: str,
+        rule_guard_section: str,
+        edit_contract_section: str,
+        repair_plan_section: str,
+        tool_surface_section: str,
+    ) -> str:
+        sections = ["# Sonar Fix Reference", "", "以下内容为本次修复的详细约束与参考资料。"]
+        for title, content in (
+            ("质量门禁", quality_gate_section),
+            ("规则额外约束", rule_guard_section),
+            ("Edit Contract", edit_contract_section),
+            ("Repair Plan", repair_plan_section),
+            ("工具策略", tool_surface_section),
+        ):
+            text = str(content or "").strip()
+            if not text:
+                continue
+            sections.extend(["", f"## {title}", "", text])
+        return "\n".join(sections).strip() + "\n"
+
+    @classmethod
+    def _maybe_externalize_reference_sections(
+        cls,
+        *,
+        workspace_path: Path | None,
+        quality_gate_section: str,
+        rule_guard_section: str,
+        edit_contract_section: str,
+        repair_plan_section: str,
+        tool_surface_section: str,
+        code_context: str,
+        prefetched_context_section: str,
+        retry_feedback_section: str,
+    ) -> tuple[str, str, str, str, str]:
+        if workspace_path is None:
+            return (
+                quality_gate_section,
+                rule_guard_section,
+                edit_contract_section,
+                repair_plan_section,
+                tool_surface_section,
+            )
+        total_chars = cls._estimate_prompt_chars(
+            (
+                quality_gate_section,
+                rule_guard_section,
+                edit_contract_section,
+                repair_plan_section,
+                tool_surface_section,
+                code_context,
+                prefetched_context_section,
+                retry_feedback_section,
+            )
+        )
+        if total_chars <= cls.PROMPT_INLINE_THRESHOLD:
+            return (
+                quality_gate_section,
+                rule_guard_section,
+                edit_contract_section,
+                repair_plan_section,
+                tool_surface_section,
+            )
+        reference_path = cls._reference_doc_path(workspace_path)
+        reference_path.parent.mkdir(parents=True, exist_ok=True)
+        reference_path.write_text(
+            cls._build_reference_document(
+                quality_gate_section=quality_gate_section,
+                rule_guard_section=rule_guard_section,
+                edit_contract_section=edit_contract_section,
+                repair_plan_section=repair_plan_section,
+                tool_surface_section=tool_surface_section,
+            ),
+            encoding="utf-8",
+        )
+        reference_hint = (
+            f"详细约束已写入 `{reference_path.relative_to(workspace_path).as_posix()}`。"
+            "优先按主 prompt 直接动手修复；需要核对门禁或 repair plan 细节时再读取该文件。"
+        )
+        return (
+            "【C# 代码质量门禁】\n" + reference_hint,
+            "【当前规则的额外约束】\n- 详细规则约束见参考文件；先按最小改动直接修复。",
+            f"【Edit Contract】\n- {reference_hint}",
+            f"【Repair Plan】\n- 详细 repair plan 见参考文件；先执行主 prompt 中的核心修复方向。",
+            f"【工具策略】\n- {reference_hint}",
+        )
 
     @staticmethod
     def build_system_prompt(workspace_path: Path) -> str:
@@ -270,7 +381,7 @@ class IssuePromptBuilder:
         if quality_gate:
             quality_gate_section = f"【C# 代码质量门禁】\n{quality_gate}"
 
-        rule_guard_section = cls.build_rule_guard_section(issue.rule)
+        rule_guard_section = cls.build_rule_guard_section(issue.rule, retry_context=retry_context)
         tool_surface_section = ""
         bash_constraints = render_controlled_bash_prompt_constraints()
         if bash_constraints:
@@ -282,6 +393,23 @@ class IssuePromptBuilder:
         file_path_candidates = "\n".join(
             f"- {candidate}"
             for candidate in cls.build_workspace_relative_candidates(issue.file_path, workspace_path)
+        )
+        (
+            quality_gate_section,
+            rule_guard_section,
+            edit_contract_section,
+            repair_plan_section,
+            tool_surface_section,
+        ) = cls._maybe_externalize_reference_sections(
+            workspace_path=workspace_path,
+            quality_gate_section=quality_gate_section,
+            rule_guard_section=rule_guard_section,
+            edit_contract_section=cls.normalize_prompt_text(edit_contract_section, ""),
+            repair_plan_section=cls.normalize_prompt_text(repair_plan_section, ""),
+            tool_surface_section=cls.normalize_prompt_text(tool_surface_section, ""),
+            code_context=code_context,
+            prefetched_context_section=cls.normalize_prompt_text(prefetched_context_section, ""),
+            retry_feedback_section=retry_feedback_section,
         )
 
         return SONAR_FIX_USER_PROMPT_TEMPLATE.format(
@@ -304,10 +432,10 @@ class IssuePromptBuilder:
             code_context=code_context,
             quality_gate_section=quality_gate_section,
             rule_guard_section=rule_guard_section,
-            edit_contract_section=cls.normalize_prompt_text(edit_contract_section, ""),
-            repair_plan_section=cls.normalize_prompt_text(repair_plan_section, ""),
+            edit_contract_section=edit_contract_section,
+            repair_plan_section=repair_plan_section,
             prefetched_context_section=cls.normalize_prompt_text(prefetched_context_section, ""),
-            tool_surface_section=cls.normalize_prompt_text(tool_surface_section, ""),
+            tool_surface_section=tool_surface_section,
             execution_mode_section=cls.normalize_prompt_text(execution_mode_section, ""),
             scope_guidance=cls.normalize_prompt_text(
                 scope_guidance,
