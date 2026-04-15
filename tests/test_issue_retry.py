@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pi_sonar_agent.agent.claude_agent import FixResult, SonarIssue
 from pi_sonar_agent.core.issue_retry import (
+    EXTENDED_BUILD_TIMEOUT_SECONDS,
     _summarize_model_timeout,
     build_retry_context,
     build_retry_feedback,
@@ -1028,6 +1029,123 @@ def test_process_issue_with_retries_passes_quality_gate_failure_to_next_attempt_
     assert "async_requires_await" in issue_log
 
 
+def test_build_retry_context_summarizes_timeout_without_dumping_full_log(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    issue = SonarIssue(
+        key="issue-timeout-summary",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=10,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    output = (
+        "Command 'dotnet build \"src/Foo.sln\"' timed out after 300 seconds\n\nSTDOUT:\n"
+        + "\n".join(f"warning line {index}" for index in range(160))
+        + "\n    366 个警告\n    0 个错误\n\n已用时间 00:05:41.76"
+    )
+    result = FixResult(
+        success=False,
+        issue_key=issue.key,
+        file_path=issue.file_path,
+        build_passed=False,
+        build_verification_failed=True,
+        error="Issue changes failed local build verification",
+        build_command='dotnet build "src/Foo.sln"',
+        build_output=output,
+        retryable_failure=True,
+        failure_kind="build",
+    )
+
+    retry_context = build_retry_context(repo, result, issue, source_attempt_number=1)
+    feedback = build_retry_feedback(repo, result, issue)
+
+    assert retry_context.build_timeout_failed is True
+    assert retry_context.build_timeout_without_errors is True
+    assert "本地构建验证超时" in retry_context.prompt_output
+    assert "366 个警告" in retry_context.prompt_output
+    assert "warning line 0" not in retry_context.prompt_output
+    assert "warning line 0" not in feedback
+
+
+def test_process_issue_with_retries_retries_build_timeout_as_verification_only(tmp_path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    tracked_file = repo / "tracked.cs"
+    tracked_file.write_text("previous success\n", encoding="utf-8")
+
+    issue = SonarIssue(
+        key="issue-timeout-recheck",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=1,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def fix_issue(self, issue, workspace_path, build_command, retry_feedback=""):
+            self.calls += 1
+            tracked_file.write_text("patched\n", encoding="utf-8")
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=[{"file": "tracked.cs", "action": "modified"}],
+                build_passed=False,
+                build_verification_failed=True,
+                error="Issue changes failed local build verification",
+                summary="Fixed 1 file(s)",
+                build_command=build_command,
+                build_output=(
+                    "Command 'dotnet build \"tracked.sln\"' timed out after 300 seconds\n\nSTDOUT:\n"
+                    "warning A\nwarning B\n    2 个警告\n    0 个错误\n\n已用时间 00:05:41.76"
+                ),
+                retryable_failure=True,
+                failure_kind="build",
+                performance_metrics={},
+            )
+
+    calls: list[int] = []
+
+    def fake_run_local_build(workspace_path, build_command, *, build_runner=None, timeout_seconds=None):
+        calls.append(int(timeout_seconds or 0))
+        assert tracked_file.read_text(encoding="utf-8") == "patched\n"
+        return True, "build ok after extended verification"
+
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.issue_retry.FixVerifier.run_local_build",
+        fake_run_local_build,
+    )
+
+    agent = FakeAgent()
+    result = process_issue_with_retries(
+        agent=agent,
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-timeout-recheck",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
+        max_build_retries=3,
+    )
+
+    assert result.success is True
+    assert result.build_passed is True
+    assert result.failure_kind == ""
+    assert agent.calls == 1
+    assert calls == [EXTENDED_BUILD_TIMEOUT_SECONDS]
+    assert "自动使用 600 秒超时重跑并通过" in result.build_output
+
+
 def test_build_retry_feedback_includes_plan_precheck_conflict(tmp_path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -1261,3 +1379,61 @@ def test_process_issue_with_retries_does_not_stop_early_on_repeated_client_conne
     assert agent.calls == 3
     assert result.attempts == 3
     assert result.skip_reason == "Model response timed out after 3 attempt(s)"
+
+
+def test_process_issue_with_retries_uses_timeout_skip_reason_for_first_response_timeout(
+    tmp_path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    issue = SonarIssue(
+        key="issue-first-response-timeout",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=1,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def fix_issue(self, issue, workspace_path, build_command, retry_feedback="", retry_context=None):
+            self.calls += 1
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                error="Model response timed out",
+                build_command=build_command,
+                build_output=(
+                    "模型在 120 秒内没有返回首个响应\n"
+                    "连接诊断：使用同配置执行最小 CLI 请求时也在 12 秒内无响应。"
+                ),
+                retryable_failure=True,
+                failure_kind="model_timeout",
+                model_timeout_stage="first_response_timeout",
+            )
+
+    agent = FakeAgent()
+
+    result = process_issue_with_retries(
+        agent=agent,
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-first-response-timeout",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
+        max_build_retries=2,
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert agent.calls == 2
+    assert result.attempts == 2
+    assert result.skip_reason == "Model response timed out after 2 attempt(s)"

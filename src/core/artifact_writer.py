@@ -39,6 +39,7 @@ class AttemptArtifactBundle:
     attempt_events_jsonl: Path
     reviewer_result_json: Path
     build_result_json: Path
+    build_output_log: Path
     compliance_summary_json: Path
     attempt_summary_json: Path
 
@@ -84,6 +85,7 @@ class ArtifactWriter:
             attempt_events_jsonl=attempt_root / "attempt_events.jsonl",
             reviewer_result_json=attempt_root / "reviewer_result.json",
             build_result_json=attempt_root / "build_result.json",
+            build_output_log=attempt_root / "build_output.log",
             compliance_summary_json=attempt_root / "compliance_summary.json",
             attempt_summary_json=attempt_root / "attempt_summary.json",
         )
@@ -199,6 +201,7 @@ class ArtifactWriter:
                 "plan_precheck": _serialize_optional_payload(getattr(result, "plan_precheck", None), None),
             },
         )
+        bundle.build_output_log.write_text(result.build_output or "", encoding="utf-8")
         self._write_json(bundle.compliance_summary_json, compliance_summary.to_dict())
         self._write_json(bundle.attempt_summary_json, attempt_state.to_dict())
         return bundle

@@ -1,2 +1,0 @@
-[2026-04-09 19:58:16] Attempt 1/3 started for f2f04149-8a3d-4915-a52a-f0098f141d5a
-[2026-04-09 19:58:16] Issue skipped by policy: 规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。

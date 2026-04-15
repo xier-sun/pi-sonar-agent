@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -270,6 +271,7 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
         assert bundle.attempt_events_jsonl.exists()
         assert bundle.reviewer_result_json.exists()
         assert bundle.build_result_json.exists()
+        assert bundle.build_output_log.exists()
         assert bundle.compliance_summary_json.exists()
         assert bundle.attempt_summary_json.exists()
         assert summary_path.exists()
@@ -298,6 +300,7 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
         assert '"repair_plan": {' in build_result
         assert '"plan_precheck": {' in build_result
         assert '"applied_rule_ids": [' in build_result
+        assert bundle.build_output_log.read_text(encoding="utf-8") == "build failed"
         attempt_events = bundle.attempt_events_jsonl.read_text(encoding="utf-8")
         assert '"kind": "attempt_runtime_started"' in attempt_events
         assert '"kind": "patch_detected"' in attempt_events

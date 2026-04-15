@@ -1,0 +1,15 @@
+[
+  {
+    "project_key": "Your_Sonar_Project_Key",
+    "repository": "BI",
+    "author": "author@example.com",
+    "reviewer_email": "reviewer@example.com",
+    "dingtalk_userid": "your_dingtalk_userid",
+    "max_issues": 50,
+    "solution_path": "OpenAuth.Core/OpenAuth.Core.WebApi.sln",
+    "keep_workspace": false,
+    "issue_keys": [
+      "your-issue-key"
+    ]
+  }
+]

@@ -28,6 +28,7 @@ from pi_sonar_agent.core.model_gateway import (
 )
 from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.policy import ToolPolicy, ToolPolicyHook, ToolUsageTracker, normalize_tool_name
+from pi_sonar_agent.core.project_env import MODEL_ENV_KEYS
 
 EDIT_NUDGE_THRESHOLD = 4
 MAX_EDIT_NUDGES = 2
@@ -268,6 +269,8 @@ class AgentRuntime:
         assistant_text_chars = 0
         timeout_stage = ""
         saw_result_event = False
+        first_response_deadline_at: float | None = None
+        last_progress_at: float | None = None
         event_stream = AttemptEventStream(
             run_label=str(request.metadata.get("run_label", "")),
             issue_key=str(request.metadata.get("issue_key", "")),
@@ -293,6 +296,130 @@ class AgentRuntime:
                 return format_preview(json.dumps(payload, ensure_ascii=False, indent=2), max_chars=2400)
             except TypeError:
                 return format_preview(str(payload), max_chars=2400)
+
+        def count_lines(value: str) -> int:
+            return len(str(value or "").splitlines())
+
+        def summarize_prompt(
+            value: str,
+            *,
+            preview_chars: int,
+            include_preview: bool,
+        ) -> dict[str, Any]:
+            text = str(value or "")
+            summary: dict[str, Any] = {
+                "chars": len(text),
+                "lines": count_lines(text),
+            }
+            if include_preview:
+                summary["preview"] = format_preview(text, max_chars=preview_chars)
+            return summary
+
+        def summarize_env_value(key: str, value: str) -> str:
+            key_text = str(key or "").upper()
+            text = str(value or "")
+            if any(marker in key_text for marker in ("KEY", "TOKEN", "SECRET", "PASSWORD")):
+                return "<redacted>"
+            return format_preview(text, max_chars=240)
+
+        def summarize_model_env(env: dict[str, str]) -> dict[str, str]:
+            summary: dict[str, str] = {}
+            for key in sorted(MODEL_ENV_KEYS):
+                if key not in env:
+                    continue
+                summary[key] = summarize_env_value(key, str(env.get(key, "")))
+            return summary
+
+        def summarize_request_config() -> dict[str, Any]:
+            metadata_summary: dict[str, Any] = {}
+            for key in (
+                "run_label",
+                "issue_key",
+                "attempt_number",
+                "execution_profile",
+                "fast_path_enabled",
+                "build_command",
+                "endpoint",
+                "model_display",
+                "mode",
+            ):
+                value = request.metadata.get(key)
+                if value not in (None, ""):
+                    metadata_summary[key] = value
+            return {
+                "cwd": request.cwd,
+                "max_turns": request.max_turns,
+                "max_budget_usd": request.max_budget_usd,
+                "tools": list(request.tools),
+                "allowed_tools": list(request.allowed_tools),
+                "extra_args": dict(request.extra_args),
+                "sdk_env": summarize_model_env(request.env),
+                "metadata": metadata_summary,
+            }
+
+        def build_request_snapshot(*, include_prompt_previews: bool) -> dict[str, Any]:
+            return {
+                "request": summarize_request_config(),
+                "system_prompt": summarize_prompt(
+                    request.system_prompt,
+                    preview_chars=1600,
+                    include_preview=include_prompt_previews,
+                ),
+                "user_prompt": summarize_prompt(
+                    request.user_prompt,
+                    preview_chars=1600,
+                    include_preview=include_prompt_previews,
+                ),
+            }
+
+        def print_prompt_block(label: str, value: str, *, max_chars: int) -> None:
+            preview = format_preview(value, max_chars=max_chars)
+            prompt_summary = summarize_prompt(value, preview_chars=max_chars, include_preview=False)
+            print(
+                f"  [{label}] chars={prompt_summary['chars']}, lines={prompt_summary['lines']}",
+                flush=True,
+            )
+            if preview:
+                print(f"  [{label} BEGIN]", flush=True)
+                print(preview, flush=True)
+                print(f"  [{label} END]", flush=True)
+
+        def print_request_snapshot(reason: str, *, include_prompt_previews: bool) -> None:
+            snapshot = build_request_snapshot(include_prompt_previews=include_prompt_previews)
+            snapshot["reason"] = reason
+            print("  [REQUEST SNAPSHOT]", flush=True)
+            print(format_payload(snapshot), flush=True)
+
+        def maybe_print_retry_context(event: TraceEvent) -> None:
+            payload = dict(event.payload or {})
+            if str(event.message_type or "") != "SystemMessage":
+                return
+            if str(payload.get("subtype") or "") != "api_retry":
+                return
+
+            attempt = payload.get("attempt")
+            max_retries = payload.get("max_retries")
+            error_status = payload.get("error_status")
+            error = payload.get("error")
+            retry_delay_ms = payload.get("retry_delay_ms")
+            session_id = payload.get("session_id")
+            request_uuid = payload.get("uuid")
+            delay_text = ""
+            if isinstance(retry_delay_ms, (int, float)):
+                delay_text = f"{retry_delay_ms:.0f}ms"
+            elif retry_delay_ms not in (None, ""):
+                delay_text = str(retry_delay_ms)
+            print(
+                "  [TRACE] SDK api_retry: "
+                f"attempt={attempt}/{max_retries}, "
+                f"status={error_status}, "
+                f"error={error or '(unknown)'}, "
+                f"retry_delay={delay_text or '(unknown)'}, "
+                f"session_id={session_id or '(unknown)'}, "
+                f"uuid={request_uuid or '(unknown)'}",
+                flush=True,
+            )
+            print_request_snapshot("api_retry", include_prompt_previews=False)
 
         def render_read_preview(tool_name: str, payload: dict[str, Any]) -> str:
             if tool_name != "Read":
@@ -362,8 +489,13 @@ class AgentRuntime:
                 runtime_events=event_stream.snapshot(),
             )
 
-        def update_status(phase: str, *, first_response: bool = False) -> None:
-            nonlocal first_response_at, last_progress_stage
+        def update_status(
+            phase: str,
+            *,
+            first_response: bool = False,
+            meaningful_progress: bool = False,
+        ) -> None:
+            nonlocal first_response_at, last_progress_at, last_progress_stage
             now = time.monotonic()
             with status_lock:
                 status_state["phase"] = phase
@@ -372,7 +504,18 @@ class AgentRuntime:
                     status_state["first_response_received"] = True
             if first_response and first_response_at is None:
                 first_response_at = now
-            last_progress_stage = phase
+            if meaningful_progress:
+                last_progress_at = now
+                last_progress_stage = phase
+
+        def trace_event_counts_as_progress(event: TraceEvent) -> bool:
+            return str(event.message_type or "") != "SystemMessage"
+
+        def compute_event_timeout_seconds() -> float:
+            now = time.monotonic()
+            if not bool(status_state["first_response_received"]):
+                return (first_response_deadline_at or now) - now
+            return ((last_progress_at or now) + self.timeouts.follow_up_seconds) - now
 
         def classify_follow_up_timeout_stage() -> str:
             last_tool_name = tracker.last_tool_name or ""
@@ -459,11 +602,12 @@ class AgentRuntime:
                 "fast_path_enabled": str(request.metadata.get("fast_path_enabled", "")),
                 "allowed_tools": list(request.allowed_tools),
                 "max_turns": request.max_turns,
+                "request": build_request_snapshot(include_prompt_previews=False),
             },
         )
 
         async def run_once() -> AgentRuntimeResult:
-            nonlocal agent_error, assistant_text_chars, assistant_text_events, captured_exception, first_edit_at, saw_result_event, timeout_stage, pending_tool_result_name, last_edit_tool_name, last_edit_raw_payload, edit_nudge_count, consecutive_non_edit_calls, pending_edit_nudge
+            nonlocal agent_error, assistant_text_chars, assistant_text_events, captured_exception, first_edit_at, saw_result_event, timeout_stage, pending_tool_result_name, last_edit_tool_name, last_edit_raw_payload, edit_nudge_count, consecutive_non_edit_calls, pending_edit_nudge, first_response_deadline_at
 
             print("  [TRACE] 正在初始化 Claude SDK Client...", flush=True)
             update_status("client_connecting")
@@ -484,17 +628,10 @@ class AgentRuntime:
             try:
                 print("  [TRACE] 已创建 Claude SDK Client，准备发送请求...", flush=True)
                 update_status("sending_query")
-                prompt_preview = format_preview(request.user_prompt, max_chars=8000)
-                prompt_lines = len(str(request.user_prompt or "").splitlines())
-                print(
-                    "  [USER MESSAGE] "
-                    f"chars={len(request.user_prompt or '')}, lines={prompt_lines}",
-                    flush=True,
-                )
-                if prompt_preview:
-                    print("  [USER MESSAGE BEGIN]", flush=True)
-                    print(prompt_preview, flush=True)
-                    print("  [USER MESSAGE END]", flush=True)
+                print_prompt_block("SYSTEM PROMPT", request.system_prompt, max_chars=4000)
+                print_request_snapshot("before_send", include_prompt_previews=False)
+                print_prompt_block("USER MESSAGE", request.user_prompt, max_chars=8000)
+                prompt_lines = count_lines(request.user_prompt)
                 event_stream.emit(
                     AttemptRuntimeEventKind.USER_MESSAGE_SENT,
                     stage="sending_query",
@@ -502,11 +639,13 @@ class AgentRuntime:
                         "chars": len(request.user_prompt or ""),
                         "lines": prompt_lines,
                         "preview": format_preview(request.user_prompt, max_chars=1500),
+                        "request": build_request_snapshot(include_prompt_previews=False),
                     },
                 )
                 await session.send(request.user_prompt)
                 print("  [TRACE] 请求已发送，等待模型首响应...", flush=True)
                 update_status("waiting_for_first_response")
+                first_response_deadline_at = time.monotonic() + self.timeouts.first_response_seconds
 
                 async def maybe_send_edit_nudge(trigger_stage: str) -> None:
                     nonlocal pending_edit_nudge, edit_nudge_count
@@ -542,11 +681,9 @@ class AgentRuntime:
                 response_stream = session.stream_events()
                 while True:
                     try:
-                        timeout_seconds = (
-                            self.timeouts.first_response_seconds
-                            if not bool(status_state["first_response_received"])
-                            else self.timeouts.follow_up_seconds
-                        )
+                        timeout_seconds = compute_event_timeout_seconds()
+                        if timeout_seconds <= 0:
+                            raise asyncio.TimeoutError()
                         event = await asyncio.wait_for(anext(response_stream), timeout=timeout_seconds)
                     except StopAsyncIteration:
                         break
@@ -560,9 +697,14 @@ class AgentRuntime:
                                 payload={"reason": "first_response_timeout"},
                             )
                             abort_result = await abort_session("first_response_timeout")
-                            raise TimeoutError(
+                            first_response_diagnostic = await diagnose_connect_timeout()
+                            timeout_message = (
                                 f"模型在 {self.timeouts.first_response_seconds} 秒内没有返回首个响应"
-                                + format_timeout_abort_suffix(abort_result)
+                            )
+                            if first_response_diagnostic:
+                                timeout_message += f"\n{first_response_diagnostic}"
+                            raise TimeoutError(
+                                timeout_message + format_timeout_abort_suffix(abort_result)
                             ) from exc
                         timeout_stage = classify_follow_up_timeout_stage()
                         event_stream.emit(
@@ -579,7 +721,11 @@ class AgentRuntime:
 
                     if isinstance(event, ToolCallEvent):
                         tool_name = normalize_tool_name(event.name)
-                        update_status(f"tool:{tool_name}", first_response=True)
+                        update_status(
+                            f"tool:{tool_name}",
+                            first_response=True,
+                            meaningful_progress=True,
+                        )
                         if tool_name in {"Edit", "MultiEdit", "Write"} and first_edit_at is None:
                             first_edit_at = time.monotonic()
                         if tool_name in {"Edit", "MultiEdit"}:
@@ -627,7 +773,11 @@ class AgentRuntime:
                         )
                         hook_pipeline.after_tool_call(context)
                     elif isinstance(event, TextEvent):
-                        update_status("assistant_text", first_response=True)
+                        update_status(
+                            "assistant_text",
+                            first_response=True,
+                            meaningful_progress=True,
+                        )
                         if pending_tool_result_name:
                             event_stream.emit(
                                 AttemptRuntimeEventKind.TOOL_RESULT_RECEIVED,
@@ -649,7 +799,11 @@ class AgentRuntime:
                             },
                         )
                     elif isinstance(event, ResultEvent):
-                        update_status("result_message", first_response=True)
+                        update_status(
+                            "result_message",
+                            first_response=True,
+                            meaningful_progress=True,
+                        )
                         if pending_tool_result_name:
                             event_stream.emit(
                                 AttemptRuntimeEventKind.TOOL_RESULT_RECEIVED,
@@ -669,7 +823,12 @@ class AgentRuntime:
                                 last_edit_raw_payload=last_edit_raw_payload,
                             )
                     elif isinstance(event, TraceEvent):
-                        update_status(f"sdk_message:{event.message_type}", first_response=True)
+                        trace_counts_as_progress = trace_event_counts_as_progress(event)
+                        update_status(
+                            f"sdk_message:{event.message_type}",
+                            first_response=trace_counts_as_progress,
+                            meaningful_progress=trace_counts_as_progress,
+                        )
                         if pending_tool_result_name:
                             event_stream.emit(
                                 AttemptRuntimeEventKind.TOOL_RESULT_RECEIVED,
@@ -682,6 +841,7 @@ class AgentRuntime:
                         print(f"  [{trace_label}] 收到 SDK 消息类型: {event.message_type}", flush=True)
                         if event.preview:
                             print(event.preview, flush=True)
+                        maybe_print_retry_context(event)
                         event_stream.emit(
                             AttemptRuntimeEventKind.SDK_TRACE,
                             stage=f"sdk_message:{event.message_type}",

@@ -1,9 +1,0 @@
-{
-  "attempt_number": 1,
-  "build_command": "dotnet build \"OpenAuth.Core/OpenAuth.Core.WebApi.sln\"",
-  "retry_feedback": "",
-  "retry_context": null,
-  "workspace_path": ".agent_workspaces/fix_BI_20260407114159-01",
-  "baseline_head_commit": "47a886fffbaa758b6dca2a6736406e09f08d078a",
-  "guardrail_mode": "scope"
-}

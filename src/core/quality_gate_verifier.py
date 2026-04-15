@@ -114,6 +114,11 @@ class QualityGateVerifier:
         issue_file = cls._normalize_path(issue_file_path)
         primary_change = cls._select_issue_file_change(issue_file, reviewed_changes)
         lines = current_issue_file_content.splitlines()
+        original_lines = (
+            original_issue_file_content.splitlines()
+            if original_issue_file_content is not None
+            else None
+        )
         changed_lines = (
             tuple(
                 sorted(
@@ -141,7 +146,35 @@ class QualityGateVerifier:
             changed_lines,
             touched_methods,
             touched_types,
+            original_lines=original_lines,
         )
+
+        # Classify methods by scope for gate-aware enforcement.
+        method_scopes: dict[str, str] = {
+            method.symbol: cls._classify_declaration_scope(
+                declaration_kind="method",
+                declaration_name=method.name,
+                declaration_signature=method.signature,
+                original_lines=original_lines,
+            )
+            for method in touched_methods
+        }
+        method_access: dict[str, str] = {
+            method.symbol: method.access
+            for method in touched_methods
+        }
+
+        # Determine what the edit contract allows the model to do.
+        capabilities = set(edit_contract.allowed_capabilities)
+        has_signature_change = "signature_change" in capabilities
+        has_multi_file = "multi_file_refactor" in capabilities
+        repair_plan = getattr(edit_contract, "repair_plan", None)
+        has_declared_propagation_targets = bool(
+            tuple(getattr(repair_plan, "propagation_targets", ()) or ())
+            or tuple(getattr(repair_plan, "verification_targets", ()) or ())
+            or tuple(getattr(edit_contract, "allowed_related_symbols", ()) or ())
+        )
+
         added_comment_lines = cls._collect_added_comment_lines(primary_change.diff_text if primary_change else "")
 
         hard_violations: list[QualityGateViolation] = []
@@ -158,13 +191,27 @@ class QualityGateVerifier:
                     )
                 )
             elif rule.rule_id == "async_signature":
-                hard_violations.extend(
-                    cls._validate_async_signature(
-                        issue_file,
-                        touched_methods,
-                        retry_hint=rule.retry_hint,
-                    )
+                async_violations = cls._validate_async_signature(
+                    issue_file,
+                    touched_methods,
+                    retry_hint=rule.retry_hint,
+                    method_scopes=method_scopes,
                 )
+                if not has_signature_change:
+                    # Contract cannot safely rename or reshape async signatures
+                    # in this attempt, so keep the finding visible without
+                    # turning it into a hard retry loop.
+                    soft_findings.extend(v.to_soft_finding() for v in async_violations)
+                else:
+                    for violation in async_violations:
+                        access = method_access.get(str(violation.symbol), "")
+                        requires_declared_propagation = access in {"public", "protected", "internal"}
+                        if requires_declared_propagation and not (
+                            has_multi_file or has_declared_propagation_targets
+                        ):
+                            soft_findings.append(violation.to_soft_finding())
+                            continue
+                        hard_violations.append(violation)
             elif rule.rule_id == "async_requires_await":
                 hard_violations.extend(
                     cls._validate_async_requires_await(
@@ -266,16 +313,91 @@ class QualityGateVerifier:
         return tuple(declarations.values())
 
     @classmethod
+    def _classify_declaration_scope(
+        cls,
+        *,
+        declaration_kind: str,
+        declaration_name: str,
+        declaration_signature: str,
+        original_lines: list[str] | None,
+    ) -> str:
+        """Classify a declaration as 'new', 'modified', or 'touched'.
+
+        Match declarations by symbol identity instead of absolute line number so
+        helper insertions above the target method do not incorrectly reclassify
+        unchanged signatures as "modified".
+        """
+        if original_lines is None:
+            return "modified"  # no baseline → conservative
+
+        normalized_kind = str(declaration_kind or "").strip().lower()
+        normalized_name = str(declaration_name or "").strip()
+        normalized_signature = cls._normalize_signature_text(declaration_signature)
+        if not normalized_name or not normalized_signature:
+            return "modified"
+
+        if normalized_kind == "method":
+            candidates = cls._find_methods_by_name(original_lines, normalized_name)
+            if not candidates:
+                return "new"
+            return (
+                "touched"
+                if any(
+                    cls._normalize_signature_text(item.signature) == normalized_signature
+                    for item in candidates
+                )
+                else "modified"
+            )
+
+        if normalized_kind in {"class", "record"}:
+            candidates = cls._find_types_by_name(original_lines, normalized_name, normalized_kind)
+            if not candidates:
+                return "new"
+            return (
+                "touched"
+                if any(
+                    cls._normalize_signature_text(
+                        original_lines[item.declaration_line - 1].strip()
+                    ) == normalized_signature
+                    for item in candidates
+                )
+                else "modified"
+            )
+
+        if normalized_kind == "property":
+            candidates = cls._find_public_properties_by_name(original_lines, normalized_name)
+            if not candidates:
+                return "new"
+            return (
+                "touched"
+                if any(
+                    cls._normalize_signature_text(str(item["signature"])) == normalized_signature
+                    for item in candidates
+                )
+                else "modified"
+            )
+
+        return "modified"
+
+    @classmethod
     def _collect_touched_public_declarations(
         cls,
         lines: list[str],
         changed_lines: tuple[int, ...],
         touched_methods: tuple[_MethodWindow, ...],
         touched_types: tuple[_TypeDeclaration, ...],
+        *,
+        original_lines: list[str] | None = None,
     ) -> tuple[dict[str, object], ...]:
         declarations: list[dict[str, object]] = []
         for method in touched_methods:
             if method.access == "public":
+                scope = cls._classify_declaration_scope(
+                    declaration_kind="method",
+                    declaration_name=method.name,
+                    declaration_signature=method.signature,
+                    original_lines=original_lines,
+                )
                 declarations.append(
                     {
                         "kind": "method",
@@ -283,6 +405,7 @@ class QualityGateVerifier:
                         "line": method.declaration_line,
                         "signature": method.signature,
                         "symbol": method.symbol,
+                        "scope": scope,
                     }
                 )
 
@@ -291,12 +414,25 @@ class QualityGateVerifier:
             property_decl = cls._find_public_property_declaration(lines, line_number)
             if property_decl is not None and property_decl["line"] not in seen_property_lines:
                 seen_property_lines.add(int(property_decl["line"]))
+                scope = cls._classify_declaration_scope(
+                    declaration_kind="property",
+                    declaration_name=str(property_decl["name"]),
+                    declaration_signature=str(property_decl["signature"]),
+                    original_lines=original_lines,
+                )
+                property_decl["scope"] = scope
                 declarations.append(property_decl)
 
         seen_type_lines: set[int] = set()
         for declaration in touched_types:
             if declaration.access == "public" and declaration.declaration_line not in seen_type_lines:
                 seen_type_lines.add(declaration.declaration_line)
+                scope = cls._classify_declaration_scope(
+                    declaration_kind=declaration.kind,
+                    declaration_name=declaration.name,
+                    declaration_signature=lines[declaration.declaration_line - 1].strip(),
+                    original_lines=original_lines,
+                )
                 declarations.append(
                     {
                         "kind": declaration.kind,
@@ -304,6 +440,7 @@ class QualityGateVerifier:
                         "line": declaration.declaration_line,
                         "signature": lines[declaration.declaration_line - 1].strip(),
                         "symbol": declaration.symbol,
+                        "scope": scope,
                     }
                 )
 
@@ -340,11 +477,37 @@ class QualityGateVerifier:
                 return method
         return None
 
+    @staticmethod
+    def _normalize_signature_text(signature: str) -> str:
+        return re.sub(r"\s+", " ", str(signature or "").strip())
+
+    @classmethod
+    def _find_methods_by_name(
+        cls,
+        lines: list[str],
+        method_name: str,
+    ) -> tuple[_MethodWindow, ...]:
+        normalized_name = str(method_name or "").strip()
+        if not normalized_name:
+            return ()
+
+        matches: dict[tuple[int, int], _MethodWindow] = {}
+        for candidate_line, raw_line in enumerate(lines, start=1):
+            if normalized_name not in raw_line:
+                continue
+            method = cls._build_method_window(lines, candidate_line)
+            if method is None or method.name != normalized_name:
+                continue
+            matches[(method.declaration_line, method.end_line)] = method
+        return tuple(matches.values())
+
     @classmethod
     def _build_method_window(cls, lines: list[str], candidate_line: int) -> _MethodWindow | None:
         total_lines = len(lines)
         first_line = lines[candidate_line - 1].strip()
         if not first_line or first_line.startswith(("///", "//", "*", "[")):
+            return None
+        if first_line in {"{", "}"} or first_line.endswith(";"):
             return None
         signature_lines: list[str] = []
         signature_end_line = 0
@@ -353,6 +516,12 @@ class QualityGateVerifier:
 
         for line_number in range(candidate_line, min(total_lines, candidate_line + 8) + 1):
             current_line = lines[line_number - 1]
+            stripped_current = current_line.strip()
+            if not saw_open_paren and (
+                stripped_current in {"{", "}"}
+                or stripped_current.endswith(";")
+            ):
+                return None
             signature_lines.append(current_line.strip())
             paren_balance += current_line.count("(") - current_line.count(")")
             saw_open_paren = saw_open_paren or "(" in current_line
@@ -623,6 +792,30 @@ class QualityGateVerifier:
         return None
 
     @classmethod
+    def _find_types_by_name(
+        cls,
+        lines: list[str],
+        declaration_name: str,
+        declaration_kind: str,
+    ) -> tuple[_TypeDeclaration, ...]:
+        normalized_name = str(declaration_name or "").strip()
+        normalized_kind = str(declaration_kind or "").strip().lower()
+        if not normalized_name or normalized_kind not in {"class", "record"}:
+            return ()
+
+        matches: dict[tuple[int, int], _TypeDeclaration] = {}
+        for candidate_line, raw_line in enumerate(lines, start=1):
+            if normalized_name not in raw_line or normalized_kind not in raw_line:
+                continue
+            declaration = cls._find_nearby_type_declaration(lines, candidate_line)
+            if declaration is None:
+                continue
+            if declaration.name != normalized_name or declaration.kind != normalized_kind:
+                continue
+            matches[(declaration.declaration_line, declaration.end_line)] = declaration
+        return tuple(matches.values())
+
+    @classmethod
     def _find_enclosing_type_declaration(
         cls,
         lines: list[str],
@@ -664,6 +857,26 @@ class QualityGateVerifier:
             "signature": stripped,
             "symbol": f"{match.group('name')}@{line_number}",
         }
+
+    @classmethod
+    def _find_public_properties_by_name(
+        cls,
+        lines: list[str],
+        property_name: str,
+    ) -> tuple[dict[str, object], ...]:
+        normalized_name = str(property_name or "").strip()
+        if not normalized_name:
+            return ()
+
+        matches: dict[int, dict[str, object]] = {}
+        for candidate_line, raw_line in enumerate(lines, start=1):
+            if normalized_name not in raw_line:
+                continue
+            declaration = cls._find_public_property_declaration(lines, candidate_line)
+            if declaration is None or str(declaration.get("name", "")).strip() != normalized_name:
+                continue
+            matches[int(declaration["line"])] = declaration
+        return tuple(matches.values())
 
     @staticmethod
     def _collect_added_comment_lines(diff_text: str) -> tuple[tuple[int, str], ...]:
@@ -733,6 +946,12 @@ class QualityGateVerifier:
     ) -> list[QualityGateViolation]:
         violations: list[QualityGateViolation] = []
         for declaration in declarations:
+            # Only enforce XML docs on new or signature-modified declarations.
+            # "touched" means the model only changed the body — don't
+            # retroactively require docs the original code never had.
+            scope = str(declaration.get("scope", "modified")).strip()
+            if scope == "touched":
+                continue
             line_number = int(declaration["line"])
             doc_lines = cls._collect_xml_doc(lines, line_number)
             doc_text = "\n".join(doc_lines)
@@ -808,9 +1027,16 @@ class QualityGateVerifier:
         touched_methods: tuple[_MethodWindow, ...],
         *,
         retry_hint: str,
+        method_scopes: dict[str, str] | None = None,
     ) -> list[QualityGateViolation]:
+        scopes = method_scopes or {}
         violations: list[QualityGateViolation] = []
         for method in touched_methods:
+            # Skip methods whose signature was not changed by the patch.
+            # "touched" means only the body was modified.
+            scope = scopes.get(method.symbol, "modified")
+            if scope == "touched":
+                continue
             if not method.is_async:
                 continue
             if "async void" in method.signature:
@@ -923,6 +1149,14 @@ class QualityGateVerifier:
         issue_line: int,
         retry_hint: str,
     ) -> list[QualityGateViolation]:
+        # S3776 is the cognitive complexity rule itself.  The local estimator
+        # is too crude to reliably approximate SonarQube's algorithm, so
+        # relying on the build verifier is more accurate and avoids false
+        # negatives that force unnecessary retries.
+        normalized_issue_rule = str(issue_rule_id or "").strip()
+        if normalized_issue_rule == "csharpsquid:S3776":
+            return []
+
         violations: list[QualityGateViolation] = []
         seen_symbols: set[str] = set()
         for method in touched_methods:
@@ -944,67 +1178,6 @@ class QualityGateVerifier:
                 )
             )
 
-        normalized_issue_rule = str(issue_rule_id or "").strip()
-        if normalized_issue_rule != "csharpsquid:S3776":
-            return violations
-        if not original_issue_file_content or issue_line <= 0:
-            return violations
-
-        original_lines = original_issue_file_content.splitlines()
-        original_method = cls._find_enclosing_method(original_lines, issue_line)
-        if original_method is None:
-            return violations
-
-        current_target_method = next(
-            (item for item in touched_methods if item.name == original_method.name),
-            None,
-        )
-        if current_target_method is None:
-            current_target_method = cls._find_method_by_name(lines, original_method.name)
-        if current_target_method is None:
-            violations.append(
-                QualityGateViolation(
-                    rule_id="cognitive_complexity",
-                    title="单方法认知复杂度不超过 30",
-                    message=(
-                        f"当前 patch 没有稳定触达 Sonar 指向的方法 {original_method.name}，"
-                        "无法确认认知复杂度已经下降。"
-                    ),
-                    file=file_path,
-                    line=original_method.declaration_line,
-                    symbol=original_method.symbol,
-                    evidence=original_method.signature,
-                    retry_hint=retry_hint,
-                )
-            )
-            return violations
-
-        original_body = "\n".join(original_lines[original_method.start_line - 1:original_method.end_line])
-        current_body = "\n".join(lines[current_target_method.start_line - 1:current_target_method.end_line])
-        original_complexity = cls._estimate_cognitive_complexity(original_body)
-        current_complexity = cls._estimate_cognitive_complexity(current_body)
-        if original_complexity <= 30:
-            return violations
-        if current_complexity < original_complexity:
-            return violations
-        if current_target_method.symbol in seen_symbols:
-            return violations
-
-        violations.append(
-            QualityGateViolation(
-                rule_id="cognitive_complexity",
-                title="单方法认知复杂度不超过 30",
-                message=(
-                    f"当前目标方法 {current_target_method.name} 的估算认知复杂度没有下降，"
-                    f"原始约为 {original_complexity}，当前约为 {current_complexity}。"
-                ),
-                file=file_path,
-                line=current_target_method.declaration_line,
-                symbol=current_target_method.symbol,
-                evidence=current_target_method.signature,
-                retry_hint=retry_hint,
-            )
-        )
         return violations
 
     @staticmethod

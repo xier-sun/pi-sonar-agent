@@ -300,10 +300,14 @@ def test_claude_adapter_build_request_handles_third_party_provider() -> None:
         build_command="dotnet build",
     )
 
-    assert request.model is None
-    assert request.env["CLAUDE_MODEL"] == "glm-4.7"
+    assert request.model == "glm-4.7"
+    assert request.env["ANTHROPIC_MODEL"] == "glm-4.7"
+    assert "CLAUDE_MODEL" not in request.env
     assert "ANTHROPIC_CUSTOM_MODEL_OPTION" not in request.env
-    assert request.extra_args == {"bare": None}
+    assert request.extra_args == {
+        "setting-sources": "project,local",
+        "bare": None,
+    }
     assert request.metadata["mode"] == "bare"
 
 
@@ -538,7 +542,7 @@ def test_claude_adapter_session_tolerates_none_assistant_content_and_none_error_
     assert events[0].agent_error == "agent failed"
 
 
-def test_claude_gateway_timeout_probe_keeps_env_driven_model_for_third_party_provider(
+def test_claude_gateway_timeout_probe_passes_explicit_model_for_third_party_provider(
     monkeypatch,
 ) -> None:
     adapter = ClaudeAdapter(
@@ -593,8 +597,18 @@ def test_claude_gateway_timeout_probe_keeps_env_driven_model_for_third_party_pro
     diagnostic = asyncio.run(session.diagnose_connect_timeout())
 
     assert diagnostic == "连接诊断：Claude CLI 最小请求可用，返回：OK"
-    assert recorded["command"] == ("claude", "--print", "--bare", "Reply with OK only.")
-    assert recorded["env"]["CLAUDE_MODEL"] == "glm-4.7"
+    assert recorded["command"] == (
+        "claude",
+        "--print",
+        "--model",
+        "glm-4.7",
+        "--setting-sources",
+        "project,local",
+        "--bare",
+        "Reply with OK only.",
+    )
+    assert recorded["env"]["ANTHROPIC_MODEL"] == "glm-4.7"
+    assert "CLAUDE_MODEL" not in recorded["env"]
 
 
 def test_agent_runtime_classifies_follow_up_timeout_after_edit() -> None:
@@ -743,6 +757,348 @@ def test_agent_runtime_reports_connect_timeout_diagnostic() -> None:
 
     assert "未完成初始化" in str(exc_info.value)
     assert "Failed to authenticate" in str(exc_info.value)
+
+
+def test_agent_runtime_does_not_treat_system_retry_events_as_first_response() -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit"],
+        mcp_tools=[],
+        forbidden_tools={"Bash"},
+    )
+    policy = ToolPolicy(registry, ["Read", "Edit"])
+    abort_reasons: list[str] = []
+
+    class FakeSession:
+        async def connect(self, timeout_seconds: float) -> None:
+            return None
+
+        async def diagnose_connect_timeout(self) -> str:
+            return "连接诊断：使用同配置执行最小 CLI 请求时也在 12 秒内无响应。"
+
+        async def send(self, user_prompt: str) -> None:
+            return None
+
+        def stream_events(self):
+            async def iterate():
+                while True:
+                    yield TraceEvent(
+                        "SystemMessage",
+                        payload={"subtype": "api_retry"},
+                        preview='{"subtype":"api_retry"}',
+                    )
+                    await asyncio.sleep(0.02)
+
+            return iterate()
+
+        async def abort(self, reason: str):
+            abort_reasons.append(reason)
+
+            class AbortResult:
+                actions = ("disconnect",)
+                errors = ()
+
+            result = AbortResult()
+            result.reason = reason
+            return result
+
+        async def close(self):
+            class Result:
+                reason = "normal_shutdown"
+                actions = ("disconnect",)
+                errors = ()
+
+            return Result()
+
+    class FakeGateway:
+        def create_session(self, request: GatewayRequest):
+            return FakeSession()
+
+    runtime = AgentRuntime(
+        gateway=FakeGateway(),
+        tool_policy=policy,
+        timeouts=RuntimeTimeouts(
+            client_connect_seconds=1,
+            first_response_seconds=0.05,
+            follow_up_seconds=0.05,
+            issue_hard_timeout_seconds=0.5,
+            heartbeat_interval_seconds=10,
+        ),
+    )
+
+    with pytest.raises(AgentRuntimeError) as exc_info:
+        runtime.run(
+            GatewayRequest(
+                system_prompt="system",
+                user_prompt="user",
+                cwd="workspace",
+                tools=("Read", "Edit"),
+                allowed_tools=("Read", "Edit"),
+                max_turns=4,
+                max_budget_usd=1.0,
+                env={},
+            )
+        )
+
+    assert exc_info.value.partial_result.timeout_stage == "first_response_timeout"
+    assert abort_reasons == ["first_response_timeout"]
+    assert "连接诊断：使用同配置执行最小 CLI 请求时也在 12 秒内无响应。" in str(exc_info.value)
+
+
+def test_agent_runtime_keeps_follow_up_timeout_classification_when_only_system_retries_arrive() -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit"],
+        mcp_tools=[],
+        forbidden_tools={"Bash"},
+    )
+    policy = ToolPolicy(registry, ["Read", "Edit"])
+    abort_reasons: list[str] = []
+
+    class FakeSession:
+        async def connect(self, timeout_seconds: float) -> None:
+            return None
+
+        async def send(self, user_prompt: str) -> None:
+            return None
+
+        def stream_events(self):
+            async def iterate():
+                yield ToolCallEvent("Read")
+                while True:
+                    yield TraceEvent(
+                        "SystemMessage",
+                        payload={"subtype": "api_retry"},
+                        preview='{"subtype":"api_retry"}',
+                    )
+                    await asyncio.sleep(0.02)
+
+            return iterate()
+
+        async def abort(self, reason: str):
+            abort_reasons.append(reason)
+
+            class AbortResult:
+                actions = ("disconnect",)
+                errors = ()
+
+            result = AbortResult()
+            result.reason = reason
+            return result
+
+        async def close(self):
+            class Result:
+                reason = "normal_shutdown"
+                actions = ("disconnect",)
+                errors = ()
+
+            return Result()
+
+    class FakeGateway:
+        def create_session(self, request: GatewayRequest):
+            return FakeSession()
+
+    runtime = AgentRuntime(
+        gateway=FakeGateway(),
+        tool_policy=policy,
+        timeouts=RuntimeTimeouts(
+            client_connect_seconds=1,
+            first_response_seconds=0.05,
+            follow_up_seconds=0.05,
+            issue_hard_timeout_seconds=0.5,
+            heartbeat_interval_seconds=10,
+        ),
+    )
+
+    with pytest.raises(AgentRuntimeError) as exc_info:
+        runtime.run(
+            GatewayRequest(
+                system_prompt="system",
+                user_prompt="user",
+                cwd="workspace",
+                tools=("Read", "Edit"),
+                allowed_tools=("Read", "Edit"),
+                max_turns=4,
+                max_budget_usd=1.0,
+                env={},
+            )
+        )
+
+    assert exc_info.value.partial_result.timeout_stage == "post_read_stall"
+    assert abort_reasons == ["follow_up_response_timeout"]
+
+
+def test_agent_runtime_logs_request_snapshot_before_send(capsys) -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit"],
+        mcp_tools=[],
+        forbidden_tools={"Bash"},
+    )
+    policy = ToolPolicy(registry, ["Read", "Edit"])
+
+    class FakeSession:
+        async def connect(self, timeout_seconds: float) -> None:
+            return None
+
+        async def send(self, user_prompt: str) -> None:
+            return None
+
+        def stream_events(self):
+            async def iterate():
+                yield ResultEvent(total_cost_usd=0.0)
+
+            return iterate()
+
+        async def abort(self, reason: str):
+            raise AssertionError("abort should not be called")
+
+        async def close(self):
+            class Result:
+                reason = "normal_shutdown"
+                actions = ("disconnect",)
+                errors = ()
+
+            return Result()
+
+    class FakeGateway:
+        def create_session(self, request: GatewayRequest):
+            return FakeSession()
+
+    runtime = AgentRuntime(
+        gateway=FakeGateway(),
+        tool_policy=policy,
+        timeouts=RuntimeTimeouts(
+            client_connect_seconds=1,
+            first_response_seconds=1,
+            follow_up_seconds=1,
+            issue_hard_timeout_seconds=5,
+            heartbeat_interval_seconds=10,
+        ),
+    )
+
+    runtime.run(
+        GatewayRequest(
+            system_prompt="system prompt line",
+            user_prompt="user prompt line",
+            cwd="workspace",
+            tools=("Read", "Edit"),
+            allowed_tools=("Read", "Edit"),
+            max_turns=4,
+            max_budget_usd=1.0,
+            env={
+                "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+                "ANTHROPIC_MODEL": "glm-5-turbo",
+                "ANTHROPIC_API_KEY": "token-123456",
+                "SONARQUBE_TOKEN": "should-not-appear",
+            },
+            metadata={
+                "endpoint": "https://open.bigmodel.cn/api/anthropic",
+                "model_display": "glm-5-turbo",
+                "mode": "bare",
+                "build_command": "dotnet build",
+            },
+        )
+    )
+
+    output = capsys.readouterr().out
+
+    assert "[SYSTEM PROMPT]" in output
+    assert "[REQUEST SNAPSHOT]" in output
+    assert '"reason": "before_send"' in output
+    assert '"ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic"' in output
+    assert '"ANTHROPIC_MODEL": "glm-5-turbo"' in output
+    assert '"ANTHROPIC_API_KEY": "<redacted>"' in output
+    assert "token-123456" not in output
+    assert "should-not-appear" not in output
+
+
+def test_agent_runtime_logs_request_snapshot_when_sdk_reports_api_retry(capsys) -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit"],
+        mcp_tools=[],
+        forbidden_tools={"Bash"},
+    )
+    policy = ToolPolicy(registry, ["Read", "Edit"])
+
+    class FakeSession:
+        async def connect(self, timeout_seconds: float) -> None:
+            return None
+
+        async def send(self, user_prompt: str) -> None:
+            return None
+
+        def stream_events(self):
+            async def iterate():
+                yield TraceEvent(
+                    "SystemMessage",
+                    payload={
+                        "subtype": "api_retry",
+                        "attempt": 2,
+                        "max_retries": 10,
+                        "retry_delay_ms": 1500.0,
+                        "error_status": 503,
+                        "error": "server_error",
+                        "session_id": "session-123",
+                        "uuid": "uuid-123",
+                    },
+                    preview='{"subtype":"api_retry","error_status":503}',
+                )
+                yield ResultEvent(total_cost_usd=0.0)
+
+            return iterate()
+
+        async def abort(self, reason: str):
+            raise AssertionError("abort should not be called")
+
+        async def close(self):
+            class Result:
+                reason = "normal_shutdown"
+                actions = ("disconnect",)
+                errors = ()
+
+            return Result()
+
+    class FakeGateway:
+        def create_session(self, request: GatewayRequest):
+            return FakeSession()
+
+    runtime = AgentRuntime(
+        gateway=FakeGateway(),
+        tool_policy=policy,
+        timeouts=RuntimeTimeouts(
+            client_connect_seconds=1,
+            first_response_seconds=1,
+            follow_up_seconds=1,
+            issue_hard_timeout_seconds=5,
+            heartbeat_interval_seconds=10,
+        ),
+    )
+
+    runtime.run(
+        GatewayRequest(
+            system_prompt="system prompt line",
+            user_prompt="user prompt line",
+            cwd="workspace",
+            tools=("Read", "Edit"),
+            allowed_tools=("Read", "Edit"),
+            max_turns=4,
+            max_budget_usd=1.0,
+            env={
+                "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+                "ANTHROPIC_MODEL": "glm-5-turbo",
+            },
+            metadata={
+                "endpoint": "https://open.bigmodel.cn/api/anthropic",
+                "model_display": "glm-5-turbo",
+                "mode": "bare",
+                "build_command": "dotnet build",
+            },
+        )
+    )
+
+    output = capsys.readouterr().out
+
+    assert "SDK api_retry: attempt=2/10, status=503, error=server_error" in output
+    assert '"reason": "api_retry"' in output
+    assert output.count("[REQUEST SNAPSHOT]") >= 2
 
 
 def test_agent_runtime_appends_closest_edit_snippet_for_string_not_found(tmp_path) -> None:

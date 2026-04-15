@@ -62,6 +62,7 @@ from pi_sonar_agent.core.tool_surface import (
     build_fix_runtime_tools,
     controlled_bash_enabled,
 )
+from pi_sonar_agent.fixers.rule_profiles import load_rule_catalog
 from pi_sonar_agent.integrations.sonar import extract_rule_detail_texts
 
 # ============== Data Classes ==============
@@ -255,6 +256,24 @@ class ClaudeFixAgent:
         self.session = requests.Session()
         self.session.auth = (sonar_token, "")
         self.session.headers.update({"Accept": "application/json"})
+
+    @staticmethod
+    def _resolve_continuation_max_turns(request_max_turns: int) -> int:
+        """Keep same-attempt continuations within the current turn budget instead of shrinking them."""
+
+        return max(2, _safe_int(request_max_turns) or 2)
+
+    def _resolve_issue_max_turns(self, issue: SonarIssue) -> int:
+        """Use the higher per-rule budget when available without lowering the instance default."""
+
+        resolved = max(2, _safe_int(self.max_turns) or 2)
+        try:
+            profile = load_rule_catalog().get(issue.rule)
+        except Exception:
+            return resolved
+        if profile is None or profile.max_turns <= 0:
+            return resolved
+        return max(resolved, profile.max_turns)
 
     @staticmethod
     def _extract_agent_error(message: ResultMessage) -> str | None:
@@ -1071,7 +1090,7 @@ class ClaudeFixAgent:
                             base_request.user_prompt,
                             context,
                         ),
-                        max_turns=max(2, min(base_request.max_turns, 4)),
+                        max_turns=cls._resolve_continuation_max_turns(base_request.max_turns),
                         metadata={
                             **dict(base_request.metadata),
                             "continuation_index": str(continuation_count),
@@ -1128,7 +1147,7 @@ class ClaudeFixAgent:
                 gateway_request.user_prompt,
                 context,
             ),
-            max_turns=max(2, min(gateway_request.max_turns, 4)),
+            max_turns=cls._resolve_continuation_max_turns(gateway_request.max_turns),
             metadata={
                 **dict(gateway_request.metadata),
                 "continuation_index": "1",
@@ -1450,10 +1469,11 @@ class ClaudeFixAgent:
         )
         edit_contract = issue_plan.edit_contract
         guardrail_mode = edit_contract.guardrail_mode
+        default_max_turns = self._resolve_issue_max_turns(issue)
         execution_schedule = AttemptScheduler.build_execution_schedule(
             edit_contract=edit_contract,
             performance_flags=performance_flags,
-            default_max_turns=self.max_turns,
+            default_max_turns=default_max_turns,
         )
         result_metadata = {
             "edit_contract": edit_contract,

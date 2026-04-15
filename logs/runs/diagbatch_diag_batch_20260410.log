@@ -1,6 +1,0 @@
-step1-log-session-open logs/runs/diagbatch_diag_batch_20260410.log
-step2-load-runtime-env 0.002
-step3-coordinator 0.0
-step4-load-targets 1 0.0
-step5-record-run-started 0.475 last_db_error= 
-加载 1 个目标

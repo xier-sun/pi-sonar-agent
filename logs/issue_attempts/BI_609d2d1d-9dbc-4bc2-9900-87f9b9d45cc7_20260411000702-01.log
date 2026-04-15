@@ -1,2 +1,0 @@
-[2026-04-11 02:56:18] Attempt 1/5 started for 609d2d1d-9dbc-4bc2-9900-87f9b9d45cc7
-[2026-04-11 02:56:18] Issue skipped by policy: 规则 csharpsquid:S107 默认跳过：方法参数过多通常需要跨调用点重构，建议人工处理。

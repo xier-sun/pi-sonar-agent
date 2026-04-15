@@ -22,6 +22,7 @@ from pi_sonar_agent.agent.rule_policies import (
     get_rule_policy,
 )
 from pi_sonar_agent.core.artifact_writer import ArtifactWriter
+from pi_sonar_agent.core.fix_verifier import FixVerifier
 from pi_sonar_agent.core.follow_up_store import FollowUpStore
 from pi_sonar_agent.core.lessons_store import LessonsStore
 from pi_sonar_agent.core.quality_gate import build_compliance_summary
@@ -55,6 +56,10 @@ from pi_sonar_agent.fixers.build_gate import format_build_failure_report
 DEFAULT_MAX_BUILD_RETRIES = 5
 EARLY_RETRY_ABORT_MIN_ATTEMPTS = 5
 EARLY_RETRY_ABORT_MIN_ATTEMPTS_NO_CHANGE = 2
+EARLY_RETRY_ABORT_MIN_ATTEMPTS_FIRST_RESPONSE_TIMEOUT = 2
+EXTENDED_BUILD_TIMEOUT_SECONDS = 600
+PROMPT_SAFE_BUILD_REPORT_MAX_LINES = 24
+RETRY_RUNTIME_MAX_TAIL_LINES = 120
 
 
 def _sanitize_name(value: str) -> str:
@@ -284,6 +289,217 @@ def _build_scope_retry_constraints(issue: SonarIssue | None) -> list[str]:
         "- 不要顺手修改本文件其他相同写法或同类规则的位置。",
         "- 如果这是行级问题，只修改包含 issue 行的那条语句。",
     ]
+
+
+def _tail_text(text: str, max_lines: int) -> str:
+    """Return a bounded tail for large logs."""
+
+    normalized = str(text or "").strip()
+    if not normalized:
+        return ""
+    lines = normalized.splitlines()
+    if len(lines) <= max_lines:
+        return normalized
+    omitted = len(lines) - max_lines
+    return f"... (省略前 {omitted} 行)\n" + "\n".join(lines[-max_lines:])
+
+
+def _looks_like_timeout_output(output: str) -> bool:
+    text = str(output or "").lower()
+    return "timed out after" in text or "timeoutexpired" in text
+
+
+def _extract_build_totals(output: str) -> tuple[int | None, int | None, str]:
+    """Extract error/warning counters and elapsed time from mixed-language build logs."""
+
+    text = str(output or "")
+    error_count: int | None = None
+    warning_count: int | None = None
+    elapsed = ""
+
+    for pattern in (
+        r"(?P<count>\d+)\s+个错误",
+        r"(?P<count>\d+)\s+Error\(s\)",
+    ):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            error_count = int(match.group("count"))
+            break
+
+    for pattern in (
+        r"(?P<count>\d+)\s+个警告",
+        r"(?P<count>\d+)\s+Warning\(s\)",
+    ):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            warning_count = int(match.group("count"))
+            break
+
+    for pattern in (
+        r"已用时间\s+(?P<elapsed>[0-9:.]+)",
+        r"Time Elapsed\s+(?P<elapsed>[0-9:.]+)",
+    ):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            elapsed = str(match.group("elapsed") or "").strip()
+            break
+
+    return error_count, warning_count, elapsed
+
+
+def _build_prompt_safe_output(
+    result: FixResult,
+    *,
+    compiler_errors: tuple[CompilerErrorContext, ...],
+) -> tuple[str, bool, bool]:
+    """Build model-facing retry text without dumping raw build logs back into the prompt."""
+
+    raw_output = str(result.build_output or "").strip()
+    if not raw_output:
+        return "", False, False
+
+    build_timeout_failed = (
+        result.failure_kind == "build"
+        and result.build_verification_failed
+        and _looks_like_timeout_output(raw_output)
+    )
+    error_count, warning_count, elapsed = _extract_build_totals(raw_output)
+    build_timeout_without_errors = build_timeout_failed and not compiler_errors and error_count == 0
+
+    if result.failure_kind == "build":
+        if compiler_errors:
+            return "", build_timeout_failed, build_timeout_without_errors
+
+        if build_timeout_without_errors:
+            sections = [
+                "上次尝试不是明确编译错误，而是本地构建验证超时。",
+                f"构建命令: {result.build_command or 'dotnet build'}",
+            ]
+            if elapsed:
+                sections.append(f"日志中的已用时间: {elapsed}")
+            if warning_count is not None:
+                sections.append(f"日志统计: {warning_count} 个警告")
+            sections.append("日志中没有发现明确的编译错误；不要因为仓库现存 warning 盲目大改代码。")
+            sections.append("优先保持当前 patch 语义稳定；如果需要查看更多上下文，只按需 Read 本地摘要或 tail 日志。")
+            return "\n".join(sections), build_timeout_failed, build_timeout_without_errors
+
+        build_report = format_build_failure_report(
+            {
+                "error": result.error or "",
+                "build_command": result.build_command,
+                "build_output": raw_output,
+            },
+            max_lines=PROMPT_SAFE_BUILD_REPORT_MAX_LINES,
+        ).strip()
+        return build_report or _tail_text(raw_output, PROMPT_SAFE_BUILD_REPORT_MAX_LINES), build_timeout_failed, build_timeout_without_errors
+
+    return "", build_timeout_failed, build_timeout_without_errors
+
+
+def _materialize_retry_workspace_files(
+    *,
+    workspace_path: Path,
+    issue_key: str,
+    retry_context: RetryContext,
+) -> RetryContext:
+    """Write model-readable retry artifacts inside the workspace after baseline restore."""
+
+    if not workspace_path.exists() or retry_context.failure_kind != "build":
+        return retry_context
+
+    retry_root = workspace_path / ".pi-sonar-agent-runtime" / "retry" / _sanitize_name(issue_key)
+    retry_root.mkdir(parents=True, exist_ok=True)
+
+    references: list[str] = []
+    summary_text = str(retry_context.prompt_output or "").strip()
+    if summary_text:
+        summary_path = retry_root / f"attempt-{retry_context.source_attempt_number:02d}-build-summary.txt"
+        summary_path.write_text(summary_text + "\n", encoding="utf-8")
+        references.append(summary_path.relative_to(workspace_path).as_posix())
+
+    raw_output = str(retry_context.raw_output or "").strip()
+    if raw_output:
+        tail_path = retry_root / f"attempt-{retry_context.source_attempt_number:02d}-build-tail.log"
+        tail_path.write_text(_tail_text(raw_output, RETRY_RUNTIME_MAX_TAIL_LINES) + "\n", encoding="utf-8")
+        references.append(tail_path.relative_to(workspace_path).as_posix())
+
+    if not references:
+        return retry_context
+
+    return replace(
+        retry_context,
+        workspace_file_references=tuple(references),
+        workspace_read_hint="先看 summary，再按需看 tail；不要一次性读取整份大日志。",
+    )
+
+
+def _should_retry_build_verification_only(
+    result: FixResult,
+    retry_context: RetryContext,
+) -> bool:
+    """Detect build timeouts that should be retried as verification, not code edits."""
+
+    return bool(
+        result.failure_kind == "build"
+        and result.build_verification_failed
+        and retry_context.build_timeout_without_errors
+        and _normalize_changed_files(result)
+    )
+
+
+def _retry_build_verification_with_extended_timeout(
+    *,
+    workspace_path: Path,
+    result: FixResult,
+) -> FixResult:
+    """Retry local build verification with a larger timeout before asking the model to edit again."""
+
+    build_command = str(result.build_command or "").strip() or "dotnet build"
+    build_passed, extended_output = FixVerifier.run_local_build(
+        workspace_path,
+        build_command,
+        timeout_seconds=EXTENDED_BUILD_TIMEOUT_SECONDS,
+    )
+
+    performance_metrics = dict(getattr(result, "performance_metrics", {}) or {})
+    performance_metrics.update(
+        {
+            "verification_timeout_recheck_invoked": True,
+            "verification_timeout_recheck_timeout_seconds": EXTENDED_BUILD_TIMEOUT_SECONDS,
+            "verification_timeout_recheck_passed": build_passed,
+        }
+    )
+    result.performance_metrics = performance_metrics
+
+    original_output = str(result.build_output or "").strip()
+    if build_passed:
+        result.success = True
+        result.build_passed = True
+        result.build_verification_failed = False
+        result.retryable_failure = False
+        result.failure_kind = ""
+        result.error = None
+        result.skip_reason = ""
+        result.build_output = "\n\n".join(
+            part
+            for part in (
+                f"初次构建验证在 {FixVerifier.BUILD_TIMEOUT_SECONDS} 秒内超时；已自动使用 {EXTENDED_BUILD_TIMEOUT_SECONDS} 秒超时重跑并通过。",
+                str(extended_output or "").strip(),
+            )
+            if str(part).strip()
+        )
+        return result
+
+    result.build_output = "\n\n".join(
+        part
+        for part in (
+            f"初次构建验证在 {FixVerifier.BUILD_TIMEOUT_SECONDS} 秒内超时；已自动使用 {EXTENDED_BUILD_TIMEOUT_SECONDS} 秒超时重跑，但验证仍未通过。",
+            _tail_text(original_output, PROMPT_SAFE_BUILD_REPORT_MAX_LINES),
+            str(extended_output or "").strip(),
+        )
+        if str(part).strip()
+    )
+    return result
 
 
 def _extract_scope_violation_context(
@@ -616,6 +832,10 @@ def build_retry_context(
     quality_gate_failure = _extract_quality_gate_failure_context(result)
     review_gate_failure = _extract_review_gate_failure_context(result)
     plan_failure = _extract_plan_failure_context(result)
+    prompt_output, build_timeout_failed, build_timeout_without_errors = _build_prompt_safe_output(
+        result,
+        compiler_errors=compiler_errors,
+    )
     return RetryContext(
         source_attempt_number=source_attempt_number,
         issue_rule_id=issue.rule if issue is not None else "",
@@ -634,6 +854,7 @@ def build_retry_context(
         summary=result.summary,
         build_command=result.build_command,
         raw_output=raw_output,
+        prompt_output=prompt_output,
         retryable_failure=result.retryable_failure,
         build_verification_failed=result.build_verification_failed,
         changed_files=_normalize_changed_files(result),
@@ -655,6 +876,8 @@ def build_retry_context(
         forbidden_tool_failed=result.failure_kind == "forbidden_tool",
         model_timeout_failed=result.failure_kind == "model_timeout",
         patch_salvaged=bool(getattr(result, "patch_salvaged", False)),
+        build_timeout_failed=build_timeout_failed,
+        build_timeout_without_errors=build_timeout_without_errors,
     )
 
 
@@ -1252,6 +1475,40 @@ def process_issue_with_retries(
                 source_attempt_number=attempt,
             )
             next_retry_context = _carry_forward_blocker_context(retry_context, next_retry_context)
+            if _should_retry_build_verification_only(result, next_retry_context):
+                logger.write(
+                    "Build verification timed out without compiler errors; retrying verification with extended timeout before asking the model to edit again."
+                )
+                result = _retry_build_verification_with_extended_timeout(
+                    workspace_path=workspace_path,
+                    result=result,
+                )
+                if result.success:
+                    logger.write("Extended build verification passed; salvaging current patch without another model retry.")
+                    attempt_state = write_attempt_artifacts(
+                        attempt=attempt,
+                        started_at=attempt_started_at,
+                        finished_at=attempt_finished_at,
+                        duration_seconds=attempt_duration_seconds,
+                        result=result,
+                    )
+                    if state_store is not None:
+                        state_store.record_attempt_state(
+                            attempt_state,
+                            run_label=run_label,
+                            repository=repository,
+                            author=author,
+                            project_key=project_key,
+                            issue_key=issue.key,
+                        )
+                    return finalize_result(result)
+                next_retry_context = build_retry_context(
+                    workspace_path,
+                    result,
+                    issue,
+                    source_attempt_number=attempt,
+                )
+                next_retry_context = _carry_forward_blocker_context(retry_context, next_retry_context)
             lessons_store.record_failure(
                 repository=repository,
                 run_label=run_label,
@@ -1265,9 +1522,6 @@ def process_issue_with_retries(
                     for rule in getattr(getattr(result, "edit_contract", None), "quality_gate_rules", ())
                 ),
             )
-            next_retry_feedback = render_retry_context(next_retry_context)
-            if next_retry_feedback:
-                logger.write("Next retry feedback for model:\n" + next_retry_feedback)
             attempt_state = write_attempt_artifacts(
                 attempt=attempt,
                 started_at=attempt_started_at,
@@ -1286,11 +1540,24 @@ def process_issue_with_retries(
                 )
             restore_workspace_baseline(workspace_path, baseline)
             logger.write("Workspace restored to issue baseline")
+            next_retry_context = _materialize_retry_workspace_files(
+                workspace_path=workspace_path,
+                issue_key=issue.key,
+                retry_context=next_retry_context,
+            )
+            next_retry_feedback = render_retry_context(next_retry_context)
+            if next_retry_feedback:
+                logger.write("Next retry feedback for model:\n" + next_retry_feedback)
 
             should_retry = result.retryable_failure or result.build_verification_failed
             early_abort_threshold = (
                 EARLY_RETRY_ABORT_MIN_ATTEMPTS_NO_CHANGE
                 if next_retry_context.failure_kind == "no_change"
+                else EARLY_RETRY_ABORT_MIN_ATTEMPTS_FIRST_RESPONSE_TIMEOUT
+                if (
+                    next_retry_context.model_timeout_failed
+                    and next_retry_context.model_timeout_stage == "first_response_timeout"
+                )
                 else EARLY_RETRY_ABORT_MIN_ATTEMPTS
             )
             if (

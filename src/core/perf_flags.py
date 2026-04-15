@@ -40,7 +40,7 @@ class PerformanceFlags:
     patch_salvage: bool = True
     continuation_retry: bool = True
     edit_failure_context_feedback: bool = True
-    fast_path_max_turns: int = 6
+    fast_path_max_turns: int = 20
     continuation_retry_limit: int = 2
 
     def enabled_flags(self) -> tuple[str, ...]:
@@ -99,6 +99,6 @@ def load_performance_flags() -> PerformanceFlags:
             "PI_SONAR_RUNTIME_EDIT_FAILURE_CONTEXT_FEEDBACK",
             True,
         ),
-        fast_path_max_turns=_env_int("PI_SONAR_PERF_FAST_PATH_MAX_TURNS", 6),
+        fast_path_max_turns=_env_int("PI_SONAR_PERF_FAST_PATH_MAX_TURNS", 20),
         continuation_retry_limit=_env_int("PI_SONAR_PERF_CONTINUATION_RETRY_LIMIT", 2),
     )

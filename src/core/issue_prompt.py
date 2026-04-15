@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pi_sonar_agent.agent.claude_agent import SonarIssue
 
 
-SONAR_FIX_SYSTEM_PROMPT = """你是一个极其严格的 .NET/C# 架构师，专门负责修复 SonarQube 代码质量问题。
+SONAR_FIX_SYSTEM_PROMPT = """你是一个极其严格的 .NET/C# Google资深软件工程师和架构师，专门负责修复 SonarQube 代码质量问题。
 
 你的任务：
 1. 仔细分析 SonarQube 报告的代码问题

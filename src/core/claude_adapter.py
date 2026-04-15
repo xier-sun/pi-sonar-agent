@@ -46,6 +46,7 @@ THIRD_PARTY_MODEL_ENV_KEYS = (
 )
 
 _CONNECT_DIAGNOSTIC_CACHE: dict[tuple[str, str, str], str] = {}
+_AUTOMATION_SETTING_SOURCES = "project,local"
 
 
 @dataclass(frozen=True)
@@ -319,11 +320,19 @@ class ClaudeAdapter(ModelGateway):
 
     @classmethod
     def build_agent_extra_args(cls, agent_env: dict[str, str]) -> dict[str, Any]:
-        """Build provider-specific CLI compatibility arguments."""
+        """Build CLI arguments for hermetic automation runs.
 
+        Automated issue fixing must not inherit user-level Claude Code settings,
+        otherwise machine-specific model/env overrides can leak into project runs.
+        Keep project/local settings available, but exclude the user source.
+        """
+
+        extra_args: dict[str, Any] = {
+            "setting-sources": _AUTOMATION_SETTING_SOURCES,
+        }
         if cls.uses_third_party_anthropic_provider(agent_env):
-            return {"bare": None}
-        return {}
+            extra_args["bare"] = None
+        return extra_args
 
     @classmethod
     def build_sdk_child_env(cls, agent_env: dict[str, str]) -> dict[str, str]:
@@ -347,7 +356,11 @@ class ClaudeAdapter(ModelGateway):
         if cls.uses_third_party_anthropic_provider(agent_env):
             model_value = str(explicit_model or "").strip()
             if model_value:
-                child_env["CLAUDE_MODEL"] = model_value
+                # Third-party Anthropic-compatible providers do not reliably honor
+                # CLAUDE_MODEL in bare mode. Pass the selected model through both
+                # the CLI flag and the Anthropic env key that the CLI respects.
+                child_env["ANTHROPIC_MODEL"] = model_value
+                return model_value
             return None
         return explicit_model
 

@@ -167,6 +167,7 @@ class RetryContext:
     summary: str = ""
     build_command: str = ""
     raw_output: str = ""
+    prompt_output: str = ""
     retryable_failure: bool = False
     build_verification_failed: bool = False
     changed_files: tuple[str, ...] = ()
@@ -184,6 +185,10 @@ class RetryContext:
     forbidden_tool_failed: bool = False
     model_timeout_failed: bool = False
     patch_salvaged: bool = False
+    build_timeout_failed: bool = False
+    build_timeout_without_errors: bool = False
+    workspace_file_references: tuple[str, ...] = ()
+    workspace_read_hint: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the retry context to a JSON-ready dictionary."""
@@ -278,6 +283,24 @@ def _append_quality_gate_details(
         sections.extend(f"- {item}" for item in guidance)
 
 
+def _append_workspace_retry_references(
+    sections: list[str],
+    retry_context: RetryContext,
+) -> None:
+    references = [
+        str(item).strip()
+        for item in getattr(retry_context, "workspace_file_references", ())
+        if str(item).strip()
+    ]
+    if not references:
+        return
+    sections.append("如需查看更多本地验证信息，可按需 Read 以下工作区文件：")
+    sections.extend(f"- {item}" for item in references)
+    read_hint = str(getattr(retry_context, "workspace_read_hint", "") or "").strip()
+    if read_hint:
+        sections.append(f"读取建议: {read_hint}")
+
+
 def render_retry_context(retry_context: RetryContext | None) -> str:
     """Render a structured retry context into the prompt text used by the model."""
 
@@ -285,6 +308,8 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
         return ""
 
     raw_output = str(retry_context.raw_output or "").strip()
+    prompt_output = str(retry_context.prompt_output or "").strip()
+    effective_output = prompt_output or raw_output
     scope_violation = retry_context.scope_violation
     review_failure = retry_context.review_failure
     quality_gate_failure = retry_context.quality_gate_failure
@@ -302,7 +327,7 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
             return "\n".join(
                 [
                     "上次尝试发出了无效的 Edit/MultiEdit 工具调用，导致没有真正落盘修改。",
-                    raw_output or "Edit/MultiEdit 缺少必要参数。",
+                    effective_output or "Edit/MultiEdit 缺少必要参数。",
                     "重试约束:",
                     "- Edit 必须提供完整的 file_path、old_string、new_string。",
                     "- MultiEdit 必须提供 file_path 和至少一个有效 edits 项。",
@@ -310,11 +335,11 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                     "- 不要发送空工具调用，也不要只输出“Using tool: Edit”而不附带参数。",
                 ]
             )
-        if raw_output:
+        if effective_output:
             if has_plan_failure:
                 lines = [
                     "上次尝试在 edit 前的 Plan 预检阶段就被拒绝，请先解决计划层冲突：",
-                    plan_failure.summary if plan_failure else raw_output,
+                    plan_failure.summary if plan_failure else effective_output,
                 ]
                 lines.extend(str(item).strip() for item in (plan_failure.details if plan_failure else ()) if str(item).strip())
                 if plan_failure and plan_failure.guidance:
@@ -322,9 +347,9 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                     lines.extend(f"- {item}" for item in plan_failure.guidance if str(item).strip())
                 return "\n".join(lines)
             if retry_context.boundary_failure is not None and retry_context.boundary_failure.summary:
-                raw_output = (
+                effective_output = (
                     f"边界主阻塞原因: {retry_context.boundary_failure.code}\n"
-                    f"{retry_context.boundary_failure.summary}\n\n{raw_output}"
+                    f"{retry_context.boundary_failure.summary}\n\n{effective_output}"
                 )
             if retry_context.model_timeout_failed:
                 timeout_label = retry_context.model_timeout_summary or "在等待模型首响应时超时"
@@ -333,7 +358,7 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                 return "\n".join(
                     [
                         f"上次尝试{timeout_label}，请先确认当前模型网关或 provider 可正常返回工具调用响应：",
-                        raw_output,
+                        effective_output,
                         "重试约束:",
                         "- 不要更换构建命令，先确认模型能稳定返回工具调用响应。",
                         "- 如果连续超时，优先检查 .env 中的模型 endpoint、token 和 provider 兼容性。",
@@ -342,7 +367,7 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
             if retry_context.forbidden_tool_failed:
                 sections = [
                     "上次尝试使用了被禁止的工具，或污染了当前 issue 的 Git 基线；本次必须严格按下面约束重试：",
-                    raw_output,
+                    effective_output,
                     "重试约束:",
                     "- 严禁使用 git_add、git_commit、git_push 或任何自行提交/推送动作。",
                     "- 如果使用 shell 工具（工具名 Bash），只写 bash 兼容命令；允许搜索、查看、诊断、echo 等无害操作。",
@@ -362,11 +387,12 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
             if retry_context.build_tool_failed:
                 sections = [
                     "上次尝试在运行构建工具时异常退出，请先处理下面的异常信息和本地回退构建输出：",
-                    raw_output,
+                    effective_output,
                     "重试约束:",
                     "- 先修复 stderr 或回退构建输出中暴露的问题，再重新运行推荐构建命令。",
                     "- 如果回退构建已经通过，也要再次运行构建，确认修改后的代码仍然稳定。",
                 ]
+                _append_workspace_retry_references(sections, retry_context)
                 if has_scope_violation:
                     sections.extend(
                         [
@@ -379,7 +405,7 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                 return "\n".join(
                     [
                         "上次尝试修改了 Sonar 指定范围之外的代码，请严格缩小修改范围：",
-                        raw_output,
+                        effective_output,
                         "重试约束:",
                         *(scope_violation.constraints if scope_violation else ()),
                     ]
@@ -388,7 +414,7 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                 return "\n".join(
                     [
                         "上次尝试被变更审查拒绝，请严格缩小当前 patch：",
-                        review_failure.raw_output if review_failure else raw_output,
+                        review_failure.raw_output if review_failure else effective_output,
                         "重试约束:",
                         *(review_failure.constraints if review_failure else ()),
                     ]
@@ -420,7 +446,9 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                     sections.append("审核 agent 给出的下一轮要求:")
                     sections.extend(f"- {item}" for item in review_gate_failure.feedback)
                 return "\n".join(sections)
-            return raw_output
+            sections = [effective_output]
+            _append_workspace_retry_references(sections, retry_context)
+            return "\n".join(section for section in sections if str(section).strip())
         if has_plan_failure:
             lines = [
                 "上次尝试在 edit 前的 Plan 预检阶段被拒绝。",
@@ -496,6 +524,7 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
     if retry_context.guidance:
         sections.append("重试约束:")
         sections.extend(f"- {item}" for item in retry_context.guidance)
+    _append_workspace_retry_references(sections, retry_context)
 
     if retry_context.boundary_failure is not None:
         sections.extend(
@@ -522,7 +551,7 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
         sections.extend(
             [
                 "另外，Diff reviewer 也拒绝了上次 patch：",
-                review_failure.raw_output if review_failure else raw_output,
+                review_failure.raw_output if review_failure else effective_output,
                 "审查约束:",
                 *(review_failure.constraints if review_failure else ()),
             ]

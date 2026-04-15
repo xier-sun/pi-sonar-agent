@@ -131,6 +131,18 @@ class QualityGateViolation:
     def to_dict(self) -> dict[str, Any]:
         return serialize_state(self)
 
+    def to_soft_finding(self) -> QualityGateSoftFinding:
+        """Downgrade this hard violation to a soft reviewer finding."""
+        return QualityGateSoftFinding(
+            rule_id=self.rule_id,
+            title=self.title,
+            message=self.message,
+            file=self.file,
+            line=self.line,
+            symbol=self.symbol,
+            evidence=self.evidence,
+        )
+
 
 @dataclass(frozen=True)
 class QualityGateSoftFinding:

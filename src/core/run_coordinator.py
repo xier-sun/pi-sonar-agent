@@ -647,13 +647,12 @@ class RunCoordinator:
                 issue_summaries=issue_summaries,
             )
 
-            git_gateway.publish_branch(
-                workspace,
-                branch,
-                f"fix: 修复 {successful} 个 SonarQube 问题",
-            )
-
             try:
+                git_gateway.publish_branch(
+                    workspace,
+                    branch,
+                    f"fix: 修复 {successful} 个 SonarQube 问题",
+                )
                 pr = ado_client.create_pull_request(
                     repository=target_config.repository,
                     title=f"Fix: 修复 {successful} 个 SonarQube 问题",

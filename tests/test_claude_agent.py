@@ -137,6 +137,51 @@ def test_build_user_prompt_renders_structured_retry_context() -> None:
     assert "请基于这些失败原因重新修复" in prompt
 
 
+def test_build_user_prompt_renders_workspace_retry_references() -> None:
+    issue = SonarIssue(
+        key="issue-retry-workspace-files",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    retry_context = RetryContext(
+        source_attempt_number=2,
+        failure_kind="build",
+        error="Issue changes failed local build verification",
+        raw_output="full build output",
+        prompt_output="构建验证超时，没有发现明确编译错误。",
+        build_timeout_failed=True,
+        build_timeout_without_errors=True,
+        workspace_file_references=(
+            ".pi-sonar-agent-runtime/retry/issue/attempt-02-build-summary.txt",
+            ".pi-sonar-agent-runtime/retry/issue/attempt-02-build-tail.log",
+        ),
+        workspace_read_hint="先看 summary，再按需看 tail；不要一次性读取整份大日志。",
+    )
+
+    prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  18 | foreach (var item in items) { ... }",
+        "",
+        "- 只允许修改第 18-24 行。",
+        {
+            "name": "Cognitive Complexity of methods should not be too high",
+            "description": "嵌套条件和循环会提高认知复杂度。",
+            "how_to_fix": "提取私有方法，减少嵌套层级。",
+        },
+        'dotnet build "src/Foo.sln"',
+        retry_context=retry_context,
+    )
+
+    assert "构建验证超时，没有发现明确编译错误。" in prompt
+    assert ".pi-sonar-agent-runtime/retry/issue/attempt-02-build-summary.txt" in prompt
+    assert ".pi-sonar-agent-runtime/retry/issue/attempt-02-build-tail.log" in prompt
+    assert "不要一次性读取整份大日志" in prompt
+
+
 def test_build_user_prompt_includes_precise_sonar_location_guidance() -> None:
     issue = SonarIssue(
         key="issue-location",
@@ -220,7 +265,10 @@ def test_build_agent_extra_args_uses_bare_for_third_party_provider() -> None:
         }
     )
 
-    assert extra_args == {"bare": None}
+    assert extra_args == {
+        "setting-sources": "project,local",
+        "bare": None,
+    }
 
 
 def test_build_agent_extra_args_keeps_default_mode_for_first_party_provider() -> None:
@@ -231,7 +279,7 @@ def test_build_agent_extra_args_keeps_default_mode_for_first_party_provider() ->
         }
     )
 
-    assert extra_args == {}
+    assert extra_args == {"setting-sources": "project,local"}
 
 
 def test_build_sdk_child_env_strips_model_env_for_third_party_provider() -> None:
@@ -252,7 +300,7 @@ def test_build_sdk_child_env_strips_model_env_for_third_party_provider() -> None
     assert "CLAUDE_MODEL" not in child_env
 
 
-def test_resolve_sdk_model_uses_env_for_third_party_provider() -> None:
+def test_resolve_sdk_model_uses_cli_model_for_third_party_provider() -> None:
     raw_env = {
         "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
         "ANTHROPIC_API_KEY": "token",
@@ -261,8 +309,9 @@ def test_resolve_sdk_model_uses_env_for_third_party_provider() -> None:
 
     sdk_model = ClaudeFixAgent._resolve_sdk_model(raw_env, child_env, "glm-4.7")
 
-    assert sdk_model is None
-    assert child_env["CLAUDE_MODEL"] == "glm-4.7"
+    assert sdk_model == "glm-4.7"
+    assert child_env["ANTHROPIC_MODEL"] == "glm-4.7"
+    assert "CLAUDE_MODEL" not in child_env
 
 
 def test_load_csharp_quality_gate_uses_repo_markdown_as_single_source(
@@ -579,6 +628,8 @@ def test_fix_issue_uses_same_attempt_no_change_continuation_before_failing(monke
     assert result.success is False
     assert result.failure_kind == "no_change"
     assert len(requests) == 2
+    assert requests[0].max_turns == 20
+    assert requests[1].max_turns == 20
     assert "你还没有真正修改代码" in requests[1].user_prompt
     assert result.performance_metrics["continuation_retry_count"] == 1
 

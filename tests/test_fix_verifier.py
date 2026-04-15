@@ -5,7 +5,8 @@ import subprocess
 from pi_sonar_agent.agent.claude_agent import SonarIssue
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange, ReviewedLineOperation
 from pi_sonar_agent.core.fix_verifier import FixVerifier
-from pi_sonar_agent.core.issue_contract import EditContract
+from pi_sonar_agent.core.issue_contract import ContractTargetSymbol, EditContract
+from pi_sonar_agent.core.perf_flags import PerformanceFlags
 from pi_sonar_agent.core.propagation_verifier import PropagationCheckResult, PropagationVerifier
 from pi_sonar_agent.core.quality_gate import QualityGateResult, QualityGateRule, QualityGateViolation
 from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
@@ -116,7 +117,7 @@ def test_fix_verifier_records_soft_drift_without_blocking_build(monkeypatch, tmp
         for item in outcome.reviewer_result.violations
     )
     assert "build ok" in outcome.combined_output
-    assert build_calls == ["build", "build"]
+    assert build_calls == ["build"]
 
 
 def test_fix_verifier_handles_build_timeout(monkeypatch, tmp_path) -> None:
@@ -172,7 +173,7 @@ def test_fix_verifier_handles_build_timeout(monkeypatch, tmp_path) -> None:
     assert "timed out after" in outcome.build_output
 
 
-def test_fix_verifier_rejects_quality_gate_violation(monkeypatch, tmp_path) -> None:
+def test_fix_verifier_downgrades_async_signature_when_contract_cannot_propagate(monkeypatch, tmp_path) -> None:
     issue = SonarIssue(
         key="issue-quality-gate",
         rule="csharpsquid:S138",
@@ -245,11 +246,12 @@ def test_fix_verifier_rejects_quality_gate_violation(monkeypatch, tmp_path) -> N
         + "\n",
     )
 
-    assert outcome.build_passed is False
-    assert outcome.quality_gate_result.status == "retry"
-    assert outcome.quality_gate_result.violations[0].rule_id == "async_signature"
-    assert "异步方法 Process 没有以 Async 结尾" in outcome.combined_output
-    assert build_calls == []
+    assert outcome.build_passed is True
+    assert outcome.quality_gate_result.status == "pass"
+    assert outcome.quality_gate_result.violations == ()
+    assert outcome.quality_gate_result.soft_findings[0].rule_id == "async_signature"
+    assert "异步方法 Process 没有以 Async 结尾" not in outcome.combined_output
+    assert build_calls == ["build"]
 
 
 def test_fix_verifier_short_circuits_build_on_incomplete_signature_propagation(monkeypatch, tmp_path) -> None:
@@ -361,7 +363,6 @@ def test_fix_verifier_short_circuits_build_on_incomplete_signature_propagation(m
     assert outcome.propagation_check_result.status == "retry"
     assert "Residual Targets:" in outcome.combined_output
     assert "callsite" in outcome.combined_output
-    assert build_calls == []
 
 
 def test_fix_verifier_short_circuits_full_build_when_fast_compile_fails(monkeypatch, tmp_path) -> None:
@@ -390,7 +391,7 @@ def test_fix_verifier_short_circuits_full_build_when_fast_compile_fails(monkeypa
             before_changed_lines=(8,),
             after_changed_lines=(),
             diff_text="@@ -8,1 +8,0 @@\n-        var unused = 1;\n",
-            hunk_count=1,
+            hunk_count=3,
         ),
     )
 
@@ -413,6 +414,10 @@ def test_fix_verifier_short_circuits_full_build_when_fast_compile_fails(monkeypa
         return BuildPassedProcess()
 
     monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.load_performance_flags",
+        lambda: PerformanceFlags(review_gate=False, fast_compile=True, layered_verification=True),
+    )
 
     outcome = FixVerifier.evaluate_attempt(
         issue=issue,
@@ -445,6 +450,186 @@ def test_fix_verifier_short_circuits_full_build_when_fast_compile_fails(monkeypa
     assert commands == ['dotnet build "src/Foo.sln" --no-restore -v:q']
 
 
+def test_fix_verifier_runs_full_build_when_fast_compile_times_out(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-fast-compile-timeout",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=8,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build",),
+        scope_mode="method",
+        validation_line_range=(8, 20),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(8, 9, 10, 11, 12, 13, 14, 15),
+            before_changed_lines=(8, 9, 10, 11, 12, 13, 14, 15),
+            after_changed_lines=(8, 9, 10, 11, 12, 13, 14, 15),
+            diff_text=(
+                "@@ -8,8 +8,8 @@\n"
+                "-    if (a && b && c) { Foo(); }\n"
+                "+    if (IsReady(a, b, c)) { Foo(); }\n"
+            ),
+            hunk_count=3,
+        ),
+    )
+
+    commands: list[str] = []
+
+    class BuildPassedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    def fake_run(command, *args, **kwargs):
+        commands.append(command)
+        if "--no-restore" in command:
+            raise subprocess.TimeoutExpired(
+                cmd=command,
+                timeout=FixVerifier.FAST_COMPILE_TIMEOUT_SECONDS,
+                output="    118 个警告\n    0 个错误\n\n已用时间 00:02:55.32",
+                stderr="",
+            )
+        return BuildPassedProcess()
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.load_performance_flags",
+        lambda: PerformanceFlags(review_gate=False, fast_compile=True, layered_verification=True),
+    )
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="scope",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content="\n".join(
+            [
+                "class Foo",
+                "{",
+                "    void Demo()",
+                "    {",
+                "        if (IsReady(a, b, c))",
+                "        {",
+                "            Run();",
+                "        }",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+    )
+
+    assert outcome.fast_compile_invoked is True
+    assert outcome.fast_compile_passed is False
+    assert "timed out after" in outcome.fast_compile_output
+    assert outcome.build_invoked is True
+    assert outcome.build_passed is True
+    assert outcome.build_output == "build ok"
+    assert commands == [
+        'dotnet build "src/Foo.sln" --no-restore -v:q',
+        'dotnet build "src/Foo.sln"',
+    ]
+
+
+def test_fix_verifier_skips_fast_compile_for_small_cleanup_patch(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-small-patch",
+        rule="csharpsquid:S125",
+        message="删除注释代码",
+        line=8,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build",),
+        scope_mode="statement",
+        validation_line_range=(8, 8),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(8,),
+            before_changed_lines=(8,),
+            after_changed_lines=(),
+            diff_text="@@ -8,1 +8,0 @@\n-        // commented out code\n",
+            hunk_count=1,
+        ),
+    )
+
+    commands: list[str] = []
+
+    class BuildPassedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    def fake_run(command, *args, **kwargs):
+        commands.append(command)
+        return BuildPassedProcess()
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.ReviewGateAgent.review",
+        lambda **kwargs: ReviewGateResult(
+            status="not_applicable",
+            summary="No reviewable verifier findings were present for this attempt.",
+            findings=(),
+            decisions=(),
+        ),
+    )
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.load_performance_flags",
+        lambda: PerformanceFlags(review_gate=True, fast_compile=True, layered_verification=True),
+    )
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="scope",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content="\n".join(
+            [
+                "class Foo",
+                "{",
+                "    void Demo()",
+                "    {",
+                "        Run();",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+    )
+
+    assert outcome.fast_compile_invoked is False
+    assert outcome.fast_compile_passed is True
+    assert outcome.build_invoked is True
+    assert outcome.build_passed is True
+    assert commands == ['dotnet build "src/Foo.sln"']
+
+
 def test_fix_verifier_retries_full_build_without_restore_after_nuget_source_failure(monkeypatch, tmp_path) -> None:
     commands: list[str] = []
 
@@ -467,6 +652,10 @@ def test_fix_verifier_retries_full_build_without_restore_after_nuget_source_fail
         return RestoreFailedProcess()
 
     monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.load_performance_flags",
+        lambda: PerformanceFlags(review_gate=False, fast_compile=True, layered_verification=True),
+    )
 
     build_passed, build_output = FixVerifier.run_local_build(
         tmp_path,
@@ -512,7 +701,7 @@ def test_fix_verifier_does_not_short_circuit_full_build_on_missing_assets_fast_c
             before_changed_lines=(8,),
             after_changed_lines=(),
             diff_text="@@ -8,1 +8,0 @@\n-        var unused = 1;\n",
-            hunk_count=1,
+            hunk_count=3,
         ),
     )
 
@@ -538,6 +727,10 @@ def test_fix_verifier_does_not_short_circuit_full_build_on_missing_assets_fast_c
         return BuildPassedProcess()
 
     monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.load_performance_flags",
+        lambda: PerformanceFlags(review_gate=False, fast_compile=True, layered_verification=True),
+    )
 
     outcome = FixVerifier.evaluate_attempt(
         issue=issue,
@@ -1119,7 +1312,7 @@ def test_quality_gate_verifier_ignores_public_properties_inside_private_nested_t
     assert result.violations == ()
 
 
-def test_quality_gate_verifier_rejects_s3776_when_patch_only_touches_helper_and_leaves_target_method_unchanged() -> None:
+def test_quality_gate_verifier_skips_local_s3776_estimator_when_patch_only_touches_helper() -> None:
     contract = EditContract(
         issue_key="issue-s3776-target-method",
         rule_id="csharpsquid:S3776",
@@ -1236,9 +1429,320 @@ def test_quality_gate_verifier_rejects_s3776_when_patch_only_touches_helper_and_
         issue_line=4,
     )
 
+    assert result.status == "pass"
+    assert result.violations == ()
+
+
+def test_quality_gate_verifier_skips_xml_doc_gate_for_body_only_changes() -> None:
+    contract = EditContract(
+        issue_key="issue-public-xml-touched",
+        rule_id="csharpsquid:S3776",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        quality_gate_rules=(
+            QualityGateRule(
+                rule_id="public_xml_docs",
+                title="公开成员 XML 文档完整",
+                summary="公开成员要有 XML。",
+                enforcement="hard",
+            ),
+        ),
+    )
+    change = ReviewedFileChange(
+        file="src/Foo.cs",
+        changed_lines=(5,),
+        before_changed_lines=(5,),
+        after_changed_lines=(5,),
+        diff_text="@@ -5,1 +5,1 @@\n-        return 1;\n+        return 2;\n",
+        hunk_count=1,
+    )
+    original_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    public int Process()",
+            "    {",
+            "        return 1;",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+    current_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    public int Process()",
+            "    {",
+            "        return 2;",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+
+    result = QualityGateVerifier.review(
+        issue_file_path="src/Foo.cs",
+        edit_contract=contract,
+        reviewed_changes=(change,),
+        original_issue_file_content=original_issue_file_content,
+        current_issue_file_content=current_issue_file_content,
+    )
+
+    assert result.status == "pass"
+    assert result.violations == ()
+
+
+def test_quality_gate_verifier_downgrades_async_signature_without_signature_capability() -> None:
+    contract = EditContract(
+        issue_key="issue-async-soft",
+        rule_id="csharpsquid:S3776",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        quality_gate_rules=(
+            QualityGateRule(
+                rule_id="async_signature",
+                title="异步签名规范",
+                summary="异步方法要用 Async 命名并返回 Task。",
+                enforcement="hard",
+            ),
+        ),
+    )
+    change = ReviewedFileChange(
+        file="src/Foo.cs",
+        changed_lines=(3,),
+        before_changed_lines=(),
+        after_changed_lines=(3,),
+        diff_text="@@ -3,0 +3,1 @@\n+    public async Task Process()\n",
+        hunk_count=1,
+    )
+    current_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    public async Task Process()",
+            "    {",
+            "        await Task.Delay(1);",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+
+    result = QualityGateVerifier.review(
+        issue_file_path="src/Foo.cs",
+        edit_contract=contract,
+        reviewed_changes=(change,),
+        original_issue_file_content=None,
+        current_issue_file_content=current_issue_file_content,
+    )
+
+    assert result.status == "pass"
+    assert result.violations == ()
+    assert len(result.soft_findings) == 1
+    assert result.soft_findings[0].rule_id == "async_signature"
+
+
+def test_quality_gate_verifier_checks_async_requires_await_for_body_only_changes() -> None:
+    contract = EditContract(
+        issue_key="issue-async-await-body-only",
+        rule_id="csharpsquid:S3776",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        quality_gate_rules=(
+            QualityGateRule(
+                rule_id="async_requires_await",
+                title="异步方法必须真正 await",
+                summary="异步方法内部如果没有 await，应改为同步方法或直接返回 Task。",
+                enforcement="hard",
+            ),
+        ),
+    )
+    change = ReviewedFileChange(
+        file="src/Foo.cs",
+        changed_lines=(5,),
+        before_changed_lines=(5,),
+        after_changed_lines=(5,),
+        diff_text="@@ -5,1 +5,1 @@\n-        await Task.Delay(1);\n+        return;\n",
+        hunk_count=1,
+    )
+    original_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    public async Task ProcessAsync()",
+            "    {",
+            "        await Task.Delay(1);",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+    current_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    public async Task ProcessAsync()",
+            "    {",
+            "        return;",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+
+    result = QualityGateVerifier.review(
+        issue_file_path="src/Foo.cs",
+        edit_contract=contract,
+        reviewed_changes=(change,),
+        original_issue_file_content=original_issue_file_content,
+        current_issue_file_content=current_issue_file_content,
+    )
+
     assert result.status == "retry"
-    assert any(item.rule_id == "cognitive_complexity" for item in result.violations)
-    assert any("没有下降" in item.message or "没有稳定触达" in item.message for item in result.violations)
+    assert len(result.violations) == 1
+    assert result.violations[0].rule_id == "async_requires_await"
+
+
+def test_quality_gate_verifier_treats_allowed_related_symbols_as_propagation_capability() -> None:
+    contract = EditContract(
+        issue_key="issue-async-related-symbols",
+        rule_id="csharpsquid:S3776",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        allowed_capabilities=("signature_change",),
+        allowed_related_symbols=(
+            ContractTargetSymbol(
+                file="src/Foo.cs",
+                symbol="callsite@9-9",
+                reason="declared same-file propagation target",
+                start_line=9,
+                end_line=9,
+            ),
+        ),
+        validation_plan=("build", "diff_review"),
+        quality_gate_rules=(
+            QualityGateRule(
+                rule_id="async_signature",
+                title="异步签名规范",
+                summary="异步方法要用 Async 命名并返回 Task。",
+                enforcement="hard",
+            ),
+        ),
+    )
+    change = ReviewedFileChange(
+        file="src/Foo.cs",
+        changed_lines=(3,),
+        before_changed_lines=(3,),
+        after_changed_lines=(3,),
+        diff_text="@@ -3,1 +3,1 @@\n-    public async Task ProcessAsync()\n+    public async Task Process()\n",
+        hunk_count=1,
+    )
+    original_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    public async Task ProcessAsync()",
+            "    {",
+            "        await Task.Delay(1);",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+    current_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    public async Task Process()",
+            "    {",
+            "        await Task.Delay(1);",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+
+    result = QualityGateVerifier.review(
+        issue_file_path="src/Foo.cs",
+        edit_contract=contract,
+        reviewed_changes=(change,),
+        original_issue_file_content=original_issue_file_content,
+        current_issue_file_content=current_issue_file_content,
+    )
+
+    assert result.status == "retry"
+    assert any(item.rule_id == "async_signature" for item in result.violations)
+    assert result.soft_findings == ()
+
+
+def test_quality_gate_verifier_keeps_shifted_public_method_as_touched() -> None:
+    contract = EditContract(
+        issue_key="issue-line-shifted-public-method",
+        rule_id="csharpsquid:S3776",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        quality_gate_rules=(
+            QualityGateRule(
+                rule_id="public_xml_docs",
+                title="公开成员 XML 文档完整",
+                summary="公开成员要有 XML。",
+                enforcement="hard",
+            ),
+        ),
+    )
+    change = ReviewedFileChange(
+        file="src/Foo.cs",
+        changed_lines=(3, 4, 5, 10),
+        before_changed_lines=(5,),
+        after_changed_lines=(3, 4, 5, 10),
+        diff_text=(
+            "@@ -3,0 +3,4 @@\n"
+            "+    private int Helper()\n"
+            "+    {\n"
+            "+        return 2;\n"
+            "+    }\n"
+            "@@ -5,1 +10,1 @@\n"
+            "-        return 1;\n"
+            "+        return Helper();\n"
+        ),
+        hunk_count=2,
+    )
+    original_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    public int Process()",
+            "    {",
+            "        return 1;",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+    current_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    private int Helper()",
+            "    {",
+            "        return 2;",
+            "    }",
+            "",
+            "    public int Process()",
+            "    {",
+            "        return Helper();",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+
+    result = QualityGateVerifier.review(
+        issue_file_path="src/Foo.cs",
+        edit_contract=contract,
+        reviewed_changes=(change,),
+        original_issue_file_content=original_issue_file_content,
+        current_issue_file_content=current_issue_file_content,
+    )
+
+    assert result.status == "pass"
+    assert result.violations == ()
 
 
 def test_fix_verifier_runs_build_when_review_gate_waives_propagation(monkeypatch, tmp_path) -> None:
@@ -1344,6 +1848,116 @@ def test_fix_verifier_runs_build_when_review_gate_waives_propagation(monkeypatch
     assert outcome.propagation_check_result.status == "pass"
     assert outcome.build_passed is True
     assert len(build_calls) == 2
+
+
+def test_fix_verifier_keeps_fast_compile_for_non_small_signature_patch(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-signature-fast-compile",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=8,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build",),
+        repair_plan=RepairPlan(
+            repair_shape="signature_preserving_refactor",
+            primary_file="src/Foo.cs",
+            primary_method_name="Foo",
+            proposed_method_name="FooAsync",
+            requires_signature_change=True,
+            verification_targets=(
+                RepairPropagationTarget(
+                    file="src/Foo.cs",
+                    symbol="method@8-16",
+                    kind="definition",
+                    start_line=8,
+                    end_line=16,
+                ),
+            ),
+        ),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(8,),
+            before_changed_lines=(8,),
+            after_changed_lines=(8,),
+            diff_text="@@ -8,1 +8,1 @@\n-public async Task Foo()\n+public async Task FooAsync()\n",
+            hunk_count=1,
+        ),
+    )
+
+    commands: list[str] = []
+
+    class BuildPassedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    def fake_run(command, *args, **kwargs):
+        commands.append(command)
+        return BuildPassedProcess()
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.ReviewGateAgent.review",
+        lambda **kwargs: ReviewGateResult(
+            status="not_applicable",
+            summary="No reviewable verifier findings were present for this attempt.",
+            findings=(),
+            decisions=(),
+        ),
+    )
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.PropagationVerifier.review",
+        lambda **kwargs: PropagationCheckResult(
+            status="pass",
+            summary="Propagation verification passed.",
+            residual_targets=(),
+        ),
+    )
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.load_performance_flags",
+        lambda: PerformanceFlags(review_gate=True, fast_compile=True, layered_verification=True),
+    )
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="scope",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content="\n".join(
+            [
+                "class Foo",
+                "{",
+                "    public async Task FooAsync()",
+                "    {",
+                "        await RunAsync();",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+    )
+
+    assert outcome.fast_compile_invoked is True
+    assert outcome.fast_compile_passed is True
+    assert outcome.build_invoked is True
+    assert outcome.build_passed is True
+    assert commands == [
+        'dotnet build "src/Foo.sln" --no-restore -v:q',
+        'dotnet build "src/Foo.sln"',
+    ]
 
 
 def test_fix_verifier_stops_before_build_when_review_gate_retries(monkeypatch, tmp_path) -> None:

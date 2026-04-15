@@ -1,0 +1,42 @@
+# Local secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+data/targets.json
+
+# Runtime logs and generated artifacts
+logs/
+.agent_workspaces/
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+.pytest_tmp*/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Scratch, smoke, and temporary workspaces
+.tmp/
+.tmp_*/
+.tmp_manual_issue_retry/
+.tmp_pytest*/
+.tmp_smoke/
+.tmp_test_temp/
+.scratch-buildscope/
+.scratch-nochange/
+.smoke_manual/
+manual_review_gate_smoke/
+smoke_artifacts/
+smoke_fix_verifier_workspace/
+smoke_planner_workspace/
+pytest-cache-files-*/
+tmp*/
+.tmp_batch_stdout.txt
+.tmp_batch_stderr.txt
+tmp_batch_stdout.txt
+tmp_batch_stderr.txt

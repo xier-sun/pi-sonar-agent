@@ -56,6 +56,10 @@ class FixVerifier:
 
     BUILD_TIMEOUT_SECONDS = 300
     FAST_COMPILE_TIMEOUT_SECONDS = 90
+    SMALL_PATCH_MAX_FILES = 1
+    SMALL_PATCH_MAX_HUNKS = 2
+    SMALL_PATCH_MAX_LINES = 12
+    SMALL_PATCH_MAX_LINE_OPERATIONS = 12
     _RESTORE_FAILURE_MARKERS = (
         "NU1301",
         "Unable to load the service index for source",
@@ -121,6 +125,11 @@ class FixVerifier:
         return all(marker in text for marker in ("NETSDK1004", "project.assets.json")) or any(
             marker in text for marker in cls._MISSING_ASSETS_MARKERS
         )
+
+    @staticmethod
+    def _looks_like_timeout_failure(output: str) -> bool:
+        text = str(output or "").lower()
+        return "timed out after" in text or "timeoutexpired" in text
 
     @staticmethod
     def _derive_offline_verification_command(command: str) -> str:
@@ -204,11 +213,13 @@ class FixVerifier:
         build_command: str,
         *,
         build_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+        timeout_seconds: int | None = None,
     ) -> tuple[bool, str]:
         """Run the normal post-edit build verification."""
 
         runner = build_runner or subprocess.run
         normalized_build_command = str(build_command or "").strip()
+        effective_timeout = int(timeout_seconds or cls.BUILD_TIMEOUT_SECONDS)
         try:
             result = runner(
                 normalized_build_command,
@@ -218,7 +229,7 @@ class FixVerifier:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=cls.BUILD_TIMEOUT_SECONDS,
+                timeout=effective_timeout,
             )
         except Exception as exc:
             return False, cls.format_exception_details(exc)
@@ -241,7 +252,7 @@ class FixVerifier:
                     text=True,
                     encoding="utf-8",
                     errors="replace",
-                    timeout=cls.BUILD_TIMEOUT_SECONDS,
+                    timeout=effective_timeout,
                 )
             except Exception as exc:
                 sections = [
@@ -274,6 +285,57 @@ class FixVerifier:
         if " -v:" not in lowered and " --verbosity" not in lowered:
             normalized += " -v:q"
         return normalized
+
+    @classmethod
+    def _is_small_patch_candidate(
+        cls,
+        *,
+        edit_contract: Any,
+        reviewed_changes: tuple[ReviewedFileChange, ...],
+    ) -> bool:
+        if not reviewed_changes or len(reviewed_changes) > cls.SMALL_PATCH_MAX_FILES:
+            return False
+
+        repair_plan = getattr(edit_contract, "repair_plan", None)
+        if repair_plan is not None:
+            if bool(getattr(repair_plan, "requires_signature_change", False)):
+                return False
+            if bool(getattr(repair_plan, "requires_propagation", False)):
+                return False
+            if bool(getattr(repair_plan, "requires_new_type", False)):
+                return False
+            if tuple(getattr(repair_plan, "new_helpers", ()) or ()):
+                return False
+            if tuple(getattr(repair_plan, "helper_async_map", ()) or ()):
+                return False
+            if tuple(getattr(repair_plan, "verification_targets", ()) or ()):
+                return False
+            if tuple(getattr(repair_plan, "propagation_targets", ()) or ()):
+                return False
+
+        total_hunks = sum(max(0, int(change.hunk_count or 0)) for change in reviewed_changes)
+        if total_hunks > cls.SMALL_PATCH_MAX_HUNKS:
+            return False
+
+        touched_lines: set[tuple[str, int]] = set()
+        operation_count = 0
+        for change in reviewed_changes:
+            if not change.before_exists or not change.after_exists:
+                return False
+            for line in change.before_changed_lines:
+                touched_lines.add((change.file, int(line)))
+            for line in change.after_changed_lines:
+                touched_lines.add((change.file, int(line)))
+            if change.line_operations:
+                operation_count += len(change.line_operations)
+            else:
+                operation_count += max(len(change.before_changed_lines), len(change.after_changed_lines))
+
+        if len(touched_lines) > cls.SMALL_PATCH_MAX_LINES:
+            return False
+        if operation_count > cls.SMALL_PATCH_MAX_LINE_OPERATIONS:
+            return False
+        return True
 
     @classmethod
     def run_fast_compile(
@@ -422,24 +484,33 @@ class FixVerifier:
 
         fast_compile_duration_seconds = 0.0
         if should_run_build and verification_schedule.run_fast_compile_before_build:
-            fast_compile_started_at = time.monotonic()
-            fast_compile_passed, fast_compile_output, fast_compile_command, fast_compile_invoked = cls.run_fast_compile(
-                workspace_path,
-                build_command,
-                build_runner=build_runner,
-            )
-            fast_compile_duration_seconds = time.monotonic() - fast_compile_started_at
-            if fast_compile_invoked and not fast_compile_passed:
-                if cls._looks_like_missing_assets_failure(fast_compile_output):
-                    # Fresh clones may not have obj/project.assets.json yet. Let the full
-                    # build perform restore instead of turning fast compile into a false
-                    # hard gate for every issue in the run.
-                    pass
-                else:
-                    should_run_build = False
-                    build_output = (
-                        f"Fast compile failed: {fast_compile_command}\n\n{fast_compile_output}".strip()
-                    )
+            if not cls._is_small_patch_candidate(
+                edit_contract=edit_contract,
+                reviewed_changes=reviewed_changes,
+            ):
+                fast_compile_started_at = time.monotonic()
+                fast_compile_passed, fast_compile_output, fast_compile_command, fast_compile_invoked = cls.run_fast_compile(
+                    workspace_path,
+                    build_command,
+                    build_runner=build_runner,
+                )
+                fast_compile_duration_seconds = time.monotonic() - fast_compile_started_at
+                if fast_compile_invoked and not fast_compile_passed:
+                    if cls._looks_like_missing_assets_failure(fast_compile_output):
+                        # Fresh clones may not have obj/project.assets.json yet. Let the full
+                        # build perform restore instead of turning fast compile into a false
+                        # hard gate for every issue in the run.
+                        pass
+                    elif cls._looks_like_timeout_failure(fast_compile_output):
+                        # Large repository solutions can exceed the short precheck window while
+                        # still succeeding under the normal build timeout. Treat timeout as an
+                        # inconclusive signal and continue with the full build.
+                        pass
+                    else:
+                        should_run_build = False
+                        build_output = (
+                            f"Fast compile failed: {fast_compile_command}\n\n{fast_compile_output}".strip()
+                        )
 
         build_duration_seconds = 0.0
         if should_run_build:
