@@ -61,7 +61,7 @@ class RepositoryWorkspaceSession:
 
         self.workspace_root.mkdir(parents=True, exist_ok=True)
         git_gateway = GitRepositoryGateway(remote_url=self.remote_url, pat=self.pat)
-        git_gateway.clone_branch(workspace_path, self.base_branch)
+        git_gateway.clone_branch(workspace_path, self.base_branch, depth=1)
 
         self._current_workspace = workspace_path
         return workspace_path

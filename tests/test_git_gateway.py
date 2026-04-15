@@ -68,6 +68,26 @@ def test_git_repository_gateway_clones_requested_branch_with_authenticated_remot
     assert "https://:secret@dev.azure.com/acme/project/_git/repo" in calls[0][0]
 
 
+def test_git_repository_gateway_clone_branch_supports_depth(tmp_path: Path) -> None:
+    calls: list[tuple[str, Path | None]] = []
+
+    def fake_runner(command: str, *, cwd: Path | None = None, timeout=None, check: bool = True):
+        calls.append((command, cwd))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    gateway = GitRepositoryGateway(
+        remote_url="https://dev.azure.com/acme/project/_git/repo",
+        pat="secret",
+        command_runner=fake_runner,
+    )
+
+    gateway.clone_branch(tmp_path / "repo", "release/1.0", depth=50)
+
+    assert len(calls) == 1
+    assert '--depth 50' in calls[0][0]
+    assert 'git clone --depth 50 -b "release/1.0" --single-branch' in calls[0][0]
+
+
 def test_git_repository_gateway_redacts_pat_when_clone_fails(tmp_path: Path) -> None:
     def fake_runner(command: str, *, cwd: Path | None = None, timeout=None, check: bool = True):
         raise subprocess.CalledProcessError(128, command, stderr="authentication failed")

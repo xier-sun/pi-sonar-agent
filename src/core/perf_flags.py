@@ -24,6 +24,16 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_non_negative_int(name: str, default: int) -> int:
+    raw_value = read_project_env().get(name)
+    if raw_value is None:
+        return default
+    try:
+        return max(0, int(str(raw_value).strip()))
+    except Exception:
+        return default
+
+
 @dataclass(frozen=True)
 class PerformanceFlags:
     """Execution flags for gradual performance improvements."""
@@ -42,6 +52,7 @@ class PerformanceFlags:
     edit_failure_context_feedback: bool = True
     fast_path_max_turns: int = 20
     continuation_retry_limit: int = 2
+    git_clone_depth: int = 50
 
     def enabled_flags(self) -> tuple[str, ...]:
         flags: list[str] = []
@@ -71,6 +82,7 @@ class PerformanceFlags:
             flags.append("runtime.edit_failure_context_feedback")
         flags.append(f"perf.fast_path_max_turns={self.fast_path_max_turns}")
         flags.append(f"perf.continuation_retry_limit={self.continuation_retry_limit}")
+        flags.append(f"perf.git_clone_depth={self.git_clone_depth}")
         return tuple(flags)
 
 
@@ -101,4 +113,5 @@ def load_performance_flags() -> PerformanceFlags:
         ),
         fast_path_max_turns=_env_int("PI_SONAR_PERF_FAST_PATH_MAX_TURNS", 20),
         continuation_retry_limit=_env_int("PI_SONAR_PERF_CONTINUATION_RETRY_LIMIT", 2),
+        git_clone_depth=_env_non_negative_int("PI_SONAR_GIT_CLONE_DEPTH", 50),
     )

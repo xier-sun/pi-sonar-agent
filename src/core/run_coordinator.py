@@ -385,12 +385,22 @@ class RunCoordinator:
                 print(f"  - {failed_workspace}")
         self.runtime_env.workspace_root.mkdir(parents=True, exist_ok=True)
         workspace = self.runtime_env.workspace_root / f"fix_{target_config.repository}_{options.run_label}"
+        performance_flags = load_performance_flags()
+        clone_depth = performance_flags.git_clone_depth or None
 
         if workspace.exists():
             shutil.rmtree(workspace, ignore_errors=True)
 
         try:
-            git_gateway.clone_branch(workspace, target_config.base_branch)
+            if clone_depth:
+                print(f"[INFO] 使用浅克隆准备仓库: depth={clone_depth}")
+            else:
+                print("[INFO] 使用完整历史克隆准备仓库")
+            git_gateway.clone_branch(
+                workspace,
+                target_config.base_branch,
+                depth=clone_depth,
+            )
         except Exception as exc:
             return abort_target(error=f"仓库克隆失败: {exc}", startup_failure=True)
 

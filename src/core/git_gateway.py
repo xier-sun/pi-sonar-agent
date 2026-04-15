@@ -196,10 +196,16 @@ class GitRepositoryGateway:
 
         return bool(str(getattr(result, "stdout", "") or "").strip())
 
-    def clone_branch(self, workspace_path: Path, branch: str) -> None:
+    def clone_branch(
+        self,
+        workspace_path: Path,
+        branch: str,
+        *,
+        depth: int | None = None,
+    ) -> None:
         """Clone a repository directly from the effective base branch."""
 
-        self.clone_repository(workspace_path, branch=branch)
+        self.clone_repository(workspace_path, branch=branch, depth=depth)
 
     def create_branch(self, workspace_path: Path, branch: str) -> None:
         """Create and switch to a new branch in an existing workspace."""
