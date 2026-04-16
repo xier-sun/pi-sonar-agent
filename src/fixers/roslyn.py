@@ -10,12 +10,16 @@ the code analysis and transformation.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from pi_sonar_agent.fixers.deterministic import IssueGroup
+
+SUPPORTED_ROSLYN_RULES = frozenset({"csharpsquid:S107"})
 
 
 @dataclass(frozen=True)
@@ -27,7 +31,17 @@ class RoslynFixResult:
     strategy: str
     summary: str
     error: str = ""
+    can_fix_safely: bool = False
+    safety_flags: tuple[str, ...] = ()
     changed_files: dict[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class RoslynAvailability:
+    """Availability probe result for the Roslyn fix engine."""
+
+    available: bool
+    reasons: tuple[str, ...] = ()
 
 
 class RoslynFixEngine:
@@ -96,6 +110,8 @@ class RoslynFixEngine:
             strategy=str(payload.get("strategy", "roslyn:unknown")),
             summary=str(payload.get("summary", "")),
             error=str(payload.get("error", "")),
+            can_fix_safely=bool(payload.get("canFixSafely", False)),
+            safety_flags=tuple(str(item).strip() for item in (payload.get("safetyFlags", []) or []) if str(item).strip()),
             changed_files=(
                 {
                     str(file_path): str(content)
@@ -159,6 +175,8 @@ class RoslynFixEngine:
             strategy=str(payload.get("strategy", "roslyn:unknown")),
             summary=str(payload.get("summary", "")),
             error=str(payload.get("error", "")),
+            can_fix_safely=bool(payload.get("canFixSafely", False)),
+            safety_flags=tuple(str(item).strip() for item in (payload.get("safetyFlags", []) or []) if str(item).strip()),
             changed_files=(
                 {
                     str(file_path): str(content)
@@ -177,14 +195,25 @@ class RoslynFixEngine:
             return None
 
         # Build the project
-        result = subprocess.run(
-            ["dotnet", "build", str(self.project_path), "-c", self.configuration],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
+        result = None
+        for attempt_index in range(2):
+            result = subprocess.run(
+                ["dotnet", "build", str(self.project_path), "-c", self.configuration],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=300,
+            )
+            if result.returncode == 0:
+                break
+            combined_output = f"{result.stdout}\n{result.stderr}".lower()
+            if attempt_index == 0 and ("cs2012" in combined_output or "being used by another process" in combined_output):
+                time.sleep(1.0)
+                continue
+            break
 
-        if result.returncode != 0:
+        if result is None or result.returncode != 0:
             return None
 
         # Find the output DLL
@@ -240,3 +269,23 @@ def is_roslyn_available() -> bool:
     """Check if Roslyn engine is available."""
     engine = RoslynFixEngine()
     return engine._ensure_built() is not None
+
+
+def supports_roslyn_rule(rule_id: str) -> bool:
+    """Return whether the current Roslyn engine implements the given rule."""
+
+    return str(rule_id or "").strip() in SUPPORTED_ROSLYN_RULES
+
+
+def inspect_roslyn_availability(
+    project_path: str = "fix_engine/AgentFixEngine.csproj",
+) -> tuple[bool, tuple[str, ...]]:
+    """Perform a light-weight availability probe for the Roslyn engine."""
+
+    reasons: list[str] = []
+    project = Path(project_path)
+    if not project.exists():
+        reasons.append(f"missing project file: {project.as_posix()}")
+    if shutil.which("dotnet") is None:
+        reasons.append("dotnet SDK not found on PATH")
+    return (not reasons, tuple(reasons))

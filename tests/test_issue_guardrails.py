@@ -9,6 +9,7 @@ from pi_sonar_agent.core.follow_up_store import FollowUpStore
 from pi_sonar_agent.core.issue_contract import EditContract
 from pi_sonar_agent.core.issue_planner import IssuePlanner
 from pi_sonar_agent.core.issue_retry import build_retry_feedback
+from pi_sonar_agent.core.editor_policy import EditorPolicy
 
 
 def test_issue_planner_builds_edit_contract_for_contract_review() -> None:
@@ -38,6 +39,80 @@ def test_issue_planner_builds_edit_contract_for_contract_review() -> None:
     assert "Quality Gate Notes" in plan.prompt_guidance
 
 
+def test_issue_planner_enables_file_creation_when_rule_profile_declares_it() -> None:
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-S107",
+        rule_id="csharpsquid:S107",
+        file_path="/src/Foo.cs",
+        issue_line=18,
+        guardrail_mode="contract_review",
+        scope_mode="statement",
+        scope_start_line=15,
+        scope_end_line=24,
+        validation_start_line=13,
+        validation_end_line=30,
+        workspace_rules="keep patches small",
+    )
+
+    assert plan.edit_contract.allow_file_creation is True
+    assert plan.edit_contract.allowed_new_file_roots == ("src",)
+    assert "Allowed New File Roots: src" in plan.prompt_guidance
+
+
+def test_editor_policy_keeps_write_when_file_creation_is_allowed() -> None:
+    contract = EditContract(
+        issue_key="ISSUE-CREATEFILE",
+        rule_id="csharpsquid:S107",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        allow_file_creation=True,
+        allowed_new_file_roots=("src",),
+        patch_only=True,
+    )
+
+    allowed_tools = EditorPolicy.allowed_tool_names(("Read", "Edit", "Write"), contract)
+    constraints = EditorPolicy.render_prompt_constraints(contract)
+
+    assert "Write" in allowed_tools
+    assert "新建文件优先使用 Write" in constraints
+
+
+def test_issue_planner_includes_repo_capability_guidance(tmp_path: Path) -> None:
+    project = tmp_path / "src" / "Foo.csproj"
+    project.parent.mkdir(parents=True, exist_ok=True)
+    project.write_text(
+        """
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+</Project>
+""".strip(),
+        encoding="utf-8",
+    )
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-CAP",
+        rule_id="csharpsquid:S3776",
+        file_path="/src/Foo.cs",
+        issue_line=3,
+        guardrail_mode="contract_review",
+        scope_mode="statement",
+        scope_start_line=1,
+        scope_end_line=3,
+        validation_start_line=1,
+        validation_end_line=5,
+        workspace_rules="keep patches small",
+        workspace_path=tmp_path,
+    )
+
+    assert "Repo Capability: TFM=netcoreapp3.1; LangVersion=default" in plan.prompt_guidance
+    assert plan.edit_contract.repo_capability is not None
+    assert any("record" in item for item in plan.edit_contract.repo_capability_hints)
+
+
 def test_diff_reviewer_records_extra_touched_file_as_soft_audit() -> None:
     contract = EditContract(
         issue_key="ISSUE-2",
@@ -65,6 +140,37 @@ def test_diff_reviewer_records_extra_touched_file_as_soft_audit() -> None:
     assert result.follow_ups
     assert result.follow_ups[0].file == "src/Bar.cs"
     assert result.metrics["drift_score"] >= 3
+
+
+def test_diff_reviewer_allows_created_file_inside_declared_root() -> None:
+    contract = EditContract(
+        issue_key="ISSUE-CREATE",
+        rule_id="csharpsquid:S107",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        scope_mode="statement",
+        validation_line_range=(7, 7),
+        allow_file_creation=True,
+        allowed_new_file_roots=("src/generated",),
+    )
+    result = DiffReviewer.review(
+        edit_contract=contract,
+        file_changes=(
+            ReviewedFileChange(
+                file="src/generated/NewType.cs",
+                changed_lines=(1, 2),
+                diff_text="@@ -0,0 +1,2 @@\n+class NewType {}\n+",
+                hunk_count=1,
+                before_exists=False,
+                after_exists=True,
+                after_changed_lines=(1, 2),
+            ),
+        ),
+    )
+
+    assert result.status == "pass"
+    assert result.violations == ()
 
 
 def test_follow_up_store_appends_jsonl(tmp_path: Path) -> None:

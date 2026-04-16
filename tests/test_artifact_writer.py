@@ -14,6 +14,8 @@ from pi_sonar_agent.core.issue_contract import (
     EditContract,
 )
 from pi_sonar_agent.core.issue_retry import capture_workspace_baseline, cleanup_workspace_baseline
+from pi_sonar_agent.core.issue_prompt import PromptBudgetReport
+from pi_sonar_agent.core.registry import VisibleToolset
 from pi_sonar_agent.core.quality_gate import QualityGateRule
 from pi_sonar_agent.core.repair_plan import PlanPrecheckResult, RepairPlan
 from pi_sonar_agent.core.retry_context import RetryContext
@@ -185,6 +187,24 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
                 summary="Plan 预检发现本次修复需要 signature_change，但当前 contract 不允许该能力。",
             ),
             guardrail_mode="contract_review",
+            prompt_budget_report=PromptBudgetReport(
+                system_chars=1200,
+                user_chars=4200,
+                system_target_chars=6000,
+                user_target_chars=8000,
+                system_within_target=True,
+                user_within_target=True,
+                system_sections={"system_prompt": 1200},
+                user_sections={"code_context": 240, "edit_contract_section": 600},
+                externalized_sections=("quality_gate_section", "repair_plan_section"),
+                reference_document_path=".pi-sonar-agent-runtime/sonar_fix_reference.md",
+            ),
+            visible_toolset=VisibleToolset(
+                runtime_tools=("Read", "Edit", "MultiEdit", "Bash", "Finish"),
+                allowed_tools=("Read", "Edit", "MultiEdit", "Bash", "Finish"),
+                visible_tools=("Read", "Edit", "MultiEdit", "Bash", "Finish"),
+                hidden_tools=(),
+            ),
             attempt_events=(
                 AttemptRuntimeEvent(
                     kind=AttemptRuntimeEventKind.ATTEMPT_STARTED,
@@ -263,11 +283,18 @@ def test_artifact_writer_writes_attempt_bundle_and_issue_summary(tmp_path: Path)
         assert bundle.issue_json.exists()
         assert bundle.edit_contract_json.exists()
         assert bundle.prompt_context_json.exists()
+        assert bundle.prompt_budget_report_json.exists()
         assert bundle.patch_diff.exists()
         prompt_context = json.loads(bundle.prompt_context_json.read_text(encoding="utf-8"))
+        prompt_budget_report = json.loads(bundle.prompt_budget_report_json.read_text(encoding="utf-8"))
         build_result = json.loads(bundle.build_result_json.read_text(encoding="utf-8"))
         assert prompt_context["review_gate_result"]["status"] == "pass"
+        assert prompt_context["prompt_budget_report"]["user_chars"] == 4200
+        assert prompt_context["visible_toolset"]["visible_tools"] == ["Read", "Edit", "MultiEdit", "Bash", "Finish"]
+        assert prompt_budget_report["reference_document_path"] == ".pi-sonar-agent-runtime/sonar_fix_reference.md"
         assert build_result["review_gate_result"]["status"] == "pass"
+        assert build_result["prompt_budget_report"]["system_chars"] == 1200
+        assert build_result["visible_toolset"]["allowed_tools"] == ["Read", "Edit", "MultiEdit", "Bash", "Finish"]
         assert bundle.attempt_events_jsonl.exists()
         assert bundle.reviewer_result_json.exists()
         assert bundle.build_result_json.exists()

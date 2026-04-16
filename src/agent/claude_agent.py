@@ -42,27 +42,31 @@ from pi_sonar_agent.core.claude_adapter import ClaudeAdapter, ClaudeSDKDependenc
 from pi_sonar_agent.core.continuation_recovery import ContinuationRecovery
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange
 from pi_sonar_agent.core.editor_policy import EditorPolicy
+from pi_sonar_agent.core.engine_router import route_engine_for_issue
 from pi_sonar_agent.core.events import AttemptRuntimeEvent, AttemptRuntimeEventKind
 from pi_sonar_agent.core.fix_verifier import FixVerifier
 from pi_sonar_agent.core.hooks import HookPipeline
 from pi_sonar_agent.core.issue_planner import IssuePlanner
 from pi_sonar_agent.core.issue_prompt import IssuePromptBuilder
+from pi_sonar_agent.core.mcp_servers import build_sonar_mcp_runtime
 from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.policy import ToolPolicy
 from pi_sonar_agent.core.project_env import read_project_env
 from pi_sonar_agent.core.quality_gate import render_quality_gate_prompt
-from pi_sonar_agent.core.registry import build_fix_tool_registry
+from pi_sonar_agent.core.registry import build_fix_tool_registry, build_visible_toolset
 from pi_sonar_agent.core.resource_loader import DEFAULT_CSHARP_QUALITY_GATE_FILE, ResourceLoader
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.scope_guard import IssueEditScope, LegacyScopeGuard
 from pi_sonar_agent.core.tool_surface import (
     BASE_BUILTIN_FIX_TOOLS,
     CONTROLLED_BASH_TOOL,
-    build_allowed_fix_tool_rules,
     build_fix_runtime_tools,
     controlled_bash_enabled,
 )
+from pi_sonar_agent.fixers.deterministic import IssueGroup
+from pi_sonar_agent.fixers.roslyn import RoslynFixEngine
 from pi_sonar_agent.fixers.rule_profiles import load_rule_catalog
+from pi_sonar_agent.fixers.s107_parameter_object import generate_s107_parameter_object_patch
 from pi_sonar_agent.integrations.sonar import extract_rule_detail_texts
 
 # ============== Data Classes ==============
@@ -192,6 +196,7 @@ class FixResult:
     repair_plan: Any | None = None
     plan_precheck: Any | None = None
     reviewer_result: Any | None = None
+    semantic_precheck_result: Any | None = None
     quality_gate_result: Any | None = None
     review_gate_result: Any | None = None
     follow_ups: tuple[Any, ...] = ()
@@ -207,10 +212,11 @@ class FixResult:
     model_timeout_stage: str = ""
     patch_salvaged: bool = False
     attempt_events: tuple[Any, ...] = ()
+    engine_routing_decision: Any | None = None
+    prompt_budget_report: Any | None = None
+    visible_toolset: Any | None = None
 
 BUILTIN_FIX_TOOLS = list(BASE_BUILTIN_FIX_TOOLS)
-
-
 MCP_FIX_TOOLS: list[str] = []
 
 FORBIDDEN_FIX_TOOLS = {
@@ -798,6 +804,8 @@ class ClaudeFixAgent:
         prefetched_context_section: str = "",
         execution_mode_section: str = "",
         workspace_path: Path | None = None,
+        edit_contract: Any | None = None,
+        visible_tool_names: tuple[str, ...] | list[str] = (),
     ) -> str:
         """Build the issue-specific user prompt."""
 
@@ -815,6 +823,47 @@ class ClaudeFixAgent:
             prefetched_context_section=prefetched_context_section,
             execution_mode_section=execution_mode_section,
             workspace_path=workspace_path,
+            edit_contract=edit_contract,
+            visible_tool_names=visible_tool_names,
+        )
+
+    @classmethod
+    def _build_user_prompt_result(
+        cls,
+        issue: SonarIssue,
+        code_context: str,
+        quality_gate_text: str,
+        scope_guidance: str,
+        rule_details: dict[str, str],
+        build_command: str,
+        retry_feedback: str = "",
+        retry_context: RetryContext | None = None,
+        edit_contract_section: str = "",
+        repair_plan_section: str = "",
+        prefetched_context_section: str = "",
+        execution_mode_section: str = "",
+        workspace_path: Path | None = None,
+        edit_contract: Any | None = None,
+        visible_tool_names: tuple[str, ...] | list[str] = (),
+    ) -> Any:
+        """Build the issue-specific user prompt plus budget metadata."""
+
+        return IssuePromptBuilder.build_user_prompt_result(
+            issue=issue,
+            code_context=code_context,
+            quality_gate_text=quality_gate_text,
+            scope_guidance=scope_guidance,
+            rule_details=rule_details,
+            build_command=build_command,
+            retry_feedback=retry_feedback,
+            retry_context=retry_context,
+            edit_contract_section=edit_contract_section,
+            repair_plan_section=repair_plan_section,
+            prefetched_context_section=prefetched_context_section,
+            execution_mode_section=execution_mode_section,
+            workspace_path=workspace_path,
+            edit_contract=edit_contract,
+            visible_tool_names=visible_tool_names,
         )
 
     @staticmethod
@@ -886,6 +935,10 @@ class ClaudeFixAgent:
             ),
             "warning_tool_uses": list(getattr(runtime_result, "warning_tool_uses", ()) or ()),
             "edit_nudge_count": int(getattr(runtime_result, "edit_nudge_count", 0) or 0),
+            "successful_edit_count": int(getattr(runtime_result, "successful_edit_count", 0) or 0),
+            "invalid_write_tool_input_count": int(
+                getattr(runtime_result, "invalid_write_tool_input_count", 0) or 0
+            ),
         }
 
     @staticmethod
@@ -952,6 +1005,12 @@ class ClaudeFixAgent:
             continuation_timeout_stages=continuation_timeout_stages,
             edit_nudge_count=int(getattr(first_result, "edit_nudge_count", 0) or 0)
             + int(getattr(second_result, "edit_nudge_count", 0) or 0),
+            successful_edit_count=int(getattr(first_result, "successful_edit_count", 0) or 0)
+            + int(getattr(second_result, "successful_edit_count", 0) or 0),
+            invalid_write_tool_input_count=int(
+                getattr(first_result, "invalid_write_tool_input_count", 0) or 0
+            )
+            + int(getattr(second_result, "invalid_write_tool_input_count", 0) or 0),
             runtime_events=tuple(merged_events),
         )
 
@@ -1249,6 +1308,12 @@ class ClaudeFixAgent:
 
         return IssuePromptBuilder.build_system_prompt(workspace_path)
 
+    @classmethod
+    def _build_system_prompt_result(cls, workspace_path: Path) -> Any:
+        """Compose the fix system prompt plus budget metadata."""
+
+        return IssuePromptBuilder.build_system_prompt_result(workspace_path)
+
     @staticmethod
     def _resolve_guardrail_mode(agent_env: dict[str, str] | None = None) -> str:
         """Resolve the configured issue guardrail mode."""
@@ -1302,26 +1367,480 @@ class ClaudeFixAgent:
         )
 
     @classmethod
-    def _build_fix_tool_policy(cls, edit_contract: Any | None = None) -> ToolPolicy:
+    def _build_fix_tool_policy(
+        cls,
+        edit_contract: Any | None = None,
+        *,
+        mcp_tool_names: tuple[str, ...] | list[str] = (),
+        workspace_path: Path | None = None,
+    ) -> ToolPolicy:
         """Build the runtime tool policy for single-issue fix attempts."""
 
-        runtime_builtin_tools = build_fix_runtime_tools()
+        policy, _ = cls._build_fix_tool_policy_bundle(
+            edit_contract,
+            mcp_tool_names=mcp_tool_names,
+            workspace_path=workspace_path,
+        )
+        return policy
+
+    @classmethod
+    def _build_fix_tool_policy_bundle(
+        cls,
+        edit_contract: Any | None = None,
+        *,
+        mcp_tool_names: tuple[str, ...] | list[str] = (),
+        workspace_path: Path | None = None,
+    ) -> tuple[ToolPolicy, Any]:
+        """Build the runtime tool policy plus the canonical visible toolset snapshot."""
+
+        allow_file_creation = bool(getattr(edit_contract, "allow_file_creation", False))
+        allowed_new_file_roots = (
+            getattr(edit_contract, "allowed_new_file_roots", ())
+            if allow_file_creation
+            else ()
+        )
+        runtime_builtin_tools = build_fix_runtime_tools(include_create_file_tool=allow_file_creation)
         registry = build_fix_tool_registry(
             runtime_builtin_tools,
-            MCP_FIX_TOOLS,
+            mcp_tool_names,
             FORBIDDEN_FIX_TOOLS,
         )
         allowed_tools = [tool_name for tool_name in runtime_builtin_tools if tool_name != CONTROLLED_BASH_TOOL]
-        allowed_tools.extend(MCP_FIX_TOOLS)
+        allowed_tools.extend(mcp_tool_names)
         if edit_contract is not None:
             allowed_tools = list(EditorPolicy.allowed_tool_names(allowed_tools, edit_contract))
-        allowed_tools = list(
-            build_allowed_fix_tool_rules(
-                allowed_tools,
-                include_controlled_bash=controlled_bash_enabled(),
-            )
+        visible_toolset = build_visible_toolset(
+            registry,
+            allowed_tools,
+            include_controlled_bash=controlled_bash_enabled(),
+            bash_file_creation_roots=allowed_new_file_roots,
+            create_file_tool_roots=allowed_new_file_roots,
         )
-        return ToolPolicy(registry, allowed_tools)
+        return ToolPolicy(
+            registry,
+            visible_toolset.allowed_tools,
+            workspace_root=workspace_path,
+        ), visible_toolset
+
+    @staticmethod
+    def _resolve_solution_path(workspace_path: Path) -> str:
+        """Find the first solution file under the workspace for Roslyn solution-scope rules."""
+
+        protected_dirs = {".git", "logs", "bin", "obj", "__pycache__"}
+        candidates: list[Path] = []
+        for path in workspace_path.rglob("*.sln"):
+            try:
+                relative_parts = path.relative_to(workspace_path).parts
+            except ValueError:
+                relative_parts = path.parts
+            if any(part in protected_dirs for part in relative_parts):
+                continue
+            candidates.append(path)
+        if not candidates:
+            return ""
+        return str(sorted(candidates)[0])
+
+    @classmethod
+    def _build_roslyn_issue_group(cls, issue: SonarIssue) -> IssueGroup:
+        """Build the deterministic issue-group shape consumed by the Roslyn engine."""
+
+        return IssueGroup(
+            group_key=issue.key,
+            file_path=IssuePromptBuilder.render_workspace_relative_path(issue.file_path),
+            rule=issue.rule,
+            issues=(
+                {
+                    "key": issue.key,
+                    "line": issue.line,
+                    "textRange": issue.text_range,
+                    "message": issue.message,
+                },
+            ),
+            start_line=issue.start_line or issue.line,
+            end_line=issue.end_line or issue.start_line or issue.line,
+            symbol_names=(),
+        )
+
+    @classmethod
+    def _align_edit_contract_for_roslyn_patch(
+        cls,
+        *,
+        issue: SonarIssue,
+        edit_contract: Any,
+        roslyn_strategy: str,
+    ) -> Any:
+        """Align repair-plan expectations with deterministic Roslyn patch shapes."""
+
+        repair_plan = getattr(edit_contract, "repair_plan", None)
+        if repair_plan is None:
+            return edit_contract
+
+        normalized_strategy = str(roslyn_strategy or "").strip()
+        if issue.rule == "csharpsquid:S107" and "parameter_object" in normalized_strategy:
+            adjusted_repair_plan = replace(
+                repair_plan,
+                requires_new_type=True,
+                requires_signature_change=True,
+                strategy_preferences=tuple(
+                    dict.fromkeys(
+                        (
+                            *tuple(getattr(repair_plan, "strategy_preferences", ()) or ()),
+                            "roslyn_parameter_object_signature_change",
+                            "roslyn_parameter_object_new_type",
+                        )
+                    )
+                ),
+                risk_notes=tuple(
+                    dict.fromkeys(
+                        (
+                            *tuple(getattr(repair_plan, "risk_notes", ()) or ()),
+                            "Roslyn S107 parameter-object patch intentionally introduces a local parameter carrier type and rewires the target method signature.",
+                        )
+                    )
+                ),
+            )
+            return replace(edit_contract, repair_plan=adjusted_repair_plan)
+
+        return edit_contract
+
+    @classmethod
+    def _run_roslyn_fix_path(
+        cls,
+        *,
+        issue: SonarIssue,
+        workspace_path: Path,
+        build_command: str,
+        edit_contract: Any,
+        guardrail_mode: str,
+        scope: IssueEditScope | None,
+        original_issue_file_content: str | None,
+        result_metadata: dict[str, Any],
+    ) -> FixResult:
+        """Run the Roslyn engine for routed rules and return a structured terminal result."""
+
+        issue_file_path = workspace_path / issue.file_path.lstrip("/")
+        engine = RoslynFixEngine()
+        issue_group = cls._build_roslyn_issue_group(issue)
+        roslyn_result = engine.apply_solution_fix(
+            workspace_path=str(workspace_path),
+            solution_path=cls._resolve_solution_path(workspace_path),
+            issue_group=issue_group,
+            primary_issue={
+                "key": issue.key,
+                "line": issue.line,
+                "textRange": issue.text_range,
+                "message": issue.message,
+            },
+        )
+        if not roslyn_result.applied and issue.rule == "csharpsquid:S107":
+            deterministic_result = generate_s107_parameter_object_patch(
+                workspace_path,
+                issue_group,
+            )
+            if deterministic_result.applied:
+                roslyn_result = replace(
+                    roslyn_result,
+                    applied=True,
+                    strategy=deterministic_result.strategy,
+                    summary=deterministic_result.summary,
+                    error=deterministic_result.error,
+                    changed_files=dict(deterministic_result.changed_files),
+                )
+            else:
+                roslyn_result = replace(
+                    roslyn_result,
+                    strategy=(
+                        roslyn_result.strategy
+                        if not bool(getattr(roslyn_result, "can_fix_safely", False))
+                        else deterministic_result.strategy
+                    ),
+                    summary=roslyn_result.summary or deterministic_result.summary,
+                    error=deterministic_result.error or roslyn_result.error,
+                )
+        summary = str(roslyn_result.summary or roslyn_result.error).strip()
+        if roslyn_result.applied and roslyn_result.changed_files:
+            fallback_before_texts: dict[str, str] = {}
+            cls._capture_attempt_workspace_state(workspace_path)
+            try:
+                changed_files: list[str] = []
+                changes: list[dict[str, Any]] = []
+                for relative_path, updated_content in roslyn_result.changed_files.items():
+                    normalized_path = str(relative_path).replace("\\", "/")
+                    target_path = workspace_path / normalized_path
+                    if target_path.exists():
+                        fallback_before_texts[normalized_path] = target_path.read_text(
+                            encoding="utf-8",
+                            errors="replace",
+                        )
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    target_path.write_text(updated_content, encoding="utf-8")
+                    changed_files.append(normalized_path)
+                    changes.append(
+                        {
+                            "file": normalized_path,
+                            "action": "modified" if normalized_path in fallback_before_texts else "created",
+                        }
+                    )
+
+                reviewed_changes = cls._build_attempt_file_changes(
+                    workspace_path,
+                    changed_files,
+                    fallback_before_texts=fallback_before_texts or None,
+                )
+                current_issue_file_content = (
+                    issue_file_path.read_text(encoding="utf-8", errors="replace")
+                    if issue_file_path.exists()
+                    else None
+                )
+                effective_edit_contract = cls._align_edit_contract_for_roslyn_patch(
+                    issue=issue,
+                    edit_contract=edit_contract,
+                    roslyn_strategy=roslyn_result.strategy,
+                )
+                effective_result_metadata = {
+                    **result_metadata,
+                    "edit_contract": effective_edit_contract,
+                    "repair_plan": getattr(effective_edit_contract, "repair_plan", None),
+                }
+                verification = FixVerifier.evaluate_attempt(
+                    issue=issue,
+                    workspace_path=workspace_path,
+                    build_command=build_command,
+                    edit_contract=effective_edit_contract,
+                    guardrail_mode=guardrail_mode,
+                    scope=scope,
+                    reviewed_changes=reviewed_changes,
+                    original_issue_file_content=original_issue_file_content,
+                    current_issue_file_content=current_issue_file_content,
+                    build_runner=subprocess.run,
+                    scope_validator=cls._validate_issue_edit_scope,
+                    rule_validator=cls._run_rule_specific_validation,
+                )
+                reviewer_result = verification.reviewer_result
+                semantic_precheck_result = verification.semantic_precheck_result
+                quality_gate_result = verification.quality_gate_result
+                review_gate_result = verification.review_gate_result
+                performance_metrics = cls._merge_performance_metrics(
+                    {
+                        "execution_profile": str(getattr(effective_edit_contract, "execution_profile", "full_path")),
+                        "fast_path_enabled": bool(getattr(effective_edit_contract, "fast_path_enabled", False)),
+                        "engine_routing_decision": getattr(
+                            result_metadata.get("engine_routing_decision"),
+                            "to_dict",
+                            lambda: result_metadata.get("engine_routing_decision"),
+                        )(),
+                        "roslyn_strategy": roslyn_result.strategy,
+                        "build_invoked": verification.build_invoked,
+                    },
+                    fast_compile_invoked=verification.fast_compile_invoked,
+                    fast_compile_passed=verification.fast_compile_passed,
+                    fast_compile_duration_seconds=verification.fast_compile_duration_seconds,
+                    fast_compile_command=verification.fast_compile_command,
+                    build_duration_seconds=verification.build_duration_seconds,
+                )
+
+                if reviewer_result.status == "retry":
+                    failure_stage = (
+                        "filesystem_boundary"
+                        if str(verification.boundary_failure_code).startswith("filesystem_")
+                        else "reviewer"
+                    )
+                    failure_error = (
+                        "Filesystem boundary rejected the Roslyn patch"
+                        if failure_stage == "filesystem_boundary"
+                        else "Diff reviewer rejected the Roslyn patch"
+                    )
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        build_passed=verification.build_passed,
+                        error=failure_error,
+                        summary=summary or "Roslyn engine produced a candidate patch.",
+                        build_command=build_command,
+                        build_output=verification.reviewer_retry_message or verification.combined_output,
+                        retryable_failure=True,
+                        failure_kind="reviewer",
+                        reviewer_result=reviewer_result.to_dict(),
+                        semantic_precheck_result=semantic_precheck_result.to_dict(),
+                        quality_gate_result=quality_gate_result.to_dict(),
+                        review_gate_result=review_gate_result.to_dict(),
+                        follow_ups=reviewer_result.follow_ups,
+                        boundary_failure_code=verification.boundary_failure_code,
+                        boundary_failure_summary=verification.boundary_failure_summary,
+                        secondary_boundary_failure_codes=verification.secondary_boundary_failure_codes,
+                        performance_metrics=performance_metrics,
+                        **effective_result_metadata,
+                    )
+
+                if semantic_precheck_result.status == "retry":
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        build_passed=verification.build_passed,
+                        error="Semantic precheck failed",
+                        summary=summary or "Roslyn engine produced a candidate patch.",
+                        build_command=build_command,
+                        build_output=semantic_precheck_result.to_retry_message(),
+                        retryable_failure=True,
+                        failure_kind="semantic_precheck",
+                        reviewer_result=reviewer_result.to_dict(),
+                        semantic_precheck_result=semantic_precheck_result.to_dict(),
+                        quality_gate_result=quality_gate_result.to_dict(),
+                        review_gate_result=review_gate_result.to_dict(),
+                        follow_ups=reviewer_result.follow_ups,
+                        boundary_failure_code=verification.boundary_failure_code,
+                        boundary_failure_summary=verification.boundary_failure_summary,
+                        secondary_boundary_failure_codes=verification.secondary_boundary_failure_codes,
+                        performance_metrics=performance_metrics,
+                        **effective_result_metadata,
+                    )
+
+                if review_gate_result.status == "retry":
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        build_passed=verification.build_passed,
+                        error="Review gate verification failed",
+                        summary=summary or "Roslyn engine produced a candidate patch.",
+                        build_command=build_command,
+                        build_output=review_gate_result.to_retry_message(),
+                        retryable_failure=True,
+                        failure_kind="review_gate",
+                        reviewer_result=reviewer_result.to_dict(),
+                        semantic_precheck_result=semantic_precheck_result.to_dict(),
+                        quality_gate_result=quality_gate_result.to_dict(),
+                        review_gate_result=review_gate_result.to_dict(),
+                        follow_ups=reviewer_result.follow_ups,
+                        boundary_failure_code=verification.boundary_failure_code,
+                        boundary_failure_summary=verification.boundary_failure_summary,
+                        secondary_boundary_failure_codes=verification.secondary_boundary_failure_codes,
+                        performance_metrics=performance_metrics,
+                        **effective_result_metadata,
+                    )
+
+                if quality_gate_result.status == "retry":
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        build_passed=verification.build_passed,
+                        error="Quality gate verification failed",
+                        summary=summary or "Roslyn engine produced a candidate patch.",
+                        build_command=build_command,
+                        build_output=quality_gate_result.to_retry_message(),
+                        retryable_failure=True,
+                        failure_kind="quality_gate",
+                        reviewer_result=reviewer_result.to_dict(),
+                        semantic_precheck_result=semantic_precheck_result.to_dict(),
+                        quality_gate_result=quality_gate_result.to_dict(),
+                        review_gate_result=review_gate_result.to_dict(),
+                        follow_ups=reviewer_result.follow_ups,
+                        boundary_failure_code=verification.boundary_failure_code,
+                        boundary_failure_summary=verification.boundary_failure_summary,
+                        secondary_boundary_failure_codes=verification.secondary_boundary_failure_codes,
+                        performance_metrics=performance_metrics,
+                        **effective_result_metadata,
+                    )
+
+                if verification.rule_validation_message:
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        build_passed=verification.build_passed,
+                        error="Rule-specific validation failed",
+                        summary=summary or "Roslyn engine produced a candidate patch.",
+                        build_command=build_command,
+                        build_output=verification.rule_validation_message,
+                        retryable_failure=True,
+                        failure_kind="rule_validation",
+                        reviewer_result=reviewer_result.to_dict(),
+                        semantic_precheck_result=semantic_precheck_result.to_dict(),
+                        quality_gate_result=quality_gate_result.to_dict(),
+                        review_gate_result=review_gate_result.to_dict(),
+                        follow_ups=reviewer_result.follow_ups,
+                        boundary_failure_code=verification.boundary_failure_code,
+                        boundary_failure_summary=verification.boundary_failure_summary,
+                        secondary_boundary_failure_codes=verification.secondary_boundary_failure_codes,
+                        performance_metrics=performance_metrics,
+                        **effective_result_metadata,
+                    )
+
+                if not verification.build_passed:
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        build_passed=False,
+                        build_verification_failed=True,
+                        error="Issue changes failed local build verification",
+                        summary=summary or "Roslyn engine produced a candidate patch.",
+                        build_command=build_command,
+                        build_output=verification.combined_output,
+                        retryable_failure=True,
+                        failure_kind="build",
+                        reviewer_result=reviewer_result.to_dict(),
+                        semantic_precheck_result=semantic_precheck_result.to_dict(),
+                        quality_gate_result=quality_gate_result.to_dict(),
+                        review_gate_result=review_gate_result.to_dict(),
+                        follow_ups=reviewer_result.follow_ups,
+                        boundary_failure_code=verification.boundary_failure_code,
+                        boundary_failure_summary=verification.boundary_failure_summary,
+                        secondary_boundary_failure_codes=verification.secondary_boundary_failure_codes,
+                        performance_metrics=performance_metrics,
+                        **effective_result_metadata,
+                    )
+
+                return FixResult(
+                    success=True,
+                    issue_key=issue.key,
+                    file_path=issue.file_path,
+                    changes=changes,
+                    build_passed=verification.build_passed,
+                    summary=summary or "Roslyn engine applied a candidate patch.",
+                    build_command=build_command,
+                    build_output=verification.build_output,
+                    reviewer_result=reviewer_result.to_dict(),
+                    semantic_precheck_result=semantic_precheck_result.to_dict(),
+                    quality_gate_result=quality_gate_result.to_dict(),
+                    review_gate_result=review_gate_result.to_dict(),
+                    follow_ups=reviewer_result.follow_ups,
+                    boundary_failure_code=verification.boundary_failure_code,
+                    boundary_failure_summary=verification.boundary_failure_summary,
+                    secondary_boundary_failure_codes=verification.secondary_boundary_failure_codes,
+                    performance_metrics=performance_metrics,
+                    **effective_result_metadata,
+                )
+            finally:
+                cls._cleanup_attempt_workspace_state(workspace_path)
+
+        failure_kind = (
+            "roslyn_candidate_not_applied"
+            if bool(getattr(roslyn_result, "can_fix_safely", False))
+            else "roslyn_cannot_fix_safely"
+        )
+        return FixResult(
+            success=False,
+            skipped=True,
+            issue_key=issue.key,
+            file_path=issue.file_path,
+            error=summary or "Roslyn engine did not apply a fix.",
+            summary=summary or "Roslyn engine did not apply a fix.",
+            build_command=build_command,
+            build_output=summary or "Roslyn engine did not apply a fix.",
+            failure_kind=failure_kind,
+            skip_reason=summary or "Roslyn engine did not apply a fix.",
+            **result_metadata,
+        )
 
     @classmethod
     def _build_edit_contract_section(cls, edit_contract: Any | None) -> str:
@@ -1376,14 +1895,14 @@ class ClaudeFixAgent:
     def _extract_invalid_write_tool_input_message(
         attempt_events: tuple[AttemptRuntimeEvent, ...] | list[AttemptRuntimeEvent],
     ) -> str:
-        """Detect malformed Edit/MultiEdit tool calls that ended with empty or invalid input."""
+        """Detect malformed Edit/MultiEdit/Write tool calls that ended with empty or invalid input."""
 
         saw_empty_write_payload = False
         for event in reversed(tuple(attempt_events or ())):
             if event.kind == AttemptRuntimeEventKind.SDK_TRACE and str(event.stage or "") == "sdk_message:UserMessage":
                 preview = str(getattr(event, "payload", {}).get("preview", "") or "")
                 if "InputValidationError" in preview and any(
-                    marker in preview for marker in ("file_path", "old_string", "new_string", "edits")
+                    marker in preview for marker in ("file_path", "old_string", "new_string", "edits", "content")
                 ):
                     return preview
             if event.kind != AttemptRuntimeEventKind.TOOL_CALLED:
@@ -1391,14 +1910,34 @@ class ClaudeFixAgent:
             payload = getattr(event, "payload", {}) or {}
             tool_name = str(payload.get("tool_name", "") or "")
             tool_payload = payload.get("tool_payload")
-            if tool_name in {"Edit", "MultiEdit"} and isinstance(tool_payload, dict) and not tool_payload:
+            if tool_name in {"Edit", "MultiEdit", "Write"} and isinstance(tool_payload, dict) and not tool_payload:
                 saw_empty_write_payload = True
         if saw_empty_write_payload:
             return (
-                "Invalid write tool input: Edit/MultiEdit was called with an empty payload. "
-                "Required parameters such as file_path, old_string/new_string, or edits were missing."
+                "Invalid write tool input: Edit/MultiEdit/Write was called with an empty payload. "
+                "Required parameters such as file_path, old_string/new_string, edits, or content were missing."
             )
         return ""
+
+    @staticmethod
+    def _is_max_turn_agent_error(agent_error: str) -> bool:
+        text = str(agent_error or "").strip().lower()
+        return "maximum number of turns" in text
+
+    @classmethod
+    def _should_salvage_agent_error(
+        cls,
+        *,
+        agent_error: str,
+        changes_detected: bool,
+        used_forbidden_tool: bool,
+        invalid_write_tool_input: str = "",
+    ) -> bool:
+        if not changes_detected or used_forbidden_tool:
+            return False
+        if cls._is_max_turn_agent_error(agent_error):
+            return True
+        return bool(invalid_write_tool_input and "invalid write tool input burst" in str(agent_error or "").lower())
 
     def fix_issue(
         self,
@@ -1467,7 +2006,26 @@ class ClaudeFixAgent:
             source_lines=source_lines,
             agent_env=self.agent_env,
         )
+        if str(getattr(issue_plan, "skip_reason", "")).strip():
+            planner_skip_reason = str(issue_plan.skip_reason).strip()
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=str(file_path),
+                error=planner_skip_reason,
+                summary="Planner skipped the issue before any model attempt.",
+                build_command=build_command.strip() or "dotnet build",
+                build_output=planner_skip_reason,
+                skipped=True,
+                skip_reason=planner_skip_reason,
+                failure_kind="planner_skip",
+                performance_metrics={"build_invoked": False},
+            )
         edit_contract = issue_plan.edit_contract
+        engine_routing_decision = route_engine_for_issue(
+            rule_id=issue.rule,
+            edit_contract=edit_contract,
+        )
         guardrail_mode = edit_contract.guardrail_mode
         default_max_turns = self._resolve_issue_max_turns(issue)
         execution_schedule = AttemptScheduler.build_execution_schedule(
@@ -1483,7 +2041,40 @@ class ClaudeFixAgent:
             "execution_profile": str(getattr(edit_contract, "execution_profile", "full_path")),
             "fast_path_enabled": bool(getattr(edit_contract, "fast_path_enabled", False)),
             "rollout_flags": tuple(getattr(edit_contract, "rollout_flags", ()) or ()),
+            "engine_routing_decision": engine_routing_decision,
         }
+        if engine_routing_decision.should_skip:
+            performance_metrics = {
+                "execution_profile": str(getattr(edit_contract, "execution_profile", "full_path")),
+                "fast_path_enabled": bool(getattr(edit_contract, "fast_path_enabled", False)),
+                "engine_routing_decision": engine_routing_decision.to_dict(),
+                "build_invoked": False,
+            }
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=str(file_path),
+                error=engine_routing_decision.skip_reason,
+                summary="Engine routing rejected the issue before any model attempt.",
+                build_command=build_command.strip() or "dotnet build",
+                build_output=engine_routing_decision.skip_reason,
+                skipped=True,
+                skip_reason=engine_routing_decision.skip_reason,
+                failure_kind="engine_router_skip",
+                performance_metrics=performance_metrics,
+                **result_metadata,
+            )
+        if engine_routing_decision.resolved_engine == "roslyn":
+            return self._run_roslyn_fix_path(
+                issue=issue,
+                workspace_path=workspace_path,
+                build_command=build_command.strip() or "dotnet build",
+                edit_contract=edit_contract,
+                guardrail_mode=guardrail_mode,
+                scope=scope,
+                original_issue_file_content=original_issue_file_content,
+                result_metadata=result_metadata,
+            )
         plan_precheck = getattr(edit_contract, "plan_precheck", None)
         if bool(getattr(plan_precheck, "blocking", False)):
             performance_metrics = {
@@ -1491,6 +2082,7 @@ class ClaudeFixAgent:
                 "fast_path_enabled": bool(getattr(edit_contract, "fast_path_enabled", False)),
                 "plan_first_enabled": bool(getattr(edit_contract, "plan_first_enabled", False)),
                 "plan_precheck_blocking": True,
+                "engine_routing_decision": engine_routing_decision.to_dict(),
                 "build_invoked": False,
             }
             detail_lines = [str(getattr(plan_precheck, "summary", "")).strip()]
@@ -1517,10 +2109,19 @@ class ClaudeFixAgent:
                 **result_metadata,
             )
 
+        sonar_mcp_runtime = build_sonar_mcp_runtime(self.agent_env)
+        tool_policy, visible_toolset = self._build_fix_tool_policy_bundle(
+            edit_contract,
+            mcp_tool_names=sonar_mcp_runtime.tool_names,
+            workspace_path=workspace_path,
+        )
+        result_metadata["visible_toolset"] = visible_toolset
+
         # Build prompts
-        system_prompt = self._build_system_prompt(workspace_path)
+        system_prompt_result = self._build_system_prompt_result(workspace_path)
+        system_prompt = system_prompt_result.prompt
         resolved_build_command = build_command.strip() or "dotnet build"
-        user_prompt = self._build_user_prompt(
+        user_prompt_result = self._build_user_prompt_result(
             issue,
             code_context,
             self._load_csharp_quality_gate(issue, edit_contract),
@@ -1534,9 +2135,15 @@ class ClaudeFixAgent:
             prefetched_context_section=self._build_prefetched_context_section(edit_contract),
             execution_mode_section=self._build_execution_mode_section(edit_contract),
             workspace_path=workspace_path,
+            edit_contract=edit_contract,
+            visible_tool_names=visible_toolset.visible_tools,
         )
-
-        tool_policy = self._build_fix_tool_policy(edit_contract)
+        user_prompt = user_prompt_result.prompt
+        prompt_budget_report = IssuePromptBuilder.build_prompt_budget_report(
+            system_prompt_result,
+            user_prompt_result,
+        )
+        result_metadata["prompt_budget_report"] = prompt_budget_report
         effective_max_turns = execution_schedule.effective_max_turns
         gateway_request = ClaudeAdapter.build_request(
             agent_env=self.agent_env,
@@ -1544,12 +2151,15 @@ class ClaudeFixAgent:
             cwd=str(workspace_path),
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            tools=build_fix_runtime_tools(),
+            tools=build_fix_runtime_tools(
+                include_create_file_tool=bool(getattr(edit_contract, "allow_file_creation", False))
+            ),
             allowed_tools=tool_policy.allowed_tool_names(),
             max_turns=effective_max_turns,
             max_budget_usd=self.max_budget_usd,
             stderr_handler=self._handle_cli_stderr,
             build_command=resolved_build_command,
+            mcp_servers=sonar_mcp_runtime.server_configs,
         )
         gateway_request.metadata.update(
             {
@@ -1557,6 +2167,16 @@ class ClaudeFixAgent:
                 "execution_profile": str(getattr(edit_contract, "execution_profile", "full_path")),
                 "fast_path_enabled": "true" if bool(getattr(edit_contract, "fast_path_enabled", False)) else "false",
                 "execution_schedule": execution_schedule.to_dict(),
+                "mcp_servers": ",".join(sorted(sonar_mcp_runtime.server_configs)),
+                "mcp_tools_count": str(len(sonar_mcp_runtime.tool_names)),
+                "mcp_mode": sonar_mcp_runtime.mode,
+                "mcp_read_only": "true" if sonar_mcp_runtime.read_only else "false",
+                "mcp_warning": sonar_mcp_runtime.warning,
+                "system_prompt_chars": str(len(system_prompt)),
+                "user_prompt_chars": str(len(user_prompt)),
+                "prompt_reference_document": prompt_budget_report.reference_document_path,
+                "visible_tools": ",".join(visible_toolset.visible_tools),
+                "hidden_tools_count": str(len(visible_toolset.hidden_tools)),
             }
         )
         runtime = AgentRuntime(
@@ -1890,6 +2510,7 @@ class ClaudeFixAgent:
                     payload={"changed_files": changed_files if 'changed_files' in locals() else [item["file"] for item in changes]},
                     runtime_result=runtime_result,
                 )
+            invalid_write_tool_input = self._extract_invalid_write_tool_input_message(attempt_events)
 
             runtime_result = runtime_result or self._run_runtime_with_continuation(
                 runtime=runtime,
@@ -1930,6 +2551,7 @@ class ClaudeFixAgent:
                         patch_salvaged=patch_salvaged,
                         model_timeout_stage=model_timeout_stage,
                     )
+                    invalid_write_tool_input = self._extract_invalid_write_tool_input_message(attempt_events)
                     changed_files = tuple(dict.fromkeys(self._collect_modified_files(workspace_path)))
                     changes = [{"file": modified_file, "action": "modified"} for modified_file in changed_files]
                     if changes:
@@ -1987,34 +2609,74 @@ class ClaudeFixAgent:
                     **result_metadata,
                 )
 
-            if runtime_result.agent_error and not patch_salvaged:
+            if (
+                runtime_result.agent_error
+                and not patch_salvaged
+                and self._should_salvage_agent_error(
+                    agent_error=runtime_result.agent_error,
+                    changes_detected=bool(changes),
+                    used_forbidden_tool=used_forbidden_tool,
+                    invalid_write_tool_input=invalid_write_tool_input,
+                )
+            ):
+                patch_salvaged = True
+                salvage_reason = (
+                    "agent_error_max_turns"
+                    if self._is_max_turn_agent_error(runtime_result.agent_error)
+                    else "agent_error_invalid_write_burst"
+                )
+                runtime_performance_metrics = self._merge_performance_metrics(
+                    runtime_performance_metrics,
+                    patch_salvaged=True,
+                    agent_error_salvaged=True,
+                    agent_error_salvage_reason=salvage_reason,
+                )
                 self._append_attempt_event(
                     attempt_events,
-                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
-                    stage="agent_error",
-                    payload={"success": False, "failure_kind": "agent_error"},
+                    AttemptRuntimeEventKind.PATCH_SALVAGED,
+                    stage="agent_error_salvage",
+                    payload={"reason": salvage_reason, "changes_detected": True},
                     runtime_result=runtime_result,
                 )
-                return FixResult(
-                    success=False,
-                    issue_key=issue.key,
-                    file_path=str(file_path),
-                    changes=changes,
-                    error=runtime_result.agent_error,
-                    performance_metrics=self._merge_performance_metrics(
-                        runtime_performance_metrics,
-                        build_duration_seconds=0.0,
-                        build_invoked=False,
-                    ),
-                    attempt_events=tuple(attempt_events),
-                    **result_metadata,
+                print(
+                    "  [TRACE] 检测到可回收的 agent_error，进入 salvage 验证流程: "
+                    f"reason={salvage_reason}",
+                    flush=True,
                 )
 
+            if runtime_result.agent_error and not patch_salvaged:
+                if invalid_write_tool_input and not changes:
+                    runtime_result = replace(runtime_result, agent_error=None)
+                else:
+                    self._append_attempt_event(
+                        attempt_events,
+                        AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                        stage="agent_error",
+                        payload={"success": False, "failure_kind": "agent_error"},
+                        runtime_result=runtime_result,
+                    )
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=str(file_path),
+                        changes=changes,
+                        error=runtime_result.agent_error,
+                        build_command=resolved_build_command,
+                        build_output=runtime_result.agent_error,
+                        failure_kind="agent_error",
+                        performance_metrics=self._merge_performance_metrics(
+                            runtime_performance_metrics,
+                            build_duration_seconds=0.0,
+                            build_invoked=False,
+                        ),
+                        attempt_events=tuple(attempt_events),
+                        **result_metadata,
+                    )
+
             if not changes:
-                invalid_write_tool_input = self._extract_invalid_write_tool_input_message(attempt_events)
                 if invalid_write_tool_input:
                     failure_kind = "tool_input_invalid"
-                    error = "Model emitted an invalid Edit/MultiEdit call"
+                    error = "Model emitted an invalid Edit/MultiEdit/Write call"
                 else:
                     failure_kind = "model_timeout" if model_timeout_stage else "no_change"
                     error = "Model response timed out" if model_timeout_stage else "Agent completed without modifying any files"
@@ -2085,6 +2747,7 @@ class ClaudeFixAgent:
             build_passed = verification.build_passed
             build_output = verification.build_output
             scope_violation = verification.scope_violation
+            semantic_precheck_result = verification.semantic_precheck_result
             quality_gate_result = verification.quality_gate_result
             review_gate_result = verification.review_gate_result
             boundary_failure_code = verification.boundary_failure_code
@@ -2199,6 +2862,43 @@ class ClaudeFixAgent:
                     retryable_failure=True,
                     failure_kind="reviewer",
                     reviewer_result=reviewer_result.to_dict(),
+                    semantic_precheck_result=semantic_precheck_result.to_dict(),
+                    quality_gate_result=quality_gate_result.to_dict(),
+                    review_gate_result=review_gate_result.to_dict(),
+                    follow_ups=reviewer_result.follow_ups,
+                    boundary_failure_code=boundary_failure_code,
+                    boundary_failure_summary=boundary_failure_summary,
+                    secondary_boundary_failure_codes=secondary_boundary_failure_codes,
+                    performance_metrics=performance_metrics,
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=patch_salvaged,
+                    attempt_events=tuple(attempt_events),
+                    **result_metadata,
+                )
+
+            if semantic_precheck_result.status == "retry":
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    stage="semantic_precheck",
+                    payload={"success": False, "failure_kind": "semantic_precheck"},
+                    runtime_result=runtime_result,
+                )
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=str(file_path),
+                    changes=changes,
+                    build_passed=build_passed,
+                    build_verification_failed=False,
+                    error="Semantic precheck failed",
+                    summary=f"Fixed {len(changes)} file(s)",
+                    build_command=resolved_build_command,
+                    build_output=semantic_precheck_result.to_retry_message(),
+                    retryable_failure=True,
+                    failure_kind="semantic_precheck",
+                    reviewer_result=reviewer_result.to_dict(),
+                    semantic_precheck_result=semantic_precheck_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
                     review_gate_result=review_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
@@ -2234,6 +2934,7 @@ class ClaudeFixAgent:
                     retryable_failure=True,
                     failure_kind="review_gate",
                     reviewer_result=reviewer_result.to_dict(),
+                    semantic_precheck_result=semantic_precheck_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
                     review_gate_result=review_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
@@ -2276,6 +2977,7 @@ class ClaudeFixAgent:
                     retryable_failure=True,
                     failure_kind="quality_gate",
                     reviewer_result=reviewer_result.to_dict(),
+                    semantic_precheck_result=semantic_precheck_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
                     review_gate_result=review_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
@@ -2312,6 +3014,7 @@ class ClaudeFixAgent:
                     retryable_failure=True,
                     failure_kind="rule_validation",
                     reviewer_result=reviewer_result.to_dict(),
+                    semantic_precheck_result=semantic_precheck_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
                     review_gate_result=review_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
@@ -2347,6 +3050,7 @@ class ClaudeFixAgent:
                     retryable_failure=True,
                     failure_kind="build",
                     reviewer_result=reviewer_result.to_dict(),
+                    semantic_precheck_result=semantic_precheck_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
                     review_gate_result=review_gate_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
@@ -2377,6 +3081,7 @@ class ClaudeFixAgent:
                 build_command=resolved_build_command,
                 build_output=build_output,
                 reviewer_result=reviewer_result.to_dict(),
+                semantic_precheck_result=semantic_precheck_result.to_dict(),
                 quality_gate_result=quality_gate_result.to_dict(),
                 review_gate_result=review_gate_result.to_dict(),
                 follow_ups=reviewer_result.follow_ups,

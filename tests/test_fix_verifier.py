@@ -10,6 +10,7 @@ from pi_sonar_agent.core.perf_flags import PerformanceFlags
 from pi_sonar_agent.core.propagation_verifier import PropagationCheckResult, PropagationVerifier
 from pi_sonar_agent.core.quality_gate import QualityGateResult, QualityGateRule, QualityGateViolation
 from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
+from pi_sonar_agent.core.repo_capability import RepoCapabilityProfile
 from pi_sonar_agent.core.repair_plan import RepairPlan, RepairPropagationTarget
 from pi_sonar_agent.core.review_gate import ReviewGateDecision, ReviewGateFinding, ReviewGateResult
 from pi_sonar_agent.core.scope_guard import IssueEditScope
@@ -1602,6 +1603,85 @@ def test_quality_gate_verifier_checks_async_requires_await_for_body_only_changes
     assert result.violations[0].rule_id == "async_requires_await"
 
 
+def test_quality_gate_verifier_does_not_truncate_async_helper_body_on_lambda_lines() -> None:
+    contract = EditContract(
+        issue_key="issue-async-await-helper-lambda",
+        rule_id="csharpsquid:S3776",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        quality_gate_rules=(
+            QualityGateRule(
+                rule_id="async_requires_await",
+                title="异步方法必须真正 await",
+                summary="异步方法内部如果没有 await，应改为同步方法或直接返回 Task。",
+                enforcement="hard",
+            ),
+        ),
+    )
+    change = ReviewedFileChange(
+        file="src/Foo.cs",
+        changed_lines=(3, 10, 11),
+        before_changed_lines=(),
+        after_changed_lines=(3, 10, 11),
+        diff_text=(
+            "@@ -0,0 +1,17 @@\n"
+            "+public class Foo\n"
+            "+{\n"
+            "+    private async Task<(bool IsNoRight, int Code, string Message)> HandleCustomQueryRight(Req req, List<string> indicators)\n"
+            "+    {\n"
+            "+        if (req.IndicatorList == null || (req.IndicatorList != null && req.IndicatorList.Count == 0))\n"
+            "+        {\n"
+            "+            req.IndicatorList = indicators;\n"
+            "+        }\n"
+            "+        else if (req.IndicatorList.Except(indicators).Any())\n"
+            "+        {\n"
+            "+            var invalidItems = req.IndicatorList.Where(x => !indicators.Contains(x)).ToList();\n"
+            "+            var idcinfo = await UnitWork.Find<crm_oidc>(x => x.sbo_id == Define.SBO_ID).Where(x => invalidItems.Contains(x.Code)).Select(x => x.Name).ToListAsync();\n"
+            "+            return (true, 500, $\"无查看{string.Join(\"，\", idcinfo)}标识的权限\");\n"
+            "+        }\n"
+            "+        req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? \"N\" : i);\n"
+            "+        return (false, 200, string.Empty);\n"
+            "+    }\n"
+            "+}\n"
+        ),
+        hunk_count=1,
+    )
+    current_issue_file_content = "\n".join(
+        [
+            "public class Foo",
+            "{",
+            "    private async Task<(bool IsNoRight, int Code, string Message)> HandleCustomQueryRight(Req req, List<string> indicators)",
+            "    {",
+            "        if (req.IndicatorList == null || (req.IndicatorList != null && req.IndicatorList.Count == 0))",
+            "        {",
+            "            req.IndicatorList = indicators;",
+            "        }",
+            "        else if (req.IndicatorList.Except(indicators).Any())",
+            "        {",
+            "            var invalidItems = req.IndicatorList.Where(x => !indicators.Contains(x)).ToList();",
+            "            var idcinfo = await UnitWork.Find<crm_oidc>(x => x.sbo_id == Define.SBO_ID).Where(x => invalidItems.Contains(x.Code)).Select(x => x.Name).ToListAsync();",
+            "            return (true, 500, $\"无查看{string.Join(\"，\", idcinfo)}标识的权限\");",
+            "        }",
+            "        req.IndicatorList = req.IndicatorList.ConvertAll(i => i == Define.Non_IndicatorCode ? \"N\" : i);",
+            "        return (false, 200, string.Empty);",
+            "    }",
+            "}",
+        ]
+    ) + "\n"
+
+    result = QualityGateVerifier.review(
+        issue_file_path="src/Foo.cs",
+        edit_contract=contract,
+        reviewed_changes=(change,),
+        original_issue_file_content=None,
+        current_issue_file_content=current_issue_file_content,
+    )
+
+    assert result.status == "pass"
+    assert result.violations == ()
+
+
 def test_quality_gate_verifier_treats_allowed_related_symbols_as_propagation_capability() -> None:
     contract = EditContract(
         issue_key="issue-async-related-symbols",
@@ -1743,6 +1823,208 @@ def test_quality_gate_verifier_keeps_shifted_public_method_as_touched() -> None:
 
     assert result.status == "pass"
     assert result.violations == ()
+
+
+def test_quality_gate_verifier_rejects_unsupported_record_syntax() -> None:
+    contract = EditContract(
+        issue_key="issue-lang-feature-record",
+        rule_id="csharpsquid:S107",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        repo_capability=RepoCapabilityProfile(
+            target_frameworks=("netcoreapp3.1",),
+            lang_version="default",
+            nullable="disable",
+            implicit_usings="disable",
+            supports_record=False,
+            supports_init_only=False,
+            supports_required=False,
+            supports_file_scoped_namespace=False,
+            supports_global_using=False,
+            evidence_files=("src/Foo.csproj",),
+        ),
+        repo_capability_summary="TFM=netcoreapp3.1; LangVersion=default; Nullable=disable",
+    )
+    change = ReviewedFileChange(
+        file="src/generated/FixArgs.cs",
+        changed_lines=(1, 2),
+        before_changed_lines=(),
+        after_changed_lines=(1, 2),
+        diff_text=(
+            "@@ -0,0 +1,2 @@\n"
+            "+public record FixArgs(string Name)\n"
+            "+{\n"
+        ),
+        hunk_count=1,
+        before_exists=False,
+        after_exists=True,
+    )
+
+    result = QualityGateVerifier.review(
+        issue_file_path="src/Foo.cs",
+        edit_contract=contract,
+        reviewed_changes=(change,),
+        original_issue_file_content="class Foo {}\n",
+        current_issue_file_content="class Foo {}\n",
+    )
+
+    assert result.status == "retry"
+    assert "language_feature_compatibility" in result.applied_rule_ids
+    assert len(result.violations) == 1
+    assert result.violations[0].rule_id == "language_feature_compatibility"
+    assert "record" in result.violations[0].message
+
+
+def test_fix_verifier_skips_build_when_repo_capability_gate_fails(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-lang-feature-build-skip",
+        rule="csharpsquid:S107",
+        message="参数过多",
+        line=8,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        repo_capability=RepoCapabilityProfile(
+            target_frameworks=("netcoreapp3.1",),
+            lang_version="default",
+            nullable="disable",
+            implicit_usings="disable",
+            supports_record=False,
+            supports_init_only=False,
+            supports_required=False,
+            supports_file_scoped_namespace=False,
+            supports_global_using=False,
+            evidence_files=("src/Foo.csproj",),
+        ),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/generated/FixArgs.cs",
+            changed_lines=(1, 2),
+            before_changed_lines=(),
+            after_changed_lines=(1, 2),
+            diff_text=(
+                "@@ -0,0 +1,2 @@\n"
+                "+public record FixArgs(string Name)\n"
+                "+{\n"
+            ),
+            hunk_count=1,
+            before_exists=False,
+            after_exists=True,
+        ),
+    )
+
+    build_calls: list[str] = []
+
+    def fake_run(*args, **kwargs):
+        build_calls.append("build")
+        raise AssertionError("build should not be invoked when repo capability gate fails")
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.load_performance_flags",
+        lambda: PerformanceFlags(review_gate=False, layered_verification=True),
+    )
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="contract_review",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        original_issue_file_content="class Foo {}\n",
+        current_issue_file_content="class Foo {}\n",
+    )
+
+    assert outcome.quality_gate_result.status == "retry"
+    assert outcome.build_invoked is False
+    assert outcome.build_passed is False
+    assert build_calls == []
+
+
+def test_fix_verifier_skips_build_when_semantic_precheck_fails(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-semantic-precheck",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=8,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(3, 4, 5, 6),
+            before_changed_lines=(),
+            after_changed_lines=(3, 4, 5, 6),
+            diff_text=(
+                "@@ -3,0 +3,4 @@\n"
+                "+    private object BuildPayload()\n"
+                "+    {\n"
+                "+        return new { Name = \"demo\" };\n"
+                "+    }\n"
+            ),
+            hunk_count=1,
+        ),
+    )
+
+    build_calls: list[str] = []
+
+    def fake_run(*args, **kwargs):
+        build_calls.append("build")
+        raise AssertionError("build should not be invoked when semantic precheck fails")
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.fix_verifier.load_performance_flags",
+        lambda: PerformanceFlags(review_gate=False, layered_verification=True),
+    )
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="contract_review",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        original_issue_file_content="class Foo {}\n",
+        current_issue_file_content="\n".join(
+            [
+                "class Foo",
+                "{",
+                "    private object BuildPayload()",
+                "    {",
+                "        return new { Name = \"demo\" };",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+    )
+
+    assert outcome.semantic_precheck_result.status == "retry"
+    assert outcome.build_invoked is False
+    assert outcome.build_passed is False
+    assert build_calls == []
 
 
 def test_fix_verifier_runs_build_when_review_gate_waives_propagation(monkeypatch, tmp_path) -> None:

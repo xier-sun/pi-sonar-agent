@@ -21,6 +21,7 @@ class GatewayRequest:
     max_turns: int
     max_budget_usd: float
     env: dict[str, str]
+    mcp_servers: dict[str, Any] = field(default_factory=dict)
     model: str | None = None
     extra_args: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, str] = field(default_factory=dict)

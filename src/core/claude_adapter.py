@@ -407,6 +407,7 @@ class ClaudeAdapter(ModelGateway):
         max_budget_usd: float,
         stderr_handler: Any,
         build_command: str,
+        mcp_servers: dict[str, Any] | None = None,
     ) -> GatewayRequest:
         """Build a normalized gateway request from Claude-specific config."""
 
@@ -424,6 +425,7 @@ class ClaudeAdapter(ModelGateway):
             max_turns=max_turns,
             max_budget_usd=max_budget_usd,
             env=sdk_env,
+            mcp_servers=dict(mcp_servers or {}),
             model=sdk_model,
             extra_args=extra_args,
             metadata={
@@ -442,6 +444,7 @@ class ClaudeAdapter(ModelGateway):
             tools=list(request.tools),
             system_prompt=request.system_prompt,
             allowed_tools=list(request.allowed_tools),
+            mcp_servers=dict(request.mcp_servers),
             max_turns=request.max_turns,
             max_budget_usd=request.max_budget_usd,
             model=request.model,

@@ -35,6 +35,11 @@ _FINANCE_ENGLISH_PATTERN = re.compile(
     r"\b(penalty|receivable|accounting|inventory|order\s+cancel|interest)\b",
     re.IGNORECASE,
 )
+_RECORD_PATTERN = re.compile(r"\brecord\b", re.IGNORECASE)
+_INIT_PATTERN = re.compile(r"\binit\s*(?:;|=>)", re.IGNORECASE)
+_REQUIRED_PATTERN = re.compile(r"\brequired\b", re.IGNORECASE)
+_FILE_SCOPED_NAMESPACE_PATTERN = re.compile(r"^\s*namespace\s+[A-Za-z_][\w.]*\s*;\s*$")
+_GLOBAL_USING_PATTERN = re.compile(r"^\s*global\s+using\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -104,11 +109,39 @@ class QualityGateVerifier:
         """Validate the current patch against the structured C# quality gate."""
 
         rules = tuple(edit_contract.quality_gate_rules)
-        if not rules or current_issue_file_content is None:
+        applied_rule_ids = list(rule.rule_id for rule in rules)
+        language_feature_violations = cls._validate_language_feature_compatibility(
+            edit_contract=edit_contract,
+            reviewed_changes=reviewed_changes,
+        )
+        if getattr(edit_contract, "repo_capability", None) is not None:
+            applied_rule_ids.append("language_feature_compatibility")
+
+        if current_issue_file_content is None:
+            if language_feature_violations:
+                return QualityGateResult(
+                    status="retry",
+                    summary=f"Quality gate rejected the patch with {len(language_feature_violations)} hard violation(s).",
+                    applied_rule_ids=tuple(applied_rule_ids),
+                    violations=tuple(language_feature_violations),
+                )
+            if not rules:
+                return QualityGateResult(
+                    status="pass",
+                    summary="No active quality gates were evaluated for this attempt.",
+                    applied_rule_ids=tuple(applied_rule_ids),
+                )
+            return QualityGateResult(
+                status="pass",
+                summary="Repo capability compatibility gate passed, but no issue-file content was available for further quality-gate review.",
+                applied_rule_ids=tuple(applied_rule_ids),
+            )
+
+        if not rules and not language_feature_violations:
             return QualityGateResult(
                 status="pass",
                 summary="No active quality gates were evaluated for this attempt.",
-                applied_rule_ids=tuple(rule.rule_id for rule in rules),
+                applied_rule_ids=tuple(applied_rule_ids),
             )
 
         issue_file = cls._normalize_path(issue_file_path)
@@ -132,11 +165,11 @@ class QualityGateVerifier:
             if primary_change is not None
             else ()
         )
-        if not changed_lines:
+        if not changed_lines and not language_feature_violations:
             return QualityGateResult(
                 status="pass",
                 summary="No post-edit changed lines were available for quality-gate review.",
-                applied_rule_ids=tuple(rule.rule_id for rule in rules),
+                applied_rule_ids=tuple(applied_rule_ids),
             )
 
         touched_methods = cls._collect_touched_methods(lines, changed_lines)
@@ -177,7 +210,7 @@ class QualityGateVerifier:
 
         added_comment_lines = cls._collect_added_comment_lines(primary_change.diff_text if primary_change else "")
 
-        hard_violations: list[QualityGateViolation] = []
+        hard_violations: list[QualityGateViolation] = list(language_feature_violations)
         soft_findings: list[QualityGateSoftFinding] = []
 
         for rule in rules:
@@ -255,7 +288,7 @@ class QualityGateVerifier:
             return QualityGateResult(
                 status="retry",
                 summary=f"Quality gate rejected the patch with {len(hard_violations)} hard violation(s).",
-                applied_rule_ids=tuple(rule.rule_id for rule in rules),
+                applied_rule_ids=tuple(applied_rule_ids),
                 violations=tuple(hard_violations),
                 soft_findings=tuple(soft_findings),
             )
@@ -266,9 +299,126 @@ class QualityGateVerifier:
         return QualityGateResult(
             status="pass",
             summary=summary,
-            applied_rule_ids=tuple(rule.rule_id for rule in rules),
+            applied_rule_ids=tuple(applied_rule_ids),
             soft_findings=tuple(soft_findings),
         )
+
+    @staticmethod
+    def _collect_added_source_lines(
+        reviewed_changes: tuple[ReviewedFileChange, ...],
+    ) -> tuple[tuple[str, int, str], ...]:
+        results: list[tuple[str, int, str]] = []
+        for change in reviewed_changes:
+            current_line = 0
+            normalized_file = QualityGateVerifier._normalize_path(change.file)
+            for raw_line in change.diff_text.splitlines():
+                if raw_line.startswith("@@ "):
+                    match = re.search(r"\+(\d+)", raw_line)
+                    current_line = int(match.group(1)) if match else 0
+                    continue
+                if raw_line.startswith("+++"):
+                    continue
+                if raw_line.startswith("+"):
+                    results.append((normalized_file, current_line, raw_line[1:]))
+                    current_line += 1
+                    continue
+                if raw_line.startswith("-"):
+                    continue
+                if current_line > 0:
+                    current_line += 1
+        return tuple(results)
+
+    @classmethod
+    def _validate_language_feature_compatibility(
+        cls,
+        *,
+        edit_contract: EditContract,
+        reviewed_changes: tuple[ReviewedFileChange, ...],
+    ) -> list[QualityGateViolation]:
+        repo_capability = getattr(edit_contract, "repo_capability", None)
+        if repo_capability is None:
+            return []
+
+        violations: list[QualityGateViolation] = []
+        seen: set[tuple[str, int, str]] = set()
+        retry_hint = (
+            "当前仓库语言能力较旧，请改用兼容的 class/property/namespace 写法，不要引入更新语法。"
+        )
+
+        def append_violation(
+            *,
+            file_path: str,
+            line_number: int,
+            feature: str,
+            message: str,
+            evidence: str,
+        ) -> None:
+            key = (file_path, line_number, feature)
+            if key in seen:
+                return
+            seen.add(key)
+            violations.append(
+                QualityGateViolation(
+                    rule_id="language_feature_compatibility",
+                    title="仓库语言特性兼容性",
+                    message=message,
+                    file=file_path,
+                    line=line_number,
+                    evidence=evidence.strip(),
+                    retry_hint=retry_hint,
+                )
+            )
+
+        for file_path, line_number, text in cls._collect_added_source_lines(reviewed_changes):
+            stripped = text.strip()
+            if not stripped or stripped.startswith(("///", "//", "/*", "*")):
+                continue
+
+            if not repo_capability.supports_record and _RECORD_PATTERN.search(stripped):
+                append_violation(
+                    file_path=file_path,
+                    line_number=line_number,
+                    feature="record",
+                    message="当前仓库不支持 record，请改用兼容的 class/struct 写法。",
+                    evidence=text,
+                )
+            if not repo_capability.supports_init_only and _INIT_PATTERN.search(stripped):
+                append_violation(
+                    file_path=file_path,
+                    line_number=line_number,
+                    feature="init",
+                    message="当前仓库不支持 init accessor，请改用 set 或构造函数赋值。",
+                    evidence=text,
+                )
+            if not repo_capability.supports_required and _REQUIRED_PATTERN.search(stripped):
+                append_violation(
+                    file_path=file_path,
+                    line_number=line_number,
+                    feature="required",
+                    message="当前仓库不支持 required 成员，请改用显式校验或构造函数约束。",
+                    evidence=text,
+                )
+            if (
+                not repo_capability.supports_file_scoped_namespace
+                and _FILE_SCOPED_NAMESPACE_PATTERN.search(stripped)
+            ):
+                append_violation(
+                    file_path=file_path,
+                    line_number=line_number,
+                    feature="file_scoped_namespace",
+                    message="当前仓库不支持 file-scoped namespace，请改回块级 namespace。",
+                    evidence=text,
+                )
+            if not repo_capability.supports_global_using and _GLOBAL_USING_PATTERN.search(stripped):
+                append_violation(
+                    file_path=file_path,
+                    line_number=line_number,
+                    feature="global_using",
+                    message="当前仓库不支持 global using，请改回普通 using 或局部 using。",
+                    evidence=text,
+                )
+
+        return violations
 
     @staticmethod
     def _normalize_path(file_path: str) -> str:
@@ -744,7 +894,11 @@ class QualityGateVerifier:
         saw_open_brace = False
         for line_number in range(declaration_line, len(lines) + 1):
             current_line = lines[line_number - 1]
-            if "=>" in current_line and line_number >= signature_end_line:
+            if (
+                not saw_open_brace
+                and line_number <= signature_end_line
+                and "=>" in current_line
+            ):
                 return line_number
             open_count = current_line.count("{")
             close_count = current_line.count("}")

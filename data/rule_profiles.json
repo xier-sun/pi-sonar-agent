@@ -254,7 +254,7 @@
           "max_turns": 20,
           "max_token_budget": 256000,
           "max_files": 1,
-          "strategy_hint": "通过提取连续且副作用边界清晰的代码块降低复杂度，优先新增 private helper 方法，避免改动对外契约。"
+          "strategy_hint": "默认优先在单文件内用 guard clause、private helper、local block simplification 降低复杂度；除非传播闭包明确且仅触达受控 internal 调用点，否则不要改动公开签名、interface 或 controller。"
         }
     },
     {
@@ -264,7 +264,7 @@
       "risk": "high",
       "enabled": true,
       "primary_engine": "roslyn",
-      "fallback_engines": ["agent"],
+      "fallback_engines": [],
       "pr_mode": "draft",
       "max_changed_lines": 40,
       "allow_signature_changes": true,
@@ -278,7 +278,7 @@
         "max_token_budget": 320000,
         "max_files": 8,
         "allowed_operations": ["read_file", "search_in_project", "get_file_outline", "apply_edit", "create_file", "list_files", "run_build", "finish"],
-        "strategy_hint": "优先在同命名空间创建参数对象或 record，并同步更新当前 solution 内所有调用点；遇到接口、端点、override 或 params/ref/out/in 风险时跳过。"
+        "strategy_hint": "优先创建兼容当前仓库语言版本的参数对象，并同步更新当前 solution 内所有调用点；仅在仓库明确支持时才使用 record；遇到接口、端点、override 或 params/ref/out/in 风险时跳过。"
       }
     },
     {

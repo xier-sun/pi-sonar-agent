@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -10,10 +11,13 @@ from typing import Any
 DEFAULT_WORKSPACE_RULE_FILES = ("CLAUDE.md", "AGENTS.md")
 PROJECT_RULE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CSHARP_QUALITY_GATE_FILE = PROJECT_RULE_ROOT / "data" / "csharp-quality-gate.md"
+_WINDOWS_ABSOLUTE_PATH_PATTERN = re.compile(r"(`)?([A-Za-z]:\\[^`\r\n]+)(`)?")
 
 
 class ResourceLoader:
     """Load optional markdown resources used during issue fixing."""
+
+    TRUNCATION_NOTICE = "[truncated]"
 
     @staticmethod
     def split_markdown_front_matter(text: str) -> tuple[str, str]:
@@ -71,6 +75,33 @@ class ResourceLoader:
         return None, "", ""
 
     @classmethod
+    def truncate_for_prompt(
+        cls,
+        text: str,
+        max_chars: int,
+        *,
+        max_lines: int | None = None,
+    ) -> str:
+        """Trim prompt-facing markdown/text to a stable budget."""
+
+        normalized = str(text or "").strip()
+        if not normalized or max_chars <= 0:
+            return ""
+
+        lines = normalized.splitlines()
+        if max_lines is not None and max_lines > 0 and len(lines) > max_lines:
+            normalized = "\n".join(lines[:max_lines]).strip()
+        else:
+            normalized = "\n".join(lines).strip()
+
+        if len(normalized) <= max_chars:
+            return normalized
+
+        suffix = "\n" + cls.TRUNCATION_NOTICE
+        cutoff = max(0, max_chars - len(suffix))
+        return normalized[:cutoff].rstrip() + suffix
+
+    @classmethod
     def load_json_front_matter(cls, paths: Iterable[Path]) -> tuple[Path | None, dict[str, Any], str]:
         """Load JSON front matter and the markdown body from the first available file."""
 
@@ -113,7 +144,7 @@ class ResourceLoader:
         """Load repository-level long-term instructions from the workspace."""
 
         paths = tuple(workspace_path / name for name in filenames if str(name).strip())
-        return cls.load_markdown(paths)
+        return cls._sanitize_workspace_rules(cls.load_markdown(paths))
 
     @classmethod
     def load_project_rules(
@@ -131,11 +162,23 @@ class ResourceLoader:
         base_prompt: str,
         workspace_path: Path,
         filenames: Iterable[str] = DEFAULT_WORKSPACE_RULE_FILES,
+        *,
+        max_chars: int | None = None,
+        max_project_rule_chars: int = 1400,
+        max_workspace_rule_chars: int = 1400,
     ) -> str:
         """Append workspace-level instructions to the base system prompt when present."""
 
-        workspace_rules = cls.load_workspace_rules(workspace_path, filenames)
-        project_rules = cls.load_project_rules(filenames)
+        workspace_rules = cls.truncate_for_prompt(
+            cls.load_workspace_rules(workspace_path, filenames),
+            max_workspace_rule_chars,
+            max_lines=80,
+        )
+        project_rules = cls.truncate_for_prompt(
+            cls.load_project_rules(filenames),
+            max_project_rule_chars,
+            max_lines=80,
+        )
         sections = [str(base_prompt).strip()]
         if project_rules:
             sections.extend(
@@ -151,4 +194,36 @@ class ResourceLoader:
                     workspace_rules.strip(),
                 ]
             )
-        return "\n\n".join(section for section in sections if section).strip()
+        prompt = "\n\n".join(section for section in sections if section).strip()
+        if max_chars is None or len(prompt) <= max_chars:
+            return prompt
+        return cls.truncate_for_prompt(prompt, max_chars, max_lines=220)
+
+    @classmethod
+    def _sanitize_workspace_rules(cls, text: str) -> str:
+        """Strip volatile absolute-path hints from workspace rules before prompting."""
+
+        normalized = str(text or "").strip()
+        if not normalized:
+            return ""
+
+        replacement_count = 0
+
+        def _replace_absolute_path(match: re.Match[str]) -> str:
+            nonlocal replacement_count
+            replacement_count += 1
+            if match.group(1) or match.group(3):
+                return "`<workspace-root>`"
+            return "<workspace-root>"
+
+        sanitized = _WINDOWS_ABSOLUTE_PATH_PATTERN.sub(_replace_absolute_path, normalized)
+        if replacement_count <= 0:
+            return sanitized
+
+        guidance = (
+            "运行时工作目录已经切到当前 issue 的临时工作区；读取和编辑源码时只使用仓库相对路径，"
+            "不要使用 `C:\\` 等绝对路径。"
+        )
+        if guidance in sanitized:
+            return sanitized
+        return f"{sanitized}\n\n{guidance}".strip()

@@ -20,6 +20,7 @@ from pi_sonar_agent.core.quality_gate import QualityGateResult
 from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
 from pi_sonar_agent.core.review_gate import ReviewGateAgent, ReviewGateResult
 from pi_sonar_agent.core.scope_guard import IssueEditScope
+from pi_sonar_agent.core.semantic_precheck import SemanticPrecheck, SemanticPrecheckResult
 
 if TYPE_CHECKING:
     from pi_sonar_agent.agent.claude_agent import SonarIssue
@@ -34,6 +35,7 @@ class VerificationOutcome:
     reviewer_result: ReviewerResult
     reviewer_retry_message: str
     scope_violation: str | None
+    semantic_precheck_result: SemanticPrecheckResult
     propagation_check_result: PropagationCheckResult
     quality_gate_result: QualityGateResult
     review_gate_result: ReviewGateResult
@@ -424,6 +426,10 @@ class FixVerifier:
             status="pass",
             summary="Propagation lifecycle verifier disabled for this attempt.",
         )
+        semantic_precheck_result = SemanticPrecheckResult(
+            status="pass",
+            summary="Semantic precheck was not evaluated for this attempt.",
+        )
         quality_gate_result = QualityGateVerifier.review(
             issue_file_path=issue.file_path,
             edit_contract=edit_contract,
@@ -441,6 +447,13 @@ class FixVerifier:
             edit_contract=edit_contract,
             performance_flags=load_performance_flags(),
         )
+        if verification_schedule.run_semantic_precheck_before_build:
+            semantic_precheck_result = SemanticPrecheck.review(
+                issue_file_path=issue.file_path,
+                edit_contract=edit_contract,
+                reviewed_changes=reviewed_changes,
+                current_issue_file_content=current_issue_file_content,
+            )
         if verification_schedule.run_propagation_check_before_build:
             propagation_check_result = PropagationVerifier.review(
                 workspace_path=workspace_path,
@@ -472,6 +485,8 @@ class FixVerifier:
         should_run_build = workspace_path.exists()
         if verification_schedule.skip_build_on_precheck_failure:
             if reviewer_result.status == "retry":
+                should_run_build = False
+            if semantic_precheck_result.status == "retry":
                 should_run_build = False
             if review_gate_result.status == "retry":
                 should_run_build = False
@@ -533,6 +548,13 @@ class FixVerifier:
                 for part in [combined_output.strip(), propagation_retry_message]
                 if str(part).strip()
             )
+        if semantic_precheck_result.status == "retry":
+            semantic_retry_message = semantic_precheck_result.to_retry_message()
+            combined_output = "\n\n".join(
+                part
+                for part in [combined_output.strip(), semantic_retry_message]
+                if str(part).strip()
+            )
         if review_gate_result.status == "retry":
             review_retry_message = review_gate_result.to_retry_message()
             combined_output = "\n\n".join(
@@ -560,6 +582,7 @@ class FixVerifier:
             reviewer_result=reviewer_result,
             reviewer_retry_message=reviewer_retry_message,
             scope_violation=scope_violation,
+            semantic_precheck_result=semantic_precheck_result,
             propagation_check_result=propagation_check_result,
             quality_gate_result=quality_gate_result,
             review_gate_result=review_gate_result,

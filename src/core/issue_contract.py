@@ -7,6 +7,7 @@ from typing import Any
 
 from pi_sonar_agent.core.lessons_store import PlannerLesson
 from pi_sonar_agent.core.quality_gate import QualityGateRule
+from pi_sonar_agent.core.repo_capability import RepoCapabilityProfile
 from pi_sonar_agent.core.repair_plan import PlanPrecheckResult, RepairPlan
 from pi_sonar_agent.core.state import serialize_state
 
@@ -72,6 +73,11 @@ class EditContract:
     target_line_range: tuple[int, int] = ()
     validation_line_range: tuple[int, int] = ()
     allowed_line_ranges: tuple[tuple[int, int], ...] = ()
+    allow_file_creation: bool = False
+    allowed_new_file_roots: tuple[str, ...] = ()
+    repo_capability: RepoCapabilityProfile | None = None
+    repo_capability_summary: str = ""
+    repo_capability_hints: tuple[str, ...] = ()
     repair_plan: RepairPlan | None = None
     plan_precheck: PlanPrecheckResult | None = None
     patch_only: bool = True

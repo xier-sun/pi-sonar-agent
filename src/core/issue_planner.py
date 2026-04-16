@@ -21,10 +21,12 @@ from pi_sonar_agent.core.boundary_capabilities import (
     BOUNDARY_PROFILE_DECLARATION_ANCHOR,
     BOUNDARY_PROFILE_MEMBER_CLUSTER,
     HELPER_EXTRACT_CAPABILITY,
+    METHOD_REWRITE_CAPABILITY,
     METHOD_CLUSTER_DELETE_CAPABILITY,
     MULTI_FILE_REFACTOR_CAPABILITY,
     NEW_TYPE_ADD_CAPABILITY,
     SIGNATURE_CHANGE_CAPABILITY,
+    normalize_boundary_capabilities,
     resolve_boundary_capabilities,
     resolve_boundary_profile,
 )
@@ -36,6 +38,7 @@ from pi_sonar_agent.core.issue_contract import (
 from pi_sonar_agent.core.lessons_store import LessonsStore, PlannerLesson
 from pi_sonar_agent.core.perf_flags import PerformanceFlags, load_performance_flags
 from pi_sonar_agent.core.quality_gate import QualityGateCatalog, load_default_quality_gate_catalog
+from pi_sonar_agent.core.repo_capability import detect_repo_capability
 from pi_sonar_agent.core.repair_plan import (
     PlanPrecheckResult,
     RepairHelperPlan,
@@ -44,6 +47,7 @@ from pi_sonar_agent.core.repair_plan import (
 )
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.scope_guard import LegacyScopeGuard
+from pi_sonar_agent.fixers.rule_profiles import load_rule_catalog
 
 
 @dataclass(frozen=True)
@@ -83,6 +87,27 @@ class IssuePlanner:
             METHOD_CLUSTER_DELETE_CAPABILITY,
         }
     )
+    _S3776_TYPE_SHAPE_FAILURE_FINGERPRINTS = frozenset(
+        {
+            "helper_extraction_type_break",
+            "nullable_type_mismatch",
+            "anonymous_type_leak",
+            "anonymous_type_helper_boundary",
+        }
+    )
+    _REPEATED_FAILURE_SKIP_FINGERPRINTS = frozenset(
+        {
+            "helper_extraction_type_break",
+            "nullable_type_mismatch",
+            "anonymous_type_leak",
+            "anonymous_type_helper_boundary",
+            "repair_plan_contract_violation",
+            "public_surface_drift",
+            "signature_propagation_incomplete",
+            "lang_feature_incompatible",
+            "turn_exhausted_after_partial_patch",
+        }
+    )
     _PRIVATE_METHOD_PATTERN = re.compile(r"\bprivate\b")
     _METHOD_NAME_PATTERN = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 
@@ -99,6 +124,18 @@ class IssuePlanner:
         if not source_lines:
             return []
         return [str(line) for line in source_lines]
+
+    @staticmethod
+    def _directory_roots_for_files(file_paths: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+        roots: list[str] = []
+        for file_path in file_paths:
+            normalized = str(file_path or "").replace("\\", "/").strip().lstrip("/")
+            if not normalized:
+                continue
+            parts = normalized.rsplit("/", 1)
+            root = parts[0] if len(parts) == 2 else "."
+            roots.append(root)
+        return IssuePlanner._dedupe_text(roots)
 
     @staticmethod
     def _infer_symbol_name(scope_mode: str, start_line: int, end_line: int) -> str:
@@ -830,6 +867,48 @@ class IssuePlanner:
 
         return tuple(results)
 
+    @classmethod
+    def _s3776_propagation_target_is_high_risk(
+        cls,
+        target: RepairPropagationTarget,
+    ) -> bool:
+        relative_path = cls._normalize_path(getattr(target, "file", ""))
+        lowered = relative_path.lower()
+        kind = str(getattr(target, "kind", "")).strip().lower()
+        if kind == "signature_declaration":
+            return True
+        if "/interfaces/" in lowered or lowered.endswith("controller.cs") or "/controllers/" in lowered:
+            return True
+        return False
+
+    @classmethod
+    def _allows_controlled_s3776_signature_propagation(
+        cls,
+        *,
+        method_descriptor: dict[str, object] | None,
+        propagation_targets: tuple[RepairPropagationTarget, ...],
+    ) -> bool:
+        if method_descriptor is None or not propagation_targets:
+            return False
+        access = str(method_descriptor.get("access", "")).strip().lower()
+        if access != "internal":
+            return False
+        if len(propagation_targets) > 6:
+            return False
+        return not any(
+            cls._s3776_propagation_target_is_high_risk(target)
+            for target in propagation_targets
+        )
+
+    @staticmethod
+    def _is_signature_preserving_archetype(selected_archetype: str) -> bool:
+        return str(selected_archetype or "").strip() in {
+            "signature_preserving_refactor",
+            "private_helper_extract",
+            "guard_clause_flatten",
+            "local_block_reorder",
+        }
+
     @staticmethod
     def _retry_quality_gate_rule_ids(retry_context: RetryContext | None) -> frozenset[str]:
         if retry_context is None or retry_context.quality_gate_failure is None:
@@ -838,6 +917,19 @@ class IssuePlanner:
             str(item.rule_id).strip()
             for item in retry_context.quality_gate_failure.violations
             if str(item.rule_id).strip()
+        )
+
+    @classmethod
+    def _retry_failure_fingerprints(
+        cls,
+        retry_context: RetryContext | None,
+    ) -> frozenset[str]:
+        if retry_context is None:
+            return frozenset()
+        return frozenset(
+            str(item).strip()
+            for item in getattr(retry_context, "failure_fingerprints", ()) or ()
+            if str(item).strip()
         )
 
     @staticmethod
@@ -860,6 +952,68 @@ class IssuePlanner:
             for rule_id in getattr(lesson, "quality_gate_rule_ids", ()) or ()
             if str(rule_id).strip()
         )
+
+    @classmethod
+    def _should_disable_helper_extract_on_retry(
+        cls,
+        *,
+        rule_id: str,
+        retry_context: RetryContext | None,
+    ) -> bool:
+        if str(rule_id or "").strip() != "csharpsquid:S3776":
+            return False
+        retry_failure_fingerprints = cls._retry_failure_fingerprints(retry_context)
+        return bool(
+            retry_failure_fingerprints.intersection(
+                cls._S3776_TYPE_SHAPE_FAILURE_FINGERPRINTS
+            )
+        )
+
+    @classmethod
+    def _apply_retry_capability_downgrades(
+        cls,
+        *,
+        rule_id: str,
+        allowed_capabilities: tuple[str, ...],
+        retry_context: RetryContext | None,
+    ) -> tuple[str, ...]:
+        normalized_capabilities = tuple(allowed_capabilities or ())
+        if not normalized_capabilities:
+            return normalized_capabilities
+        if not cls._should_disable_helper_extract_on_retry(
+            rule_id=rule_id,
+            retry_context=retry_context,
+        ):
+            return normalized_capabilities
+        return normalize_boundary_capabilities(
+            tuple(
+                capability
+                for capability in normalized_capabilities
+                if capability != HELPER_EXTRACT_CAPABILITY
+            )
+        )
+
+    @classmethod
+    def _should_skip_after_repeated_failure(
+        cls,
+        *,
+        rule_id: str,
+        failure_fingerprints: frozenset[str],
+        failure_fingerprint_repetition: int,
+    ) -> bool:
+        if failure_fingerprint_repetition <= 0 or not failure_fingerprints:
+            return False
+        relevant_fingerprints = failure_fingerprints.intersection(
+            cls._REPEATED_FAILURE_SKIP_FINGERPRINTS
+        )
+        if not relevant_fingerprints:
+            return False
+        if (
+            str(rule_id or "").strip() == "csharpsquid:S3776"
+            and relevant_fingerprints.intersection(cls._S3776_TYPE_SHAPE_FAILURE_FINGERPRINTS)
+        ):
+            return failure_fingerprint_repetition >= 3
+        return failure_fingerprint_repetition >= 2
 
     @classmethod
     def _should_enable_plan_first(
@@ -908,6 +1062,10 @@ class IssuePlanner:
         observed_quality_gate_ids = frozenset((*retry_quality_gate_ids, *lesson_quality_gate_ids))
         retry_compiler_codes = cls._retry_compiler_error_codes(retry_context)
         retry_failure_kind = str(getattr(retry_context, "failure_kind", "")).strip()
+        retry_failure_fingerprints = cls._retry_failure_fingerprints(retry_context)
+        failure_fingerprint_repetition = int(
+            getattr(retry_context, "failure_fingerprint_repetition", 0) or 0
+        )
         saw_symbol_closure_failure = bool(retry_compiler_codes.intersection({"CS0103", "CS1061"}))
         saw_contract_closure_failure = bool(retry_compiler_codes.intersection({"CS0535", "CS0738"}))
         saw_async_gate_retry = bool(
@@ -919,6 +1077,8 @@ class IssuePlanner:
             repair_shape = "member_cluster_delete"
         elif HELPER_EXTRACT_CAPABILITY in allowed_capabilities:
             repair_shape = "method_rewrite_with_helpers"
+        elif METHOD_REWRITE_CAPABILITY in allowed_capabilities:
+            repair_shape = "method_rewrite_in_place"
         elif SIGNATURE_CHANGE_CAPABILITY in allowed_capabilities:
             repair_shape = "signature_adjustment"
 
@@ -945,6 +1105,9 @@ class IssuePlanner:
         strategy_preferences: list[str] = []
         impact_summary = "Keep the fix centered on the primary file and avoid unnecessary propagation."
         prefer_signature_preserving_archetype = False
+        has_type_shape_retry = bool(
+            retry_failure_fingerprints.intersection(cls._S3776_TYPE_SHAPE_FAILURE_FINGERPRINTS)
+        )
 
         if method_descriptor is not None:
             method_name = str(method_descriptor.get("name", "")).strip()
@@ -1001,6 +1164,34 @@ class IssuePlanner:
                         f"Keep `{method_name}` stable in this attempt and reduce complexity inside the current body "
                         "until verified propagation targets become available."
                     )
+                elif normalized_rule_id == "csharpsquid:S3776" and requires_propagation:
+                    if not cls._allows_controlled_s3776_signature_propagation(
+                        method_descriptor=method_descriptor,
+                        propagation_targets=propagation_targets,
+                    ):
+                        requires_signature_change = False
+                        requires_propagation = False
+                        proposed_method_name = ""
+                        method_descriptor["proposed_name"] = ""
+                        propagation_targets = ()
+                        verification_targets = []
+                        prefer_signature_preserving_archetype = True
+                        risk_notes.append(
+                            "S3776 只在 internal/private 且传播闭包明确、目标不触达 interface/controller、预算受控时才允许签名传播；当前计划已自动降级为单文件保签名修法。"
+                        )
+                        strategy_preferences.extend(
+                            (
+                                "force_signature_preserving_for_s3776_public_surface",
+                                "prefer_single_file_complexity_reduction",
+                                "avoid_interface_controller_propagation",
+                                "preserve_existing_signature_in_this_attempt",
+                                "skip_signature_propagation_for_this_attempt",
+                            )
+                        )
+                        impact_summary = (
+                            f"Keep `{method_name}` stable in this attempt and reduce complexity inside the current file "
+                            "with guard clauses, local block simplification, or private helpers."
+                        )
                 else:
                     if proposed_method_name:
                         verification_targets.append(
@@ -1042,6 +1233,36 @@ class IssuePlanner:
                             "unfinished propagation."
                         )
                         strategy_preferences.append("avoid_partial_signature_updates")
+
+        if normalized_rule_id == "csharpsquid:S3776" and has_type_shape_retry:
+            prefer_signature_preserving_archetype = True
+            risk_notes.append(
+                "最近失败集中在 helper 提取后的类型保持问题；当前 attempt 必须禁用 helper 提取，改为原方法内/保签名收口。"
+            )
+            strategy_preferences.extend(
+                (
+                    "preserve_type_shape_on_retry",
+                    "disable_helper_extract_after_type_shape_failure",
+                    "force_in_method_refactor_after_type_shape_failure",
+                    "prefer_in_method_complexity_reduction",
+                )
+            )
+            stable_name = method_name or str(target_symbol.symbol or "").strip() or "the current method"
+            impact_summary = (
+                f"Keep `{stable_name}` stable in this attempt and reduce complexity inside the current method body "
+                "without introducing helper boundaries for anonymous or nullable-heavy state."
+            )
+            if "anonymous_type_helper_boundary" in retry_failure_fingerprints:
+                risk_notes.append(
+                    "最近失败在 semantic precheck 阶段命中了匿名类型跨 helper 边界；本轮必须保持 anonymous projection 在当前方法内。"
+                )
+                strategy_preferences.extend(
+                    (
+                        "forbid_helper_boundaries_for_anonymous_projections",
+                        "force_in_method_refactor_for_anonymous_projections",
+                        "disable_helper_extract_after_semantic_precheck",
+                    )
+                )
 
         if normalized_rule_id == "csharpsquid:S3776" and HELPER_EXTRACT_CAPABILITY in allowed_capabilities:
             new_helpers.append("private helper(s) extracted from the target method")
@@ -1101,6 +1322,66 @@ class IssuePlanner:
                         "prefer_existing_public_signature_until_propagation_is_verified",
                     )
                 )
+            if has_type_shape_retry:
+                risk_notes.append("最近失败集中在类型保持问题；下一轮应减少 helper 搬运，保持匿名类型/nullable-heavy 逻辑留在原方法内。")
+                strategy_preferences.extend(
+                    (
+                        "preserve_type_shape_on_retry",
+                        "avoid_helper_boundaries_for_anonymous_or_nullable_state",
+                    )
+                )
+                prefer_signature_preserving_archetype = True
+            if "anonymous_type_helper_boundary" in retry_failure_fingerprints:
+                prefer_signature_preserving_archetype = True
+                risk_notes.append("最近失败在 semantic precheck 阶段命中了匿名类型跨 helper 边界；下一轮必须改为原方法内收口，禁止再把 anonymous projection 搬进 helper。")
+                strategy_preferences.extend(
+                    (
+                        "forbid_helper_boundaries_for_anonymous_projections",
+                        "force_in_method_refactor_for_anonymous_projections",
+                        "disable_helper_extract_after_semantic_precheck",
+                    )
+                )
+            if "repair_plan_contract_violation" in retry_failure_fingerprints:
+                prefer_signature_preserving_archetype = True
+                risk_notes.append("最近失败直接违背了 repair plan 合约；下一轮必须收缩为不新增类型、不漂移签名的小步修法。")
+                strategy_preferences.extend(
+                    (
+                        "respect_repair_plan_contract_on_retry",
+                        "avoid_new_type_or_signature_drift_after_plan_violation",
+                    )
+                )
+            if retry_failure_fingerprints.intersection(
+                {"public_surface_drift", "signature_propagation_incomplete"}
+            ):
+                prefer_signature_preserving_archetype = True
+                risk_notes.append("最近失败集中在公开表面或传播闭包漂移；下一轮强制收缩为保签名修法。")
+                strategy_preferences.extend(
+                    (
+                        "force_signature_preserving_after_surface_drift",
+                        "avoid_public_surface_expansion_on_retry",
+                    )
+                )
+            if "turn_exhausted_after_partial_patch" in retry_failure_fingerprints:
+                prefer_signature_preserving_archetype = True
+                risk_notes.append("上一轮在已经落盘 patch 后耗尽 turn；下一轮必须用更小、更快收口的单次补丁。")
+                strategy_preferences.extend(
+                    (
+                        "prefer_one_shot_small_patch_after_turn_exhaustion",
+                        "avoid_iterative_patch_churn",
+                        "force_signature_preserving_after_turn_exhaustion",
+                    )
+                )
+            if "tool_input_invalid_burst" in retry_failure_fingerprints:
+                risk_notes.append("上一轮连续发出了无效 Edit/MultiEdit/Write 调用；下一轮必须先精确 Read 小窗口，再提交一次有效 patch。")
+                strategy_preferences.extend(
+                    (
+                        "force_precise_write_payload_after_invalid_tool_input",
+                        "read_before_write_when_context_is_uncertain",
+                    )
+                )
+            if failure_fingerprint_repetition >= 2:
+                risk_notes.append("连续命中同类失败指纹；下一轮必须切换到更保守的 fallback archetype，避免重复同一修法。")
+                strategy_preferences.append("force_fallback_archetype_on_repeated_failure")
             if retry_failure_kind == "no_change":
                 risk_notes.append("上一轮没有产生有效补丁；下一轮必须提交具体的小范围代码修改。")
                 strategy_preferences.append("force_concrete_delta")
@@ -1145,7 +1426,7 @@ class IssuePlanner:
             if archetype_chain:
                 selected_archetype = archetype_chain[0]
                 fallback_archetype = archetype_chain[1] if len(archetype_chain) > 1 else ""
-        if selected_archetype == "signature_preserving_refactor" and requires_signature_change:
+        if cls._is_signature_preserving_archetype(selected_archetype) and requires_signature_change:
             if proposed_method_name:
                 risk_notes.append(
                     "当前 attempt 已降级为保签名重构；本轮不要推动公开签名改名或传播验证。"
@@ -1247,40 +1528,79 @@ class IssuePlanner:
         observed_quality_gate_ids = frozenset((*retry_quality_gate_ids, *lesson_quality_gate_ids))
         retry_compiler_codes = cls._retry_compiler_error_codes(retry_context)
         retry_failure_kind = str(getattr(retry_context, "failure_kind", "")).strip()
+        retry_failure_fingerprints = cls._retry_failure_fingerprints(retry_context)
+        failure_fingerprint_repetition = int(
+            getattr(retry_context, "failure_fingerprint_repetition", 0) or 0
+        )
 
         if rule_id in {"csharpsquid:S125", "csharpsquid:S1481", "csharpsquid:S1144"}:
             return ("declaration_hygiene", "expression_simplification")
         if METHOD_CLUSTER_DELETE_CAPABILITY in allowed_capabilities:
             return ("declaration_hygiene", "expression_simplification")
         if rule_id == "csharpsquid:S3776":
+            if failure_fingerprint_repetition >= 2 and retry_failure_fingerprints.intersection(
+                {
+                    "async_without_await",
+                    "helper_extraction_type_break",
+                    "nullable_type_mismatch",
+                    "anonymous_type_leak",
+                    "anonymous_type_helper_boundary",
+                    "repair_plan_contract_violation",
+                    "public_surface_drift",
+                    "signature_propagation_incomplete",
+                    "lang_feature_incompatible",
+                    "turn_exhausted_after_partial_patch",
+                }
+            ):
+                return ("signature_preserving_refactor", "expression_simplification")
             if requires_signature_change and requires_propagation:
                 should_downgrade_public_async_rename = bool(
                     prefer_signature_preserving
-                    or retry_failure_kind in {"no_change", "forbidden_tool"}
+                    or retry_failure_kind in {"no_change", "forbidden_tool", "tool_input_invalid"}
                     or retry_compiler_codes.intersection({"CS0103", "CS1061", "CS0535", "CS0738"})
                     or observed_quality_gate_ids.intersection(
                         {"async_requires_await", "async_signature", "public_xml_docs"}
+                    )
+                    or retry_failure_fingerprints.intersection(
+                        {"turn_exhausted_after_partial_patch", "tool_input_invalid_burst"}
                     )
                 )
                 if should_downgrade_public_async_rename:
                     return ("signature_preserving_refactor", "expression_simplification")
                 return (
                     "bounded_signature_propagation",
-                    "signature_preserving_refactor",
-                    "expression_simplification",
+                    "private_helper_extract",
+                    "guard_clause_flatten",
+                    "local_block_reorder",
                 )
             if prefer_signature_preserving:
                 return ("signature_preserving_refactor", "expression_simplification")
-            if retry_compiler_codes.intersection({"CS0103", "CS1061"}) or retry_failure_kind == "no_change":
+            if (
+                "anonymous_type_helper_boundary" in retry_failure_fingerprints
+                or "repair_plan_contract_violation" in retry_failure_fingerprints
+            ):
+                return ("signature_preserving_refactor", "expression_simplification")
+            if (
+                retry_compiler_codes.intersection({"CS0103", "CS1061"})
+                or retry_failure_kind in {"no_change", "tool_input_invalid"}
+                or retry_failure_fingerprints.intersection(
+                    {"turn_exhausted_after_partial_patch", "tool_input_invalid_burst"}
+                )
+            ):
                 return ("signature_preserving_refactor", "expression_simplification")
             if observed_quality_gate_ids.intersection({"async_requires_await", "async_signature", "public_xml_docs"}):
                 return ("signature_preserving_refactor", "expression_simplification")
             if requires_signature_change:
                 return ("signature_preserving_refactor", "expression_simplification")
+            if HELPER_EXTRACT_CAPABILITY in allowed_capabilities:
+                return (
+                    "private_helper_extract",
+                    "guard_clause_flatten",
+                    "local_block_reorder",
+                )
             return (
-                "method_decomposition",
-                "signature_preserving_refactor",
-                "expression_simplification",
+                "guard_clause_flatten",
+                "local_block_reorder",
             )
         if requires_signature_change and requires_propagation:
             return (
@@ -1317,15 +1637,33 @@ class IssuePlanner:
         observed_quality_gate_ids = frozenset((*retry_quality_gate_ids, *lesson_quality_gate_ids))
         retry_compiler_codes = cls._retry_compiler_error_codes(retry_context)
         retry_failure_kind = str(getattr(retry_context, "failure_kind", "")).strip()
+        retry_failure_fingerprints = cls._retry_failure_fingerprints(retry_context)
+        failure_fingerprint_repetition = int(
+            getattr(retry_context, "failure_fingerprint_repetition", 0) or 0
+        )
         hints: list[str] = []
-        if selected_archetype == "method_decomposition":
+        if selected_archetype in {"method_decomposition", "private_helper_extract"}:
             hints.extend(
                 (
                     "Prefer extracting small private helpers instead of rewriting the whole method in one patch.",
                     "Keep each helper focused on one branch/phase so follow-up edits can land incrementally.",
-                    "Extract at most two small helpers in one attempt and keep the rest of the logic in the original method.",
+                    "Extract at most one or two small helpers in one attempt and keep the rest of the logic in the original method.",
                     "Default every extracted helper to private and synchronous unless the helper body itself contains a real await.",
                     "Do not introduce public/protected helper methods, DTOs, or properties just to carry extracted state.",
+                )
+            )
+        elif selected_archetype == "guard_clause_flatten":
+            hints.extend(
+                (
+                    "Prefer flattening nested branches into guard clauses inside the current method before extracting new helpers.",
+                    "Keep the patch in the current file and do not change the existing public signature while reducing complexity.",
+                )
+            )
+        elif selected_archetype == "local_block_reorder":
+            hints.extend(
+                (
+                    "Prefer reordering local blocks, early returns, and local variables inside the current method instead of widening propagation.",
+                    "Do not move anonymous or nullable-heavy state across helper boundaries when a local simplification can achieve the same complexity drop.",
                 )
             )
         elif selected_archetype == "bounded_signature_propagation":
@@ -1370,7 +1708,7 @@ class IssuePlanner:
             hints.append("Propagation is only complete when declaration, interface, callsite, and nameof(...) targets stay in sync.")
         if rule_id == "csharpsquid:S3776":
             hints.append("For S3776, keep the externally visible API stable unless the plan explicitly provides verified propagation targets.")
-            if selected_archetype == "signature_preserving_refactor":
+            if cls._is_signature_preserving_archetype(selected_archetype):
                 hints.append("For this attempt, do not rename the existing public async method; keep the current signature line untouched and reduce complexity inside the body/private helpers.")
         if "async_requires_await" in observed_quality_gate_ids:
             hints.append("Retry downgrade: new helpers and extracted phases must stay synchronous unless their bodies contain a real await.")
@@ -1382,6 +1720,26 @@ class IssuePlanner:
             hints.append("Retry downgrade: avoid helper fan-out that depends on many outer locals; if extraction needs several captured values, keep the logic in the current method.")
         if retry_compiler_codes.intersection({"CS0535", "CS0738"}):
             hints.append("Retry downgrade: if a public method and its interface/contract are no longer aligned, either restore the existing public signature or update every verified declaration/callsite before finishing.")
+        if "helper_extraction_type_break" in retry_failure_fingerprints:
+            hints.append("Retry downgrade: extracted helpers must preserve concrete types; avoid moving anonymous/dynamic/nullable-heavy expressions across method boundaries.")
+        if "nullable_type_mismatch" in retry_failure_fingerprints:
+            hints.append("Retry downgrade: keep nullable-heavy branches and generic inference inside the current method; do not widen helper signatures just to pass state around.")
+        if "anonymous_type_leak" in retry_failure_fingerprints:
+            hints.append("Retry downgrade: never let anonymous types cross a helper boundary; keep them local or replace them with an existing named type.")
+        if "anonymous_type_helper_boundary" in retry_failure_fingerprints:
+            hints.append("Retry downgrade: semantic precheck already proved that anonymous projections cannot cross helper boundaries here; keep them inside the current method body and simplify control flow in place.")
+        if "repair_plan_contract_violation" in retry_failure_fingerprints:
+            hints.append("Retry downgrade: the last patch violated the declared repair plan; do not introduce new types or signature drift unless the plan explicitly requires them.")
+        if "signature_propagation_incomplete" in retry_failure_fingerprints:
+            hints.append("Retry downgrade: do not attempt another partial signature rename unless every declared propagation target is already known.")
+        if "public_surface_drift" in retry_failure_fingerprints:
+            hints.append("Retry downgrade: avoid any new public/protected members, DTOs, or interface changes in this attempt.")
+        if "turn_exhausted_after_partial_patch" in retry_failure_fingerprints:
+            hints.append("Retry downgrade: the last attempt exhausted turns after landing a partial patch; finish with one small, self-contained delta instead of iterative churn.")
+        if "tool_input_invalid_burst" in retry_failure_fingerprints:
+            hints.append("Retry downgrade: do not emit another incomplete Edit/MultiEdit/Write payload; Read a smaller window first, then send one precise patch with all required fields.")
+        if failure_fingerprint_repetition >= 2:
+            hints.append("Repeated failure fingerprint detected: switch to the safer fallback archetype instead of repeating the previous repair shape.")
         if retry_failure_kind == "no_change":
             hints.append("This retry must end with a concrete code delta; do not stop after analysis.")
         hints.append("Avoid introducing new public or protected surface area unless the contract explicitly requires it.")
@@ -1583,6 +1941,14 @@ class IssuePlanner:
             lines.append("- Allowed Capabilities: " + ", ".join(edit_contract.allowed_capabilities))
         if edit_contract.allowed_change_kinds:
             lines.append("- Allowed Change Kinds: " + ", ".join(edit_contract.allowed_change_kinds))
+        if edit_contract.allow_file_creation:
+            lines.append("- File Creation: allowed")
+            if edit_contract.allowed_new_file_roots:
+                lines.append("- Allowed New File Roots: " + ", ".join(edit_contract.allowed_new_file_roots))
+        if edit_contract.repo_capability_summary:
+            lines.append("- Repo Capability: " + edit_contract.repo_capability_summary)
+        for hint in edit_contract.repo_capability_hints:
+            lines.append("- " + hint)
         if edit_contract.forbidden_change_kinds:
             lines.append("- Forbidden Change Kinds: " + ", ".join(edit_contract.forbidden_change_kinds))
         if edit_contract.validation_line_range:
@@ -1772,6 +2138,11 @@ class IssuePlanner:
             normalized_scope_mode,
             policy.boundary_capabilities,
         )
+        allowed_capabilities = cls._apply_retry_capability_downgrades(
+            rule_id=rule_id,
+            allowed_capabilities=allowed_capabilities,
+            retry_context=retry_context,
+        )
         planner_lessons: tuple[PlannerLesson, ...] = ()
         if retry_context is not None:
             planner_lessons = (lessons_store or LessonsStore()).load_planner_lessons(
@@ -1954,6 +2325,24 @@ class IssuePlanner:
                 )
             )
         )
+        rule_profile = load_rule_catalog().get(rule_id)
+        allow_file_creation = bool(
+            rule_profile is not None and "create_file" in rule_profile.allowed_operations
+        )
+        allowed_new_file_roots = (
+            cls._directory_roots_for_files(target_files) if allow_file_creation else ()
+        )
+        repo_capability = None
+        repo_capability_summary = ""
+        repo_capability_hints: tuple[str, ...] = ()
+        if workspace_path is not None:
+            try:
+                repo_capability = detect_repo_capability(workspace_path)
+            except Exception:
+                repo_capability = None
+            if repo_capability is not None:
+                repo_capability_summary = repo_capability.summary()
+                repo_capability_hints = repo_capability.prompt_hints()
         source_file_map = cls._load_workspace_source_map(
             workspace_path,
             target_files,
@@ -2003,6 +2392,11 @@ class IssuePlanner:
             target_line_range=((scope_start_line, scope_end_line) if scope_start_line and scope_end_line else ()),
             validation_line_range=validation_line_range,
             allowed_line_ranges=allowed_line_ranges,
+            allow_file_creation=allow_file_creation,
+            allowed_new_file_roots=allowed_new_file_roots,
+            repo_capability=repo_capability,
+            repo_capability_summary=repo_capability_summary,
+            repo_capability_hints=repo_capability_hints,
             repair_plan=repair_plan,
             plan_precheck=plan_precheck,
             patch_only=True,
@@ -2023,9 +2417,24 @@ class IssuePlanner:
             cls.render_contract_guidance(edit_contract),
             cls.render_repair_plan_guidance(edit_contract),
         ]
+        repeated_failure_skip_reason = ""
+        retry_failure_fingerprints = cls._retry_failure_fingerprints(retry_context)
+        failure_fingerprint_repetition = int(
+            getattr(retry_context, "failure_fingerprint_repetition", 0) or 0
+        )
+        if cls._should_skip_after_repeated_failure(
+            rule_id=rule_id,
+            failure_fingerprints=retry_failure_fingerprints,
+            failure_fingerprint_repetition=failure_fingerprint_repetition,
+        ):
+            repeated_failure_skip_reason = (
+                "Repeated failure fingerprint indicates this issue is unlikely to converge with another generic agent retry; "
+                "handoff to a specialized engine or manual review."
+            )
         return IssuePlan(
             strategy=strategy,
             edit_contract=edit_contract,
             prompt_guidance="\n\n".join(section for section in prompt_guidance_sections if section),
             validation_plan=validation_plan,
+            skip_reason=repeated_failure_skip_reason,
         )

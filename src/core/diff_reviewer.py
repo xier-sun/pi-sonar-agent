@@ -199,6 +199,30 @@ class DiffReviewer:
         return any(normalized.startswith(prefix) for prefix in cls._PROTECTED_PATH_PREFIXES)
 
     @staticmethod
+    def _normalize_creation_roots(edit_contract: EditContract) -> tuple[str, ...]:
+        roots = []
+        for root in getattr(edit_contract, "allowed_new_file_roots", ()) or ():
+            normalized = str(root or "").replace("\\", "/").strip().strip("/")
+            if normalized:
+                roots.append(normalized)
+        return tuple(dict.fromkeys(roots))
+
+    @classmethod
+    def _is_allowed_created_file(cls, file_path: str, edit_contract: EditContract) -> bool:
+        if not bool(getattr(edit_contract, "allow_file_creation", False)):
+            return False
+        normalized_path = str(file_path or "").replace("\\", "/").strip().lstrip("/")
+        if not normalized_path or cls._is_protected_path(normalized_path):
+            return False
+        roots = cls._normalize_creation_roots(edit_contract)
+        if not roots:
+            return False
+        return any(
+            root == "." or normalized_path == root or normalized_path.startswith(root + "/")
+            for root in roots
+        )
+
+    @staticmethod
     def _drift_score(violations: list[ReviewerViolation]) -> int:
         score = 0
         for violation in violations:
@@ -253,6 +277,8 @@ class DiffReviewer:
                 continue
 
             if not change.before_exists and change.after_exists:
+                if cls._is_allowed_created_file(change.file, edit_contract):
+                    continue
                 reason = "Creating new files is not allowed during automated issue repair."
                 hard_violations.append(
                     ReviewerViolation(

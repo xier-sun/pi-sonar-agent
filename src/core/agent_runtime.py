@@ -32,6 +32,7 @@ from pi_sonar_agent.core.project_env import MODEL_ENV_KEYS
 
 EDIT_NUDGE_THRESHOLD = 4
 MAX_EDIT_NUDGES = 2
+INVALID_WRITE_TOOL_INPUT_BURST_THRESHOLD = 2
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,8 @@ class AgentRuntimeResult:
     continuation_recovered: bool = False
     continuation_timeout_stages: tuple[str, ...] = ()
     edit_nudge_count: int = 0
+    successful_edit_count: int = 0
+    invalid_write_tool_input_count: int = 0
     runtime_events: tuple[Any, ...] = ()
 
 
@@ -84,6 +87,33 @@ class AgentRuntimeError(RuntimeError):
 
 def _normalize_match_text(value: str) -> str:
     return " ".join(str(value or "").replace("\r\n", "\n").split())
+
+
+def _extract_invalid_write_tool_input_from_preview(preview: str) -> str:
+    text = str(preview or "").strip()
+    if "InputValidationError" not in text:
+        return ""
+    if not any(
+        marker in text
+        for marker in ("file_path", "old_string", "new_string", "edits", "content")
+    ):
+        return ""
+    return text
+
+
+def _is_write_tool_error_preview(preview: str) -> bool:
+    text = str(preview or "").strip()
+    if not text:
+        return False
+    return any(
+        marker in text
+        for marker in (
+            "<tool_use_error>",
+            "InputValidationError",
+            "String to replace not found",
+            "No changes to make",
+        )
+    )
 
 
 def _extract_edit_search_requests(
@@ -282,6 +312,9 @@ class AgentRuntime:
         consecutive_non_edit_calls = 0
         pending_edit_nudge = False
         edit_nudge_count = 0
+        successful_edit_count = 0
+        invalid_write_tool_input_count = 0
+        invalid_write_tool_input_message = ""
 
         def format_preview(value: str, *, max_chars: int = 1200) -> str:
             text = str(value or "").replace("\r\n", "\n").strip()
@@ -342,6 +375,11 @@ class AgentRuntime:
                 "endpoint",
                 "model_display",
                 "mode",
+                "mcp_servers",
+                "mcp_tools_count",
+                "mcp_mode",
+                "mcp_read_only",
+                "mcp_warning",
             ):
                 value = request.metadata.get(key)
                 if value not in (None, ""):
@@ -352,6 +390,7 @@ class AgentRuntime:
                 "max_budget_usd": request.max_budget_usd,
                 "tools": list(request.tools),
                 "allowed_tools": list(request.allowed_tools),
+                "mcp_servers": list(request.mcp_servers),
                 "extra_args": dict(request.extra_args),
                 "sdk_env": summarize_model_env(request.env),
                 "metadata": metadata_summary,
@@ -486,6 +525,8 @@ class AgentRuntime:
                 last_progress_stage=last_progress_stage,
                 saw_result_event=saw_result_event,
                 edit_nudge_count=edit_nudge_count,
+                successful_edit_count=successful_edit_count,
+                invalid_write_tool_input_count=invalid_write_tool_input_count,
                 runtime_events=event_stream.snapshot(),
             )
 
@@ -607,7 +648,7 @@ class AgentRuntime:
         )
 
         async def run_once() -> AgentRuntimeResult:
-            nonlocal agent_error, assistant_text_chars, assistant_text_events, captured_exception, first_edit_at, saw_result_event, timeout_stage, pending_tool_result_name, last_edit_tool_name, last_edit_raw_payload, edit_nudge_count, consecutive_non_edit_calls, pending_edit_nudge, first_response_deadline_at
+            nonlocal agent_error, assistant_text_chars, assistant_text_events, captured_exception, first_edit_at, saw_result_event, timeout_stage, pending_tool_result_name, last_edit_tool_name, last_edit_raw_payload, edit_nudge_count, consecutive_non_edit_calls, pending_edit_nudge, first_response_deadline_at, successful_edit_count, invalid_write_tool_input_count, invalid_write_tool_input_message
 
             print("  [TRACE] 正在初始化 Claude SDK Client...", flush=True)
             update_status("client_connecting")
@@ -649,14 +690,14 @@ class AgentRuntime:
 
                 async def maybe_send_edit_nudge(trigger_stage: str) -> None:
                     nonlocal pending_edit_nudge, edit_nudge_count
-                    if not pending_edit_nudge or first_edit_at is not None:
+                    if not pending_edit_nudge or successful_edit_count > 0:
                         return
                     if edit_nudge_count >= MAX_EDIT_NUDGES:
                         pending_edit_nudge = False
                         return
                     nudge_message = (
                         "你已经连续多次只做读取/搜索，还没有任何代码修改。"
-                        "现在请立即使用 Edit 或 MultiEdit 对当前 Sonar issue 落盘修改。"
+                        "现在请立即使用 Edit、MultiEdit，或在允许的新文件场景下使用 Write，对当前 Sonar issue 落盘修改。"
                         "不要继续扩展读取范围；如果你确认当前约束下无法安全修复，请直接明确说明原因。"
                     )
                     pending_edit_nudge = False
@@ -677,6 +718,62 @@ class AgentRuntime:
                     )
                     update_status("edit_nudge", first_response=True)
                     await session.send(nudge_message)
+
+                async def finalize_pending_tool_result(
+                    *,
+                    preview: str = "",
+                ) -> bool:
+                    nonlocal pending_tool_result_name, first_edit_at, successful_edit_count
+                    nonlocal consecutive_non_edit_calls, pending_edit_nudge
+                    nonlocal invalid_write_tool_input_count, invalid_write_tool_input_message
+                    nonlocal agent_error
+
+                    tool_name = str(pending_tool_result_name or "").strip()
+                    if not tool_name:
+                        return False
+
+                    event_stream.emit(
+                        AttemptRuntimeEventKind.TOOL_RESULT_RECEIVED,
+                        stage=f"tool_result:{tool_name}",
+                        payload={"tool_name": tool_name},
+                    )
+                    pending_tool_result_name = None
+
+                    if tool_name not in {"Edit", "MultiEdit", "Write"}:
+                        await maybe_send_edit_nudge("tool_result")
+                        return False
+
+                    invalid_message = _extract_invalid_write_tool_input_from_preview(preview)
+                    if invalid_message:
+                        invalid_write_tool_input_count += 1
+                        invalid_write_tool_input_message = invalid_message
+                        if invalid_write_tool_input_count >= INVALID_WRITE_TOOL_INPUT_BURST_THRESHOLD:
+                            agent_error = (
+                                "Invalid write tool input burst detected; stop this attempt and retry with a precise patch.\n\n"
+                                + invalid_message
+                            )
+                            event_stream.emit(
+                                AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                                stage="tool_input_invalid_burst",
+                                payload={
+                                    "success": False,
+                                    "failure_kind": "tool_input_invalid",
+                                    "count": invalid_write_tool_input_count,
+                                },
+                            )
+                            await abort_session("invalid_write_tool_input_burst")
+                            return True
+                        return False
+
+                    if _is_write_tool_error_preview(preview):
+                        return False
+
+                    if first_edit_at is None:
+                        first_edit_at = time.monotonic()
+                    successful_edit_count += 1
+                    consecutive_non_edit_calls = 0
+                    pending_edit_nudge = False
+                    return False
 
                 response_stream = session.stream_events()
                 while True:
@@ -726,17 +823,14 @@ class AgentRuntime:
                             first_response=True,
                             meaningful_progress=True,
                         )
-                        if tool_name in {"Edit", "MultiEdit", "Write"} and first_edit_at is None:
-                            first_edit_at = time.monotonic()
-                        if tool_name in {"Edit", "MultiEdit"}:
-                            consecutive_non_edit_calls = 0
+                        if tool_name in {"Edit", "MultiEdit", "Write"}:
                             pending_edit_nudge = False
-                        elif first_edit_at is None:
+                        elif successful_edit_count <= 0:
                             consecutive_non_edit_calls += 1
                             if consecutive_non_edit_calls >= EDIT_NUDGE_THRESHOLD:
                                 pending_edit_nudge = True
                                 consecutive_non_edit_calls = 0
-                        if tool_name in {"Edit", "MultiEdit"}:
+                        if tool_name in {"Edit", "MultiEdit", "Write"}:
                             last_edit_tool_name = tool_name
                             last_edit_raw_payload = dict(event.raw_payload or {})
                         pending_tool_result_name = tool_name
@@ -779,13 +873,9 @@ class AgentRuntime:
                             meaningful_progress=True,
                         )
                         if pending_tool_result_name:
-                            event_stream.emit(
-                                AttemptRuntimeEventKind.TOOL_RESULT_RECEIVED,
-                                stage=f"tool_result:{pending_tool_result_name}",
-                                payload={"tool_name": pending_tool_result_name},
-                            )
-                            pending_tool_result_name = None
-                            await maybe_send_edit_nudge("tool_result")
+                            should_abort = await finalize_pending_tool_result()
+                            if should_abort:
+                                break
                         assistant_text_events += 1
                         assistant_text_chars += len(event.text or "")
                         print(f"  Claude: {event.text[:200]}...", flush=True)
@@ -805,13 +895,11 @@ class AgentRuntime:
                             meaningful_progress=True,
                         )
                         if pending_tool_result_name:
-                            event_stream.emit(
-                                AttemptRuntimeEventKind.TOOL_RESULT_RECEIVED,
-                                stage=f"tool_result:{pending_tool_result_name}",
-                                payload={"tool_name": pending_tool_result_name},
+                            should_abort = await finalize_pending_tool_result(
+                                preview=str(getattr(event, "agent_error", "") or ""),
                             )
-                            pending_tool_result_name = None
-                            await maybe_send_edit_nudge("tool_result")
+                            if should_abort:
+                                break
                         saw_result_event = True
                         print(f"  Done. Cost: ${event.total_cost_usd:.4f}", flush=True)
                         agent_error = event.agent_error
@@ -830,13 +918,11 @@ class AgentRuntime:
                             meaningful_progress=trace_counts_as_progress,
                         )
                         if pending_tool_result_name:
-                            event_stream.emit(
-                                AttemptRuntimeEventKind.TOOL_RESULT_RECEIVED,
-                                stage=f"tool_result:{pending_tool_result_name}",
-                                payload={"tool_name": pending_tool_result_name},
+                            should_abort = await finalize_pending_tool_result(
+                                preview=str(event.preview or ""),
                             )
-                            pending_tool_result_name = None
-                            await maybe_send_edit_nudge("tool_result")
+                            if should_abort:
+                                break
                         trace_label = "THINKING" if "Thinking" in event.message_type else "TRACE"
                         print(f"  [{trace_label}] 收到 SDK 消息类型: {event.message_type}", flush=True)
                         if event.preview:
@@ -877,6 +963,8 @@ class AgentRuntime:
                     "tool_call_count": len(tool_uses),
                     "saw_result_event": saw_result_event,
                     "edit_nudge_count": edit_nudge_count,
+                    "successful_edit_count": successful_edit_count,
+                    "invalid_write_tool_input_count": invalid_write_tool_input_count,
                     "warning_tool_uses": list(warning_tool_uses),
                 },
             )

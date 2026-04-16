@@ -423,6 +423,67 @@ def test_build_user_prompt_includes_rule_specific_guards() -> None:
     assert "不要为了满足规则把简单循环改成更难读" in prompt
 
 
+def test_build_user_prompt_includes_visible_tool_summary() -> None:
+    issue = SonarIssue(
+        key="issue-visible-tools",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  18 | if (condition) { ... }",
+        "",
+        "- 只允许修改当前方法。",
+        {
+            "name": "Cognitive Complexity of methods should not be too high",
+            "description": "嵌套条件和循环会提高认知复杂度。",
+            "how_to_fix": "提取私有方法，减少嵌套层级。",
+        },
+        'dotnet build "src/Foo.sln"',
+        visible_tool_names=("Read", "Edit", "MultiEdit", "Bash", "Finish"),
+    )
+
+    assert "当前 attempt 可用工具: Read, Edit, MultiEdit, Bash, Finish" in prompt
+    assert "【推荐构建命令】" not in prompt
+    assert "【构建执行】" in prompt
+    assert "构建与验证由外层流程统一执行" in prompt
+    assert "不要在 Bash 中执行 dotnet restore/build/test" in prompt
+
+
+def test_build_user_prompt_keeps_build_command_when_build_tool_is_visible() -> None:
+    issue = SonarIssue(
+        key="issue-visible-build-tool",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  18 | if (condition) { ... }",
+        "",
+        "- 只允许修改当前方法。",
+        {
+            "name": "Cognitive Complexity of methods should not be too high",
+            "description": "嵌套条件和循环会提高认知复杂度。",
+            "how_to_fix": "提取私有方法，减少嵌套层级。",
+        },
+        'dotnet build "src/Foo.sln"',
+        visible_tool_names=("Read", "Edit", "mcp__sonar-fix__run_build", "Finish"),
+    )
+
+    assert "【推荐构建命令】" in prompt
+    assert 'dotnet build "src/Foo.sln"' in prompt
+
+
 def test_build_user_prompt_splits_s3776_retry_guards_between_first_attempt_and_retry() -> None:
     issue = SonarIssue(
         key="issue-s3776-guards",
@@ -708,11 +769,11 @@ def test_fix_issue_classifies_empty_edit_payload_as_tool_input_invalid(monkeypat
     assert result.success is False
     assert result.retryable_failure is True
     assert result.failure_kind == "tool_input_invalid"
-    assert result.error == "Model emitted an invalid Edit/MultiEdit call"
+    assert result.error == "Model emitted an invalid Edit/MultiEdit/Write call"
     assert "InputValidationError" in result.build_output
 
 
-def test_fix_issue_no_longer_skips_previously_policy_managed_rule(monkeypatch, tmp_path) -> None:
+def test_fix_issue_routes_s107_to_roslyn_engine_when_available(monkeypatch, tmp_path) -> None:
     agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
     issue = SonarIssue(
         key="issue-skip",
@@ -747,34 +808,68 @@ def test_fix_issue_no_longer_skips_previously_policy_managed_rule(monkeypatch, t
         lambda self, rule_key: rule_detail_calls.append(rule_key) or {"description": "原因", "how_to_fix": "修复方法"},
     )
     monkeypatch.setattr(
-        ClaudeFixAgent,
-        "_collect_modified_files",
-        staticmethod(lambda workspace_path: []),
+        "pi_sonar_agent.core.engine_router.inspect_roslyn_availability",
+        lambda: (True, ()),
     )
-
-    import pi_sonar_agent.agent.claude_agent as claude_agent_module
-
-    def fake_runtime_run(self, request):
-        return AgentRuntimeResult(
-            runtime_events=(
-                AttemptRuntimeEvent(
-                    kind=AttemptRuntimeEventKind.ATTEMPT_FINISHED,
-                    sequence=1,
-                    stage="completed",
-                    payload={"success": False},
-                ),
-            ),
-            saw_result_event=True,
-        )
-
-    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fake_runtime_run)
 
     result = agent.fix_issue(issue, tmp_path)
 
     assert result.success is False
-    assert result.skipped is False
-    assert result.failure_kind == "no_change"
+    assert result.skipped is True
+    assert result.failure_kind == "roslyn_cannot_fix_safely"
     assert rule_detail_calls == ["csharpsquid:S107"]
+    assert result.engine_routing_decision is not None
+    assert result.engine_routing_decision.resolved_engine == "roslyn"
+
+
+def test_fix_issue_skips_when_engine_router_rejects_rule(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-engine-routing-skip",
+        rule="csharpsquid:S107",
+        message="方法参数过多",
+        line=12,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    from pi_sonar_agent.core.engine_router import EngineRoutingDecision
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        "pi_sonar_agent.agent.claude_agent.route_engine_for_issue",
+        lambda **kwargs: EngineRoutingDecision(
+            primary_engine="roslyn",
+            resolved_engine="skip",
+            fallback_allowed=False,
+            fallback_reason="S107 agent fallback disabled until Roslyn solution engine is available.",
+            skip_reason="S107 requires Roslyn engine, but it is unavailable. missing project file: fix_engine/AgentFixEngine.csproj",
+            requires_roslyn=True,
+        ),
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_build_user_prompt",
+        staticmethod(lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("prompt should not be built"))),
+    )
+
+    result = agent.fix_issue(issue, tmp_path)
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.failure_kind == "engine_router_skip"
+    assert result.skip_reason.startswith("S107 requires Roslyn engine")
+    assert result.engine_routing_decision is not None
+    assert result.engine_routing_decision.resolved_engine == "skip"
 
 
 def test_previously_skipped_rules_now_expose_prompt_guards_without_skip_reason() -> None:
@@ -877,6 +972,17 @@ def test_allowed_fix_tool_rules_append_controlled_bash_rules() -> None:
     assert "Finish" in allowed_tools
 
 
+def test_allowed_fix_tool_rules_append_scoped_write_create_file_rules() -> None:
+    allowed_tools = build_allowed_fix_tool_rules(
+        ["Read", "Edit"],
+        create_file_tool_roots=("src/generated",),
+    )
+
+    assert "Write" in allowed_tools
+    assert "Write(create_file_under=src/generated)" in allowed_tools
+    assert "Finish" in allowed_tools
+
+
 def test_claude_fix_tool_policy_allows_finish_and_harmless_shell() -> None:
     policy = ClaudeFixAgent._build_fix_tool_policy()
 
@@ -888,6 +994,107 @@ def test_claude_fix_tool_policy_allows_finish_and_harmless_shell() -> None:
     assert echo_decision.allowed is True
     assert delete_decision.allowed is False
     assert delete_decision.policy_violation is True
+
+
+def test_claude_fix_tool_policy_bundle_exposes_write_for_create_file_contract(tmp_path) -> None:
+    contract = EditContract(
+        issue_key="ISSUE-WRITE",
+        rule_id="csharpsquid:S107",
+        guardrail_mode="contract_review",
+        target_files=("src/Foo.cs",),
+        allow_file_creation=True,
+        allowed_new_file_roots=("src/generated",),
+        patch_only=True,
+    )
+
+    policy, visible_toolset = ClaudeFixAgent._build_fix_tool_policy_bundle(
+        contract,
+        workspace_path=tmp_path,
+    )
+
+    assert "Write" in visible_toolset.visible_tools
+    assert "Write(create_file_under=src/generated)" in visible_toolset.allowed_tools
+    write_decision = policy.classify(
+        "Write",
+        {"file_path": "src/generated/NewType.cs", "content": "class NewType {}\n"},
+    )
+    assert write_decision.allowed is True
+
+
+def test_fix_issue_attaches_sonar_mcp_runtime_when_configured(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(
+        sonar_host="https://sonar.example",
+        sonar_token="token",
+        agent_env={
+            "SONAR_MCP_ENABLED": "true",
+            "SONAR_MCP_MODE": "stdio",
+            "SONAR_MCP_COMMAND": "sonarqube-mcp-server",
+            "SONAR_MCP_ARGS": "--stdio",
+            "SONAR_MCP_TOOLS": "mcp__sonarqube__search_issues,mcp__sonarqube__get_rule",
+            "SONAR_MCP_READ_ONLY": "true",
+            "SONAR_MCP_URL": "https://sonar.example",
+            "SONAR_MCP_TOKEN": "token",
+        },
+    )
+    issue = SonarIssue(
+        key="issue-mcp-runtime",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=3,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    public void Demo()",
+                "    {",
+                "    }",
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    runtime_requests: list[object] = []
+
+    def fake_runtime_run(self, request):
+        runtime_requests.append(request)
+        return AgentRuntimeResult(
+            agent_error=None,
+            tool_uses=("Read",),
+            last_tool_name="Read",
+            saw_result_event=True,
+        )
+
+    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fake_runtime_run)
+
+    result = agent.fix_issue(issue, tmp_path)
+
+    assert result.failure_kind == "no_change"
+    assert runtime_requests
+    request = runtime_requests[0]
+    assert "mcp__sonarqube__search_issues" in request.allowed_tools
+    assert request.mcp_servers["sonarqube"]["command"] == "sonarqube-mcp-server"
+    assert request.metadata["mcp_tools_count"] == "2"
+    assert request.metadata["mcp_mode"] == "stdio"
+    assert "mcp__sonarqube__search_issues" in request.metadata["visible_tools"]
+    assert result.visible_toolset is not None
+    assert "mcp__sonarqube__search_issues" in result.visible_toolset.visible_tools
 
 
 def test_fix_issue_fails_when_local_build_verification_fails(monkeypatch, tmp_path) -> None:
@@ -1569,6 +1776,99 @@ def test_fix_issue_salvages_patch_after_post_edit_timeout(monkeypatch, tmp_path)
     assert result.performance_metrics["patch_salvaged"] is True
     assert result.performance_metrics["model_timeout_stage"] == "post_edit_stall"
     assert result.performance_metrics["build_invoked"] is True
+
+
+def test_fix_issue_salvages_patch_after_max_turn_agent_error(monkeypatch, tmp_path) -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-max-turn-salvage",
+        rule="csharpsquid:S1481",
+        message="删除未使用的局部变量",
+        line=5,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    source_file = tmp_path / "src" / "Foo.cs"
+    source_file.parent.mkdir(parents=True, exist_ok=True)
+    source_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    void Demo()",
+                "    {",
+                "        var unused = 1;",
+                "    }",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "get_rule_details",
+        lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
+    )
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_collect_modified_files",
+        staticmethod(lambda workspace_path: ["src/Foo.cs"]),
+    )
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+
+    def fake_runtime_run(self, request):
+        source_file.write_text(
+            "\n".join(
+                [
+                    "class Foo",
+                    "{",
+                    "    void Demo()",
+                    "    {",
+                    "    }",
+                    "}",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        return AgentRuntimeResult(
+            tool_uses=("Read", "Edit"),
+            last_tool_name="Edit",
+            total_duration_seconds=9.0,
+            time_to_first_model_content_seconds=1.0,
+            time_after_first_edit_to_finalize_seconds=8.0,
+            tool_call_count=2,
+            read_call_count=1,
+            edit_call_count=1,
+            successful_edit_count=1,
+            agent_error="Reached maximum number of turns (20)",
+        )
+
+    monkeypatch.setattr(claude_agent_module.AgentRuntime, "run", fake_runtime_run)
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    monkeypatch.setattr(
+        claude_agent_module.subprocess,
+        "run",
+        lambda *args, **kwargs: FakeCompletedProcess(),
+    )
+
+    result = agent.fix_issue(issue, tmp_path, 'dotnet build "src/Foo.sln"')
+
+    assert result.success is True
+    assert result.patch_salvaged is True
+    assert result.performance_metrics["patch_salvaged"] is True
+    assert result.performance_metrics["agent_error_salvaged"] is True
+    assert result.performance_metrics["agent_error_salvage_reason"] == "agent_error_max_turns"
 
 
 def test_fix_issue_scope_validation_ignores_previous_successful_changes_in_same_file(

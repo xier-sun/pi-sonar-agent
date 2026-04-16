@@ -377,7 +377,7 @@ def test_build_retry_feedback_explains_invalid_edit_tool_input(tmp_path) -> None
         success=False,
         issue_key="issue-tool-input-invalid",
         file_path="tracked.cs",
-        error="Model emitted an invalid Edit/MultiEdit call",
+        error="Model emitted an invalid Edit/MultiEdit/Write call",
         build_output=(
             "InputValidationError: Edit failed due to the following issues:\n"
             "The required parameter `file_path` is missing\n"
@@ -390,11 +390,36 @@ def test_build_retry_feedback_explains_invalid_edit_tool_input(tmp_path) -> None
 
     feedback = build_retry_feedback(repo, result)
 
-    assert "无效的 Edit/MultiEdit 工具调用" in feedback
+    assert "无效的 Edit/MultiEdit/Write 工具调用" in feedback
     assert "file_path" in feedback
     assert "old_string" in feedback
     assert "new_string" in feedback
     assert "不要发送空工具调用" in feedback
+
+
+def test_build_retry_context_normalizes_invalid_tool_input_detail_key(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-tool-input-detail",
+        file_path="tracked.cs",
+        error="Model emitted an invalid Edit/MultiEdit/Write call",
+        build_output=(
+            '{"content":[{"tool_use_id":"call_abc123","content_preview":"'
+            "<tool_use_error>InputValidationError: Edit failed due to the following issue:\\n"
+            "The required parameter `old_string` is missing</tool_use_error>"
+            '","is_error":true}]}'
+        ),
+        retryable_failure=True,
+        failure_kind="tool_input_invalid",
+    )
+
+    retry_context = build_retry_context(repo, result, source_attempt_number=1)
+
+    assert retry_context.failure_detail_key == "tool_input_invalid:missing:old_string"
+    assert retry_context.primary_failure_fingerprint == "tool_input_invalid_burst"
 
 
 def test_build_retry_context_captures_review_gate_feedback(tmp_path) -> None:
@@ -697,8 +722,8 @@ def test_build_retry_feedback_includes_forbidden_tool_constraints(tmp_path) -> N
     assert "如果使用 shell 工具（工具名 Bash）" in feedback
     assert "bash 兼容命令" in feedback
     assert "仓库相对路径候选" in feedback
-    assert "严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码" in feedback
-    assert "提交由外层流程统一处理" in feedback
+    assert "严禁通过 shell 删除文件、覆盖已有文件、移动/重命名文件或直接改写已有源码" in feedback
+    assert "构建与验证由外层流程统一执行" in feedback
 
 
 def test_build_retry_feedback_includes_model_timeout_constraints(tmp_path) -> None:
@@ -1235,10 +1260,93 @@ def test_build_retry_context_records_failure_and_strategy_fingerprints(tmp_path)
 
     assert retry_context.failure_kind == "quality_gate"
     assert retry_context.failure_detail_key == "quality_gate:async_signature"
+    assert isinstance(retry_context.failure_fingerprints, tuple)
+    assert retry_context.failure_fingerprint_repetition in {0, 1}
     assert "profile=plan_first_full_path" in retry_context.strategy_fingerprint
     assert "archetype=method_decomposition" in retry_context.strategy_fingerprint
     assert retry_context.diff_fingerprint != ""
     assert retry_context.diff_fingerprint != "no_change"
+
+
+def test_build_retry_context_prioritizes_semantic_precheck_feedback_over_quality_gate(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-semantic-precheck-priority",
+        file_path="src/Foo.cs",
+        changes=[{"file": "src/Foo.cs", "action": "modified"}],
+        error="Semantic precheck failed",
+        build_output="Semantic precheck failed before build.",
+        retryable_failure=True,
+        failure_kind="semantic_precheck",
+        semantic_precheck_result={
+            "status": "retry",
+            "summary": "Semantic precheck rejected the patch with 1 blocker(s).",
+            "findings": [
+                {
+                    "finding_id": "anonymous_type_helper_boundary",
+                    "title": "匿名类型跨 helper 边界风险",
+                    "message": "当前 patch 同时新增 helper 和匿名类型表达式，容易在 helper 提取后丢失类型推断。",
+                    "file": "src/Foo.cs",
+                    "line": 18,
+                    "evidence": "return items.Select(x => new { x.Id });",
+                    "retry_hint": "匿名类型保持在当前方法内，或改用已有命名类型。",
+                }
+            ],
+        },
+        quality_gate_result={
+            "status": "retry",
+            "summary": "Quality gate rejected the patch with 1 hard violation(s).",
+            "violations": [
+                {
+                    "rule_id": "linq_method_syntax",
+                    "title": "保持 LINQ 方法语法",
+                    "message": "不要把 LINQ query syntax 引入到改动代码中。",
+                    "file": "src/Foo.cs",
+                    "line": 18,
+                }
+            ],
+        },
+    )
+
+    retry_context = build_retry_context(repo, result, source_attempt_number=1)
+    feedback = build_retry_feedback(repo, result)
+
+    assert retry_context.failure_kind == "semantic_precheck"
+    assert retry_context.failure_detail_key == "semantic_precheck:anonymous_type_helper_boundary"
+    assert retry_context.primary_failure_fingerprint == "anonymous_type_helper_boundary"
+    assert "anonymous_type_helper_boundary" in retry_context.failure_fingerprints
+    assert retry_context.semantic_precheck_failure is not None
+    assert "上次尝试在 semantic precheck 阶段被拦下" in feedback
+    assert "匿名类型跨 helper 边界风险" in feedback
+    assert "匿名类型保持在当前方法内" in feedback
+    assert "相关的质量门禁上下文" in feedback
+    assert "linq_method_syntax" in feedback
+
+
+def test_build_retry_context_marks_partial_patch_turn_exhaustion(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    tracked_file = repo / "tracked.cs"
+    tracked_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    result = FixResult(
+        success=False,
+        issue_key="issue-turn-exhaustion",
+        file_path="tracked.cs",
+        changes=[{"file": "tracked.cs", "action": "modified"}],
+        error="Reached maximum number of turns (20)",
+        build_output="Reached maximum number of turns (20)",
+        retryable_failure=True,
+        failure_kind="tool_input_invalid",
+    )
+
+    retry_context = build_retry_context(repo, result, source_attempt_number=1)
+
+    assert "tool_input_invalid_burst" in retry_context.failure_fingerprints
+    assert "turn_exhausted_after_partial_patch" in retry_context.failure_fingerprints
 
 
 def test_process_issue_with_retries_stops_early_on_identical_failure_and_diff(tmp_path) -> None:
@@ -1324,6 +1432,67 @@ def test_process_issue_with_retries_stops_early_on_identical_failure_and_diff(tm
     assert agent.calls == 5
     assert result.attempts == 5
     assert "Retry stopped early after 5 attempt(s)" in result.skip_reason
+
+
+def test_process_issue_with_retries_stops_after_repeated_identical_invalid_tool_input(
+    tmp_path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    issue = SonarIssue(
+        key="issue-invalid-tool-input",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=1,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def fix_issue(self, issue, workspace_path, build_command, retry_feedback=""):
+            self.calls += 1
+            call_id = f"call_{self.calls:02d}abcd"
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                error="Model emitted an invalid Edit/MultiEdit/Write call",
+                build_output=(
+                    '{"content":[{"tool_use_id":"'
+                    + call_id
+                    + '","content_preview":"<tool_use_error>InputValidationError: '
+                    + "Edit failed due to the following issue:\\n"
+                    + "The required parameter `old_string` is missing</tool_use_error>"
+                    + '","is_error":true}]}'
+                ),
+                retryable_failure=True,
+                failure_kind="tool_input_invalid",
+            )
+
+    agent = FakeAgent()
+
+    result = process_issue_with_retries(
+        agent=agent,
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-invalid-tool-input",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
+        max_build_retries=5,
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert agent.calls == 2
+    assert result.attempts == 2
+    assert "tool_input_invalid:missing:old_string" in result.skip_reason
 
 
 def test_process_issue_with_retries_does_not_stop_early_on_repeated_client_connect_timeout(

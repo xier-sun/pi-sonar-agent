@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -14,6 +15,7 @@ from pi_sonar_agent.core.preflight import (
     ensure_remote_branch_exists,
     ensure_workspace_writable,
 )
+from pi_sonar_agent.core.repo_capability import detect_repo_capability
 from pi_sonar_agent.core.run_logging import format_removed_workspaces
 from pi_sonar_agent.core.state import (
     IssueState,
@@ -403,6 +405,20 @@ class RunCoordinator:
             )
         except Exception as exc:
             return abort_target(error=f"仓库克隆失败: {exc}", startup_failure=True)
+
+        try:
+            repo_capability = detect_repo_capability(workspace)
+            runtime_dir = workspace / ".pi-sonar-agent-runtime"
+            runtime_dir.mkdir(parents=True, exist_ok=True)
+            capability_path = runtime_dir / "repo_capability.json"
+            capability_path.write_text(
+                json.dumps(repo_capability.to_dict(), ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            print(f"[INFO] 仓库能力指纹: {repo_capability.summary()}")
+            print(f"[INFO] 仓库能力工件已写入: {capability_path.relative_to(workspace).as_posix()}")
+        except Exception as exc:
+            print(f"[WARN] 仓库能力指纹生成失败: {exc}")
 
         issue_summaries: list[PullRequestIssueSummary] = []
         build_command = target_config.build_command or "dotnet build"

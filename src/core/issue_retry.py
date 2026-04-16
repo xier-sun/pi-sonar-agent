@@ -22,6 +22,7 @@ from pi_sonar_agent.agent.rule_policies import (
     get_rule_policy,
 )
 from pi_sonar_agent.core.artifact_writer import ArtifactWriter
+from pi_sonar_agent.core.failure_fingerprint import detect_failure_fingerprints
 from pi_sonar_agent.core.fix_verifier import FixVerifier
 from pi_sonar_agent.core.follow_up_store import FollowUpStore
 from pi_sonar_agent.core.lessons_store import LessonsStore
@@ -37,6 +38,8 @@ from pi_sonar_agent.core.retry_context import (
     ReviewGateFailureContext,
     ReviewFailureContext,
     ReviewViolationContext,
+    SemanticPrecheckFailureContext,
+    SemanticPrecheckFindingContext,
     ScopeViolationContext,
     render_retry_context,
 )
@@ -57,6 +60,7 @@ DEFAULT_MAX_BUILD_RETRIES = 5
 EARLY_RETRY_ABORT_MIN_ATTEMPTS = 5
 EARLY_RETRY_ABORT_MIN_ATTEMPTS_NO_CHANGE = 2
 EARLY_RETRY_ABORT_MIN_ATTEMPTS_FIRST_RESPONSE_TIMEOUT = 2
+EARLY_RETRY_ABORT_MIN_ATTEMPTS_TOOL_INPUT_INVALID = 2
 EXTENDED_BUILD_TIMEOUT_SECONDS = 600
 PROMPT_SAFE_BUILD_REPORT_MAX_LINES = 24
 RETRY_RUNTIME_MAX_TAIL_LINES = 120
@@ -690,6 +694,43 @@ def _extract_plan_failure_context(result: FixResult) -> PlanFailureContext | Non
     )
 
 
+def _extract_semantic_precheck_failure_context(
+    result: FixResult,
+) -> SemanticPrecheckFailureContext | None:
+    """Extract structured semantic-precheck blockers from a FixResult."""
+
+    payload = getattr(result, "semantic_precheck_result", None)
+    if payload is None:
+        return None
+    if hasattr(payload, "to_dict"):
+        payload = payload.to_dict()
+    if not isinstance(payload, dict):
+        return None
+    if str(payload.get("status", "")).strip().lower() != "retry":
+        return None
+
+    findings = tuple(
+        SemanticPrecheckFindingContext(
+            finding_id=str(item.get("finding_id", "")).strip(),
+            title=str(item.get("title", "")).strip(),
+            message=str(item.get("message", "")).strip(),
+            file=str(item.get("file", "")).strip(),
+            line=int(item.get("line", 0) or 0),
+            evidence=str(item.get("evidence", "")).strip(),
+            retry_hint=str(item.get("retry_hint", "")).strip(),
+        )
+        for item in payload.get("findings", [])
+        if isinstance(item, dict)
+    )
+    if not findings:
+        return None
+    return SemanticPrecheckFailureContext(
+        summary=str(payload.get("summary", "")).strip()
+        or "Semantic precheck rejected the patch.",
+        findings=findings,
+    )
+
+
 def _extract_boundary_failure_context(result: FixResult) -> BoundaryFailureContext | None:
     """Extract structured runtime boundary failure details from a FixResult."""
 
@@ -716,9 +757,33 @@ def _build_failure_detail_key(
     quality_gate_failure: QualityGateFailureContext | None,
     review_gate_failure: ReviewGateFailureContext | None,
     plan_failure: PlanFailureContext | None,
+    semantic_precheck_failure: SemanticPrecheckFailureContext | None,
 ) -> str:
     if result.failure_kind == "no_change":
         return "no_change"
+    if result.failure_kind == "tool_input_invalid":
+        normalized_detail = _normalize_invalid_write_tool_input_detail(
+            "\n".join(
+                part
+                for part in (
+                    str(result.error or "").strip(),
+                    str(result.build_output or "").strip(),
+                )
+                if part
+            )
+        )
+        if normalized_detail:
+            return f"tool_input_invalid:{normalized_detail}"
+        return "tool_input_invalid"
+    if result.failure_kind == "semantic_precheck" and semantic_precheck_failure is not None:
+        finding_ids = tuple(
+            str(item.finding_id).strip()
+            for item in semantic_precheck_failure.findings
+            if str(item.finding_id).strip()
+        )
+        if finding_ids:
+            return "semantic_precheck:" + ",".join(dict.fromkeys(finding_ids))
+        return "semantic_precheck"
     if quality_gate_failure is not None and quality_gate_failure.violations:
         return "quality_gate:" + ",".join(
             dict.fromkeys(item.rule_id for item in quality_gate_failure.violations if item.rule_id)
@@ -748,6 +813,35 @@ def _build_failure_detail_key(
             digest = hashlib.sha1(normalized_output.encode("utf-8")).hexdigest()[:12]
             return f"{result.failure_kind}:{digest}"
         return result.failure_kind
+    return ""
+
+
+def _normalize_invalid_write_tool_input_detail(raw_text: str) -> str:
+    """Normalize volatile tool-input errors into stable retry detail keys."""
+
+    normalized = " ".join(str(raw_text or "").split()).lower()
+    if not normalized:
+        return ""
+
+    normalized = re.sub(r"call_[0-9a-f]+", "call_id", normalized)
+    missing_fields = [
+        field
+        for field in ("file_path", "old_string", "new_string", "edits", "content")
+        if re.search(rf"(required parameter|parameter)\s+`?{re.escape(field)}`?\s+is missing", normalized)
+        or f"`{field}` is missing" in normalized
+    ]
+    if missing_fields:
+        return "missing:" + ",".join(dict.fromkeys(missing_fields))
+    if "empty payload" in normalized:
+        return "empty_payload"
+    if "at least one valid edits" in normalized:
+        return "invalid_edits"
+    if "string to replace not found" in normalized:
+        return "old_string_not_found"
+    if "no changes to make" in normalized:
+        return "no_effect"
+    if "inputvalidationerror" in normalized:
+        return "input_validation_error"
     return ""
 
 
@@ -832,10 +926,24 @@ def build_retry_context(
     quality_gate_failure = _extract_quality_gate_failure_context(result)
     review_gate_failure = _extract_review_gate_failure_context(result)
     plan_failure = _extract_plan_failure_context(result)
+    semantic_precheck_failure = _extract_semantic_precheck_failure_context(result)
+    changed_files = _normalize_changed_files(result)
     prompt_output, build_timeout_failed, build_timeout_without_errors = _build_prompt_safe_output(
         result,
         compiler_errors=compiler_errors,
     )
+    failure_fingerprints = detect_failure_fingerprints(
+        failure_kind=result.failure_kind,
+        compiler_errors=compiler_errors,
+        quality_gate_failure=quality_gate_failure,
+        review_gate_failure=review_gate_failure,
+        boundary_failure=boundary_failure,
+        semantic_precheck_failure=semantic_precheck_failure,
+        raw_output=raw_output,
+        error=result.error or "",
+        changed_files=changed_files,
+    )
+    primary_failure_fingerprint = failure_fingerprints[0] if failure_fingerprints else ""
     return RetryContext(
         source_attempt_number=source_attempt_number,
         issue_rule_id=issue.rule if issue is not None else "",
@@ -847,7 +955,11 @@ def build_retry_context(
             quality_gate_failure=quality_gate_failure,
             review_gate_failure=review_gate_failure,
             plan_failure=plan_failure,
+            semantic_precheck_failure=semantic_precheck_failure,
         ),
+        failure_fingerprints=failure_fingerprints,
+        primary_failure_fingerprint=primary_failure_fingerprint,
+        failure_fingerprint_repetition=(1 if primary_failure_fingerprint else 0),
         strategy_fingerprint=_build_strategy_fingerprint(result),
         diff_fingerprint=_build_diff_fingerprint(workspace_path, result),
         error=result.error or "",
@@ -857,7 +969,7 @@ def build_retry_context(
         prompt_output=prompt_output,
         retryable_failure=result.retryable_failure,
         build_verification_failed=result.build_verification_failed,
-        changed_files=_normalize_changed_files(result),
+        changed_files=changed_files,
         compiler_errors=compiler_errors,
         guidance=tuple(_build_retry_guidance(list(compiler_errors))) if compiler_errors else (),
         boundary_failure=boundary_failure,
@@ -866,6 +978,7 @@ def build_retry_context(
         quality_gate_failure=quality_gate_failure,
         review_gate_failure=review_gate_failure,
         plan_failure=plan_failure,
+        semantic_precheck_failure=semantic_precheck_failure,
         model_timeout_summary=(
             _summarize_model_timeout(raw_output, getattr(result, "model_timeout_stage", ""))
             if result.failure_kind == "model_timeout"
@@ -900,7 +1013,7 @@ def _carry_forward_blocker_context(
     if previous_retry_context is None:
         return next_retry_context
     if next_retry_context.failure_kind not in {"no_change", "tool_input_invalid"}:
-        return next_retry_context
+        return _apply_failure_fingerprint_progression(previous_retry_context, next_retry_context)
 
     guidance = tuple(
         dict.fromkeys(
@@ -913,13 +1026,48 @@ def _carry_forward_blocker_context(
         )
     )
 
-    return replace(
+    merged = replace(
         next_retry_context,
         guidance=guidance,
         quality_gate_failure=next_retry_context.quality_gate_failure or previous_retry_context.quality_gate_failure,
         review_gate_failure=next_retry_context.review_gate_failure or previous_retry_context.review_gate_failure,
         plan_failure=next_retry_context.plan_failure or previous_retry_context.plan_failure,
+        semantic_precheck_failure=(
+            next_retry_context.semantic_precheck_failure
+            or previous_retry_context.semantic_precheck_failure
+        ),
     )
+    if not merged.failure_fingerprints and previous_retry_context.failure_fingerprints:
+        merged = replace(
+            merged,
+            failure_fingerprints=previous_retry_context.failure_fingerprints,
+            primary_failure_fingerprint=previous_retry_context.primary_failure_fingerprint,
+            failure_fingerprint_repetition=previous_retry_context.failure_fingerprint_repetition,
+        )
+    return _apply_failure_fingerprint_progression(previous_retry_context, merged)
+
+
+def _apply_failure_fingerprint_progression(
+    previous_retry_context: RetryContext | None,
+    next_retry_context: RetryContext,
+) -> RetryContext:
+    """Track repeated failure fingerprints across attempts."""
+
+    primary = str(getattr(next_retry_context, "primary_failure_fingerprint", "")).strip()
+    if not primary:
+        return replace(next_retry_context, failure_fingerprint_repetition=0)
+    if (
+        previous_retry_context is not None
+        and str(getattr(previous_retry_context, "primary_failure_fingerprint", "")).strip() == primary
+    ):
+        previous_repetition = int(
+            getattr(previous_retry_context, "failure_fingerprint_repetition", 0) or 0
+        )
+        return replace(
+            next_retry_context,
+            failure_fingerprint_repetition=max(1, previous_repetition) + 1,
+        )
+    return replace(next_retry_context, failure_fingerprint_repetition=1)
 
 
 def _summarize_model_timeout(raw_output: str, timeout_stage: str = "") -> str:
@@ -962,8 +1110,12 @@ def _build_final_skip_reason(result: FixResult, attempts: int) -> str:
         return f"Review gate verification failed after {attempts} attempt(s)"
     if result.failure_kind == "plan_conflict":
         return f"Plan precheck rejected the edit after {attempts} attempt(s)"
+    if result.failure_kind == "semantic_precheck":
+        return f"Semantic precheck failed after {attempts} attempt(s)"
+    if result.failure_kind == "planner_skip":
+        return f"Planner skipped the issue after {attempts} attempt(s)"
     if result.failure_kind == "tool_input_invalid":
-        return f"Agent emitted invalid Edit/MultiEdit input after {attempts} attempt(s)"
+        return f"Agent emitted invalid Edit/MultiEdit/Write input after {attempts} attempt(s)"
     if result.failure_kind == "no_change":
         return f"Agent completed without modifying any files after {attempts} attempt(s)"
     if result.failure_kind == "rule_validation":
@@ -1553,6 +1705,8 @@ def process_issue_with_retries(
             early_abort_threshold = (
                 EARLY_RETRY_ABORT_MIN_ATTEMPTS_NO_CHANGE
                 if next_retry_context.failure_kind == "no_change"
+                else EARLY_RETRY_ABORT_MIN_ATTEMPTS_TOOL_INPUT_INVALID
+                if next_retry_context.failure_kind == "tool_input_invalid"
                 else EARLY_RETRY_ABORT_MIN_ATTEMPTS_FIRST_RESPONSE_TIMEOUT
                 if (
                     next_retry_context.model_timeout_failed

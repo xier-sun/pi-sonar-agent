@@ -154,6 +154,33 @@ class PlanFailureContext:
 
 
 @dataclass(frozen=True)
+class SemanticPrecheckFindingContext:
+    """Structured semantic-precheck blocker for retry analysis."""
+
+    finding_id: str
+    title: str
+    message: str
+    file: str = ""
+    line: int = 0
+    evidence: str = ""
+    retry_hint: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
+
+
+@dataclass(frozen=True)
+class SemanticPrecheckFailureContext:
+    """Structured semantic-precheck rejection details for retry analysis."""
+
+    summary: str = ""
+    findings: tuple[SemanticPrecheckFindingContext, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return serialize_state(self)
+
+
+@dataclass(frozen=True)
 class RetryContext:
     """Structured retry memory for the next issue attempt."""
 
@@ -161,6 +188,9 @@ class RetryContext:
     issue_rule_id: str = ""
     failure_kind: str = ""
     failure_detail_key: str = ""
+    failure_fingerprints: tuple[str, ...] = ()
+    primary_failure_fingerprint: str = ""
+    failure_fingerprint_repetition: int = 0
     strategy_fingerprint: str = ""
     diff_fingerprint: str = ""
     error: str = ""
@@ -179,6 +209,7 @@ class RetryContext:
     quality_gate_failure: QualityGateFailureContext | None = None
     review_gate_failure: ReviewGateFailureContext | None = None
     plan_failure: PlanFailureContext | None = None
+    semantic_precheck_failure: SemanticPrecheckFailureContext | None = None
     model_timeout_summary: str = ""
     model_timeout_stage: str = ""
     build_tool_failed: bool = False
@@ -283,6 +314,39 @@ def _append_quality_gate_details(
         sections.extend(f"- {item}" for item in guidance)
 
 
+def _append_semantic_precheck_details(
+    sections: list[str],
+    semantic_precheck_failure: SemanticPrecheckFailureContext | None,
+) -> None:
+    if semantic_precheck_failure is None:
+        return
+
+    sections.append(semantic_precheck_failure.summary)
+    for index, item in enumerate(semantic_precheck_failure.findings, start=1):
+        detail = f"{index}. [{item.finding_id}] {item.title}: {item.message}"
+        if item.file:
+            location = item.file
+            if item.line > 0:
+                location = f"{location}:{item.line}"
+            detail += f" | location: {location}"
+        sections.append(detail)
+        if item.evidence:
+            sections.append(f"   证据: {item.evidence}")
+        if item.retry_hint:
+            sections.append(f"   原始提示: {item.retry_hint}")
+
+    retry_hints = _dedupe_ordered(
+        [
+            str(item.retry_hint).strip()
+            for item in semantic_precheck_failure.findings
+            if str(item.retry_hint).strip()
+        ]
+    )
+    if retry_hints:
+        sections.append("语义预检重试约束:")
+        sections.extend(f"- {item}" for item in retry_hints)
+
+
 def _append_workspace_retry_references(
     sections: list[str],
     retry_context: RetryContext,
@@ -315,19 +379,29 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
     quality_gate_failure = retry_context.quality_gate_failure
     review_gate_failure = retry_context.review_gate_failure
     plan_failure = retry_context.plan_failure
+    semantic_precheck_failure = retry_context.semantic_precheck_failure
     has_scope_violation = scope_violation is not None
     has_review_failure = review_failure is not None
     has_quality_gate_failure = quality_gate_failure is not None
     has_review_gate_failure = review_gate_failure is not None
     has_plan_failure = plan_failure is not None
+    has_semantic_precheck_failure = semantic_precheck_failure is not None
     compiler_errors = list(retry_context.compiler_errors)
+    if retry_context.primary_failure_fingerprint:
+        repetition = int(getattr(retry_context, "failure_fingerprint_repetition", 0) or 0)
+        label = f"失败指纹: {retry_context.primary_failure_fingerprint}"
+        if repetition > 1:
+            label += f"（连续命中 {repetition} 次）"
+        if prompt_output or raw_output:
+            raw_output = f"{label}\n{raw_output}" if raw_output else label
+            prompt_output = f"{label}\n{prompt_output}" if prompt_output else label
 
     if not compiler_errors:
         if retry_context.failure_kind == "tool_input_invalid":
             return "\n".join(
                 [
-                    "上次尝试发出了无效的 Edit/MultiEdit 工具调用，导致没有真正落盘修改。",
-                    effective_output or "Edit/MultiEdit 缺少必要参数。",
+                    "上次尝试发出了无效的 Edit/MultiEdit/Write 工具调用，导致没有真正落盘修改。",
+                    effective_output or "Edit/MultiEdit/Write 缺少必要参数。",
                     "重试约束:",
                     "- Edit 必须提供完整的 file_path、old_string、new_string。",
                     "- MultiEdit 必须提供 file_path 和至少一个有效 edits 项。",
@@ -346,6 +420,20 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                     lines.append("重试约束:")
                     lines.extend(f"- {item}" for item in plan_failure.guidance if str(item).strip())
                 return "\n".join(lines)
+            if retry_context.failure_kind == "semantic_precheck" and has_semantic_precheck_failure:
+                sections = ["上次尝试在 semantic precheck 阶段被拦下，请先解决这些语义阻塞："]
+                _append_semantic_precheck_details(sections, semantic_precheck_failure)
+                if has_quality_gate_failure:
+                    sections.append("相关的质量门禁上下文：")
+                    _append_quality_gate_details(
+                        sections,
+                        quality_gate_failure,
+                        issue_rule_id=retry_context.issue_rule_id,
+                    )
+                if effective_output and effective_output not in sections:
+                    sections.append("原始运行输出：")
+                    sections.append(effective_output)
+                return "\n".join(section for section in sections if str(section).strip())
             if retry_context.boundary_failure is not None and retry_context.boundary_failure.summary:
                 effective_output = (
                     f"边界主阻塞原因: {retry_context.boundary_failure.code}\n"
@@ -370,11 +458,11 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                     effective_output,
                     "重试约束:",
                     "- 严禁使用 git_add、git_commit、git_push 或任何自行提交/推送动作。",
-                    "- 如果使用 shell 工具（工具名 Bash），只写 bash 兼容命令；允许搜索、查看、诊断、echo 等无害操作。",
+                    "- 如果使用 shell 工具（工具名 Bash），只写 bash 兼容命令；默认只允许搜索、查看、诊断等无害操作；若工具策略明确放开新增文件，只能按声明目录创建。",
                     "- 优先使用 prompt 中给出的仓库相对路径候选，不要靠 Bash 拼接仓库根目录反复试错。",
-                    "- 严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码。",
-                    "- 修复阶段只能直接编辑代码并运行推荐构建命令，提交由外层流程统一处理。",
-                    "- 先根据下面的本地构建输出修复问题，再重新运行推荐构建命令验证。",
+                    "- 严禁通过 shell 删除文件、覆盖已有文件、移动/重命名文件或直接改写已有源码。",
+                    "- 修复阶段只负责直接编辑代码；构建与验证由外层流程统一执行。",
+                    "- 先根据下面的本地构建输出修复问题，再交由外层流程重新执行构建验证。",
                 ]
                 if has_scope_violation:
                     sections.extend(
@@ -389,8 +477,8 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                     "上次尝试在运行构建工具时异常退出，请先处理下面的异常信息和本地回退构建输出：",
                     effective_output,
                     "重试约束:",
-                    "- 先修复 stderr 或回退构建输出中暴露的问题，再重新运行推荐构建命令。",
-                    "- 如果回退构建已经通过，也要再次运行构建，确认修改后的代码仍然稳定。",
+                    "- 先修复 stderr 或回退构建输出中暴露的问题，再交由外层流程重新执行构建验证。",
+                    "- 如果回退构建已经通过，也要保持补丁稳定，避免下一轮再次破坏编译。",
                 ]
                 _append_workspace_retry_references(sections, retry_context)
                 if has_scope_violation:
@@ -460,10 +548,21 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                 lines.append("重试约束:")
                 lines.extend(f"- {item}" for item in plan_failure.guidance if str(item).strip())
             return "\n".join(lines)
+        if retry_context.failure_kind == "semantic_precheck" and has_semantic_precheck_failure:
+            sections = ["上次尝试在 semantic precheck 阶段被拦下，请先解决这些语义阻塞："]
+            _append_semantic_precheck_details(sections, semantic_precheck_failure)
+            if has_quality_gate_failure:
+                sections.append("相关的质量门禁上下文：")
+                _append_quality_gate_details(
+                    sections,
+                    quality_gate_failure,
+                    issue_rule_id=retry_context.issue_rule_id,
+                )
+            return "\n".join(section for section in sections if str(section).strip())
         if retry_context.failure_kind == "no_change" or retry_context.error == "Agent completed without modifying any files":
             sections = [
                 "上次尝试没有实际修改任何文件。",
-                "这次必须对 Sonar 指向的代码真正落盘修改，然后再运行构建验证。",
+                "这次必须对 Sonar 指向的代码真正落盘修改，然后交由外层流程执行构建验证。",
             ]
             if has_quality_gate_failure:
                 sections.append("而且前一轮已经明确暴露了这些 C# 质量门禁问题，不能继续忽略：")
@@ -490,7 +589,7 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
                     "重试约束:",
                     "- 不要只做分析或解释，必须提交实际代码修改。",
                     "- 优先直接修掉上面已经明确指出的门禁/审核问题，不要重新大改整段逻辑。",
-                    "- 修改后立即使用推荐构建命令验证。",
+                    "- 修改后让外层流程执行构建验证，不要自行在 Bash 中跑 dotnet build/restore/test。",
                     "- 如果这是行级问题，只修改 Sonar 指向的那条语句。",
                 ]
             )
@@ -506,10 +605,10 @@ def render_retry_context(retry_context: RetryContext | None) -> str:
         sections.append("先确认当前模型 provider/网关与 Claude SDK 工具调用协议兼容，再继续重试。")
     if retry_context.forbidden_tool_failed:
         sections.append("上次尝试使用了被禁止的工具，或污染了当前 issue 的 Git 基线。")
-        sections.append("这次严禁使用 git_add、git_commit、git_push；只允许直接编辑代码并运行推荐构建命令。")
-        sections.append("如果使用 shell 工具（工具名 Bash），只写 bash 兼容命令；允许无害操作。")
+        sections.append("这次严禁使用 git_add、git_commit、git_push；只允许直接编辑代码，构建验证由外层流程统一执行。")
+        sections.append("如果使用 shell 工具（工具名 Bash），只写 bash 兼容命令；默认只允许无害操作；若工具策略明确放开新增文件，只能按声明目录创建。")
         sections.append("优先使用 prompt 中给出的仓库相对路径候选，不要靠 Bash 拼接仓库根目录反复试错。")
-        sections.append("严禁通过 shell 删除文件、创建文件、覆盖文件或直接改写源码。")
+        sections.append("严禁通过 shell 删除文件、覆盖已有文件、移动/重命名文件或直接改写已有源码。")
     if retry_context.build_tool_failed:
         sections.append("上次尝试在运行构建工具时异常退出；已附加本地回退构建结果。")
     sections.append("上次尝试引入了以下关键编译错误，请先修复这些错误：")

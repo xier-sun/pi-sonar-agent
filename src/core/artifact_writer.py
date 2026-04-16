@@ -35,6 +35,7 @@ class AttemptArtifactBundle:
     issue_json: Path
     edit_contract_json: Path
     prompt_context_json: Path
+    prompt_budget_report_json: Path
     patch_diff: Path
     attempt_events_jsonl: Path
     reviewer_result_json: Path
@@ -81,6 +82,7 @@ class ArtifactWriter:
             issue_json=attempt_root / "issue.json",
             edit_contract_json=attempt_root / "edit_contract.json",
             prompt_context_json=attempt_root / "prompt_context.json",
+            prompt_budget_report_json=attempt_root / "prompt_budget_report.json",
             patch_diff=attempt_root / "patch.diff",
             attempt_events_jsonl=attempt_root / "attempt_events.jsonl",
             reviewer_result_json=attempt_root / "reviewer_result.json",
@@ -128,7 +130,23 @@ class ArtifactWriter:
                 "rollout_flags": list(getattr(result, "rollout_flags", ())),
                 "repair_plan": _serialize_optional_payload(getattr(result, "repair_plan", None), None),
                 "plan_precheck": _serialize_optional_payload(getattr(result, "plan_precheck", None), None),
+                "semantic_precheck_result": _serialize_optional_payload(
+                    getattr(result, "semantic_precheck_result", None),
+                    None,
+                ),
+                "engine_routing_decision": _serialize_optional_payload(
+                    getattr(result, "engine_routing_decision", None),
+                    None,
+                ),
                 "review_gate_result": _serialize_optional_payload(getattr(result, "review_gate_result", None), None),
+                "prompt_budget_report": _serialize_optional_payload(
+                    getattr(result, "prompt_budget_report", None),
+                    None,
+                ),
+                "visible_toolset": _serialize_optional_payload(
+                    getattr(result, "visible_toolset", None),
+                    None,
+                ),
                 "planner_lessons": [
                     lesson.to_dict()
                     for lesson in getattr(getattr(result, "edit_contract", None), "planner_lessons", ())
@@ -161,6 +179,16 @@ class ArtifactWriter:
             ),
         )
         self._write_json(
+            bundle.prompt_budget_report_json,
+            _serialize_optional_payload(
+                getattr(result, "prompt_budget_report", None),
+                {
+                    "status": "not_available",
+                    "reason": "Prompt budget report was not attached to this attempt.",
+                },
+            ),
+        )
+        self._write_json(
             bundle.build_result_json,
             {
                 "success": result.success,
@@ -173,6 +201,13 @@ class ArtifactWriter:
                 "build_command": result.build_command or build_command,
                 "build_output": result.build_output,
                 "guardrail_mode": getattr(result, "guardrail_mode", ""),
+                "semantic_precheck_result": _serialize_optional_payload(
+                    getattr(result, "semantic_precheck_result", None),
+                    {
+                        "status": "not_available",
+                        "reason": "Semantic precheck result was not attached to this attempt.",
+                    },
+                ),
                 "quality_gate_result": _serialize_optional_payload(
                     getattr(result, "quality_gate_result", None),
                     {
@@ -199,6 +234,18 @@ class ArtifactWriter:
                 "follow_up_log_path": getattr(result, "follow_up_log_path", ""),
                 "repair_plan": _serialize_optional_payload(getattr(result, "repair_plan", None), None),
                 "plan_precheck": _serialize_optional_payload(getattr(result, "plan_precheck", None), None),
+                "engine_routing_decision": _serialize_optional_payload(
+                    getattr(result, "engine_routing_decision", None),
+                    None,
+                ),
+                "prompt_budget_report": _serialize_optional_payload(
+                    getattr(result, "prompt_budget_report", None),
+                    None,
+                ),
+                "visible_toolset": _serialize_optional_payload(
+                    getattr(result, "visible_toolset", None),
+                    None,
+                ),
             },
         )
         bundle.build_output_log.write_text(result.build_output or "", encoding="utf-8")

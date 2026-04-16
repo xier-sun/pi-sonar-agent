@@ -45,6 +45,7 @@ class VerificationSchedule:
     """Verification ordering and build-gating decisions."""
 
     run_boundary_first: bool
+    run_semantic_precheck_before_build: bool
     run_propagation_check_before_build: bool
     run_quality_gate_before_build: bool
     run_rule_validation_before_build: bool
@@ -55,6 +56,7 @@ class VerificationSchedule:
     def to_dict(self) -> dict[str, object]:
         return {
             "run_boundary_first": self.run_boundary_first,
+            "run_semantic_precheck_before_build": self.run_semantic_precheck_before_build,
             "run_propagation_check_before_build": self.run_propagation_check_before_build,
             "run_quality_gate_before_build": self.run_quality_gate_before_build,
             "run_rule_validation_before_build": self.run_rule_validation_before_build,
@@ -101,6 +103,7 @@ class AttemptScheduler:
     ) -> VerificationSchedule:
         return VerificationSchedule(
             run_boundary_first=True,
+            run_semantic_precheck_before_build=True,
             run_propagation_check_before_build=performance_flags.propagation_lifecycle,
             run_quality_gate_before_build=True,
             run_rule_validation_before_build=True,

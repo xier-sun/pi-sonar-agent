@@ -6,6 +6,7 @@ from pi_sonar_agent.core.boundary_capabilities import (
     BOUNDARY_PROFILE_DECLARATION_ANCHOR,
     BOUNDARY_PROFILE_MEMBER_CLUSTER,
     DECLARATION_DELETE_CAPABILITY,
+    HELPER_EXTRACT_CAPABILITY,
     MEMBER_DELETE_CAPABILITY,
     METHOD_CLUSTER_DELETE_CAPABILITY,
     MULTI_FILE_REFACTOR_CAPABILITY,
@@ -390,7 +391,7 @@ def test_issue_planner_downgrades_unverified_signature_change_to_signature_prese
     assert "Archetype Chain: signature_preserving_refactor -> expression_simplification" in plan.prompt_guidance
 
 
-def test_issue_planner_allows_controlled_signature_propagation_for_s3776(tmp_path) -> None:
+def test_issue_planner_downgrades_public_interface_propagation_for_s3776(tmp_path) -> None:
     workspace = tmp_path / "workspace"
     issue_file = workspace / "OpenAuth.Core" / "OpenAuth.App" / "Finance" / "FinanceHanlerApp.cs"
     interface_file = (
@@ -458,56 +459,142 @@ def test_issue_planner_allows_controlled_signature_propagation_for_s3776(tmp_pat
     )
 
     assert plan.edit_contract.plan_first_enabled is True
-    assert SIGNATURE_CHANGE_CAPABILITY in plan.edit_contract.allowed_capabilities
-    assert MULTI_FILE_REFACTOR_CAPABILITY in plan.edit_contract.allowed_capabilities
-    assert "OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IFinanceHanlerApp.cs" in plan.edit_contract.target_files
+    assert SIGNATURE_CHANGE_CAPABILITY not in plan.edit_contract.allowed_capabilities
+    assert MULTI_FILE_REFACTOR_CAPABILITY not in plan.edit_contract.allowed_capabilities
+    assert "OpenAuth.Core/OpenAuth.App/Finance/Interfaces/IFinanceHanlerApp.cs" not in plan.edit_contract.target_files
     assert plan.edit_contract.repair_plan is not None
-    assert plan.edit_contract.repair_plan.requires_signature_change is True
-    assert plan.edit_contract.repair_plan.requires_propagation is True
-    assert plan.edit_contract.repair_plan.proposed_method_name == "AutoPluginAsync"
-    assert plan.edit_contract.repair_plan.selected_archetype == "bounded_signature_propagation"
-    assert plan.edit_contract.repair_plan.fallback_archetype == "signature_preserving_refactor"
+    assert plan.edit_contract.repair_plan.requires_signature_change is False
+    assert plan.edit_contract.repair_plan.requires_propagation is False
+    assert plan.edit_contract.repair_plan.proposed_method_name == ""
+    assert plan.edit_contract.repair_plan.selected_archetype == "signature_preserving_refactor"
+    assert plan.edit_contract.repair_plan.fallback_archetype == "expression_simplification"
     assert plan.edit_contract.repair_plan.archetype_chain == (
-        "bounded_signature_propagation",
         "signature_preserving_refactor",
         "expression_simplification",
     )
-    assert plan.edit_contract.repair_plan.auto_upgraded_capabilities == (
-        SIGNATURE_CHANGE_CAPABILITY,
-        MULTI_FILE_REFACTOR_CAPABILITY,
-    )
-    assert plan.edit_contract.repair_plan.propagation_budget >= 4
-    assert "complete_propagation_before_finish" in plan.edit_contract.repair_plan.strategy_preferences
+    assert plan.edit_contract.repair_plan.propagation_budget == 0
+    assert "avoid_interface_controller_propagation" in plan.edit_contract.repair_plan.strategy_preferences
     assert any(
-        target.kind == "definition"
-        and target.file.endswith("FinanceHanlerApp.cs")
-        for target in plan.edit_contract.repair_plan.verification_targets
-    )
-    assert any(
-        target.kind == "signature_declaration"
-        and target.file.endswith("IFinanceHanlerApp.cs")
-        for target in plan.edit_contract.repair_plan.propagation_targets
-    )
-    assert any(
-        target.kind == "callsite" and target.file.endswith("FinanceHanlerApp.cs")
-        for target in plan.edit_contract.repair_plan.propagation_targets
-    )
-    assert any(
-        target.kind == "nameof_ref" and target.file.endswith("FinanceHanlerApp.cs")
-        for target in plan.edit_contract.repair_plan.propagation_targets
-    )
-    assert any(
-        "declaration first" in hint.lower() or "synchronize declared interfaces" in hint
+        "keep the externally visible api stable" in hint.lower()
         for hint in plan.edit_contract.repair_plan.constraint_hints
     )
     assert plan.edit_contract.plan_precheck is not None
     assert plan.edit_contract.plan_precheck.status == "pass"
-    assert any(
-        symbol.file.endswith("IFinanceHanlerApp.cs")
+    assert all(
+        not symbol.file.endswith("IFinanceHanlerApp.cs")
         for symbol in plan.edit_contract.allowed_related_symbols
     )
-    assert "Selected Archetype: bounded_signature_propagation" in plan.prompt_guidance
+    assert "Selected Archetype: signature_preserving_refactor" in plan.prompt_guidance
     assert "Constraint Hints:" in plan.prompt_guidance
+
+
+def test_issue_planner_prefers_private_helper_extract_for_default_local_s3776() -> None:
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-LOCAL-S3776",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=6,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=3,
+        scope_end_line=16,
+        validation_start_line=3,
+        validation_end_line=16,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private void Demo()",
+            "    {",
+            "        if (first) { Work(); }",
+            "        if (second) { Work(); }",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert plan.edit_contract.repair_plan is not None
+    assert plan.edit_contract.repair_plan.selected_archetype == "private_helper_extract"
+    assert plan.edit_contract.repair_plan.fallback_archetype == "guard_clause_flatten"
+    assert plan.edit_contract.repair_plan.archetype_chain == (
+        "private_helper_extract",
+        "guard_clause_flatten",
+        "local_block_reorder",
+    )
+    assert any(
+        "small private helpers" in hint.lower()
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+
+
+def test_issue_planner_allows_controlled_internal_signature_propagation_for_s3776(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    issue_file = workspace / "OpenAuth.Core" / "OpenAuth.App" / "Finance" / "FinanceHanlerApp.cs"
+    caller_file = workspace / "OpenAuth.Core" / "OpenAuth.App" / "Finance" / "FinanceSyncService.cs"
+    issue_file.parent.mkdir(parents=True, exist_ok=True)
+
+    issue_file.write_text(
+        "\n".join(
+            [
+                "class FinanceHanlerApp",
+                "{",
+                "    internal async Task AutoPlugin(IEnumerable<int> orderIds)",
+                "    {",
+                "        await SaveAsync(orderIds);",
+                "    }",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    caller_file.write_text(
+        "\n".join(
+            [
+                "class FinanceSyncService",
+                "{",
+                "    private readonly FinanceHanlerApp _app = new();",
+                "",
+                "    public Task Sync(IEnumerable<int> ids)",
+                "    {",
+                "        return _app.AutoPlugin(ids);",
+                "    }",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-INTERNAL-PROP",
+        rule_id="csharpsquid:S3776",
+        file_path="OpenAuth.Core/OpenAuth.App/Finance/FinanceHanlerApp.cs",
+        issue_line=3,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=3,
+        scope_end_line=6,
+        validation_start_line=3,
+        validation_end_line=6,
+        source_lines=tuple(issue_file.read_text(encoding="utf-8").splitlines()),
+        workspace_path=workspace,
+    )
+
+    assert plan.edit_contract.repair_plan is not None
+    assert plan.edit_contract.repair_plan.requires_signature_change is True
+    assert plan.edit_contract.repair_plan.requires_propagation is True
+    assert plan.edit_contract.repair_plan.selected_archetype == "bounded_signature_propagation"
+    assert plan.edit_contract.repair_plan.fallback_archetype == "private_helper_extract"
+    assert plan.edit_contract.repair_plan.archetype_chain == (
+        "bounded_signature_propagation",
+        "private_helper_extract",
+        "guard_clause_flatten",
+        "local_block_reorder",
+    )
+    assert any(
+        target.kind == "callsite" and target.file.endswith("FinanceSyncService.cs")
+        for target in plan.edit_contract.repair_plan.propagation_targets
+    )
 
 
 def test_issue_planner_downgrades_s3776_after_async_quality_gate_retry() -> None:
@@ -797,6 +884,358 @@ def test_issue_planner_keeps_s1144_on_minimal_deletion_strategy_after_no_change(
     assert "force_direct_local_edit" in plan.edit_contract.repair_plan.strategy_preferences
 
 
+def test_issue_planner_marks_type_shape_retry_constraints_for_s3776() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=2,
+        failure_kind="build",
+        failure_fingerprints=("helper_extraction_type_break",),
+        primary_failure_fingerprint="helper_extraction_type_break",
+        failure_fingerprint_repetition=1,
+        compiler_errors=(
+            CompilerErrorContext(
+                file_path="src/Foo.cs",
+                line=12,
+                column=3,
+                code="CS0103",
+                message="name does not exist",
+            ),
+        ),
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-TYPE-SHAPE",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=8,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=24,
+        validation_start_line=2,
+        validation_end_line=24,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private void Demo()",
+            "    {",
+            "        if (true) { }",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert plan.edit_contract.repair_plan is not None
+    assert HELPER_EXTRACT_CAPABILITY not in plan.edit_contract.allowed_capabilities
+    assert plan.edit_contract.repair_plan.repair_shape == "method_rewrite_in_place"
+    assert plan.edit_contract.repair_plan.new_helpers == ()
+    assert "preserve_type_shape_on_retry" in plan.edit_contract.repair_plan.strategy_preferences
+    assert (
+        "disable_helper_extract_after_type_shape_failure"
+        in plan.edit_contract.repair_plan.strategy_preferences
+    )
+    assert (
+        "force_in_method_refactor_after_type_shape_failure"
+        in plan.edit_contract.repair_plan.strategy_preferences
+    )
+    assert any(
+        "preserve concrete types" in hint.lower()
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+
+
+def test_issue_planner_downgrades_s3776_after_anonymous_type_helper_boundary() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=2,
+        failure_kind="semantic_precheck",
+        failure_fingerprints=("anonymous_type_helper_boundary",),
+        primary_failure_fingerprint="anonymous_type_helper_boundary",
+        failure_fingerprint_repetition=1,
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-ANON-HELPER-BOUNDARY",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=8,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=24,
+        validation_start_line=2,
+        validation_end_line=24,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private void Demo()",
+            "    {",
+            "        if (true) { }",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert plan.edit_contract.repair_plan is not None
+    assert HELPER_EXTRACT_CAPABILITY not in plan.edit_contract.allowed_capabilities
+    assert plan.edit_contract.repair_plan.selected_archetype == "signature_preserving_refactor"
+    assert (
+        "forbid_helper_boundaries_for_anonymous_projections"
+        in plan.edit_contract.repair_plan.strategy_preferences
+    )
+    assert (
+        "force_in_method_refactor_for_anonymous_projections"
+        in plan.edit_contract.repair_plan.strategy_preferences
+    )
+    assert any(
+        "anonymous projections cannot cross helper boundaries" in hint.lower()
+        or "keep them inside the current method body" in hint.lower()
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+
+
+def test_issue_planner_downgrades_s3776_after_partial_patch_turn_exhaustion() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=2,
+        failure_kind="tool_input_invalid",
+        failure_fingerprints=("turn_exhausted_after_partial_patch", "tool_input_invalid_burst"),
+        primary_failure_fingerprint="turn_exhausted_after_partial_patch",
+        failure_fingerprint_repetition=1,
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-TURN-EXHAUSTION",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=8,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=24,
+        validation_start_line=2,
+        validation_end_line=24,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    public void Demo()",
+            "    {",
+            "        if (true) { }",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert plan.edit_contract.repair_plan is not None
+    assert plan.edit_contract.repair_plan.selected_archetype == "signature_preserving_refactor"
+    assert (
+        "prefer_one_shot_small_patch_after_turn_exhaustion"
+        in plan.edit_contract.repair_plan.strategy_preferences
+    )
+    assert (
+        "force_precise_write_payload_after_invalid_tool_input"
+        in plan.edit_contract.repair_plan.strategy_preferences
+    )
+    assert any(
+        "partial patch" in hint.lower() or "one precise patch" in hint.lower()
+        for hint in plan.edit_contract.repair_plan.constraint_hints
+    )
+
+
+def test_issue_planner_allows_second_repeated_anonymous_type_helper_boundary_retry() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=3,
+        failure_kind="semantic_precheck",
+        failure_fingerprints=("anonymous_type_helper_boundary",),
+        primary_failure_fingerprint="anonymous_type_helper_boundary",
+        failure_fingerprint_repetition=2,
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-REPEATED-ANON-BOUNDARY",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=8,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=24,
+        validation_start_line=2,
+        validation_end_line=24,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private void Demo()",
+            "    {",
+            "        if (true) { }",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert plan.skip_reason == ""
+
+
+def test_issue_planner_allows_second_repeated_type_shape_failure_retry() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=3,
+        failure_kind="build",
+        failure_fingerprints=("helper_extraction_type_break",),
+        primary_failure_fingerprint="helper_extraction_type_break",
+        failure_fingerprint_repetition=2,
+        compiler_errors=(
+            CompilerErrorContext(
+                file_path="src/Foo.cs",
+                line=12,
+                column=3,
+                code="CS1503",
+                message="cannot convert anonymous projection to dynamic helper contract",
+            ),
+        ),
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-SECOND-REPEATED-TYPE-SHAPE",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=8,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=24,
+        validation_start_line=2,
+        validation_end_line=24,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private void Demo()",
+            "    {",
+            "        if (true) { }",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert HELPER_EXTRACT_CAPABILITY not in plan.edit_contract.allowed_capabilities
+    assert plan.skip_reason == ""
+
+
+def test_issue_planner_skips_after_third_repeated_anonymous_type_helper_boundary() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=4,
+        failure_kind="semantic_precheck",
+        failure_fingerprints=("anonymous_type_helper_boundary",),
+        primary_failure_fingerprint="anonymous_type_helper_boundary",
+        failure_fingerprint_repetition=3,
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-REPEATED-ANON-BOUNDARY",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=8,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=24,
+        validation_start_line=2,
+        validation_end_line=24,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private void Demo()",
+            "    {",
+            "        if (true) { }",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert "unlikely to converge" in plan.skip_reason
+
+
+def test_issue_planner_skips_after_third_repeated_failure_fingerprint() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=4,
+        failure_kind="build",
+        failure_fingerprints=("helper_extraction_type_break",),
+        primary_failure_fingerprint="helper_extraction_type_break",
+        failure_fingerprint_repetition=3,
+        compiler_errors=(
+            CompilerErrorContext(
+                file_path="src/Foo.cs",
+                line=12,
+                column=3,
+                code="CS0103",
+                message="name does not exist",
+            ),
+        ),
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-REPEATED-FP",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=8,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=24,
+        validation_start_line=2,
+        validation_end_line=24,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private void Demo()",
+            "    {",
+            "        if (true) { }",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert "unlikely to converge" in plan.skip_reason
+
+
+def test_issue_planner_skips_after_repeated_partial_patch_turn_exhaustion() -> None:
+    retry_context = RetryContext(
+        source_attempt_number=3,
+        failure_kind="tool_input_invalid",
+        failure_fingerprints=("turn_exhausted_after_partial_patch",),
+        primary_failure_fingerprint="turn_exhausted_after_partial_patch",
+        failure_fingerprint_repetition=2,
+    )
+
+    plan = IssuePlanner.plan_issue(
+        issue_key="ISSUE-PLAN-REPEATED-TURN-EXHAUSTION",
+        rule_id="csharpsquid:S3776",
+        file_path="src/Foo.cs",
+        issue_line=8,
+        guardrail_mode="scope",
+        scope_mode="method",
+        scope_start_line=2,
+        scope_end_line=24,
+        validation_start_line=2,
+        validation_end_line=24,
+        retry_context=retry_context,
+        source_lines=(
+            "class Foo",
+            "{",
+            "    private void Demo()",
+            "    {",
+            "        if (true) { }",
+            "    }",
+            "}",
+        ),
+    )
+
+    assert "unlikely to converge" in plan.skip_reason
+
+
 def test_issue_planner_does_not_schedule_async_rename_for_s1144_private_async_method() -> None:
     plan = IssuePlanner.plan_issue(
         issue_key="ISSUE-S1144-ASYNC-DELETE",
@@ -935,26 +1374,15 @@ def test_issue_planner_signature_propagation_scans_real_agent_workspace_layout(t
     )
 
     assert plan.edit_contract.plan_first_enabled is True
-    assert SIGNATURE_CHANGE_CAPABILITY in plan.edit_contract.allowed_capabilities
-    assert MULTI_FILE_REFACTOR_CAPABILITY in plan.edit_contract.allowed_capabilities
+    assert SIGNATURE_CHANGE_CAPABILITY not in plan.edit_contract.allowed_capabilities
+    assert MULTI_FILE_REFACTOR_CAPABILITY not in plan.edit_contract.allowed_capabilities
     assert plan.edit_contract.plan_precheck is not None
     assert plan.edit_contract.plan_precheck.status == "pass"
     assert plan.edit_contract.repair_plan is not None
-    assert plan.edit_contract.repair_plan.requires_signature_change is True
-    assert plan.edit_contract.repair_plan.requires_propagation is True
-    assert any(
-        target.kind == "signature_declaration"
-        and target.file.endswith("IFinanceHanlerApp.cs")
-        for target in plan.edit_contract.repair_plan.propagation_targets
-    )
-    assert any(
-        target.kind == "callsite" and target.file.endswith("FinanceHanlerApp.cs")
-        for target in plan.edit_contract.repair_plan.propagation_targets
-    )
-    assert any(
-        target.kind == "nameof_ref" and target.file.endswith("FinanceHanlerApp.cs")
-        for target in plan.edit_contract.repair_plan.propagation_targets
-    )
+    assert plan.edit_contract.repair_plan.requires_signature_change is False
+    assert plan.edit_contract.repair_plan.requires_propagation is False
+    assert plan.edit_contract.repair_plan.propagation_targets == ()
+    assert "prefer_single_file_complexity_reduction" in plan.edit_contract.repair_plan.strategy_preferences
 
 
 def test_issue_planner_ignores_controller_wrapper_declarations_in_signature_propagation(tmp_path) -> None:
