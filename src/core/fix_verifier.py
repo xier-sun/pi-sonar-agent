@@ -9,18 +9,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pi_sonar_agent.agent.rule_policies import get_rule_policy
-from pi_sonar_agent.agent.rule_validators import validate_rule_fix
-from pi_sonar_agent.core.attempt_scheduler import AttemptScheduler
 from pi_sonar_agent.core.boundary_runtime import BoundaryRuntime
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange, ReviewerResult
-from pi_sonar_agent.core.perf_flags import load_performance_flags
-from pi_sonar_agent.core.propagation_verifier import PropagationCheckResult, PropagationVerifier
+from pi_sonar_agent.core.propagation_verifier import PropagationCheckResult
 from pi_sonar_agent.core.quality_gate import QualityGateResult
-from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
-from pi_sonar_agent.core.review_gate import ReviewGateAgent, ReviewGateResult
+from pi_sonar_agent.core.review_gate import ReviewGateResult
 from pi_sonar_agent.core.scope_guard import IssueEditScope
-from pi_sonar_agent.core.semantic_precheck import SemanticPrecheck, SemanticPrecheckResult
+from pi_sonar_agent.core.semantic_precheck import SemanticPrecheckResult
+from pi_sonar_agent.core.simple_post_check import PostFixCheckResult, SimplePostCheck
 
 if TYPE_CHECKING:
     from pi_sonar_agent.agent.claude_agent import SonarIssue
@@ -41,6 +37,7 @@ class VerificationOutcome:
     review_gate_result: ReviewGateResult
     combined_output: str
     rule_validation_message: str
+    post_fix_check_result: PostFixCheckResult
     fast_compile_passed: bool = True
     fast_compile_output: str = ""
     fast_compile_command: str = ""
@@ -397,14 +394,10 @@ class FixVerifier:
         scope_validator: Callable[..., str | None] | None = None,
         rule_validator: Callable[[SonarIssue, str], str] | None = None,
     ) -> VerificationOutcome:
-        """Evaluate build, diff review, scope, and rule-specific validation."""
+        """Evaluate filesystem boundary and build only."""
 
         build_passed = False
         build_output = ""
-        fast_compile_passed = True
-        fast_compile_output = ""
-        fast_compile_command = ""
-        fast_compile_invoked = False
         boundary_outcome = BoundaryRuntime.review(
             issue_key=issue.key,
             rule_id=issue.rule,
@@ -423,109 +416,26 @@ class FixVerifier:
         scope_violation = boundary_outcome.scope_violation
         guardrail_message = reviewer_retry_message or scope_violation or ""
         propagation_check_result = PropagationCheckResult(
-            status="pass",
-            summary="Propagation lifecycle verifier disabled for this attempt.",
+            status="not_applicable",
+            summary="Local propagation verification is disabled; review child agent owns semantic review.",
         )
         semantic_precheck_result = SemanticPrecheckResult(
-            status="pass",
-            summary="Semantic precheck was not evaluated for this attempt.",
+            status="not_applicable",
+            summary="Local semantic precheck is disabled; review child agent owns semantic review.",
         )
-        quality_gate_result = QualityGateVerifier.review(
-            issue_file_path=issue.file_path,
-            edit_contract=edit_contract,
-            reviewed_changes=reviewed_changes,
-            original_issue_file_content=original_issue_file_content,
-            current_issue_file_content=current_issue_file_content,
-            issue_line=issue.line,
+        quality_gate_result = QualityGateResult(
+            status="not_applicable",
+            summary="Local quality gate precheck is disabled; review child agent owns code-quality review.",
         )
         rule_validation_message = ""
-        if current_issue_file_content is not None:
-            effective_rule_validator = rule_validator or cls.run_rule_specific_validation
-            rule_validation_message = effective_rule_validator(issue, current_issue_file_content)
-
-        verification_schedule = AttemptScheduler.build_verification_schedule(
-            edit_contract=edit_contract,
-            performance_flags=load_performance_flags(),
+        post_fix_check_result = SimplePostCheck.not_evaluated(
+            "Local post-fix check is disabled; main agent decides whether to compile and build is authoritative."
         )
-        if verification_schedule.run_semantic_precheck_before_build:
-            semantic_precheck_result = SemanticPrecheck.review(
-                issue_file_path=issue.file_path,
-                edit_contract=edit_contract,
-                reviewed_changes=reviewed_changes,
-                current_issue_file_content=current_issue_file_content,
-            )
-        if verification_schedule.run_propagation_check_before_build:
-            propagation_check_result = PropagationVerifier.review(
-                workspace_path=workspace_path,
-                edit_contract=edit_contract,
-                issue_file_path=issue.file_path,
-                current_issue_file_content=current_issue_file_content,
-            )
         review_gate_result = ReviewGateResult(
             status="not_applicable",
-            summary="Review gate was not evaluated for this attempt.",
+            summary="Optional patch audit is disabled; review child agent owns code review.",
         )
-        if getattr(load_performance_flags(), "review_gate", True):
-            review_gate_result = ReviewGateAgent.review(
-                workspace_path=workspace_path,
-                issue=issue,
-                reviewed_changes=reviewed_changes,
-                edit_contract=edit_contract,
-                propagation_check_result=propagation_check_result,
-                quality_gate_result=quality_gate_result,
-                reviewer_status=reviewer_result.status,
-                rule_validation_message=rule_validation_message,
-            )
-            if review_gate_result.status == "pass":
-                propagation_check_result, quality_gate_result = ReviewGateAgent.apply_waivers(
-                    propagation_check_result=propagation_check_result,
-                    quality_gate_result=quality_gate_result,
-                    review_gate_result=review_gate_result,
-                )
-        should_run_build = workspace_path.exists()
-        if verification_schedule.skip_build_on_precheck_failure:
-            if reviewer_result.status == "retry":
-                should_run_build = False
-            if semantic_precheck_result.status == "retry":
-                should_run_build = False
-            if review_gate_result.status == "retry":
-                should_run_build = False
-            if propagation_check_result.status == "retry":
-                should_run_build = False
-            if quality_gate_result.status == "retry":
-                should_run_build = False
-            if rule_validation_message:
-                should_run_build = False
-
-        fast_compile_duration_seconds = 0.0
-        if should_run_build and verification_schedule.run_fast_compile_before_build:
-            if not cls._is_small_patch_candidate(
-                edit_contract=edit_contract,
-                reviewed_changes=reviewed_changes,
-            ):
-                fast_compile_started_at = time.monotonic()
-                fast_compile_passed, fast_compile_output, fast_compile_command, fast_compile_invoked = cls.run_fast_compile(
-                    workspace_path,
-                    build_command,
-                    build_runner=build_runner,
-                )
-                fast_compile_duration_seconds = time.monotonic() - fast_compile_started_at
-                if fast_compile_invoked and not fast_compile_passed:
-                    if cls._looks_like_missing_assets_failure(fast_compile_output):
-                        # Fresh clones may not have obj/project.assets.json yet. Let the full
-                        # build perform restore instead of turning fast compile into a false
-                        # hard gate for every issue in the run.
-                        pass
-                    elif cls._looks_like_timeout_failure(fast_compile_output):
-                        # Large repository solutions can exceed the short precheck window while
-                        # still succeeding under the normal build timeout. Treat timeout as an
-                        # inconclusive signal and continue with the full build.
-                        pass
-                    else:
-                        should_run_build = False
-                        build_output = (
-                            f"Fast compile failed: {fast_compile_command}\n\n{fast_compile_output}".strip()
-                        )
+        should_run_build = workspace_path.exists() and reviewer_result.status != "retry"
 
         build_duration_seconds = 0.0
         if should_run_build:
@@ -536,45 +446,9 @@ class FixVerifier:
                 build_runner=build_runner,
             )
             build_duration_seconds = time.monotonic() - build_started_at
-        elif fast_compile_invoked and not fast_compile_passed:
-            build_passed = False
 
         combined_output_parts = [part for part in [build_output.strip(), guardrail_message] if part]
         combined_output = "\n\n".join(combined_output_parts)
-        if propagation_check_result.status == "retry":
-            propagation_retry_message = propagation_check_result.to_retry_message()
-            combined_output = "\n\n".join(
-                part
-                for part in [combined_output.strip(), propagation_retry_message]
-                if str(part).strip()
-            )
-        if semantic_precheck_result.status == "retry":
-            semantic_retry_message = semantic_precheck_result.to_retry_message()
-            combined_output = "\n\n".join(
-                part
-                for part in [combined_output.strip(), semantic_retry_message]
-                if str(part).strip()
-            )
-        if review_gate_result.status == "retry":
-            review_retry_message = review_gate_result.to_retry_message()
-            combined_output = "\n\n".join(
-                part
-                for part in [combined_output.strip(), review_retry_message]
-                if str(part).strip()
-            )
-        if quality_gate_result.status == "retry":
-            quality_retry_message = quality_gate_result.to_retry_message()
-            combined_output = "\n\n".join(
-                part
-                for part in [combined_output.strip(), quality_retry_message]
-                if str(part).strip()
-            )
-        if rule_validation_message:
-            combined_output = "\n\n".join(
-                part
-                for part in [combined_output.strip(), rule_validation_message]
-                if str(part).strip()
-            )
 
         return VerificationOutcome(
             build_passed=build_passed,
@@ -588,11 +462,12 @@ class FixVerifier:
             review_gate_result=review_gate_result,
             combined_output=combined_output,
             rule_validation_message=rule_validation_message,
-            fast_compile_passed=fast_compile_passed,
-            fast_compile_output=fast_compile_output,
-            fast_compile_command=fast_compile_command,
-            fast_compile_invoked=fast_compile_invoked,
-            fast_compile_duration_seconds=round(fast_compile_duration_seconds, 3),
+            post_fix_check_result=post_fix_check_result,
+            fast_compile_passed=True,
+            fast_compile_output="",
+            fast_compile_command="",
+            fast_compile_invoked=False,
+            fast_compile_duration_seconds=0.0,
             boundary_failure_code=boundary_outcome.primary_failure_code,
             boundary_failure_summary=boundary_outcome.primary_failure_summary,
             secondary_boundary_failure_codes=boundary_outcome.secondary_failure_codes,

@@ -403,6 +403,7 @@ class RunCoordinator:
                 target_config.base_branch,
                 depth=clone_depth,
             )
+            git_gateway.install_local_excludes(workspace)
         except Exception as exc:
             return abort_target(error=f"仓库克隆失败: {exc}", startup_failure=True)
 
@@ -473,11 +474,22 @@ class RunCoordinator:
                 suffix = f" (attempt {result.attempts})" if result.attempts > 1 else ""
                 print(f"  [OK] {result.summary}{suffix}")
                 successful += 1
+                local_issue_status = str(
+                    getattr(getattr(result, "post_fix_check_result", None), "get", lambda _key, _default=None: None)("issue_status", None)
+                    if isinstance(getattr(result, "post_fix_check_result", None), dict)
+                    else getattr(getattr(result, "post_fix_check_result", None), "issue_status", "")
+                ).strip()
                 issue_summary_text = "已完成修复，并通过该 issue 的本地构建验证。"
+                if local_issue_status == "UNKNOWN":
+                    issue_summary_text = "已完成修复并通过本地构建验证，但当前规则缺少可靠的本地判定器，最终状态待 Sonar 正式分析确认。"
                 if result.attempts > 1:
                     issue_summary_text = (
                         f"经过 {result.attempts} 次尝试后，已完成修复，并通过该 issue 的本地构建验证。"
                     )
+                    if local_issue_status == "UNKNOWN":
+                        issue_summary_text = (
+                            f"经过 {result.attempts} 次尝试后，已完成修复并通过本地构建验证，但当前规则缺少可靠的本地判定器，最终状态待 Sonar 正式分析确认。"
+                        )
                 issue_summaries.append(
                     PullRequestIssueSummary(
                         status="FIXED",

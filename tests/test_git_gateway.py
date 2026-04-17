@@ -131,6 +131,22 @@ def test_git_repository_gateway_publish_branch_runs_expected_command_sequence(tm
     assert all(cwd == tmp_path for _, cwd in calls)
 
 
+def test_git_repository_gateway_install_local_excludes_writes_runtime_pattern(tmp_path: Path) -> None:
+    gateway = GitRepositoryGateway(
+        remote_url="https://dev.azure.com/acme/project/_git/repo",
+        pat="secret",
+        command_runner=lambda command, **kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
+    )
+    exclude_path = tmp_path / ".git" / "info" / "exclude"
+
+    gateway.install_local_excludes(tmp_path)
+    gateway.install_local_excludes(tmp_path)
+
+    content = exclude_path.read_text(encoding="utf-8")
+    assert "/.pi-sonar-agent-runtime/" in content
+    assert content.count("/.pi-sonar-agent-runtime/") == 1
+
+
 def test_git_repository_gateway_supports_generic_clone_with_depth(tmp_path: Path) -> None:
     calls: list[tuple[str, Path | None]] = []
 
@@ -176,6 +192,33 @@ def test_git_repository_gateway_stage_paths_and_push_head_use_expected_commands(
         "git push -u origin HEAD",
     ]
     assert all(cwd == tmp_path for _, cwd in calls)
+
+
+def test_git_repository_gateway_stage_paths_filters_runtime_artifacts(tmp_path: Path) -> None:
+    calls: list[tuple[str, Path | None]] = []
+
+    def fake_runner(command: str, *, cwd: Path | None = None, timeout=None, check: bool = True):
+        calls.append((command, cwd))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    gateway = GitRepositoryGateway(
+        remote_url="https://dev.azure.com/acme/project/_git/repo",
+        pat="secret",
+        command_runner=fake_runner,
+    )
+
+    gateway.stage_paths(
+        tmp_path,
+        [
+            "src/Foo.cs",
+            ".pi-sonar-agent-runtime/retry/issue/attempt-01-build-tail.log",
+            r".git\pi-sonar-agent-runtime\issues\issue\working-memory.json",
+        ],
+    )
+
+    assert calls == [
+        ('git add -- "src/Foo.cs"', tmp_path),
+    ]
 
 
 def test_git_repository_gateway_branch_exists_checks_remote_refs() -> None:

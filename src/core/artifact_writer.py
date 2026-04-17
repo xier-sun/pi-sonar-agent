@@ -123,6 +123,7 @@ class ArtifactWriter:
                 "workspace_path": workspace_path.as_posix(),
                 "baseline_head_commit": baseline.head_commit,
                 "guardrail_mode": getattr(result, "guardrail_mode", ""),
+                "execution_mode": getattr(result, "execution_mode", ""),
                 "active_quality_gate_rules": active_quality_gate_rules,
                 "execution_profile": getattr(result, "execution_profile", "full_path"),
                 "fast_path_enabled": bool(getattr(result, "fast_path_enabled", False)),
@@ -139,6 +140,14 @@ class ArtifactWriter:
                     None,
                 ),
                 "review_gate_result": _serialize_optional_payload(getattr(result, "review_gate_result", None), None),
+                "post_fix_check_result": _serialize_optional_payload(
+                    getattr(result, "post_fix_check_result", None),
+                    None,
+                ),
+                "issue_working_memory": _serialize_optional_payload(
+                    getattr(result, "issue_working_memory", None),
+                    None,
+                ),
                 "prompt_budget_report": _serialize_optional_payload(
                     getattr(result, "prompt_budget_report", None),
                     None,
@@ -201,6 +210,7 @@ class ArtifactWriter:
                 "build_command": result.build_command or build_command,
                 "build_output": result.build_output,
                 "guardrail_mode": getattr(result, "guardrail_mode", ""),
+                "execution_mode": getattr(result, "execution_mode", ""),
                 "semantic_precheck_result": _serialize_optional_payload(
                     getattr(result, "semantic_precheck_result", None),
                     {
@@ -220,6 +230,20 @@ class ArtifactWriter:
                     {
                         "status": "not_available",
                         "reason": "Review gate result was not attached to this attempt.",
+                    },
+                ),
+                "post_fix_check_result": _serialize_optional_payload(
+                    getattr(result, "post_fix_check_result", None),
+                    {
+                        "status": "not_available",
+                        "reason": "Post-fix check result was not attached to this attempt.",
+                    },
+                ),
+                "issue_working_memory": _serialize_optional_payload(
+                    getattr(result, "issue_working_memory", None),
+                    {
+                        "status": "not_available",
+                        "reason": "Issue working memory was not attached to this attempt.",
                     },
                 ),
                 "boundary_failure_code": getattr(result, "boundary_failure_code", ""),

@@ -46,6 +46,11 @@ from pi_sonar_agent.core.repair_plan import (
     RepairPropagationTarget,
 )
 from pi_sonar_agent.core.retry_context import RetryContext
+from pi_sonar_agent.core.simple_mode import (
+    SIMPLE_LOOP_EXECUTION_MODE,
+    is_simple_loop_execution_mode,
+    normalize_execution_mode,
+)
 from pi_sonar_agent.core.scope_guard import LegacyScopeGuard
 from pi_sonar_agent.fixers.rule_profiles import load_rule_catalog
 
@@ -154,7 +159,11 @@ class IssuePlanner:
         return symbol_kind
 
     @staticmethod
-    def _allowed_change_kinds(scope_mode: str) -> tuple[str, ...]:
+    def _allowed_change_kinds(
+        scope_mode: str,
+        *,
+        allowed_capabilities: tuple[str, ...] = (),
+    ) -> tuple[str, ...]:
         default = ("direct-fix", "extract-local", "guard-clause-adjustment")
         per_mode = {
             METHOD_SCOPE_MODE: (*default, "extract-private-helper"),
@@ -165,7 +174,12 @@ class IssuePlanner:
             LOOP_REWRITE_SCOPE_MODE: ("loop-rewrite", "linq-rewrite", "extract-local"),
             STATEMENT_SCOPE_MODE: default,
         }
-        return per_mode.get(scope_mode, default)
+        allowed_change_kinds = per_mode.get(scope_mode, default)
+        if HELPER_EXTRACT_CAPABILITY not in allowed_capabilities:
+            allowed_change_kinds = tuple(
+                item for item in allowed_change_kinds if item != "extract-private-helper"
+            )
+        return allowed_change_kinds
 
     @staticmethod
     def _rule_specific_change_kinds(rule_id: str) -> tuple[str, ...]:
@@ -2121,12 +2135,14 @@ class IssuePlanner:
         quality_gate_catalog: QualityGateCatalog | None = None,
         lessons_store: LessonsStore | None = None,
         performance_flags: PerformanceFlags | None = None,
+        execution_mode: str = SIMPLE_LOOP_EXECUTION_MODE,
     ) -> IssuePlan:
         """Build an issue plan and edit contract from runtime context."""
 
         normalized_path = cls._normalize_path(file_path)
         catalog = quality_gate_catalog or load_default_quality_gate_catalog()
         effective_performance_flags = performance_flags or load_performance_flags()
+        normalized_execution_mode = normalize_execution_mode(execution_mode)
         quality_gate_rules = catalog.rules_for_path(normalized_path)
         normalized_scope_mode = str(scope_mode or STATEMENT_SCOPE_MODE)
         policy = get_rule_policy(rule_id)
@@ -2148,6 +2164,11 @@ class IssuePlanner:
             planner_lessons = (lessons_store or LessonsStore()).load_planner_lessons(
                 issue_rule_id=rule_id,
                 failure_kind=retry_context.failure_kind,
+                failure_fingerprints=tuple(
+                    str(item).strip()
+                    for item in getattr(retry_context, "failure_fingerprints", ()) or ()
+                    if str(item).strip()
+                ),
                 scope_mode=normalized_scope_mode,
                 guardrail_mode=guardrail_mode,
                 boundary_failure_code=(
@@ -2209,45 +2230,49 @@ class IssuePlanner:
             allowed_line_ranges=allowed_line_ranges,
             allowed_related_symbols=allowed_related_symbols,
         )
-        fast_path_enabled = cls._should_enable_fast_path(
-            rule_id=rule_id,
-            retry_context=retry_context,
-            allowed_capabilities=allowed_capabilities,
-            allowed_related_symbols=allowed_related_symbols,
-            performance_flags=effective_performance_flags,
-        )
-        plan_first_enabled = cls._should_enable_plan_first(
-            rule_id=rule_id,
-            retry_context=retry_context,
-            allowed_capabilities=allowed_capabilities,
-            fast_path_enabled=fast_path_enabled,
-            performance_flags=effective_performance_flags,
-        )
-        repair_plan = (
-            cls._build_repair_plan(
+        fast_path_enabled = False
+        plan_first_enabled = False
+        repair_plan = None
+        if not is_simple_loop_execution_mode(normalized_execution_mode):
+            fast_path_enabled = cls._should_enable_fast_path(
                 rule_id=rule_id,
-                workspace_path=workspace_path,
-                normalized_path=normalized_path,
-                target_symbol=symbol,
-                allowed_related_symbols=allowed_related_symbols,
-                allowed_capabilities=allowed_capabilities,
-                quality_gate_rules=quality_gate_rules,
-                source_lines=normalized_source_lines,
-                issue_line=issue_line,
-                scope_start_line=scope_start_line,
-                scope_end_line=scope_end_line,
                 retry_context=retry_context,
-                planner_lessons=planner_lessons,
-                enable_archetype_strategy_selection=bool(
-                    getattr(effective_performance_flags, "repair_archetype_strategy_selection", True)
-                ),
-                enable_constraint_injection=bool(
-                    getattr(effective_performance_flags, "repair_archetype_constraint_injection", True)
-                ),
+                allowed_capabilities=allowed_capabilities,
+                allowed_related_symbols=allowed_related_symbols,
+                performance_flags=effective_performance_flags,
             )
-            if plan_first_enabled
-            else None
-        )
+            plan_first_enabled = cls._should_enable_plan_first(
+                rule_id=rule_id,
+                retry_context=retry_context,
+                allowed_capabilities=allowed_capabilities,
+                fast_path_enabled=fast_path_enabled,
+                performance_flags=effective_performance_flags,
+            )
+            repair_plan = (
+                cls._build_repair_plan(
+                    rule_id=rule_id,
+                    workspace_path=workspace_path,
+                    normalized_path=normalized_path,
+                    target_symbol=symbol,
+                    allowed_related_symbols=allowed_related_symbols,
+                    allowed_capabilities=allowed_capabilities,
+                    quality_gate_rules=quality_gate_rules,
+                    source_lines=normalized_source_lines,
+                    issue_line=issue_line,
+                    scope_start_line=scope_start_line,
+                    scope_end_line=scope_end_line,
+                    retry_context=retry_context,
+                    planner_lessons=planner_lessons,
+                    enable_archetype_strategy_selection=bool(
+                        getattr(effective_performance_flags, "repair_archetype_strategy_selection", True)
+                    ),
+                    enable_constraint_injection=bool(
+                        getattr(effective_performance_flags, "repair_archetype_constraint_injection", True)
+                    ),
+                )
+                if plan_first_enabled
+                else None
+            )
         if (
             repair_plan is not None
             and repair_plan.requires_signature_change
@@ -2293,10 +2318,20 @@ class IssuePlanner:
                     repair_plan,
                     auto_upgraded_capabilities=auto_upgraded_capabilities,
                 )
-        plan_precheck = cls._precheck_repair_plan(
-            repair_plan=repair_plan,
-            allowed_capabilities=allowed_capabilities,
+        plan_precheck = PlanPrecheckResult(
+            status="not_applicable",
+            blocking=False,
+            code="simple_loop_minimal_plan",
+            summary="Simple-loop execution keeps planning minimal and defers validation to build + post-check.",
+            details=(
+                "Structured repair-plan precheck is disabled in simple_loop mode.",
+            ),
         )
+        if not is_simple_loop_execution_mode(normalized_execution_mode):
+            plan_precheck = cls._precheck_repair_plan(
+                repair_plan=repair_plan,
+                allowed_capabilities=allowed_capabilities,
+            )
         execution_profile = "fast_path_short_form" if fast_path_enabled else "full_path"
         if plan_first_enabled and not fast_path_enabled:
             execution_profile = "plan_first_full_path"
@@ -2325,13 +2360,8 @@ class IssuePlanner:
                 )
             )
         )
-        rule_profile = load_rule_catalog().get(rule_id)
-        allow_file_creation = bool(
-            rule_profile is not None and "create_file" in rule_profile.allowed_operations
-        )
-        allowed_new_file_roots = (
-            cls._directory_roots_for_files(target_files) if allow_file_creation else ()
-        )
+        allow_file_creation = False
+        allowed_new_file_roots = ()
         repo_capability = None
         repo_capability_summary = ""
         repo_capability_hints: tuple[str, ...] = ()
@@ -2370,7 +2400,10 @@ class IssuePlanner:
             boundary_profile=boundary_profile,
             allowed_capabilities=allowed_capabilities,
             allowed_change_kinds=(
-                *cls._allowed_change_kinds(normalized_scope_mode),
+                *cls._allowed_change_kinds(
+                    normalized_scope_mode,
+                    allowed_capabilities=allowed_capabilities,
+                ),
                 *cls._rule_specific_change_kinds(rule_id),
             ),
             forbidden_change_kinds=forbidden_change_kinds,
@@ -2384,6 +2417,7 @@ class IssuePlanner:
             quality_gate_rules=quality_gate_rules,
             planner_lessons=planner_lessons,
             prefetched_context=prefetched_context,
+            execution_mode=normalized_execution_mode,
             execution_profile=execution_profile,
             fast_path_enabled=fast_path_enabled,
             plan_first_enabled=plan_first_enabled,
@@ -2422,11 +2456,13 @@ class IssuePlanner:
         failure_fingerprint_repetition = int(
             getattr(retry_context, "failure_fingerprint_repetition", 0) or 0
         )
-        if cls._should_skip_after_repeated_failure(
+        if (
+            not is_simple_loop_execution_mode(normalized_execution_mode)
+            and cls._should_skip_after_repeated_failure(
             rule_id=rule_id,
             failure_fingerprints=retry_failure_fingerprints,
             failure_fingerprint_repetition=failure_fingerprint_repetition,
-        ):
+        )):
             repeated_failure_skip_reason = (
                 "Repeated failure fingerprint indicates this issue is unlikely to converge with another generic agent retry; "
                 "handoff to a specialized engine or manual review."

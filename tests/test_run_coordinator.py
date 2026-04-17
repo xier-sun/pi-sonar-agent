@@ -351,6 +351,7 @@ def test_run_coordinator_passes_configured_clone_depth_to_git_gateway(
     monkeypatch.setattr(run_coordinator_module, "ArtifactWriter", FakeArtifactWriter)
 
     clone_calls: list[tuple[Path, str, int | None]] = []
+    exclude_calls: list[Path] = []
 
     class FakeGitRepositoryGateway:
         def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
@@ -359,6 +360,9 @@ def test_run_coordinator_passes_configured_clone_depth_to_git_gateway(
         def clone_branch(self, workspace_path: Path, branch: str, *, depth: int | None = None) -> None:
             clone_calls.append((workspace_path, branch, depth))
             workspace_path.mkdir(parents=True, exist_ok=True)
+
+        def install_local_excludes(self, workspace_path: Path) -> None:
+            exclude_calls.append(workspace_path)
 
         def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
             return None
@@ -460,6 +464,7 @@ def test_run_coordinator_passes_configured_clone_depth_to_git_gateway(
             25,
         )
     ]
+    assert exclude_calls == [tmp_path / "workspaces" / "fix_repo-a_20260415100000"]
     output = capsys.readouterr().out
     assert "使用浅克隆准备仓库: depth=25" in output
 

@@ -6,7 +6,7 @@ from collections.abc import Iterable
 
 from pi_sonar_agent.core.project_env import read_project_env
 
-BASE_BUILTIN_FIX_TOOLS = ("Read", "Edit", "MultiEdit")
+BASE_BUILTIN_FIX_TOOLS = ("Read", "Edit", "MultiEdit", "Write")
 CREATE_FILE_TOOL = "Write"
 CONTROLLED_BASH_TOOL = "Bash"
 CONTROLLED_SHELL_DISPLAY_NAME = "Bash"
@@ -30,7 +30,7 @@ def build_fix_runtime_tools(*, include_create_file_tool: bool = False) -> tuple[
     """Return the runtime builtin tool list for issue fixing."""
 
     tools = list(BASE_BUILTIN_FIX_TOOLS)
-    if include_create_file_tool:
+    if include_create_file_tool and CREATE_FILE_TOOL not in tools:
         tools.append(CREATE_FILE_TOOL)
     if controlled_bash_enabled():
         tools.append(CONTROLLED_BASH_TOOL)
@@ -111,7 +111,7 @@ def render_controlled_bash_prompt_constraints(
         )
     if allow_file_creation and normalized_roots:
         constraints.append(
-            "如果需要创建尚不存在的新文件，优先使用 Write 工具；Write 仅用于第一次创建新文件，不要用来重写已有文件。"
+            "如果需要创建尚不存在的新文件，允许使用 Write 工具，但新文件只能落在声明目录内。"
         )
         constraints.append(
             "当前 attempt 允许用 Bash 新建文件，但仅限 bash 兼容创建命令，且新文件必须落在以下目录内："
@@ -123,6 +123,6 @@ def render_controlled_bash_prompt_constraints(
         )
     else:
         constraints.append(
-            "严禁用 shell 删除文件、创建文件、覆盖文件或通过 shell 直接改写源文件；已有文件修改仍使用 Edit。"
+            "严禁用 shell 删除文件、创建文件、覆盖文件或通过 shell 直接改写源文件；已有文件修改使用 Read/Edit/MultiEdit/Write。"
         )
     return tuple(constraints)

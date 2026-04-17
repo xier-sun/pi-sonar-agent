@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import hashlib
 import re
 import shutil
@@ -26,6 +26,16 @@ from pi_sonar_agent.core.failure_fingerprint import detect_failure_fingerprints
 from pi_sonar_agent.core.fix_verifier import FixVerifier
 from pi_sonar_agent.core.follow_up_store import FollowUpStore
 from pi_sonar_agent.core.lessons_store import LessonsStore
+from pi_sonar_agent.core.memory.evidence_state import (
+    EVIDENCE_STATE_VERSION,
+    EvidenceState,
+)
+from pi_sonar_agent.core.memory.issue_working_memory import (
+    IssueWorkingMemory,
+    create_initial_issue_working_memory,
+    merge_issue_working_memory,
+)
+from pi_sonar_agent.core.memory.working_memory_store import WorkingMemoryStore
 from pi_sonar_agent.core.quality_gate import build_compliance_summary
 from pi_sonar_agent.core.retry_context import (
     BoundaryFailureContext,
@@ -41,6 +51,7 @@ from pi_sonar_agent.core.retry_context import (
     SemanticPrecheckFailureContext,
     SemanticPrecheckFindingContext,
     ScopeViolationContext,
+    merge_retry_context_history,
     render_retry_context,
 )
 from pi_sonar_agent.core.state import (
@@ -56,7 +67,7 @@ from pi_sonar_agent.core.state import (
 from pi_sonar_agent.core.state_store import RunStateStore
 from pi_sonar_agent.fixers.build_gate import format_build_failure_report
 
-DEFAULT_MAX_BUILD_RETRIES = 5
+DEFAULT_MAX_BUILD_RETRIES = 3
 EARLY_RETRY_ABORT_MIN_ATTEMPTS = 5
 EARLY_RETRY_ABORT_MIN_ATTEMPTS_NO_CHANGE = 2
 EARLY_RETRY_ABORT_MIN_ATTEMPTS_FIRST_RESPONSE_TIMEOUT = 2
@@ -64,6 +75,19 @@ EARLY_RETRY_ABORT_MIN_ATTEMPTS_TOOL_INPUT_INVALID = 2
 EXTENDED_BUILD_TIMEOUT_SECONDS = 600
 PROMPT_SAFE_BUILD_REPORT_MAX_LINES = 24
 RETRY_RUNTIME_MAX_TAIL_LINES = 120
+PATCH_SUMMARY_MAX_PREVIEW_LINES = 6
+PATCH_SUMMARY_MAX_CHARS = 520
+
+
+@dataclass(frozen=True)
+class _BestS3776Candidate:
+    """Best build-passing local S3776 patch preserved across retries."""
+
+    attempt: int
+    estimated_complexity: int
+    fail_threshold: int
+    baseline: WorkspaceBaseline
+    result: FixResult
 
 
 def _sanitize_name(value: str) -> str:
@@ -83,6 +107,155 @@ def _build_issue_artifact_root(
         / _sanitize_name(repository)
         / _sanitize_name(run_label)
         / _sanitize_name(issue_key)
+    )
+
+
+def _post_fix_check_as_dict(result: FixResult) -> dict[str, object]:
+    raw = getattr(result, "post_fix_check_result", None)
+    if isinstance(raw, dict):
+        return raw
+    if hasattr(raw, "to_dict") and callable(getattr(raw, "to_dict")):
+        try:
+            data = raw.to_dict()
+        except Exception:
+            data = {}
+        return data if isinstance(data, dict) else {}
+    if raw is None:
+        return {}
+    try:
+        issue_check = getattr(raw, "issue_check", None)
+        blocker_check = getattr(raw, "blocker_check", None)
+        return {
+            "issue_status": getattr(raw, "issue_status", ""),
+            "issue_check": issue_check.to_dict() if hasattr(issue_check, "to_dict") else issue_check,
+            "blocker_check": blocker_check.to_dict() if hasattr(blocker_check, "to_dict") else blocker_check,
+            "retry_message": getattr(raw, "retry_message", ""),
+        }
+    except Exception:
+        return {}
+
+
+def _extract_s3776_local_complexity(result: FixResult) -> tuple[int, int] | None:
+    post_fix_check = _post_fix_check_as_dict(result)
+    issue_check = post_fix_check.get("issue_check")
+    if not isinstance(issue_check, dict):
+        return None
+    metrics = issue_check.get("metrics")
+    if not isinstance(metrics, dict):
+        return None
+    try:
+        complexity = int(metrics.get("estimated_cognitive_complexity"))
+        fail_threshold = int(metrics.get("fail_threshold"))
+    except (TypeError, ValueError):
+        return None
+    if complexity <= 0 or fail_threshold <= 0:
+        return None
+    return complexity, fail_threshold
+
+
+def _is_preservable_s3776_candidate(issue: SonarIssue, result: FixResult) -> bool:
+    if str(getattr(issue, "rule", "")).strip() != "csharpsquid:S3776":
+        return False
+    if not bool(getattr(result, "build_passed", False)):
+        return False
+    post_fix_check = _post_fix_check_as_dict(result)
+    issue_status = str(post_fix_check.get("issue_status", "")).strip().upper()
+    if issue_status not in {"UNKNOWN", "PASS"}:
+        return False
+    complexity_pair = _extract_s3776_local_complexity(result)
+    if complexity_pair is None:
+        return False
+    complexity, fail_threshold = complexity_pair
+    return complexity <= fail_threshold
+
+
+def _should_replace_best_s3776_candidate(
+    current: _BestS3776Candidate | None,
+    *,
+    issue: SonarIssue,
+    result: FixResult,
+) -> bool:
+    if not _is_preservable_s3776_candidate(issue, result):
+        return False
+    next_complexity, _ = _extract_s3776_local_complexity(result) or (0, 0)
+    if current is None:
+        return True
+    return next_complexity < current.estimated_complexity
+
+
+def _clone_fix_result(result: FixResult) -> FixResult:
+    return replace(
+        result,
+        changes=[dict(item) for item in getattr(result, "changes", ()) or ()],
+        performance_metrics=dict(getattr(result, "performance_metrics", {}) or {}),
+        post_fix_check_result=dict(_post_fix_check_as_dict(result)),
+    )
+
+
+def _capture_best_s3776_candidate(
+    *,
+    issue: SonarIssue,
+    result: FixResult,
+    workspace_path: Path,
+    repository: str,
+    run_label: str,
+    attempt: int,
+    snapshot_root: Path,
+) -> _BestS3776Candidate | None:
+    if not _is_preservable_s3776_candidate(issue, result):
+        return None
+    complexity, fail_threshold = _extract_s3776_local_complexity(result) or (0, 0)
+    baseline = capture_workspace_baseline(
+        workspace_path,
+        repository=repository,
+        issue_key=f"{issue.key}-best-attempt-{attempt:02d}",
+        run_label=run_label,
+        snapshot_root=str(snapshot_root),
+    )
+    return _BestS3776Candidate(
+        attempt=attempt,
+        estimated_complexity=complexity,
+        fail_threshold=fail_threshold,
+        baseline=baseline,
+        result=_clone_fix_result(result),
+    )
+
+
+def _should_preserve_best_s3776_candidate(
+    current_result: FixResult,
+    candidate: _BestS3776Candidate | None,
+) -> bool:
+    if candidate is None:
+        return False
+    if bool(getattr(current_result, "success", False)):
+        return False
+    current_complexity = _extract_s3776_local_complexity(current_result)
+    if not bool(getattr(current_result, "build_passed", False)) or current_complexity is None:
+        return True
+    return current_complexity[0] > candidate.estimated_complexity
+
+
+def _build_preserved_best_s3776_result(
+    *,
+    candidate: _BestS3776Candidate,
+    attempts: int,
+) -> FixResult:
+    skip_reason = (
+        f"Preserved the best build-passing S3776 patch from attempt {candidate.attempt}; "
+        f"local complexity estimate reached {candidate.estimated_complexity} "
+        f"(allowed threshold {candidate.fail_threshold}) and the workspace was restored to that patch."
+    )
+    return replace(
+        _clone_fix_result(candidate.result),
+        success=False,
+        skipped=True,
+        attempts=attempts,
+        retryable_failure=False,
+        build_verification_failed=False,
+        error=skip_reason,
+        skip_reason=skip_reason,
+        summary=skip_reason,
+        patch_salvaged=True,
     )
 
 
@@ -168,7 +341,7 @@ def _extract_compiler_errors(workspace_path: Path, build_output: str) -> list[Co
     """Extract unique compiler errors and local snippets from build output."""
 
     pattern = re.compile(
-        r"^(?P<file>[A-Za-z]:\\.+?\.(?:cs|fs|vb))\((?P<line>\d+),(?P<column>\d+)\):\s+"
+        r"^(?P<file>[A-Za-z]:[\\/].+?\.(?:cs|fs|vb))\((?P<line>\d+),(?P<column>\d+)\):\s+"
         r"error\s+(?P<code>[A-Z]{2,}\d+):\s+(?P<message>.+?)\s+\[",
         re.IGNORECASE,
     )
@@ -408,13 +581,19 @@ def _materialize_retry_workspace_files(
 ) -> RetryContext:
     """Write model-readable retry artifacts inside the workspace after baseline restore."""
 
-    if not workspace_path.exists() or retry_context.failure_kind != "build":
+    if not workspace_path.exists():
         return retry_context
 
     retry_root = workspace_path / ".pi-sonar-agent-runtime" / "retry" / _sanitize_name(issue_key)
     retry_root.mkdir(parents=True, exist_ok=True)
 
     references: list[str] = []
+    patch_summary_text = str(getattr(retry_context, "patch_summary", "") or "").strip()
+    if patch_summary_text:
+        patch_summary_path = retry_root / f"attempt-{retry_context.source_attempt_number:02d}-patch-summary.txt"
+        patch_summary_path.write_text(patch_summary_text + "\n", encoding="utf-8")
+        references.append(patch_summary_path.relative_to(workspace_path).as_posix())
+
     summary_text = str(retry_context.prompt_output or "").strip()
     if summary_text:
         summary_path = retry_root / f"attempt-{retry_context.source_attempt_number:02d}-build-summary.txt"
@@ -861,6 +1040,116 @@ def _build_strategy_fingerprint(result: FixResult) -> str:
     return "|".join(part for part in parts if not part.endswith("="))
 
 
+def _build_strategy_summary(result: FixResult) -> str:
+    edit_contract = getattr(result, "edit_contract", None)
+    repair_plan = getattr(result, "repair_plan", None) or getattr(edit_contract, "repair_plan", None)
+    parts: list[str] = []
+    selected_archetype = str(getattr(repair_plan, "selected_archetype", "")).strip()
+    repair_shape = str(getattr(repair_plan, "repair_shape", "")).strip()
+    scope_mode = str(getattr(edit_contract, "scope_mode", "")).strip()
+    execution_profile = str(getattr(edit_contract, "execution_profile", "")).strip()
+    allowed_capabilities = tuple(
+        str(item).strip()
+        for item in (getattr(edit_contract, "allowed_capabilities", ()) or ())
+        if str(item).strip()
+    )
+    if selected_archetype:
+        parts.append(f"archetype={selected_archetype}")
+    if repair_shape:
+        parts.append(f"shape={repair_shape}")
+    if scope_mode:
+        parts.append(f"scope={scope_mode}")
+    if execution_profile:
+        parts.append(f"profile={execution_profile}")
+    if allowed_capabilities:
+        parts.append("caps=" + ",".join(allowed_capabilities[:4]))
+    return "; ".join(parts)
+
+
+def _read_workspace_diff_text(
+    workspace_path: Path,
+    changed_files: tuple[str, ...],
+) -> str:
+    if not changed_files or not (workspace_path / ".git").exists():
+        return ""
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(workspace_path),
+                "diff",
+                "--no-ext-diff",
+                "--unified=1",
+                "--",
+                *changed_files,
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=20,
+            check=False,
+        )
+    except Exception:
+        return ""
+    if result.returncode not in (0, 1):
+        return ""
+    return str(result.stdout or "").strip()
+
+
+def _extract_edited_symbols_from_diff(diff_text: str) -> tuple[str, ...]:
+    if not diff_text:
+        return ()
+    symbols: list[str] = []
+    method_pattern = re.compile(
+        r"^\+\s*(?:\[[^\]]+\]\s*)*(?:public|private|protected|internal|static|sealed|virtual|override|partial|async|new|unsafe|\s)+"
+        r"[\w<>\[\],?.]+\s+(?P<name>[A-Za-z_]\w*)\s*\(",
+    )
+    type_pattern = re.compile(
+        r"^\+\s*(?:public|private|protected|internal|static|sealed|partial|abstract|\s)*(?:class|record|struct|interface)\s+(?P<name>[A-Za-z_]\w*)\b",
+    )
+    for line in diff_text.splitlines():
+        if not line.startswith("+") or line.startswith("+++"):
+            continue
+        method_match = method_pattern.match(line.rstrip())
+        if method_match:
+            symbols.append(method_match.group("name"))
+            continue
+        type_match = type_pattern.match(line.rstrip())
+        if type_match:
+            symbols.append(type_match.group("name"))
+    return tuple(dict.fromkeys(item for item in symbols if item))
+
+
+def _build_patch_summary(
+    *,
+    changed_files: tuple[str, ...],
+    diff_text: str,
+    edited_symbols: tuple[str, ...],
+) -> str:
+    sections: list[str] = []
+    if changed_files:
+        sections.append("files=" + ", ".join(changed_files[:4]))
+    if edited_symbols:
+        sections.append("symbols=" + ", ".join(edited_symbols[:6]))
+    preview_lines: list[str] = []
+    for raw_line in diff_text.splitlines():
+        if raw_line.startswith(("diff --git", "index ", "--- ", "+++ ", "@@")):
+            continue
+        if not raw_line.startswith(("+", "-")):
+            continue
+        normalized = " ".join(raw_line[1:].strip().split())
+        if not normalized:
+            continue
+        preview_lines.append(f"{raw_line[0]} {normalized}")
+        if len(preview_lines) >= PATCH_SUMMARY_MAX_PREVIEW_LINES:
+            break
+    if preview_lines:
+        sections.append("preview=" + " | ".join(preview_lines))
+    return " ; ".join(sections)[:PATCH_SUMMARY_MAX_CHARS]
+
+
 def _build_diff_fingerprint(workspace_path: Path, result: FixResult) -> str:
     changed_files = _normalize_changed_files(result)
     if not changed_files:
@@ -928,6 +1217,8 @@ def build_retry_context(
     plan_failure = _extract_plan_failure_context(result)
     semantic_precheck_failure = _extract_semantic_precheck_failure_context(result)
     changed_files = _normalize_changed_files(result)
+    diff_text = _read_workspace_diff_text(workspace_path, changed_files)
+    edited_symbols = _extract_edited_symbols_from_diff(diff_text)
     prompt_output, build_timeout_failed, build_timeout_without_errors = _build_prompt_safe_output(
         result,
         compiler_errors=compiler_errors,
@@ -967,6 +1258,13 @@ def build_retry_context(
         build_command=result.build_command,
         raw_output=raw_output,
         prompt_output=prompt_output,
+        strategy_summary=_build_strategy_summary(result),
+        patch_summary=_build_patch_summary(
+            changed_files=changed_files,
+            diff_text=diff_text,
+            edited_symbols=edited_symbols,
+        ),
+        edited_symbols=edited_symbols,
         retryable_failure=result.retryable_failure,
         build_verification_failed=result.build_verification_failed,
         changed_files=changed_files,
@@ -1282,17 +1580,35 @@ def _invoke_fix_issue(
     *,
     retry_feedback: str,
     retry_context: RetryContext | None,
+    working_memory: IssueWorkingMemory | None,
 ) -> FixResult:
     """Invoke agent.fix_issue while remaining compatible with legacy test doubles."""
 
     fix_issue_params = signature(agent.fix_issue).parameters
     if "retry_context" in fix_issue_params:
+        if "working_memory" in fix_issue_params:
+            return agent.fix_issue(
+                issue,
+                workspace_path,
+                build_command,
+                retry_feedback=retry_feedback,
+                retry_context=retry_context,
+                working_memory=working_memory,
+            )
         return agent.fix_issue(
             issue,
             workspace_path,
             build_command,
             retry_feedback=retry_feedback,
             retry_context=retry_context,
+        )
+    if "working_memory" in fix_issue_params:
+        return agent.fix_issue(
+            issue,
+            workspace_path,
+            build_command,
+            retry_feedback=retry_feedback,
+            working_memory=working_memory,
         )
     return agent.fix_issue(
         issue,
@@ -1309,6 +1625,293 @@ def _normalize_changed_files(result: FixResult) -> tuple[str, ...]:
         str(change.get("file", "")).replace("\\", "/").lstrip("/")
         for change in result.changes
         if str(change.get("file", "")).strip()
+    )
+
+
+def _normalize_relative_path(value: str) -> str:
+    return str(value or "").replace("\\", "/").lstrip("/").strip()
+
+
+def _build_file_content_fingerprint(file_path: Path) -> str:
+    digest = hashlib.sha1()
+    if not file_path.exists() or not file_path.is_file():
+        digest.update(b"<missing>")
+        return digest.hexdigest()[:16]
+    try:
+        digest.update(file_path.read_bytes())
+    except Exception:
+        digest.update(file_path.read_text(encoding="utf-8", errors="replace").encode("utf-8"))
+    return digest.hexdigest()[:16]
+
+
+def _build_latest_verification_summary(result: FixResult) -> str:
+    post_fix = _post_fix_check_as_dict(result)
+    issue_status = str(post_fix.get("issue_status", "")).strip().upper()
+    issue_check = post_fix.get("issue_check")
+    retry_bits: list[str] = []
+    if bool(getattr(result, "build_passed", False)):
+        retry_bits.append("build=pass")
+    elif bool(getattr(result, "build_verification_failed", False)):
+        retry_bits.append("build=fail")
+    if issue_status:
+        retry_bits.append(f"issue_status={issue_status}")
+    if isinstance(issue_check, dict):
+        summary = str(issue_check.get("summary", "")).strip()
+        if summary:
+            retry_bits.append(summary)
+    if not retry_bits:
+        return str(getattr(result, "summary", "") or "").strip()
+    return "; ".join(bit for bit in retry_bits if bit)
+
+
+def _build_latest_retryable_failure_summary(
+    result: FixResult,
+    retry_context: RetryContext | None,
+) -> str:
+    if retry_context is not None:
+        if retry_context.summary:
+            return str(retry_context.summary).strip()
+        if retry_context.error:
+            return str(retry_context.error).strip()
+    return str(getattr(result, "error", "") or "").strip()
+
+
+def _derive_rejected_strategies(
+    retry_context: RetryContext | None,
+    result: FixResult,
+) -> tuple[str, ...]:
+    items: list[str] = []
+    fingerprints = {
+        str(item).strip()
+        for item in getattr(retry_context, "failure_fingerprints", ()) or ()
+        if str(item).strip()
+    }
+    boundary_code = str(getattr(result, "boundary_failure_code", "") or "").strip()
+    if "helper_extraction_type_break" in fingerprints or boundary_code == "helper_extract_disabled":
+        items.append("不要继续新增 helper/private method。")
+    if "nullable_type_mismatch" in fingerprints:
+        items.append("不要收窄 nullable、泛型或集合类型。")
+    if fingerprints.intersection({"anonymous_type_helper_boundary", "anonymous_type_leak"}):
+        items.append("不要让匿名类型跨方法边界流动。")
+    if fingerprints.intersection({"async_without_await", "async_requires_await"}):
+        items.append("不要保留没有真实 await 的 async helper。")
+    return tuple(dict.fromkeys(item for item in items if str(item).strip()))
+
+
+def _derive_accepted_constraints(result: FixResult) -> tuple[str, ...]:
+    items: list[str] = []
+    edit_contract = getattr(result, "edit_contract", None)
+    execution_mode = str(getattr(result, "execution_mode", "")).strip()
+    if execution_mode == "simple_loop":
+        items.append("当前运行在 simple_loop，构建与 post-check 由外层统一执行。")
+    target_files = tuple(
+        _normalize_relative_path(item)
+        for item in getattr(edit_contract, "target_files", ()) or ()
+        if _normalize_relative_path(item)
+    )
+    if target_files:
+        items.append("允许修改文件: " + ", ".join(target_files[:3]))
+    allowed_capabilities = {
+        str(item).strip()
+        for item in getattr(edit_contract, "allowed_capabilities", ()) or ()
+        if str(item).strip()
+    }
+    if allowed_capabilities and "helper_extract" not in allowed_capabilities:
+        items.append("当前 contract 不允许 helper_extract。")
+    return tuple(dict.fromkeys(item for item in items if str(item).strip()))
+
+
+def _derive_next_action(
+    result: FixResult,
+    retry_context: RetryContext | None,
+) -> str:
+    if bool(getattr(result, "success", False)):
+        return "当前 issue 已通过本地验证，进入下一个 issue。"
+    if bool(getattr(result, "build_verification_failed", False)):
+        if retry_context is not None and retry_context.guidance:
+            return "先重新读取当前文件，再按这些约束修复: " + "；".join(retry_context.guidance[:2])
+        return "先读取当前文件，再优先修复仍然有效的构建错误。"
+    if bool(getattr(result, "retryable_failure", False)):
+        return "保持当前 issue 范围不变，换一种策略继续修复。"
+    if bool(getattr(result, "skipped", False)):
+        return "当前 issue 已停止自动修复，等待后续人工或策略升级处理。"
+    return "继续围绕当前 issue 做最小修复。"
+
+
+def _build_compiler_error_evidence(
+    *,
+    workspace_path: Path,
+    retry_context: RetryContext,
+) -> tuple[EvidenceState, ...]:
+    evidence: list[EvidenceState] = []
+    diff_fingerprint = str(getattr(retry_context, "diff_fingerprint", "") or "").strip()
+    for index, error in enumerate(getattr(retry_context, "compiler_errors", ()) or (), start=1):
+        normalized_path = _normalize_relative_path(getattr(error, "file_path", ""))
+        file_path = Path(getattr(error, "file_path", ""))
+        content_fingerprint = _build_file_content_fingerprint(file_path)
+        summary = f"{error.code} at {normalized_path or file_path.name}:{error.line} - {error.message}"
+        evidence_id = (
+            f"compiler:{retry_context.source_attempt_number}:{index}:"
+            f"{error.code}:{normalized_path or file_path.name}:{error.line}"
+        )
+        evidence.append(
+            EvidenceState(
+                version=EVIDENCE_STATE_VERSION,
+                evidence_id=evidence_id,
+                source_type="compiler_error",
+                summary=summary,
+                related_files=((normalized_path,) if normalized_path else ()),
+                related_symbols=(),
+                status="current",
+                content_fingerprint=content_fingerprint,
+                diff_fingerprint=diff_fingerprint,
+                superseded_by="",
+            )
+        )
+    return tuple(evidence)
+
+
+def _merge_evidence_items(
+    existing: tuple[EvidenceState, ...],
+    new_items: tuple[EvidenceState, ...],
+) -> tuple[EvidenceState, ...]:
+    merged: dict[str, EvidenceState] = {item.evidence_id: item for item in existing}
+    for item in new_items:
+        merged[item.evidence_id] = item
+    return tuple(merged[key] for key in sorted(merged))
+
+
+def _stale_current_compiler_error_evidence(
+    evidence_items: tuple[EvidenceState, ...],
+    *,
+    reason: str,
+) -> tuple[EvidenceState, ...]:
+    updated: list[EvidenceState] = []
+    for item in evidence_items:
+        if item.source_type == "compiler_error" and item.status == "current":
+            updated.append(
+                replace(
+                    item,
+                    status="stale",
+                    superseded_by=reason,
+                )
+            )
+            continue
+        updated.append(item)
+    return tuple(updated)
+
+
+def _stale_evidence_summaries(
+    evidence_items: tuple[EvidenceState, ...],
+    *,
+    limit: int = 3,
+) -> tuple[str, ...]:
+    summaries: list[str] = []
+    for item in evidence_items:
+        if item.status != "stale":
+            continue
+        summaries.append(item.summary)
+        if len(summaries) >= limit:
+            break
+    return tuple(summaries)
+
+
+def _fallback_stale_compiler_error_summaries(
+    retry_context: RetryContext | None,
+    *,
+    limit: int = 3,
+) -> tuple[str, ...]:
+    if retry_context is None:
+        return ()
+    summaries: list[str] = []
+    for item in getattr(retry_context, "compiler_errors", ()) or ():
+        normalized_path = _normalize_relative_path(getattr(item, "file_path", ""))
+        summaries.append(
+            f"{item.code} at {normalized_path or Path(getattr(item, 'file_path', '')).name}:{item.line} - {item.message}"
+        )
+        if len(summaries) >= limit:
+            break
+    return tuple(summaries)
+
+
+def _build_best_patch_summary(
+    previous: IssueWorkingMemory,
+    result: FixResult,
+) -> str:
+    if bool(getattr(result, "success", False)):
+        return "当前 workspace patch 已通过本地验证。"
+    if bool(getattr(result, "build_passed", False)):
+        verification = _build_latest_verification_summary(result)
+        return verification or "当前 patch 已通过本地 build。"
+    return previous.best_known_patch_state
+
+
+def _update_issue_working_memory_from_result(
+    current: IssueWorkingMemory,
+    *,
+    issue: SonarIssue,
+    result: FixResult,
+    retry_context: RetryContext | None,
+) -> IssueWorkingMemory:
+    issue_path = _normalize_relative_path(issue.file_path)
+    changed_files = _normalize_changed_files(result)
+    files_inspected = tuple(dict.fromkeys((*(current.files_inspected or ()), issue_path, *changed_files)))
+    latest_strategy_summary = (
+        str(getattr(retry_context, "strategy_summary", "") or "").strip()
+        if retry_context is not None
+        else current.latest_strategy_summary
+    )
+    latest_patch_summary = (
+        str(getattr(retry_context, "patch_summary", "") or "").strip()
+        if retry_context is not None
+        else current.latest_patch_summary
+    )
+    symbols_touched = tuple(
+        dict.fromkeys(
+            (
+                *(current.symbols_touched or ()),
+                *(
+                    tuple(str(item).strip() for item in getattr(retry_context, "edited_symbols", ()) if str(item).strip())
+                    if retry_context is not None
+                    else ()
+                ),
+            )
+        )
+    )
+    return merge_issue_working_memory(
+        current,
+        authoritative_workspace_state=(
+            "fixed_patch"
+            if bool(getattr(result, "success", False))
+            else "attempt_patch"
+        ),
+        best_known_patch_state=_build_best_patch_summary(current, result),
+        latest_strategy_summary=latest_strategy_summary,
+        latest_patch_summary=latest_patch_summary,
+        accepted_constraints=_derive_accepted_constraints(result),
+        rejected_strategies=_derive_rejected_strategies(retry_context, result),
+        files_inspected=files_inspected,
+        symbols_touched=symbols_touched,
+        latest_verification=_build_latest_verification_summary(result),
+        latest_retryable_failure=_build_latest_retryable_failure_summary(result, retry_context),
+        rollback_reason="",
+        next_action=_derive_next_action(result, retry_context),
+    )
+
+
+def _update_issue_working_memory_after_restore(
+    current: IssueWorkingMemory,
+    *,
+    restored_workspace_state: str,
+    rollback_reason: str,
+    rejected_strategies: tuple[str, ...] = (),
+) -> IssueWorkingMemory:
+    return merge_issue_working_memory(
+        current,
+        authoritative_workspace_state=restored_workspace_state,
+        rollback_reason=rollback_reason,
+        rejected_strategies=rejected_strategies,
+        next_action="当前工作区已回滚；先读取当前文件，再在新策略下继续修复。",
     )
 
 
@@ -1458,6 +2061,7 @@ def process_issue_with_retries(
     artifact_writer = ArtifactWriter()
     follow_up_store = FollowUpStore()
     lessons_store = lessons_store or LessonsStore()
+    working_memory_store = WorkingMemoryStore(workspace_path)
     issue_artifact_root = _build_issue_artifact_root(repository, run_label, issue.key)
     baseline = capture_workspace_baseline(
         workspace_path,
@@ -1465,9 +2069,15 @@ def process_issue_with_retries(
         issue_key=issue.key,
         run_label=run_label,
     )
+    active_retry_baseline = baseline
+    best_s3776_candidate: _BestS3776Candidate | None = None
     retry_context: RetryContext | None = None
     retry_feedback = ""
     attempt_states: list[AttemptState] = []
+    current_working_memory = (
+        working_memory_store.load(issue.key) or create_initial_issue_working_memory(issue)
+    )
+    working_memory_store.save(current_working_memory)
 
     def write_attempt_artifacts(
         *,
@@ -1503,7 +2113,12 @@ def process_issue_with_retries(
         return attempt_state
 
     def finalize_result(result: FixResult) -> FixResult:
+        nonlocal current_working_memory
         result.artifact_root = issue_artifact_root.as_posix()
+        if isinstance(getattr(result, "issue_working_memory", None), IssueWorkingMemory):
+            current_working_memory = result.issue_working_memory
+        else:
+            result.issue_working_memory = current_working_memory
         issue_state = _build_issue_state(
             issue=issue,
             repository=repository,
@@ -1552,9 +2167,11 @@ def process_issue_with_retries(
                 build_command,
                 retry_feedback=retry_feedback,
                 retry_context=retry_context,
+                working_memory=current_working_memory,
             )
             result.attempts = attempt
             result.issue_log_path = str(logger.log_path)
+            result.issue_working_memory = current_working_memory
             queue_path = follow_up_store.append(
                 repository=repository,
                 run_label=run_label,
@@ -1567,6 +2184,13 @@ def process_issue_with_retries(
             attempt_duration_seconds = time.monotonic() - attempt_started_monotonic
 
             if result.success:
+                current_working_memory = _update_issue_working_memory_from_result(
+                    current_working_memory,
+                    issue=issue,
+                    result=result,
+                    retry_context=retry_context,
+                )
+                working_memory_store.save(current_working_memory)
                 logger.write(f"Attempt {attempt} succeeded: {result.summary}")
                 attempt_state = write_attempt_artifacts(
                     attempt=attempt,
@@ -1584,9 +2208,18 @@ def process_issue_with_retries(
                         project_key=project_key,
                         issue_key=issue.key,
                     )
+                result.issue_working_memory = current_working_memory
                 return finalize_result(result)
 
             if result.skipped and result.failure_kind == "policy_skip":
+                current_working_memory = merge_issue_working_memory(
+                    current_working_memory,
+                    authoritative_workspace_state="issue_baseline",
+                    latest_verification="policy_skip",
+                    latest_retryable_failure=str(result.error or result.skip_reason or "").strip(),
+                    next_action="当前 issue 被策略跳过，等待后续策略升级或人工处理。",
+                )
+                working_memory_store.save(current_working_memory)
                 logger.write(f"Issue skipped by policy: {result.skip_reason or result.error or 'policy skip'}")
                 attempt_state = write_attempt_artifacts(
                     attempt=attempt,
@@ -1604,6 +2237,7 @@ def process_issue_with_retries(
                         project_key=project_key,
                         issue_key=issue.key,
                     )
+                result.issue_working_memory = current_working_memory
                 return finalize_result(result)
 
             logger.write(f"Attempt {attempt} failed: {result.error or 'unknown error'}")
@@ -1627,6 +2261,7 @@ def process_issue_with_retries(
                 source_attempt_number=attempt,
             )
             next_retry_context = _carry_forward_blocker_context(retry_context, next_retry_context)
+            next_retry_context = merge_retry_context_history(retry_context, next_retry_context)
             if _should_retry_build_verification_only(result, next_retry_context):
                 logger.write(
                     "Build verification timed out without compiler errors; retrying verification with extended timeout before asking the model to edit again."
@@ -1661,6 +2296,23 @@ def process_issue_with_retries(
                     source_attempt_number=attempt,
                 )
                 next_retry_context = _carry_forward_blocker_context(retry_context, next_retry_context)
+                next_retry_context = merge_retry_context_history(retry_context, next_retry_context)
+            current_working_memory = _update_issue_working_memory_from_result(
+                current_working_memory,
+                issue=issue,
+                result=result,
+                retry_context=next_retry_context,
+            )
+            working_memory_store.save(current_working_memory)
+            if getattr(next_retry_context, "compiler_errors", ()):
+                merged_evidence = _merge_evidence_items(
+                    working_memory_store.load_evidence(issue.key),
+                    _build_compiler_error_evidence(
+                        workspace_path=workspace_path,
+                        retry_context=next_retry_context,
+                    ),
+                )
+                working_memory_store.save_evidence(issue.key, merged_evidence)
             lessons_store.record_failure(
                 repository=repository,
                 run_label=run_label,
@@ -1690,8 +2342,88 @@ def process_issue_with_retries(
                     project_key=project_key,
                     issue_key=issue.key,
                 )
-            restore_workspace_baseline(workspace_path, baseline)
-            logger.write("Workspace restored to issue baseline")
+            if _should_replace_best_s3776_candidate(
+                best_s3776_candidate,
+                issue=issue,
+                result=result,
+            ):
+                updated_candidate = _capture_best_s3776_candidate(
+                    issue=issue,
+                    result=result,
+                    workspace_path=workspace_path,
+                    repository=repository,
+                    run_label=run_label,
+                    attempt=attempt,
+                    snapshot_root=issue_artifact_root / "best_attempt_snapshots",
+                )
+                if updated_candidate is not None:
+                    if best_s3776_candidate is not None:
+                        cleanup_workspace_baseline(best_s3776_candidate.baseline)
+                    best_s3776_candidate = updated_candidate
+                    active_retry_baseline = best_s3776_candidate.baseline
+                    logger.write(
+                        "Preserved best S3776 patch candidate: "
+                        f"attempt {attempt}, estimated complexity {best_s3776_candidate.estimated_complexity} "
+                        f"(allowed threshold {best_s3776_candidate.fail_threshold})."
+                    )
+            restore_workspace_baseline(workspace_path, active_retry_baseline)
+            evidence_items = working_memory_store.load_evidence(issue.key)
+            if active_retry_baseline is baseline:
+                logger.write("Workspace restored to issue baseline")
+                rollback_reason = (
+                    "上一轮 patch 已撤销，工作区回到 issue baseline；必须以当前文件状态为准，不要机械重复上一轮修法。"
+                )
+                evidence_items = _stale_current_compiler_error_evidence(
+                    evidence_items,
+                    reason="restored_issue_baseline",
+                )
+                working_memory_store.save_evidence(issue.key, evidence_items)
+                next_retry_context = replace(
+                    next_retry_context,
+                    workspace_state_note=(
+                        "进入本轮前工作区已恢复到 issue baseline；上一轮错误来自先前 patch，"
+                        "不保证当前文件仍与错误片段逐字一致。请先 Read 当前文件，再根据失败原因继续修复。"
+                    ),
+                )
+                current_working_memory = _update_issue_working_memory_after_restore(
+                    current_working_memory,
+                    restored_workspace_state="issue_baseline",
+                    rollback_reason=rollback_reason,
+                    rejected_strategies=_derive_rejected_strategies(next_retry_context, result),
+                )
+            else:
+                logger.write(
+                    "Workspace restored to preserved best-attempt baseline before retry"
+                )
+                rollback_reason = (
+                    "上一轮较差 patch 已撤销，工作区回到 best known patch；请在当前最优 patch 基础上换策略继续修复。"
+                )
+                evidence_items = _stale_current_compiler_error_evidence(
+                    evidence_items,
+                    reason="restored_best_known_patch",
+                )
+                working_memory_store.save_evidence(issue.key, evidence_items)
+                next_retry_context = replace(
+                    next_retry_context,
+                    workspace_state_note=(
+                        "进入本轮前工作区已恢复到已保留的 best patch；上一轮错误来自更晚但更差的 patch，"
+                        "请以当前文件状态为准，只把历史错误当作失败线索。"
+                    ),
+                )
+                current_working_memory = _update_issue_working_memory_after_restore(
+                    current_working_memory,
+                    restored_workspace_state="best_known_patch",
+                    rollback_reason=rollback_reason,
+                    rejected_strategies=_derive_rejected_strategies(next_retry_context, result),
+                )
+            current_working_memory = merge_issue_working_memory(
+                current_working_memory,
+                stale_evidence=(
+                    _stale_evidence_summaries(evidence_items)
+                    or _fallback_stale_compiler_error_summaries(next_retry_context)
+                ),
+            )
+            working_memory_store.save(current_working_memory)
             next_retry_context = _materialize_retry_workspace_files(
                 workspace_path=workspace_path,
                 issue_key=issue.key,
@@ -1737,8 +2469,37 @@ def process_issue_with_retries(
                 result.skip_reason = result.error or "Issue fix failed"
             else:
                 result.skip_reason = result.skip_reason or result.error or "Issue fix failed"
+            if _should_preserve_best_s3776_candidate(result, best_s3776_candidate):
+                restore_workspace_baseline(workspace_path, best_s3776_candidate.baseline)
+                logger.write(
+                    "Retries exhausted with a worse S3776 patch; restored workspace to the best build-passing attempt."
+                )
+                result = _build_preserved_best_s3776_result(
+                    candidate=best_s3776_candidate,
+                    attempts=attempt,
+                )
+                current_working_memory = merge_issue_working_memory(
+                    current_working_memory,
+                    authoritative_workspace_state="best_known_patch",
+                    best_known_patch_state=(
+                        f"已恢复到 attempt {best_s3776_candidate.attempt} 的 best known patch；"
+                        f"本地复杂度估计 {best_s3776_candidate.estimated_complexity}/"
+                        f"{best_s3776_candidate.fail_threshold}。"
+                    ),
+                    next_action="当前 issue 已保留最优 patch，等待后续更强策略或最终 Sonar 复核。",
+                )
             result.error = result.skip_reason
             result.skipped = True
+            if not bool(getattr(result, "success", False)):
+                current_working_memory = merge_issue_working_memory(
+                    current_working_memory,
+                    authoritative_workspace_state=(
+                        current_working_memory.authoritative_workspace_state or "issue_baseline"
+                    ),
+                    latest_retryable_failure=str(result.skip_reason or result.error or "").strip(),
+                    next_action="当前 issue 已停止自动修复，等待后续人工或策略升级处理。",
+                )
+            working_memory_store.save(current_working_memory)
             logger.write(f"Issue skipped: {result.skip_reason}")
             final_attempt_state = _build_attempt_state(
                 attempt=attempt,
@@ -1771,6 +2532,7 @@ def process_issue_with_retries(
                     project_key=project_key,
                     issue_key=issue.key,
                 )
+            result.issue_working_memory = current_working_memory
             return finalize_result(result)
 
         skipped = FixResult(
@@ -1783,7 +2545,16 @@ def process_issue_with_retries(
             skip_reason=f"Build verification failed after {max_build_retries} attempt(s)",
             issue_log_path=str(logger.log_path),
         )
+        current_working_memory = merge_issue_working_memory(
+            current_working_memory,
+            latest_retryable_failure=skipped.error or "",
+            next_action="当前 issue 已停止自动修复，等待后续人工或策略升级处理。",
+        )
+        working_memory_store.save(current_working_memory)
+        skipped.issue_working_memory = current_working_memory
         logger.write(f"Issue skipped: {skipped.skip_reason}")
         return finalize_result(skipped)
     finally:
+        if best_s3776_candidate is not None:
+            cleanup_workspace_baseline(best_s3776_candidate.baseline)
         cleanup_workspace_baseline(baseline)

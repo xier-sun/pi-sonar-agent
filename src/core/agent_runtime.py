@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import difflib
 import json
+import subprocess
 import threading
 import time
 from collections.abc import Callable
@@ -14,6 +15,7 @@ from typing import Any
 
 import anyio
 
+from pi_sonar_agent.core.attempt_changes import AttemptFileChangeBuilder
 from pi_sonar_agent.core.events import AttemptEventStream, AttemptRuntimeEventKind
 from pi_sonar_agent.core.hooks import AttemptFinalizeContext, HookPipeline, ToolCallContext
 from pi_sonar_agent.core.model_gateway import (
@@ -29,11 +31,11 @@ from pi_sonar_agent.core.model_gateway import (
 from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.policy import ToolPolicy, ToolPolicyHook, ToolUsageTracker, normalize_tool_name
 from pi_sonar_agent.core.project_env import MODEL_ENV_KEYS
+from pi_sonar_agent.core.diff_reviewer import DiffReviewer
 
 EDIT_NUDGE_THRESHOLD = 4
 MAX_EDIT_NUDGES = 2
 INVALID_WRITE_TOOL_INPUT_BURST_THRESHOLD = 2
-
 
 @dataclass(frozen=True)
 class RuntimeTimeouts:
@@ -114,6 +116,142 @@ def _is_write_tool_error_preview(preview: str) -> bool:
             "No changes to make",
         )
     )
+
+
+def _load_attempt_manifest(workspace_path: Path) -> dict[str, Any] | None:
+    manifest_path = workspace_path / ".git" / "pi-sonar-agent-attempt-state" / "manifest.json"
+    if not manifest_path.exists():
+        return None
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _read_file_bytes(file_path: Path) -> bytes:
+    try:
+        return file_path.read_bytes()
+    except Exception:
+        return b""
+
+
+def _get_head_commit(workspace_path: Path) -> str:
+    git_dir = workspace_path / ".git"
+    if not git_dir.exists():
+        return ""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(workspace_path),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        return ""
+    if result.returncode != 0:
+        return ""
+    return (result.stdout or "").strip()
+
+
+def _collect_workspace_dirty_files(workspace_path: Path) -> list[str]:
+    git_dir = workspace_path / ".git"
+    if not git_dir.exists():
+        return []
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(workspace_path),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        return []
+    if result.returncode != 0:
+        return []
+    changed_files: list[str] = []
+    for raw_line in (result.stdout or "").splitlines():
+        line = raw_line.rstrip()
+        if len(line) < 4:
+            continue
+        rel_path = line[3:].strip()
+        if not rel_path:
+            continue
+        if " -> " in rel_path:
+            rel_path = rel_path.split(" -> ", 1)[-1].strip()
+        changed_files.append(rel_path.replace("\\", "/"))
+    return sorted(dict.fromkeys(changed_files))
+
+
+def _collect_attempt_modified_files(workspace_path: Path, manifest: dict[str, Any]) -> list[str]:
+    changed_files: set[str] = set()
+    baseline_head = str(manifest.get("head_commit", "")).strip()
+    before_paths = {
+        str(path).replace("\\", "/")
+        for path in manifest.get("status_paths", [])
+        if str(path).strip()
+    }
+    existing_before = {
+        str(path).replace("\\", "/")
+        for path in manifest.get("existing_paths", [])
+        if str(path).strip()
+    }
+    current_head = _get_head_commit(workspace_path)
+    if baseline_head and current_head and baseline_head != current_head:
+        return sorted(before_paths)
+
+    after_paths = {
+        str(path).replace("\\", "/")
+        for path in _collect_workspace_dirty_files(workspace_path)
+        if str(path).strip()
+    }
+    files_root = workspace_path / ".git" / "pi-sonar-agent-attempt-state" / "files"
+    for rel_path in sorted(before_paths | after_paths):
+        current_file = workspace_path / rel_path
+        current_exists = current_file.is_file()
+        before_exists = rel_path in existing_before
+        if rel_path not in before_paths:
+            changed_files.add(rel_path)
+            continue
+        if before_exists != current_exists:
+            changed_files.add(rel_path)
+            continue
+        if before_exists and current_exists:
+            snapshot_file = files_root / rel_path
+            if _read_file_bytes(snapshot_file) != _read_file_bytes(current_file):
+                changed_files.add(rel_path)
+    return sorted(changed_files)
+
+
+def _detect_helper_extract_runtime_violation(workspace_path: Path) -> tuple[str, ...]:
+    manifest = _load_attempt_manifest(workspace_path)
+    if manifest is None:
+        return ()
+    changed_files = _collect_attempt_modified_files(workspace_path, manifest)
+    if not changed_files:
+        return ()
+    file_changes = AttemptFileChangeBuilder.build(
+        workspace_path=workspace_path,
+        changed_files=changed_files,
+        manifest=manifest,
+    )
+    findings: list[str] = []
+    for change in file_changes:
+        private_method_additions = DiffReviewer._find_private_method_additions(change)
+        if not private_method_additions:
+            continue
+        findings.append(
+            f"{change.file}: added private helper/method at lines {', '.join(str(item) for item in private_method_additions)}"
+        )
+    return tuple(findings)
 
 
 def _extract_edit_search_requests(
@@ -315,7 +453,6 @@ class AgentRuntime:
         successful_edit_count = 0
         invalid_write_tool_input_count = 0
         invalid_write_tool_input_message = ""
-
         def format_preview(value: str, *, max_chars: int = 1200) -> str:
             text = str(value or "").replace("\r\n", "\n").strip()
             if len(text) <= max_chars:
@@ -773,6 +910,29 @@ class AgentRuntime:
                     successful_edit_count += 1
                     consecutive_non_edit_calls = 0
                     pending_edit_nudge = False
+                    helper_extract_runtime_guard = str(
+                        request.metadata.get("helper_extract_runtime_guard", "")
+                    ).strip().lower() in {"1", "true", "yes", "on"}
+                    if helper_extract_runtime_guard:
+                        helper_findings = _detect_helper_extract_runtime_violation(Path(request.cwd))
+                        if helper_findings:
+                            guidance_lines = [
+                                "当前 retry 已禁用 helper_extract，但你刚刚仍新增了 private helper/private method。",
+                                *tuple(f"- {item}" for item in helper_findings),
+                                "本轮 attempt 到此终止；请在下一轮基于当前方法体内收口的策略继续修复，不要继续保留这些新增 private 方法。",
+                            ]
+                            agent_error = "\n".join(guidance_lines)
+                            event_stream.emit(
+                                AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                                stage="helper_extract_runtime_guard",
+                                payload={
+                                    "success": False,
+                                    "failure_kind": "runtime_contract_violation",
+                                    "findings": list(helper_findings),
+                                },
+                            )
+                            await abort_session("helper_extract_runtime_guard")
+                            return True
                     return False
 
                 response_stream = session.stream_events()

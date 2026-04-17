@@ -43,3 +43,24 @@ def test_attempt_scheduler_builds_layered_verification_schedule() -> None:
     assert schedule.run_rule_validation_before_build is True
     assert schedule.run_fast_compile_before_build is True
     assert schedule.skip_build_on_precheck_failure is True
+
+
+def test_attempt_scheduler_builds_simple_loop_verification_schedule() -> None:
+    schedule = AttemptScheduler.build_verification_schedule(
+        edit_contract=EditContract(
+            issue_key="ISSUE-3",
+            rule_id="csharpsquid:S3776",
+            guardrail_mode="contract_review",
+            target_files=("src/Foo.cs",),
+            execution_mode="simple_loop",
+        ),
+        performance_flags=PerformanceFlags(layered_verification=True, fast_compile=True),
+    )
+
+    assert schedule.run_boundary_first is True
+    assert schedule.run_semantic_precheck_before_build is False
+    assert schedule.run_propagation_check_before_build is False
+    assert schedule.run_quality_gate_before_build is False
+    assert schedule.run_rule_validation_before_build is False
+    assert schedule.run_fast_compile_before_build is False
+    assert schedule.skip_build_on_precheck_failure is False

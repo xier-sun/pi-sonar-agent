@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import subprocess
 
 import pytest
 
 import pi_sonar_agent.core.claude_adapter as claude_adapter_module
-from pi_sonar_agent.core.agent_runtime import AgentRuntime, AgentRuntimeError, RuntimeTimeouts
+from pi_sonar_agent.core.agent_runtime import (
+    AgentRuntime,
+    AgentRuntimeError,
+    RuntimeTimeouts,
+    _detect_helper_extract_runtime_violation,
+)
 from pi_sonar_agent.core.claude_adapter import ClaudeAdapter, ClaudeSDKDependencies
 from pi_sonar_agent.core.events import AttemptRuntimeEventKind
 from pi_sonar_agent.core.hooks import HookPipeline
@@ -143,6 +150,98 @@ def test_tool_policy_allows_bash_commands_but_rejects_filesystem_mutation() -> N
     assert policy.is_forbidden_tool("Bash", {"command": "Remove-Item Foo.cs"}) is True
 
 
+def test_tool_policy_keeps_read_only_grep_allowed_when_bash_is_visible() -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Bash", "Finish"],
+        mcp_tools=[],
+        forbidden_tools={"mcp__sonar-fix__git_push"},
+    )
+    policy = ToolPolicy(
+        registry,
+        build_allowed_fix_tool_rules(["Read", "Finish"], include_controlled_bash=True),
+    )
+
+    decision = policy.classify("Bash", {"command": "grep -n Process src/Foo.cs"})
+
+    assert decision.allowed is True
+    assert decision.policy_violation is False
+    assert decision.matched_rule == "windows-shell-safe"
+
+
+def test_runtime_helper_extract_guard_detects_new_private_method_from_attempt_diff(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True, capture_output=True)
+    source_file = repo / "Foo.cs"
+    source_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    private void Process()",
+                "    {",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "Foo.cs"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo, check=True, capture_output=True)
+    head_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout.strip()
+
+    state_root = repo / ".git" / "pi-sonar-agent-attempt-state"
+    state_root.mkdir(parents=True, exist_ok=True)
+    (state_root / "files").mkdir(parents=True, exist_ok=True)
+    (state_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "head_commit": head_commit,
+                "status_paths": [],
+                "existing_paths": [],
+            },
+            ensure_ascii=True,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    source_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    private void Process()",
+                "    {",
+                "        Helper();",
+                "    }",
+                "",
+                "    private void Helper()",
+                "    {",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    findings = _detect_helper_extract_runtime_violation(repo)
+
+    assert findings
+    assert "Foo.cs" in findings[0]
+
+
 def test_tool_policy_allows_scoped_bash_file_creation() -> None:
     registry = build_fix_tool_registry(
         builtin_tools=["Read", "Bash", "Finish"],
@@ -222,6 +321,35 @@ def test_tool_policy_blocks_write_to_existing_file_when_only_create_file_is_allo
 
     assert blocked.allowed is False
     assert blocked.policy_violation is True
+
+
+def test_tool_policy_allows_write_on_existing_file_when_write_is_generally_visible(tmp_path) -> None:
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit", "Write", "Finish"],
+        mcp_tools=[],
+        forbidden_tools={"mcp__sonar-fix__git_push"},
+    )
+    existing_file = tmp_path / "src" / "Foo.cs"
+    existing_file.parent.mkdir(parents=True, exist_ok=True)
+    existing_file.write_text("class Foo {}\n", encoding="utf-8")
+    policy = ToolPolicy(
+        registry,
+        build_allowed_fix_tool_rules(["Read", "Edit", "Write", "Finish"]),
+        workspace_root=tmp_path,
+    )
+
+    allowed = policy.classify(
+        "Write",
+        {"file_path": "src/Foo.cs", "content": "class Foo { }\n"},
+    )
+    blocked_create = policy.classify(
+        "Write",
+        {"file_path": "src/NewFile.cs", "content": "class NewFile {}\n"},
+    )
+
+    assert allowed.allowed is True
+    assert blocked_create.allowed is False
+    assert blocked_create.policy_violation is True
 
 
 def test_build_visible_toolset_keeps_prompt_runtime_and_policy_in_sync() -> None:
@@ -427,8 +555,9 @@ def test_claude_adapter_build_request_handles_third_party_provider() -> None:
 
     assert request.model == "glm-4.7"
     assert request.env["ANTHROPIC_MODEL"] == "glm-4.7"
-    assert "CLAUDE_MODEL" not in request.env
-    assert "ANTHROPIC_CUSTOM_MODEL_OPTION" not in request.env
+    assert request.env["CLAUDE_MODEL"] == ""
+    assert request.env["ANTHROPIC_CUSTOM_MODEL_OPTION"] == ""
+    assert request.env["ANTHROPIC_DEFAULT_SONNET_MODEL"] == ""
     assert request.extra_args == {
         "setting-sources": "project,local",
         "bare": None,
@@ -733,7 +862,9 @@ def test_claude_gateway_timeout_probe_passes_explicit_model_for_third_party_prov
         "Reply with OK only.",
     )
     assert recorded["env"]["ANTHROPIC_MODEL"] == "glm-4.7"
-    assert "CLAUDE_MODEL" not in recorded["env"]
+    assert recorded["env"]["CLAUDE_MODEL"] == ""
+    assert recorded["env"]["ANTHROPIC_CUSTOM_MODEL_OPTION"] == ""
+    assert recorded["env"]["ANTHROPIC_DEFAULT_SONNET_MODEL"] == ""
 
 
 def test_agent_runtime_classifies_follow_up_timeout_after_edit() -> None:
@@ -882,6 +1013,121 @@ def test_agent_runtime_reports_connect_timeout_diagnostic() -> None:
 
     assert "未完成初始化" in str(exc_info.value)
     assert "Failed to authenticate" in str(exc_info.value)
+
+
+def test_claude_sdk_session_controller_force_kills_process_tree_on_timeout(monkeypatch) -> None:
+    events: list[str] = []
+    kill_pids: list[int] = []
+
+    class FakeClient:
+        async def interrupt(self) -> None:
+            events.append("interrupt")
+
+    class FakeResponseStream:
+        async def aclose(self) -> None:
+            events.append("close_response_stream")
+
+    class FakeProcess:
+        pid = 4321
+
+    class FakeTransport:
+        _process = FakeProcess()
+
+    class FakeClientManager:
+        _transport = FakeTransport()
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            events.append("disconnect")
+
+    async def fake_force_terminate(pid: int) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        kill_pids.append(pid)
+        return ("kill_process_tree",), ()
+
+    monkeypatch.setattr(
+        claude_adapter_module,
+        "_force_terminate_sdk_process_tree",
+        fake_force_terminate,
+    )
+
+    controller = claude_adapter_module._ClaudeSDKSessionController(FakeClientManager())
+    controller.client = FakeClient()
+    controller.response_stream = FakeResponseStream()
+
+    result = asyncio.run(controller.abort("client_connect_timeout"))
+
+    assert kill_pids == [4321]
+    assert result.actions == (
+        "interrupt",
+        "kill_process_tree",
+        "close_response_stream",
+        "disconnect",
+    )
+    assert result.errors == ()
+    assert events == ["interrupt", "close_response_stream", "disconnect"]
+
+
+def test_claude_sdk_session_controller_normal_close_skips_force_kill(monkeypatch) -> None:
+    events: list[str] = []
+    kill_pids: list[int] = []
+
+    class FakeResponseStream:
+        async def aclose(self) -> None:
+            events.append("close_response_stream")
+
+    class FakeProcess:
+        pid = 4321
+
+    class FakeTransport:
+        _process = FakeProcess()
+
+    class FakeClientManager:
+        _transport = FakeTransport()
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            events.append("disconnect")
+
+    async def fake_force_terminate(pid: int) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        kill_pids.append(pid)
+        return ("kill_process_tree",), ()
+
+    monkeypatch.setattr(
+        claude_adapter_module,
+        "_force_terminate_sdk_process_tree",
+        fake_force_terminate,
+    )
+
+    controller = claude_adapter_module._ClaudeSDKSessionController(FakeClientManager())
+    controller.response_stream = FakeResponseStream()
+
+    result = asyncio.run(controller.close())
+
+    assert kill_pids == []
+    assert result.actions == ("close_response_stream", "disconnect")
+    assert result.errors == ()
+    assert events == ["close_response_stream", "disconnect"]
+
+
+def test_force_terminate_sdk_process_tree_treats_missing_windows_pid_as_benign(
+    monkeypatch,
+) -> None:
+    completed = subprocess.CompletedProcess(
+        args=["taskkill", "/PID", "34668", "/T", "/F"],
+        returncode=128,
+        stdout="",
+        stderr='错误: 没有找到进程 "34668"。',
+    )
+
+    def fake_run(*args, **kwargs):
+        return completed
+
+    monkeypatch.setattr(claude_adapter_module.subprocess, "run", fake_run)
+
+    actions, errors = asyncio.run(
+        claude_adapter_module._force_terminate_sdk_process_tree(34668)
+    )
+
+    assert actions == ()
+    assert errors == ()
 
 
 def test_agent_runtime_does_not_treat_system_retry_events_as_first_response() -> None:
@@ -1563,3 +1809,159 @@ def test_agent_runtime_keeps_edit_nudge_enabled_after_failed_edit() -> None:
     assert result.edit_nudge_count == 1
     assert result.successful_edit_count == 0
     assert result.invalid_write_tool_input_count == 1
+
+
+def test_agent_runtime_aborts_immediately_on_first_helper_extract_runtime_violation(
+    tmp_path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True, capture_output=True)
+    source_file = repo / "Foo.cs"
+    source_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    private void Process()",
+                "    {",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "Foo.cs"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo, check=True, capture_output=True)
+    head_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout.strip()
+
+    state_root = repo / ".git" / "pi-sonar-agent-attempt-state"
+    state_root.mkdir(parents=True, exist_ok=True)
+    (state_root / "files").mkdir(parents=True, exist_ok=True)
+    (state_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "head_commit": head_commit,
+                "status_paths": [],
+                "existing_paths": [],
+            },
+            ensure_ascii=True,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    registry = build_fix_tool_registry(
+        builtin_tools=["Read", "Edit"],
+        mcp_tools=[],
+        forbidden_tools={"Bash"},
+    )
+    policy = ToolPolicy(registry, ["Read", "Edit"])
+    abort_reasons: list[str] = []
+
+    class FakeSession:
+        async def connect(self, timeout_seconds: float) -> None:
+            return None
+
+        async def send(self, user_prompt: str) -> None:
+            return None
+
+        def stream_events(self):
+            async def iterate():
+                yield ToolCallEvent("Edit")
+                source_file.write_text(
+                    "\n".join(
+                        [
+                            "class Foo",
+                            "{",
+                            "    private void Process()",
+                            "    {",
+                            "        Helper();",
+                            "    }",
+                            "",
+                            "    private void Helper()",
+                            "    {",
+                            "    }",
+                            "}",
+                        ]
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                yield TraceEvent(
+                    "UserMessage",
+                    preview="The file Foo.cs has been updated successfully.",
+                )
+                yield ResultEvent(total_cost_usd=0.1, agent_error=None)
+
+            return iterate()
+
+        async def abort(self, reason: str):
+            abort_reasons.append(reason)
+
+            class Result:
+                def __init__(self, value: str) -> None:
+                    self.reason = value
+                    self.actions = ("disconnect",)
+                    self.errors = ()
+
+            return Result(reason)
+
+        async def close(self):
+            class Result:
+                reason = "normal_shutdown"
+                actions = ("disconnect",)
+                errors = ()
+
+            return Result()
+
+    class FakeGateway:
+        def create_session(self, request: GatewayRequest):
+            return FakeSession()
+
+    runtime = AgentRuntime(
+        gateway=FakeGateway(),
+        tool_policy=policy,
+        timeouts=RuntimeTimeouts(
+            client_connect_seconds=1,
+            first_response_seconds=1,
+            follow_up_seconds=1,
+            issue_hard_timeout_seconds=5,
+            heartbeat_interval_seconds=10,
+        ),
+    )
+
+    result = runtime.run(
+        GatewayRequest(
+            system_prompt="system",
+            user_prompt="user",
+            cwd=str(repo),
+            tools=("Read", "Edit"),
+            allowed_tools=("Read", "Edit"),
+            max_turns=4,
+            max_budget_usd=1.0,
+            env={},
+            metadata={"helper_extract_runtime_guard": "true"},
+        )
+    )
+
+    assert "当前 retry 已禁用 helper_extract" in (result.agent_error or "")
+    assert "本轮 attempt 到此终止" in (result.agent_error or "")
+    assert result.successful_edit_count == 1
+    assert abort_reasons == ["helper_extract_runtime_guard"]
+    assert any(
+        event.kind == AttemptRuntimeEventKind.ATTEMPT_FINISHED
+        and event.stage == "helper_extract_runtime_guard"
+        and event.payload.get("failure_kind") == "runtime_contract_violation"
+        for event in result.runtime_events
+    )

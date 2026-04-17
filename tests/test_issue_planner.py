@@ -515,6 +515,7 @@ def test_issue_planner_prefers_private_helper_extract_for_default_local_s3776() 
     assert plan.edit_contract.repair_plan is not None
     assert plan.edit_contract.repair_plan.selected_archetype == "private_helper_extract"
     assert plan.edit_contract.repair_plan.fallback_archetype == "guard_clause_flatten"
+    assert "extract-private-helper" in plan.edit_contract.allowed_change_kinds
     assert plan.edit_contract.repair_plan.archetype_chain == (
         "private_helper_extract",
         "guard_clause_flatten",
@@ -927,6 +928,7 @@ def test_issue_planner_marks_type_shape_retry_constraints_for_s3776() -> None:
 
     assert plan.edit_contract.repair_plan is not None
     assert HELPER_EXTRACT_CAPABILITY not in plan.edit_contract.allowed_capabilities
+    assert "extract-private-helper" not in plan.edit_contract.allowed_change_kinds
     assert plan.edit_contract.repair_plan.repair_shape == "method_rewrite_in_place"
     assert plan.edit_contract.repair_plan.new_helpers == ()
     assert "preserve_type_shape_on_retry" in plan.edit_contract.repair_plan.strategy_preferences
@@ -978,6 +980,7 @@ def test_issue_planner_downgrades_s3776_after_anonymous_type_helper_boundary() -
 
     assert plan.edit_contract.repair_plan is not None
     assert HELPER_EXTRACT_CAPABILITY not in plan.edit_contract.allowed_capabilities
+    assert "extract-private-helper" not in plan.edit_contract.allowed_change_kinds
     assert plan.edit_contract.repair_plan.selected_archetype == "signature_preserving_refactor"
     assert (
         "forbid_helper_boundaries_for_anonymous_projections"
@@ -1119,6 +1122,7 @@ def test_issue_planner_allows_second_repeated_type_shape_failure_retry() -> None
     )
 
     assert HELPER_EXTRACT_CAPABILITY not in plan.edit_contract.allowed_capabilities
+    assert "extract-private-helper" not in plan.edit_contract.allowed_change_kinds
     assert plan.skip_reason == ""
 
 

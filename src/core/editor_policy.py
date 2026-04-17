@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from pi_sonar_agent.core.boundary_capabilities import HELPER_EXTRACT_CAPABILITY
 from pi_sonar_agent.core.issue_contract import EditContract
 
 
@@ -15,11 +16,7 @@ class EditorPolicy:
         """Return the SDK allowlist for the current guardrail mode."""
 
         tools = tuple(dict.fromkeys(str(name) for name in default_allowed_tools if str(name).strip()))
-        if not edit_contract.patch_only:
-            return tools
-        if edit_contract.allow_file_creation:
-            return tools
-        return tuple(tool for tool in tools if tool != "Write")
+        return tools
 
     @staticmethod
     def render_prompt_constraints(edit_contract: EditContract) -> str:
@@ -37,8 +34,12 @@ class EditorPolicy:
                 + ", ".join(edit_contract.allowed_new_file_roots)
                 + "。"
             )
-            lines.append("- 新建文件优先使用 Write，且只允许创建当前还不存在的新文件。")
+            lines.append("- 允许使用 Write 创建当前还不存在的新文件，但只能创建到声明目录内。")
             lines.append("- 新建文件优先用于当前规则明确需要的新增类型或参数对象，不要借机扩散重构范围。")
         if edit_contract.patch_only:
-            lines.append("- 当前 attempt 默认采用 patch-only 策略；已有文件继续使用 Edit/MultiEdit，只有新文件创建才允许用 Write。")
+            lines.append("- 当前 attempt 默认采用 patch-only 策略；允许使用 Edit/MultiEdit/Write 修改已有文件。")
+            if not edit_contract.allow_file_creation:
+                lines.append("- Write 只能用于重写已有文件，不能借此创建新文件。")
+        if HELPER_EXTRACT_CAPABILITY not in set(edit_contract.allowed_capabilities):
+            lines.append("- 当前 attempt 禁止新增 private helper / private method；必须在现有方法体内收口逻辑。")
         return "\n".join(lines)

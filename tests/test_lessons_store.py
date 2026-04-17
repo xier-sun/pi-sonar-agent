@@ -74,3 +74,58 @@ def test_lessons_store_records_patterns_and_returns_planner_lessons(tmp_path) ->
     assert any(lesson.source == "quality_gate_lesson" for lesson in planner_lessons)
     assert any("Async method must end with Async" in lesson.summary for lesson in planner_lessons)
     assert any(lesson.boundary_failure_code == "scope_symbol_anchor_miss" for lesson in planner_lessons)
+
+
+def test_lessons_store_prefers_exact_failure_fingerprint_and_limits_injection(tmp_path) -> None:
+    store = LessonsStore(tmp_path / "lessons")
+    helper_retry = RetryContext(
+        source_attempt_number=1,
+        issue_rule_id="csharpsquid:S3776",
+        failure_kind="build",
+        summary="Helper extraction broke the type shape.",
+        primary_failure_fingerprint="helper_extraction_type_break",
+        failure_fingerprints=("helper_extraction_type_break",),
+        guidance=("不要再提取 helper。",),
+    )
+    public_retry = RetryContext(
+        source_attempt_number=2,
+        issue_rule_id="csharpsquid:S3776",
+        failure_kind="build",
+        summary="Public surface drift after signature change.",
+        primary_failure_fingerprint="public_surface_drift",
+        failure_fingerprints=("public_surface_drift",),
+        guidance=("恢复公开签名。",),
+    )
+
+    store.record_failure(
+        repository="repo",
+        run_label="run1",
+        issue_key="ISSUE-HELPER",
+        issue_rule_id="csharpsquid:S3776",
+        retry_context=helper_retry,
+        scope_mode="method",
+        guardrail_mode="contract_review",
+    )
+    store.record_failure(
+        repository="repo",
+        run_label="run1",
+        issue_key="ISSUE-PUBLIC",
+        issue_rule_id="csharpsquid:S3776",
+        retry_context=public_retry,
+        scope_mode="method",
+        guardrail_mode="contract_review",
+    )
+
+    planner_lessons = store.load_planner_lessons(
+        issue_rule_id="csharpsquid:S3776",
+        failure_kind="build",
+        failure_fingerprints=("helper_extraction_type_break",),
+        scope_mode="method",
+        guardrail_mode="contract_review",
+    )
+
+    assert planner_lessons
+    assert len(planner_lessons) <= 2
+    assert planner_lessons[0].primary_failure_fingerprint == "helper_extraction_type_break"
+    assert planner_lessons[0].selection_mode == "rule_plus_fingerprint"
+    assert "failure_fingerprint=helper_extraction_type_break" in planner_lessons[0].selection_reason

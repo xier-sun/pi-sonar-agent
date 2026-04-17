@@ -460,6 +460,19 @@ class ToolPolicy:
                     policy_violation=True,
                     severity="critical",
                 )
+            if normalized_tool_name in self._allowed_lookup:
+                target_path = self._normalize_tool_path(payload)
+                resolved = self._resolve_workspace_target(self._workspace_root, target_path)
+                if target_path and resolved is not None and not resolved.exists():
+                    return ToolDecision(
+                        tool_name=normalized_tool_name,
+                        allowed=False,
+                        kind=spec.kind,
+                        tags=spec.tags,
+                        reason="Write may rewrite existing files, but creating new files is not allowed in the current issue-fix runtime.",
+                        policy_violation=True,
+                        severity="critical",
+                    )
 
         if spec.kind == ToolKind.FORBIDDEN:
             return ToolDecision(

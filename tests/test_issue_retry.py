@@ -16,6 +16,7 @@ from pi_sonar_agent.core.issue_retry import (
     restore_workspace_baseline,
 )
 from pi_sonar_agent.core.lessons_store import LessonsStore
+from pi_sonar_agent.core.retry_context import merge_retry_context_history, render_retry_context
 
 
 def _run_git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -159,10 +160,16 @@ def test_process_issue_with_retries_skips_after_three_build_failures(tmp_path) -
     assert tracked_file.read_text(encoding="utf-8") == "previous success\n"
     assert agent.retry_feedbacks[0] == ""
     assert "关键编译错误" in agent.retry_feedbacks[1]
+    assert "【累计重试上下文】" in agent.retry_feedbacks[1]
+    assert "已累计失败 1 次" in agent.retry_feedbacks[1]
+    assert "Attempt 1 | build" in agent.retry_feedbacks[1]
     assert "CS0103" in agent.retry_feedbacks[1]
     assert "出错代码片段" in agent.retry_feedbacks[1]
     assert "不要引用未定义的变量" in agent.retry_feedbacks[1]
     assert "关键编译错误" in agent.retry_feedbacks[2]
+    assert "已累计失败 2 次" in agent.retry_feedbacks[2]
+    assert "Attempt 1 | build" in agent.retry_feedbacks[2]
+    assert "Attempt 2 | build" in agent.retry_feedbacks[2]
     issue_summary = json.loads((Path(result.artifact_root) / "issue_summary.json").read_text(encoding="utf-8"))
     assert issue_summary["status"] == "skipped"
     assert len(issue_summary["attempts"]) == 3
@@ -237,6 +244,98 @@ def test_process_issue_with_retries_defaults_to_five_attempts(tmp_path) -> None:
     assert result.attempts == 5
     assert agent.calls == 5
     assert result.skip_reason == "Build verification failed after 5 attempt(s)"
+
+
+def test_process_issue_with_retries_preserves_best_build_passing_s3776_patch(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    tracked_file = repo / "tracked.cs"
+    tracked_file.write_text("original\n", encoding="utf-8")
+
+    issue = SonarIssue(
+        key="issue-best-s3776",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=1,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def fix_issue(self, issue, workspace_path, build_command, retry_feedback="", retry_context=None):
+            self.calls += 1
+            if self.calls == 1:
+                tracked_file.write_text("best\n", encoding="utf-8")
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=issue.file_path,
+                    changes=[{"file": "tracked.cs", "action": "modified"}],
+                    build_passed=True,
+                    build_verification_failed=False,
+                    error="Simple-loop post-fix check failed",
+                    build_command=build_command,
+                    build_output="",
+                    retryable_failure=True,
+                    failure_kind="post_fix_check",
+                    post_fix_check_result={
+                        "issue_status": "UNKNOWN",
+                        "issue_check": {
+                            "status": "UNKNOWN",
+                            "summary": "Estimated cognitive complexity for Process is 30. The local estimator is inconclusive in the middle range, so final Sonar confirmation is still needed.",
+                            "metrics": {
+                                "method_name": "Process",
+                                "estimated_cognitive_complexity": 30,
+                                "pass_threshold": 15,
+                                "fail_threshold": 30,
+                            },
+                        },
+                        "blocker_check": {
+                            "status": "PASS",
+                            "summary": "No new blockers.",
+                            "blockers": [],
+                        },
+                        "retry_message": "",
+                    },
+                )
+            assert tracked_file.read_text(encoding="utf-8") == "best\n"
+            tracked_file.write_text("worse\n", encoding="utf-8")
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=[{"file": "tracked.cs", "action": "modified"}],
+                build_passed=False,
+                build_verification_failed=True,
+                error="Issue changes failed local build verification",
+                build_command=build_command,
+                build_output="tracked.cs(1,1): error CS1002: ; expected [tracked.csproj]",
+                retryable_failure=True,
+                failure_kind="build",
+            )
+
+    result = process_issue_with_retries(
+        agent=FakeAgent(),
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-best-s3776",
+        lessons_store=LessonsStore(tmp_path / "lessons"),
+        max_build_retries=2,
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.patch_salvaged is True
+    assert "Preserved the best build-passing S3776 patch from attempt 1" in result.skip_reason
+    assert tracked_file.read_text(encoding="utf-8") == "best\n"
 
 
 def test_process_issue_with_retries_retries_when_agent_makes_no_changes(tmp_path) -> None:
@@ -1347,6 +1446,238 @@ def test_build_retry_context_marks_partial_patch_turn_exhaustion(tmp_path) -> No
 
     assert "tool_input_invalid_burst" in retry_context.failure_fingerprints
     assert "turn_exhausted_after_partial_patch" in retry_context.failure_fingerprints
+
+
+def test_merge_retry_context_history_carries_attempt_history_into_next_prompt(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    failing_file = repo / "tracked.cs"
+    failing_file.write_text("line1\nline2\nline3\n", encoding="utf-8")
+
+    attempt_one = FixResult(
+        success=False,
+        issue_key="issue-history",
+        file_path="tracked.cs",
+        build_passed=False,
+        build_verification_failed=True,
+        error="Issue changes failed local build verification",
+        build_command='dotnet build "tracked.sln"',
+        build_output=f"{failing_file}(2,1): error CS0103: name not found [tracked.csproj]",
+        retryable_failure=True,
+        failure_kind="build",
+    )
+    retry_context = merge_retry_context_history(
+        None,
+        build_retry_context(repo, attempt_one, source_attempt_number=1),
+    )
+
+    attempt_two = FixResult(
+        success=False,
+        issue_key="issue-history",
+        file_path="tracked.cs",
+        build_passed=False,
+        build_verification_failed=True,
+        error="Issue changes failed local build verification",
+        build_command='dotnet build "tracked.sln"',
+        build_output=f"{failing_file}(2,1): error CS1503: cannot convert [tracked.csproj]",
+        retryable_failure=True,
+        failure_kind="build",
+    )
+    retry_context = merge_retry_context_history(
+        retry_context,
+        build_retry_context(repo, attempt_two, source_attempt_number=2),
+    )
+
+    rendered = render_retry_context(retry_context)
+
+    assert "【累计重试上下文】" in rendered
+    assert "已累计失败 2 次" in rendered
+    assert "Attempt 1 | build" in rendered
+    assert "Attempt 2 | build" in rendered
+    assert "CS0103" in rendered
+    assert "CS1503" in rendered
+
+
+def test_build_retry_context_captures_patch_summary_and_symbols(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+
+    tracked_file = repo / "tracked.cs"
+    tracked_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    void Process()",
+                "    {",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _run_git(repo, "add", "tracked.cs")
+    _run_git(repo, "commit", "-m", "add tracked cs")
+    tracked_file.write_text(
+        "\n".join(
+            [
+                "class Foo",
+                "{",
+                "    void Process()",
+                "    {",
+                "        if (true)",
+                "        {",
+                "        }",
+                "    }",
+                "",
+                "    private void Helper()",
+                "    {",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    repair_plan = type(
+        "RepairPlanStub",
+        (),
+        {
+            "repair_shape": "method_rewrite_in_place",
+            "selected_archetype": "guard_clause_flatten",
+        },
+    )()
+    edit_contract = type(
+        "EditContractStub",
+        (),
+        {
+            "scope_mode": "method",
+            "execution_profile": "full_path",
+            "allowed_capabilities": ("method_rewrite",),
+            "repair_plan": repair_plan,
+        },
+    )()
+    result = FixResult(
+        success=False,
+        issue_key="issue-patch-summary",
+        file_path="tracked.cs",
+        build_passed=False,
+        build_verification_failed=True,
+        error="Issue changes failed local build verification",
+        build_command='dotnet build "tracked.sln"',
+        build_output=f"{tracked_file}(10,5): error CS0103: Helper not found [tracked.csproj]",
+        retryable_failure=True,
+        failure_kind="build",
+        changes=[{"file": "tracked.cs", "action": "modified"}],
+        edit_contract=edit_contract,
+        repair_plan=repair_plan,
+    )
+
+    retry_context = build_retry_context(repo, result, source_attempt_number=1)
+
+    assert "guard_clause_flatten" in retry_context.strategy_summary
+    assert "tracked.cs" in retry_context.patch_summary
+    assert "Helper" in retry_context.edited_symbols
+
+
+def test_process_issue_with_retries_retries_runtime_contract_violation(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_git_repo(repo)
+    tracked_file = repo / "tracked.cs"
+    tracked_file.write_text("class Foo {}\n", encoding="utf-8")
+
+    issue = SonarIssue(
+        key="issue-runtime-contract",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=1,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def fix_issue(self, *_args, **_kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path="tracked.cs",
+                    error="当前 retry 已禁用 helper_extract，但你刚刚仍新增了 private helper/private method。",
+                    build_output="当前 retry 已禁用 helper_extract，但你刚刚仍新增了 private helper/private method。",
+                    failure_kind="runtime_contract_violation",
+                    retryable_failure=True,
+                    boundary_failure_code="helper_extract_runtime_guard",
+                    boundary_failure_summary="当前 retry 已禁用 helper_extract，但你刚刚仍新增了 private helper/private method。",
+                )
+            return FixResult(
+                success=True,
+                issue_key=issue.key,
+                file_path="tracked.cs",
+                summary="Fixed 1 file(s)",
+                build_passed=True,
+                changes=[{"file": "tracked.cs", "action": "modified"}],
+            )
+
+    result = process_issue_with_retries(
+        agent=FakeAgent(),
+        issue=issue,
+        workspace_path=repo,
+        build_command='dotnet build "tracked.sln"',
+        repository="repo",
+        run_label="run-runtime-contract",
+        max_build_retries=3,
+    )
+
+    assert result.success is True
+    assert result.attempts == 2
+
+
+def test_merge_retry_context_history_compacts_older_attempts_when_budget_is_small(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    failing_file = repo / "tracked.cs"
+    failing_file.write_text("line1\nline2\nline3\n", encoding="utf-8")
+
+    retry_context = None
+    for attempt_number, code in enumerate(("CS0103", "CS1503", "CS8197", "CS0029"), start=1):
+        result = FixResult(
+            success=False,
+            issue_key="issue-history-compact",
+            file_path="tracked.cs",
+            build_passed=False,
+            build_verification_failed=True,
+            error="Issue changes failed local build verification",
+            build_command='dotnet build "tracked.sln"',
+            build_output=f"{failing_file}(2,1): error {code}: synthetic failure [tracked.csproj]",
+            retryable_failure=True,
+            failure_kind="build",
+        )
+        retry_context = merge_retry_context_history(
+            retry_context,
+            build_retry_context(repo, result, source_attempt_number=attempt_number),
+            char_budget=220,
+            keep_recent=2,
+        )
+
+    assert retry_context is not None
+    assert retry_context.retry_history_total_attempts == 4
+    assert len(retry_context.retry_history_items) >= 1
+    assert len(retry_context.retry_history_compacted_items) >= 2
+    assert retry_context.retry_history_compaction_count >= 1
+
+    rendered = render_retry_context(retry_context)
+
+    assert "更早" in rendered and "已压缩" in rendered
+    assert "Attempt 4 | build" in rendered
 
 
 def test_process_issue_with_retries_stops_early_on_identical_failure_and_diff(tmp_path) -> None:

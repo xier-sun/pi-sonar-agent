@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AgentFixEngine")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9c553badd886504f44ff5936a9bd50724bc663d3")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9b9ca802aba858bc8644c6d419929b904980ab3d")]
 [assembly: System.Reflection.AssemblyProductAttribute("AgentFixEngine")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AgentFixEngine")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

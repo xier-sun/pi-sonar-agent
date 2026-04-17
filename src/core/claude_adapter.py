@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import locale
 import os
+import subprocess
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -93,6 +95,8 @@ class _ClaudeSDKSessionController:
 
         actions: list[str] = []
         errors: list[str] = []
+        force_kill_process_tree = interrupt and "timeout" in str(reason or "").lower()
+        process_pid = _extract_sdk_process_pid(self.client_manager)
 
         if interrupt:
             interrupt_call = getattr(self.client, "interrupt", None)
@@ -102,6 +106,11 @@ class _ClaudeSDKSessionController:
                     actions.append("interrupt")
                 except Exception as exc:
                     errors.append(f"interrupt failed: {exc}")
+
+        if force_kill_process_tree and process_pid is not None:
+            kill_actions, kill_errors = await _force_terminate_sdk_process_tree(process_pid)
+            actions.extend(kill_actions)
+            errors.extend(kill_errors)
 
         response_stream = self.response_stream
         self.response_stream = None
@@ -127,6 +136,69 @@ class _ClaudeSDKSessionController:
             actions=tuple(actions),
             errors=tuple(errors),
         )
+
+
+def _extract_sdk_process_pid(client_manager: Any) -> int | None:
+    """Best-effort extraction of the Claude CLI subprocess PID from the SDK client."""
+
+    candidates = [
+        getattr(client_manager, "_transport", None),
+        getattr(getattr(client_manager, "_query", None), "transport", None),
+    ]
+    for transport in candidates:
+        process = getattr(transport, "_process", None)
+        pid = getattr(process, "pid", None)
+        if isinstance(pid, int) and pid > 0:
+            return pid
+    return None
+
+
+async def _force_terminate_sdk_process_tree(pid: int) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Best-effort hard kill for Claude CLI process trees that outlive SDK aborts."""
+
+    if pid <= 0:
+        return (), ()
+
+    if os.name == "nt":
+        try:
+            result = await asyncio.to_thread(
+                subprocess.run,
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                encoding=locale.getpreferredencoding(False) or "utf-8",
+                errors="replace",
+                timeout=8,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return (), (f"kill_process_tree timed out for pid={pid}",)
+        except Exception as exc:
+            return (), (f"kill_process_tree failed for pid={pid}: {exc}",)
+
+        combined = "\n".join(
+            part.strip()
+            for part in ((result.stdout or ""), (result.stderr or ""))
+            if str(part or "").strip()
+        ).strip()
+        normalized = combined.lower()
+        if result.returncode == 0:
+            return ("kill_process_tree",), ()
+        if any(
+            marker in normalized
+            for marker in (
+                "not found",
+                "no running instance",
+                "没有找到进程",
+                "没有运行的任务",
+                "找不到",
+            )
+        ):
+            return (), ()
+        message = combined or f"exit={result.returncode}"
+        return (), (f"kill_process_tree failed for pid={pid}: {message}",)
+
+    return (), ()
 
 
 class ClaudeGatewaySession(ModelGatewaySession):
@@ -338,10 +410,22 @@ class ClaudeAdapter(ModelGateway):
     def build_sdk_child_env(cls, agent_env: dict[str, str]) -> dict[str, str]:
         """Sanitize the env passed to the Claude CLI."""
 
-        child_env = {key: value for key, value in agent_env.items() if str(value).strip()}
+        # The SDK transport starts subprocesses by merging our request env on top
+        # of the current process environment. To keep project-managed model
+        # configuration authoritative, we must explicitly clear model keys that
+        # should not leak from the parent process into the Claude CLI child.
+        child_env: dict[str, str] = {
+            key: str(agent_env.get(key, ""))
+            for key in MODEL_ENV_KEYS
+        }
+        for key, value in agent_env.items():
+            if key in MODEL_ENV_KEYS:
+                continue
+            if str(value).strip():
+                child_env[key] = str(value)
         if cls.uses_third_party_anthropic_provider(agent_env):
             for key in THIRD_PARTY_MODEL_ENV_KEYS:
-                child_env.pop(key, None)
+                child_env[key] = ""
         return child_env
 
     @classmethod

@@ -19,12 +19,27 @@ from pi_sonar_agent.agent.rule_policies import (
 )
 from pi_sonar_agent.agent.rule_validators import validate_rule_fix
 from pi_sonar_agent.core.agent_runtime import AgentRuntimeError, AgentRuntimeResult
+from pi_sonar_agent.core.agent_role_prompts import build_fix_role_user_prompt
 from pi_sonar_agent.core.events import AttemptRuntimeEvent, AttemptRuntimeEventKind
 from pi_sonar_agent.core.issue_contract import EditContract
 from pi_sonar_agent.core.quality_gate import QualityGateRule
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.scope_guard import IssueEditScope
 from pi_sonar_agent.core.tool_surface import build_allowed_fix_tool_rules
+
+
+def test_parse_role_decision_extracts_json_payload() -> None:
+    decision = ClaudeFixAgent._parse_role_decision(
+        raw_text='```json\n{"decision":"approve","summary":"可以进入编译。","findings":["无明显门禁阻塞"],"constraints":["保持最小改动"]}\n```',
+        allowed_decisions=("approve", "retry"),
+        fallback_decision="retry",
+        fallback_summary="fallback",
+    )
+
+    assert decision.decision == "approve"
+    assert decision.summary == "可以进入编译。"
+    assert decision.findings == ("无明显门禁阻塞",)
+    assert decision.constraints == ("保持最小改动",)
 
 
 def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
@@ -132,9 +147,60 @@ def test_build_user_prompt_renders_structured_retry_context() -> None:
         retry_context=retry_context,
     )
 
-    assert "【上次尝试的构建失败信息】" in prompt
+    assert "【上次尝试的失败信息】" in prompt
     assert "build failed" in prompt
     assert "请基于这些失败原因重新修复" in prompt
+
+
+def test_build_user_prompt_includes_repair_summary_from_retry_context() -> None:
+    issue = SonarIssue(
+        key="issue-repair-summary",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    retry_context = RetryContext(
+        source_attempt_number=2,
+        failure_kind="runtime_contract_violation",
+        error="当前 retry 已禁用 helper_extract。",
+        raw_output="当前 retry 已禁用 helper_extract。",
+        strategy_summary="archetype=guard_clause_flatten; scope=method",
+        patch_summary="files=src/Foo.cs ; symbols=Helper ; preview=+ private void Helper()",
+        edited_symbols=("Helper",),
+        workspace_state_note="进入本轮前工作区已恢复到 issue baseline；请先 Read 当前文件。",
+    )
+
+    prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  18 | foreach (var item in items) { ... }",
+        "",
+        "- 只允许修改第 18-24 行。",
+        {
+            "name": "Cognitive Complexity of methods should not be too high",
+            "description": "嵌套条件和循环会提高认知复杂度。",
+            "how_to_fix": "提取私有方法，减少嵌套层级。",
+        },
+        'dotnet build "src/Foo.sln"',
+        retry_context=retry_context,
+    )
+
+    assert "【上次修复摘要】" in prompt
+    assert "上次修法" in prompt
+    assert "Helper" in prompt
+
+
+def test_classify_runtime_contract_agent_error_helper_extract_guard() -> None:
+    classified = ClaudeFixAgent._classify_runtime_contract_agent_error(
+        "当前 retry 已禁用 helper_extract，但你刚刚仍新增了 private helper/private method。"
+    )
+
+    assert classified == (
+        "helper_extract_runtime_guard",
+        "当前 retry 已禁用 helper_extract，但你刚刚仍新增了 private helper/private method。",
+    )
 
 
 def test_build_user_prompt_renders_workspace_retry_references() -> None:
@@ -295,9 +361,9 @@ def test_build_sdk_child_env_strips_model_env_for_third_party_provider() -> None
 
     assert child_env["ANTHROPIC_BASE_URL"] == "https://open.bigmodel.cn/api/anthropic"
     assert child_env["ANTHROPIC_API_KEY"] == "token"
-    assert "ANTHROPIC_CUSTOM_MODEL_OPTION" not in child_env
-    assert "ANTHROPIC_DEFAULT_SONNET_MODEL" not in child_env
-    assert "CLAUDE_MODEL" not in child_env
+    assert child_env["ANTHROPIC_CUSTOM_MODEL_OPTION"] == ""
+    assert child_env["ANTHROPIC_DEFAULT_SONNET_MODEL"] == ""
+    assert child_env["CLAUDE_MODEL"] == ""
 
 
 def test_resolve_sdk_model_uses_cli_model_for_third_party_provider() -> None:
@@ -311,7 +377,25 @@ def test_resolve_sdk_model_uses_cli_model_for_third_party_provider() -> None:
 
     assert sdk_model == "glm-4.7"
     assert child_env["ANTHROPIC_MODEL"] == "glm-4.7"
-    assert "CLAUDE_MODEL" not in child_env
+    assert child_env["CLAUDE_MODEL"] == ""
+
+
+def test_build_sdk_child_env_preserves_explicit_model_key_clears() -> None:
+    child_env = ClaudeFixAgent._build_sdk_child_env(
+        {
+            "ANTHROPIC_BASE_URL": "https://api.minimaxi.com/anthropic",
+            "ANTHROPIC_API_KEY": "token",
+            "ANTHROPIC_AUTH_TOKEN": "",
+            "CLAUDE_MODEL": "",
+            "OPENAI_MODEL": "",
+        }
+    )
+
+    assert child_env["ANTHROPIC_BASE_URL"] == "https://api.minimaxi.com/anthropic"
+    assert child_env["ANTHROPIC_API_KEY"] == "token"
+    assert child_env["ANTHROPIC_AUTH_TOKEN"] == ""
+    assert child_env["CLAUDE_MODEL"] == ""
+    assert child_env["OPENAI_MODEL"] == ""
 
 
 def test_load_csharp_quality_gate_uses_repo_markdown_as_single_source(
@@ -482,6 +566,35 @@ def test_build_user_prompt_keeps_build_command_when_build_tool_is_visible() -> N
 
     assert "【推荐构建命令】" in prompt
     assert 'dotnet build "src/Foo.sln"' in prompt
+
+
+def test_build_user_prompt_hides_bash_constraints_when_bash_is_not_visible() -> None:
+    issue = SonarIssue(
+        key="issue-no-bash",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = ClaudeFixAgent._build_user_prompt(
+        issue,
+        "  18 | if (condition) { ... }",
+        "",
+        "- 只允许修改当前方法。",
+        {
+            "name": "Cognitive Complexity of methods should not be too high",
+            "description": "嵌套条件和循环会提高认知复杂度。",
+            "how_to_fix": "减少嵌套层级。",
+        },
+        'dotnet build "src/Foo.sln"',
+        visible_tool_names=("Read", "Edit", "MultiEdit", "Finish"),
+    )
+
+    assert "当前 attempt 可用工具: Read, Edit, MultiEdit, Finish" in prompt
+    assert "如果使用 shell 工具（工具名 Bash）" not in prompt
 
 
 def test_build_user_prompt_splits_s3776_retry_guards_between_first_attempt_and_retry() -> None:
@@ -955,12 +1068,71 @@ def test_fix_issue_downgrades_complex_plan_instead_of_hard_blocking(monkeypatch,
 
 
 def test_builtin_tool_policy_allows_editing_tools_without_bash() -> None:
-    assert BUILTIN_FIX_TOOLS == ["Read", "Edit", "MultiEdit"]
+    assert BUILTIN_FIX_TOOLS == ["Read", "Edit", "MultiEdit", "Write"]
     assert "Bash" not in BUILTIN_FIX_TOOLS
     assert MCP_FIX_TOOLS == []
     assert "mcp__sonar-fix__git_add" not in MCP_FIX_TOOLS
     assert "mcp__sonar-fix__git_commit" not in MCP_FIX_TOOLS
     assert "mcp__sonar-fix__git_push" not in MCP_FIX_TOOLS
+
+
+def test_build_fix_role_user_prompt_prefers_relative_path_and_summarizes_invalid_edit_feedback() -> None:
+    issue = SonarIssue(
+        key="issue-role-fix",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=41,
+        component="BI:OpenAuth.Core/OpenAuth.App/Finance/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = build_fix_role_user_prompt(
+        issue=issue,
+        code_context="  41 | public async Task ProcessAsync()",
+        file_path_candidates=("OpenAuth.Core/OpenAuth.App/Finance/Foo.cs",),
+        working_memory=None,
+        fix_memory=None,
+        retry_feedback=(
+            "Invalid write tool input burst detected; stop this attempt and retry with a precise patch.\n\n"
+            "{\"content\": [{\"content_preview\": \"<tool_use_error>InputValidationError: "
+            "Edit failed due to the following issue:\\nThe required parameter `old_string` is missing"
+            "</tool_use_error>\"}]}"
+        ),
+    )
+
+    assert "- 主文件相对路径: OpenAuth.Core/OpenAuth.App/Finance/Foo.cs" in prompt
+    assert "- 读取和编辑时只使用上面的仓库相对路径，不要先尝试带前导 / 的路径。" in prompt
+    assert "Edit 必须带 file_path、old_string、new_string" in prompt
+    assert "required parameter `old_string` is missing" not in prompt
+    assert "\"content_preview\"" not in prompt
+
+
+def test_classify_fix_role_failure_surfaces_tool_input_invalid() -> None:
+    attempt_events = (
+        AttemptRuntimeEvent(
+            sequence=1,
+            kind=AttemptRuntimeEventKind.SDK_TRACE,
+            stage="sdk_message:UserMessage",
+            payload={
+                "preview": (
+                    "{\"content\": [{\"content_preview\": \"<tool_use_error>InputValidationError: "
+                    "Edit failed due to the following issue:\\nThe required parameter `old_string` is missing"
+                    "</tool_use_error>\"}]}"
+                )
+            },
+        ),
+    )
+
+    failure_kind, summary, child_summary, build_output = ClaudeFixAgent._classify_fix_role_failure(
+        agent_error="Invalid write tool input burst detected; stop this attempt and retry with a precise patch.",
+        attempt_events=attempt_events,
+    )
+
+    assert failure_kind == "tool_input_invalid"
+    assert "无效的 Edit/MultiEdit/Write 工具调用" in summary
+    assert "缺少必要参数" in child_summary
+    assert "old_string" in build_output
 
 
 def test_allowed_fix_tool_rules_append_controlled_bash_rules() -> None:
@@ -1012,13 +1184,22 @@ def test_claude_fix_tool_policy_bundle_exposes_write_for_create_file_contract(tm
         workspace_path=tmp_path,
     )
 
+    existing_file = tmp_path / "src" / "Foo.cs"
+    existing_file.parent.mkdir(parents=True, exist_ok=True)
+    existing_file.write_text("class Foo {}\n", encoding="utf-8")
+
     assert "Write" in visible_toolset.visible_tools
-    assert "Write(create_file_under=src/generated)" in visible_toolset.allowed_tools
-    write_decision = policy.classify(
+    assert "Write(create_file_under=src/generated)" not in visible_toolset.allowed_tools
+    rewrite_decision = policy.classify(
+        "Write",
+        {"file_path": "src/Foo.cs", "content": "class Foo { }\n"},
+    )
+    create_decision = policy.classify(
         "Write",
         {"file_path": "src/generated/NewType.cs", "content": "class NewType {}\n"},
     )
-    assert write_decision.allowed is True
+    assert rewrite_decision.allowed is True
+    assert create_decision.allowed is False
 
 
 def test_fix_issue_attaches_sonar_mcp_runtime_when_configured(monkeypatch, tmp_path) -> None:

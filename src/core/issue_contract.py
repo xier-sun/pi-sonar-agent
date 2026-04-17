@@ -9,6 +9,7 @@ from pi_sonar_agent.core.lessons_store import PlannerLesson
 from pi_sonar_agent.core.quality_gate import QualityGateRule
 from pi_sonar_agent.core.repo_capability import RepoCapabilityProfile
 from pi_sonar_agent.core.repair_plan import PlanPrecheckResult, RepairPlan
+from pi_sonar_agent.core.simple_mode import SIMPLE_LOOP_EXECUTION_MODE
 from pi_sonar_agent.core.state import serialize_state
 
 
@@ -65,6 +66,7 @@ class EditContract:
     quality_gate_rules: tuple[QualityGateRule, ...] = ()
     planner_lessons: tuple[PlannerLesson, ...] = ()
     prefetched_context: tuple[ContractContextSnippet, ...] = ()
+    execution_mode: str = SIMPLE_LOOP_EXECUTION_MODE
     execution_profile: str = "full_path"
     fast_path_enabled: bool = False
     plan_first_enabled: bool = False

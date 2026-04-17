@@ -8,6 +8,15 @@ from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import quote, urlsplit, urlunsplit
 
+DEFAULT_LOCAL_EXCLUDE_PATTERNS: tuple[str, ...] = (
+    "/.pi-sonar-agent-runtime/",
+)
+
+_RUNTIME_STAGE_EXCLUDE_PREFIXES: tuple[str, ...] = (
+    ".pi-sonar-agent-runtime",
+    ".git/pi-sonar-agent-runtime",
+)
+
 
 class CommandRunner(Protocol):
     """Callable protocol for shell command execution."""
@@ -216,17 +225,61 @@ class GitRepositoryGateway:
             cwd=workspace_path,
         )
 
+    def install_local_excludes(
+        self,
+        workspace_path: Path,
+        patterns: list[str] | tuple[str, ...] = DEFAULT_LOCAL_EXCLUDE_PATTERNS,
+    ) -> None:
+        """Install repo-local ignore rules that should never enter commits."""
+
+        exclude_path = workspace_path / ".git" / "info" / "exclude"
+        exclude_path.parent.mkdir(parents=True, exist_ok=True)
+
+        existing = ""
+        if exclude_path.exists():
+            existing = exclude_path.read_text(encoding="utf-8", errors="replace")
+
+        existing_lines = {
+            line.strip()
+            for line in existing.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        new_patterns = [
+            normalized
+            for normalized in (str(item or "").strip() for item in patterns)
+            if normalized and normalized not in existing_lines
+        ]
+        if not new_patterns:
+            return
+
+        payload = existing
+        if payload and not payload.endswith("\n"):
+            payload += "\n"
+        payload += "\n".join(new_patterns) + "\n"
+        exclude_path.write_text(payload, encoding="utf-8")
+
     def stage_all_changes(self, workspace_path: Path) -> None:
         """Stage all changes in a workspace."""
 
+        self.install_local_excludes(workspace_path)
         self.stage_paths(workspace_path)
 
     def stage_paths(self, workspace_path: Path, paths: list[str] | tuple[str, ...] | None = None) -> None:
         """Stage either all changes or a selected list of paths."""
 
+        if not paths:
+            self.install_local_excludes(workspace_path)
+        filtered_paths = [
+            path
+            for path in (paths or ())
+            if not _is_runtime_stage_path(path)
+        ]
+        if paths and not filtered_paths:
+            return
+
         command = "git add -A"
-        if paths:
-            quoted_paths = " ".join(_shell_quote(path) for path in paths)
+        if filtered_paths:
+            quoted_paths = " ".join(_shell_quote(path) for path in filtered_paths)
             command = f"git add -- {quoted_paths}"
 
         self._run_git_command(
@@ -265,6 +318,7 @@ class GitRepositoryGateway:
     def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
         """Create a branch, commit all changes, and push it to origin."""
 
+        self.install_local_excludes(workspace_path)
         self.create_branch(workspace_path, branch)
         self.stage_all_changes(workspace_path)
         self.commit_all_changes(workspace_path, commit_message)
@@ -371,3 +425,16 @@ def _shell_quote(value: str) -> str:
 
     escaped = value.replace('"', '\\"')
     return f'"{escaped}"'
+
+
+def _is_runtime_stage_path(path: str) -> bool:
+    """Return whether a path points to runtime-only artifacts that must stay local."""
+
+    normalized = str(path or "").replace("\\", "/").strip()
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    normalized = normalized.lstrip("/")
+    for prefix in _RUNTIME_STAGE_EXCLUDE_PREFIXES:
+        if normalized == prefix or normalized.startswith(f"{prefix}/"):
+            return True
+    return False

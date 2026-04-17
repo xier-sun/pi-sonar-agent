@@ -2027,6 +2027,83 @@ def test_fix_verifier_skips_build_when_semantic_precheck_fails(monkeypatch, tmp_
     assert build_calls == []
 
 
+def test_fix_verifier_simple_loop_runs_build_before_post_check(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-simple-loop",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=3,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        execution_mode="simple_loop",
+        validation_plan=("build",),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(3, 4, 5),
+            before_changed_lines=(3, 4, 5),
+            after_changed_lines=(3, 4, 5),
+            diff_text=(
+                "@@ -3,3 +3,3 @@\n"
+                "-    void Process()\n"
+                "+    async Task ProcessAsync()\n"
+                "+    {\n"
+                "+        return;\n"
+            ),
+            hunk_count=1,
+        ),
+    )
+
+    build_calls: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    def fake_run(*args, **kwargs):
+        build_calls.append("build")
+        return FakeCompletedProcess()
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="scope",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content="\n".join(
+            [
+                "class Foo",
+                "{",
+                "    async Task ProcessAsync()",
+                "    {",
+                "        return;",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+    )
+
+    assert outcome.build_invoked is True
+    assert outcome.build_passed is True
+    assert outcome.post_fix_check_result.issue_status == "UNKNOWN"
+    assert outcome.semantic_precheck_result.status == "not_applicable"
+    assert build_calls == ["build"]
+
+
 def test_fix_verifier_runs_build_when_review_gate_waives_propagation(monkeypatch, tmp_path) -> None:
     issue = SonarIssue(
         key="issue-review-gate-pass",

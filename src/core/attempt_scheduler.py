@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from pi_sonar_agent.core.issue_contract import EditContract
 from pi_sonar_agent.core.perf_flags import PerformanceFlags
+from pi_sonar_agent.core.simple_mode import is_simple_loop_execution_mode
 
 
 @dataclass(frozen=True)
@@ -101,6 +102,17 @@ class AttemptScheduler:
         edit_contract: EditContract,
         performance_flags: PerformanceFlags,
     ) -> VerificationSchedule:
+        if is_simple_loop_execution_mode(getattr(edit_contract, "execution_mode", "")):
+            return VerificationSchedule(
+                run_boundary_first=True,
+                run_semantic_precheck_before_build=False,
+                run_propagation_check_before_build=False,
+                run_quality_gate_before_build=False,
+                run_rule_validation_before_build=False,
+                run_fast_compile_before_build=False,
+                skip_build_on_precheck_failure=False,
+                rollout_flags=performance_flags.enabled_flags(),
+            )
         return VerificationSchedule(
             run_boundary_first=True,
             run_semantic_precheck_before_build=True,

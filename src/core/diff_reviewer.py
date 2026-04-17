@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
-from pi_sonar_agent.core.boundary_policy import BoundaryPolicy
 from pi_sonar_agent.core.issue_contract import EditContract
 from pi_sonar_agent.core.state import serialize_state, utc_now_iso
 
@@ -158,8 +158,7 @@ class ReviewerResult:
                 [
                     "Review Constraints:",
                     "- Only modify existing source files inside the checked-out workspace.",
-                    "- Do not create, delete, rename, or whole-file overwrite files.",
-                    "- Keep code changes landing through Edit-style patch operations.",
+                    "- Do not create, delete, move, or rename files.",
                 ]
             )
         else:
@@ -181,6 +180,16 @@ class DiffReviewer:
         ".git/",
         "logs/",
         ".agent_workspaces/",
+    )
+    _PRIVATE_METHOD_DECLARATION_RE = re.compile(
+        r"^\s*private\s+(?!class\b|record\b|struct\b|interface\b|enum\b|delegate\b)"
+        r"(?:static\s+|async\s+|unsafe\s+|new\s+|partial\s+|extern\s+|virtual\s+|override\s+)*"
+        r"[\w<>\[\],.?]+\s+[\w@]+\s*\(",
+        re.IGNORECASE,
+    )
+    _PRIVATE_CONSTRUCTOR_DECLARATION_RE = re.compile(
+        r"^\s*private\s+(?:unsafe\s+|extern\s+|partial\s+)*[\w@]+\s*\(",
+        re.IGNORECASE,
     )
 
     @staticmethod
@@ -234,6 +243,36 @@ class DiffReviewer:
                 score += 10
         return score
 
+    @classmethod
+    def _is_private_method_declaration(cls, line_text: str) -> bool:
+        normalized = str(line_text or "").strip()
+        if not normalized.startswith("private ") or "(" not in normalized:
+            return False
+        prefix = normalized.split("(", 1)[0]
+        if "=" in prefix:
+            return False
+        return bool(
+            cls._PRIVATE_METHOD_DECLARATION_RE.match(normalized)
+            or cls._PRIVATE_CONSTRUCTOR_DECLARATION_RE.match(normalized)
+        )
+
+    @classmethod
+    def _find_private_method_additions(
+        cls,
+        change: ReviewedFileChange,
+    ) -> tuple[int, ...]:
+        return tuple(
+            sorted(
+                {
+                    int(operation.after_line)
+                    for operation in change.line_operations
+                    if operation.kind == "add"
+                    and int(operation.after_line or 0) > 0
+                    and cls._is_private_method_declaration(operation.text)
+                }
+            )
+        )
+
     @staticmethod
     def _build_audit_summary(
         *,
@@ -241,7 +280,13 @@ class DiffReviewer:
         soft_violations: list[ReviewerViolation],
     ) -> str:
         if hard_violations:
-            return "Patch violates the filesystem boundary policy."
+            hard_types = {item.type for item in hard_violations}
+            filesystem_only = hard_types.issubset(
+                {"forbidden_path", "file_created", "file_deleted"}
+            )
+            if filesystem_only:
+                return "Patch violates the filesystem boundary policy."
+            return "Patch violates the current issue contract and must be retried with a smaller, compliant patch."
         if not soft_violations:
             return "Patch stayed inside the filesystem boundary and no contract drift was detected."
         return "Patch stayed inside the filesystem boundary; extra drift was recorded for reviewer audit."
@@ -255,9 +300,6 @@ class DiffReviewer:
     ) -> ReviewerResult:
         """Review the current file changes against the edit contract."""
 
-        target_files = set(edit_contract.target_files)
-        line_range = cls._line_range(edit_contract)
-        allowed_line_ranges = cls._allowed_line_ranges(edit_contract)
         hard_violations: list[ReviewerViolation] = []
         soft_violations: list[ReviewerViolation] = []
         follow_ups: list[FollowUpItem] = []
@@ -277,8 +319,6 @@ class DiffReviewer:
                 continue
 
             if not change.before_exists and change.after_exists:
-                if cls._is_allowed_created_file(change.file, edit_contract):
-                    continue
                 reason = "Creating new files is not allowed during automated issue repair."
                 hard_violations.append(
                     ReviewerViolation(
@@ -304,97 +344,21 @@ class DiffReviewer:
                 )
                 continue
 
-            if change.file not in target_files:
-                reason = "This file is outside the primary issue file set and was recorded as extra touched drift."
-                soft_violations.append(
-                    ReviewerViolation(
-                        type="extra_touched_file",
-                        file=change.file,
-                        reason=reason,
-                        changed_lines=change.boundary_changed_lines,
-                        evidence_hunk=change.diff_text,
-                    )
-                )
-                follow_ups.append(
-                    FollowUpItem(
-                        source_issue_key=edit_contract.issue_key,
-                        file=change.file,
-                        symbol="",
-                        summary="Extra touched file detected outside the primary issue file set; review separately.",
-                        evidence_hunk=change.diff_text,
-                        discovered_at=utc_now_iso(),
-                    )
-                )
-                continue
-
-            if not allowed_line_ranges or not change.boundary_changed_lines:
-                continue
-
-            outside_lines = BoundaryPolicy.find_outside_lines(
-                change.boundary_changed_lines,
-                allowed_line_ranges,
-            )
-            if not outside_lines:
-                continue
-
-            if line_range is not None:
-                start_line, end_line = line_range
-                reason = (
-                    f"This hunk changes lines outside the primary issue window {start_line}-{end_line}; recorded as drift only."
-                )
-            else:
-                reason = "This hunk changes lines outside the primary issue ranges; recorded as drift only."
-            soft_violations.append(
-                ReviewerViolation(
-                    type="outside_primary_region",
-                    file=change.file,
-                    reason=reason,
-                    symbol=(edit_contract.target_symbols[0].symbol if edit_contract.target_symbols else ""),
-                    changed_lines=outside_lines,
-                    evidence_hunk=change.diff_text,
-                )
-            )
-            follow_ups.append(
-                FollowUpItem(
-                    source_issue_key=edit_contract.issue_key,
-                    file=change.file,
-                    symbol=(edit_contract.target_symbols[0].symbol if edit_contract.target_symbols else ""),
-                    summary="Patch touched lines outside the primary issue region; review whether the extra cleanup is acceptable.",
-                    evidence_hunk=change.diff_text,
-                    discovered_at=utc_now_iso(),
-                )
-            )
-
-        drift_score = cls._drift_score((*hard_violations, *soft_violations))
-        extra_touched_file_count = sum(
-            1 for item in soft_violations if item.type == "extra_touched_file"
-        )
-        outside_primary_region_count = sum(
-            1 for item in soft_violations if item.type == "outside_primary_region"
-        )
-        scope_expansion_reasons = tuple(
-            dict.fromkeys(
-                item.type
-                for item in soft_violations
-                if item.type in {"outside_primary_region", "extra_touched_file"}
-            )
-        )
+        drift_score = cls._drift_score(hard_violations)
         metrics = {
             "changed_file_count": len(file_changes),
             "hunk_count": sum(change.hunk_count for change in file_changes),
             "total_changed_lines": sum(len(change.boundary_changed_lines) for change in file_changes),
             "hard_boundary_violation_count": len(hard_violations),
-            "soft_boundary_violation_count": len(soft_violations),
-            "extra_touched_file_count": extra_touched_file_count,
-            "outside_primary_region_line_count": sum(
-                len(item.changed_lines) for item in soft_violations if item.type == "outside_primary_region"
-            ),
-            "outside_primary_region_count": outside_primary_region_count,
-            "scope_audit_mode": "scope_soft_audit",
-            "scope_audit_active": True,
-            "scope_expansion_count": extra_touched_file_count + outside_primary_region_count,
-            "scope_expansion_reasons": list(scope_expansion_reasons),
-            "high_drift_warning": drift_score >= 3,
+            "soft_boundary_violation_count": 0,
+            "extra_touched_file_count": 0,
+            "outside_primary_region_line_count": 0,
+            "outside_primary_region_count": 0,
+            "scope_audit_mode": "filesystem_only",
+            "scope_audit_active": False,
+            "scope_expansion_count": 0,
+            "scope_expansion_reasons": [],
+            "high_drift_warning": drift_score >= 10,
             "drift_score": drift_score,
         }
         summary = cls._build_audit_summary(

@@ -462,7 +462,12 @@ class LegacyScopeGuard:
         )
 
     @staticmethod
-    def build_scope_guidance(issue: SonarIssue, scope: IssueEditScope | None) -> str:
+    def build_scope_guidance(
+        issue: SonarIssue,
+        scope: IssueEditScope | None,
+        *,
+        allow_helper_extract: bool = True,
+    ) -> str:
         if scope is None:
             return (
                 "- 只允许修改 SonarQube 指向的那一处问题。\n"
@@ -470,11 +475,17 @@ class LegacyScopeGuard:
             )
 
         if scope.mode == METHOD_SCOPE_MODE:
-            return (
-                f"- 只允许修改第 {scope.start_line}-{scope.end_line} 行的目标方法。\n"
-                f"- 如果必须提取 private 辅助方法，只能新增在该方法后方紧邻区域，且不要超过第 {scope.validation_end_line} 行。\n"
-                "- 新增的辅助方法只能服务当前 issue 对应的方法，不要改动本文件其他方法中的同类问题。"
-            )
+            lines = [f"- 只允许修改第 {scope.start_line}-{scope.end_line} 行的目标方法。"]
+            if allow_helper_extract:
+                lines.extend(
+                    (
+                        f"- 如果必须提取 private 辅助方法，只能新增在该方法后方紧邻区域，且不要超过第 {scope.validation_end_line} 行。",
+                        "- 新增的辅助方法只能服务当前 issue 对应的方法，不要改动本文件其他方法中的同类问题。",
+                    )
+                )
+            else:
+                lines.append("- 当前 retry 已禁用 helper/private method 提取；必须在现有方法体内完成收口。")
+            return "\n".join(lines)
 
         if scope.mode == CONTROL_BLOCK_SCOPE_MODE:
             return (

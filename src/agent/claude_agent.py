@@ -7,9 +7,11 @@ This module provides the main agent class that:
 4. Creates PR in Azure DevOps
 """
 
+import asyncio
 import json
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -35,12 +37,21 @@ from pi_sonar_agent.core.agent_runtime import (
     AgentRuntimeResult,
     RuntimeTimeouts,
 )
+from pi_sonar_agent.core.agent_role_prompts import (
+    build_fix_role_system_prompt,
+    build_fix_role_user_prompt,
+    build_main_role_system_prompt,
+    build_main_role_user_prompt,
+    build_review_role_system_prompt,
+    build_review_role_user_prompt,
+)
 from pi_sonar_agent.core.attempt_changes import AttemptFileChangeBuilder
 from pi_sonar_agent.core.attempt_context import AttemptContextCache
 from pi_sonar_agent.core.attempt_scheduler import AttemptScheduler
 from pi_sonar_agent.core.claude_adapter import ClaudeAdapter, ClaudeSDKDependencies
 from pi_sonar_agent.core.continuation_recovery import ContinuationRecovery
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange
+from pi_sonar_agent.core.diff_reviewer import DiffReviewer
 from pi_sonar_agent.core.editor_policy import EditorPolicy
 from pi_sonar_agent.core.engine_router import route_engine_for_issue
 from pi_sonar_agent.core.events import AttemptRuntimeEvent, AttemptRuntimeEventKind
@@ -48,7 +59,15 @@ from pi_sonar_agent.core.fix_verifier import FixVerifier
 from pi_sonar_agent.core.hooks import HookPipeline
 from pi_sonar_agent.core.issue_planner import IssuePlanner
 from pi_sonar_agent.core.issue_prompt import IssuePromptBuilder
+from pi_sonar_agent.core.memory.child_agent_memory import (
+    ChildAgentMemory,
+    append_child_agent_memory_turn,
+    create_initial_child_agent_memory,
+)
+from pi_sonar_agent.core.memory.issue_working_memory import IssueWorkingMemory
+from pi_sonar_agent.core.memory.working_memory_store import WorkingMemoryStore
 from pi_sonar_agent.core.mcp_servers import build_sonar_mcp_runtime
+from pi_sonar_agent.core.model_gateway import ResultEvent, TextEvent, ToolCallEvent, TraceEvent
 from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.policy import ToolPolicy
 from pi_sonar_agent.core.project_env import read_project_env
@@ -56,6 +75,10 @@ from pi_sonar_agent.core.quality_gate import render_quality_gate_prompt
 from pi_sonar_agent.core.registry import build_fix_tool_registry, build_visible_toolset
 from pi_sonar_agent.core.resource_loader import DEFAULT_CSHARP_QUALITY_GATE_FILE, ResourceLoader
 from pi_sonar_agent.core.retry_context import RetryContext
+from pi_sonar_agent.core.simple_mode import (
+    is_simple_loop_execution_mode,
+    resolve_execution_mode,
+)
 from pi_sonar_agent.core.scope_guard import IssueEditScope, LegacyScopeGuard
 from pi_sonar_agent.core.tool_surface import (
     BASE_BUILTIN_FIX_TOOLS,
@@ -215,6 +238,31 @@ class FixResult:
     engine_routing_decision: Any | None = None
     prompt_budget_report: Any | None = None
     visible_toolset: Any | None = None
+    execution_mode: str = ""
+    post_fix_check_result: Any | None = None
+    issue_working_memory: Any | None = None
+
+
+@dataclass(frozen=True)
+class RoleAgentRunResult:
+    """Result of one fix/review/main child-agent session."""
+
+    role: str
+    response_text: str
+    total_cost_usd: float = 0.0
+    agent_error: str | None = None
+    tool_uses: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RoleDecision:
+    """Parsed structured decision returned by review/main child agents."""
+
+    decision: str
+    summary: str
+    findings: tuple[str, ...] = ()
+    constraints: tuple[str, ...] = ()
+    raw_text: str = ""
 
 BUILTIN_FIX_TOOLS = list(BASE_BUILTIN_FIX_TOOLS)
 MCP_FIX_TOOLS: list[str] = []
@@ -727,10 +775,23 @@ class ClaudeFixAgent:
         return LegacyScopeGuard.build_issue_edit_scope(issue, lines)
 
     @staticmethod
-    def _build_scope_guidance(issue: SonarIssue, scope: IssueEditScope | None) -> str:
+    def _build_scope_guidance(
+        issue: SonarIssue,
+        scope: IssueEditScope | None,
+        edit_contract: EditContract | None = None,
+    ) -> str:
         """Render edit-scope guidance for the model prompt."""
 
-        return LegacyScopeGuard.build_scope_guidance(issue, scope)
+        allow_helper_extract = True
+        if edit_contract is not None:
+            allow_helper_extract = "helper_extract" in tuple(
+                getattr(edit_contract, "allowed_capabilities", ()) or ()
+            )
+        return LegacyScopeGuard.build_scope_guidance(
+            issue,
+            scope,
+            allow_helper_extract=allow_helper_extract,
+        )
 
     @staticmethod
     def _get_rule_skip_reason(issue: SonarIssue) -> str:
@@ -806,6 +867,8 @@ class ClaudeFixAgent:
         workspace_path: Path | None = None,
         edit_contract: Any | None = None,
         visible_tool_names: tuple[str, ...] | list[str] = (),
+        working_memory: IssueWorkingMemory | None = None,
+        model_hint: str = "",
     ) -> str:
         """Build the issue-specific user prompt."""
 
@@ -825,6 +888,8 @@ class ClaudeFixAgent:
             workspace_path=workspace_path,
             edit_contract=edit_contract,
             visible_tool_names=visible_tool_names,
+            working_memory=working_memory,
+            model_hint=model_hint,
         )
 
     @classmethod
@@ -845,6 +910,8 @@ class ClaudeFixAgent:
         workspace_path: Path | None = None,
         edit_contract: Any | None = None,
         visible_tool_names: tuple[str, ...] | list[str] = (),
+        working_memory: IssueWorkingMemory | None = None,
+        model_hint: str = "",
     ) -> Any:
         """Build the issue-specific user prompt plus budget metadata."""
 
@@ -864,6 +931,8 @@ class ClaudeFixAgent:
             workspace_path=workspace_path,
             edit_contract=edit_contract,
             visible_tool_names=visible_tool_names,
+            working_memory=working_memory,
+            model_hint=model_hint,
         )
 
     @staticmethod
@@ -890,6 +959,17 @@ class ClaudeFixAgent:
     def _build_execution_mode_section(edit_contract: Any | None) -> str:
         """Render short-form execution instructions when enabled."""
 
+        if edit_contract is not None and is_simple_loop_execution_mode(
+            getattr(edit_contract, "execution_mode", "")
+        ):
+            lines = [
+                "【执行模式】",
+                "- 当前 issue 使用 headless simple-loop execution。",
+                "- 目标是先完成当前 issue 的最小修复，再交给外层做 build 和 post-check。",
+                "- 优先提交可编译、最小、聚焦当前 issue 的 patch；不要展开长篇推理。",
+                "- 如果上一轮方案失败或已回滚，请直接换一种更小的修法。",
+            ]
+            return "\n".join(lines)
         if edit_contract is None or not bool(getattr(edit_contract, "fast_path_enabled", False)):
             return ""
         return "\n".join(
@@ -1309,10 +1389,605 @@ class ClaudeFixAgent:
         return IssuePromptBuilder.build_system_prompt(workspace_path)
 
     @classmethod
-    def _build_system_prompt_result(cls, workspace_path: Path) -> Any:
+    def _build_system_prompt_result(
+        cls,
+        workspace_path: Path,
+        *,
+        edit_contract: Any | None = None,
+    ) -> Any:
         """Compose the fix system prompt plus budget metadata."""
 
-        return IssuePromptBuilder.build_system_prompt_result(workspace_path)
+        return IssuePromptBuilder.build_system_prompt_result(
+            workspace_path,
+            execution_mode=str(getattr(edit_contract, "execution_mode", "") or ""),
+        )
+
+    @staticmethod
+    def _normalize_edit_contract_for_child_agents(edit_contract: Any) -> Any:
+        """Drop legacy local constraints for the child-agent flow."""
+
+        return replace(
+            edit_contract,
+            execution_mode="simple_loop",
+            allow_file_creation=False,
+            allowed_new_file_roots=(),
+        )
+
+    @staticmethod
+    def _build_patch_summary(
+        reviewed_changes: tuple[ReviewedFileChange, ...],
+    ) -> str:
+        """Build a concise patch summary for review/main agents."""
+
+        sections: list[str] = []
+        for change in reviewed_changes[:3]:
+            preview_lines: list[str] = []
+            for raw_line in str(change.diff_text or "").splitlines():
+                stripped = raw_line.rstrip()
+                if stripped.startswith(("+++", "---", "@@")):
+                    continue
+                if stripped.startswith(("+", "-")):
+                    preview_lines.append(stripped[:160])
+                if len(preview_lines) >= 6:
+                    break
+            body = " ; ".join(preview_lines)
+            sections.append(f"{change.file}: {body or 'modified'}")
+        return "\n".join(section for section in sections if section).strip()
+
+    @staticmethod
+    def _extract_json_payload(raw_text: str) -> dict[str, Any]:
+        text = str(raw_text or "").strip()
+        if not text:
+            return {}
+        candidates = [text]
+        if "```json" in text:
+            start = text.find("```json") + len("```json")
+            end = text.find("```", start)
+            if end > start:
+                candidates.append(text[start:end].strip())
+        first_brace = text.find("{")
+        last_brace = text.rfind("}")
+        if first_brace >= 0 and last_brace > first_brace:
+            candidates.append(text[first_brace : last_brace + 1].strip())
+        for candidate in candidates:
+            try:
+                data = json.loads(candidate)
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                return data
+        return {}
+
+    @classmethod
+    def _parse_role_decision(
+        cls,
+        *,
+        raw_text: str,
+        allowed_decisions: tuple[str, ...],
+        fallback_decision: str,
+        fallback_summary: str,
+    ) -> RoleDecision:
+        payload = cls._extract_json_payload(raw_text)
+        decision = str(payload.get("decision", "")).strip().lower()
+        if decision not in set(allowed_decisions):
+            decision = fallback_decision
+        findings = tuple(
+            str(item).strip()
+            for item in payload.get("findings", ()) or ()
+            if str(item).strip()
+        )
+        constraints = tuple(
+            str(item).strip()
+            for item in payload.get("constraints", ()) or ()
+            if str(item).strip()
+        )
+        summary = str(payload.get("summary", "")).strip() or fallback_summary
+        return RoleDecision(
+            decision=decision,
+            summary=summary,
+            findings=findings,
+            constraints=constraints,
+            raw_text=str(raw_text or "").strip(),
+        )
+
+    @classmethod
+    async def _run_prompt_only_role_session_async(
+        cls,
+        role: str,
+        workspace_path: Path,
+        system_prompt: str,
+        user_prompt: str,
+        max_turns: int,
+        agent_env: dict[str, str] | None,
+        explicit_model: str | None,
+    ) -> RoleAgentRunResult:
+        """Run a prompt-only child-agent session and capture raw text output."""
+
+        gateway = ClaudeAdapter(cls._sdk_dependencies())
+        request = ClaudeAdapter.build_request(
+            agent_env=dict(agent_env or read_project_env()),
+            explicit_model=explicit_model,
+            cwd=str(workspace_path),
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            tools=(),
+            allowed_tools=(),
+            max_turns=max_turns,
+            max_budget_usd=2.0,
+            stderr_handler=cls._handle_cli_stderr,
+            build_command="",
+            mcp_servers={},
+        )
+        session = gateway.create_session(request)
+        texts: list[str] = []
+        tool_uses: list[str] = []
+        total_cost = 0.0
+        agent_error = ""
+        start_at = time.monotonic()
+        connected = False
+        try:
+            await session.connect(timeout_seconds=CLIENT_CONNECT_TIMEOUT_SECONDS)
+            connected = True
+            await session.send(request.user_prompt)
+            stream = session.stream_events()
+            while True:
+                remaining = max(10.0, 180.0 - (time.monotonic() - start_at))
+                try:
+                    event = await asyncio.wait_for(anext(stream), timeout=remaining)
+                except StopAsyncIteration:
+                    break
+                if isinstance(event, TextEvent):
+                    texts.append(str(event.text or ""))
+                elif isinstance(event, ToolCallEvent):
+                    tool_uses.append(str(getattr(event, "name", "") or "").strip())
+                elif isinstance(event, ResultEvent):
+                    total_cost = float(getattr(event, "total_cost_usd", 0.0) or 0.0)
+                    agent_error = str(getattr(event, "agent_error", "") or "").strip()
+                elif isinstance(event, TraceEvent):
+                    continue
+        except Exception as exc:
+            agent_error = str(exc)
+        finally:
+            if connected:
+                try:
+                    await session.close()
+                except Exception:
+                    pass
+        return RoleAgentRunResult(
+            role=role,
+            response_text="".join(texts).strip(),
+            total_cost_usd=total_cost,
+            agent_error=agent_error or None,
+            tool_uses=tuple(dict.fromkeys(item for item in tool_uses if item)),
+        )
+
+    @classmethod
+    def _run_prompt_only_role_session(
+        cls,
+        *,
+        role: str,
+        workspace_path: Path,
+        system_prompt: str,
+        user_prompt: str,
+        max_turns: int = 4,
+        agent_env: dict[str, str] | None = None,
+        explicit_model: str | None = None,
+    ) -> RoleAgentRunResult:
+        return anyio.run(
+            cls._run_prompt_only_role_session_async,
+            role,
+            workspace_path,
+            system_prompt,
+            user_prompt,
+            max_turns,
+            agent_env,
+            explicit_model,
+        )
+
+    @classmethod
+    def _load_child_memory(
+        cls,
+        *,
+        store: WorkingMemoryStore,
+        issue_key: str,
+        role: str,
+        focus: str,
+    ) -> ChildAgentMemory:
+        existing = store.load_child_memory(issue_key, role)
+        if existing is not None:
+            return existing
+        memory = create_initial_child_agent_memory(issue_key=issue_key, role=role, focus=focus)
+        store.save_child_memory(memory)
+        return memory
+
+    @classmethod
+    def _run_role_orchestrated_flow(
+        cls,
+        *,
+        agent: "ClaudeFixAgent",
+        issue: SonarIssue,
+        workspace_path: Path,
+        build_command: str,
+        code_context: str,
+        rule_details: dict[str, str],
+        scope: IssueEditScope | None,
+        original_issue_file_content: str | None,
+        retry_feedback: str,
+        working_memory: IssueWorkingMemory | None,
+        edit_contract: Any,
+        guardrail_mode: str,
+        visible_toolset: Any,
+        tool_policy: ToolPolicy,
+        result_metadata: dict[str, Any],
+        execution_schedule: Any,
+    ) -> FixResult:
+        """Run the new main -> fix -> review -> compile orchestration flow."""
+
+        store = WorkingMemoryStore(workspace_path)
+        fix_memory = cls._load_child_memory(
+            store=store,
+            issue_key=issue.key,
+            role="fix",
+            focus="直接修改代码，完成当前 issue 的最小修复。",
+        )
+        review_memory = cls._load_child_memory(
+            store=store,
+            issue_key=issue.key,
+            role="review",
+            focus="审查当前 patch 是否符合 C# 质量门禁和 issue 修复目标。",
+        )
+        main_memory = cls._load_child_memory(
+            store=store,
+            issue_key=issue.key,
+            role="main",
+            focus="决定当前 patch 是否进入编译阶段。",
+        )
+
+        system_prompt = build_fix_role_system_prompt()
+        file_path_candidates = IssuePromptBuilder.build_workspace_relative_candidates(
+            issue.file_path,
+            workspace_path,
+        )
+        user_prompt = build_fix_role_user_prompt(
+            issue=issue,
+            code_context=code_context,
+            file_path_candidates=file_path_candidates,
+            working_memory=working_memory,
+            fix_memory=fix_memory,
+            retry_feedback=retry_feedback,
+        )
+        gateway_request = ClaudeAdapter.build_request(
+            agent_env=agent.agent_env,
+            explicit_model=agent.model,
+            cwd=str(workspace_path),
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            tools=build_fix_runtime_tools(include_create_file_tool=False),
+            allowed_tools=tool_policy.allowed_tool_names(),
+            max_turns=int(getattr(execution_schedule, "effective_max_turns", 8) or 8),
+            max_budget_usd=agent.max_budget_usd,
+            stderr_handler=agent._handle_cli_stderr,
+            build_command=build_command,
+            mcp_servers={},
+        )
+        gateway_request.metadata.update(
+            {
+                "issue_key": issue.key,
+                "role": "fix",
+                "helper_extract_runtime_guard": "false",
+            }
+        )
+        runtime = AgentRuntime(
+            gateway=ClaudeAdapter(cls._sdk_dependencies()),
+            tool_policy=tool_policy,
+            timeouts=RuntimeTimeouts(
+                client_connect_seconds=CLIENT_CONNECT_TIMEOUT_SECONDS,
+                first_response_seconds=FIRST_RESPONSE_TIMEOUT_SECONDS,
+                follow_up_seconds=FOLLOW_UP_RESPONSE_TIMEOUT_SECONDS,
+                issue_hard_timeout_seconds=ISSUE_HARD_TIMEOUT_SECONDS,
+                heartbeat_interval_seconds=HEARTBEAT_INTERVAL_SECONDS,
+            ),
+            hooks=HookPipeline(),
+            run_sync=anyio.run,
+        )
+        cls._capture_attempt_workspace_state(workspace_path)
+        try:
+            try:
+                runtime_result = agent._run_runtime_with_continuation(
+                    runtime=runtime,
+                    gateway_request=gateway_request,
+                    execution_schedule=execution_schedule,
+                    workspace_path=workspace_path,
+                )
+            except AgentRuntimeError as exc:
+                runtime_result = exc.partial_result
+                runtime_metrics = agent._build_runtime_performance_metrics(runtime_result)
+                attempt_events = tuple(getattr(runtime_result, "runtime_events", ()) or ())
+                failure_kind, summary, child_summary, build_output = cls._classify_fix_role_failure(
+                    agent_error=str(exc.cause or exc),
+                    attempt_events=attempt_events,
+                )
+                fix_memory = append_child_agent_memory_turn(
+                    fix_memory,
+                    attempt_number=len(fix_memory.turns) + 1,
+                    decision="retry",
+                    summary=child_summary,
+                    workspace_state="issue_baseline",
+                    next_action=(
+                        "先 Read 当前目标文件，再用完整参数重新提交更精确的 patch。"
+                        if failure_kind == "tool_input_invalid"
+                        else "重新读取问题文件，改用更小的修法。"
+                    ),
+                )
+                store.save_child_memory(fix_memory)
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=issue.file_path,
+                    error=str(exc.cause or exc),
+                    summary=summary,
+                    build_command=build_command,
+                    build_output=build_output,
+                    retryable_failure=True,
+                    failure_kind=failure_kind,
+                    performance_metrics=runtime_metrics,
+                    attempt_events=attempt_events,
+                    **result_metadata,
+                )
+            runtime_metrics = agent._build_runtime_performance_metrics(runtime_result)
+            attempt_events = tuple(getattr(runtime_result, "runtime_events", ()) or ())
+            if runtime_result.agent_error:
+                failure_kind, summary, child_summary, build_output = cls._classify_fix_role_failure(
+                    agent_error=runtime_result.agent_error,
+                    attempt_events=attempt_events,
+                )
+                fix_memory = append_child_agent_memory_turn(
+                    fix_memory,
+                    attempt_number=len(fix_memory.turns) + 1,
+                    decision="retry",
+                    summary=child_summary,
+                    workspace_state="issue_baseline",
+                    next_action=(
+                        "先 Read 当前目标文件，再用完整参数重新提交更精确的 patch。"
+                        if failure_kind == "tool_input_invalid"
+                        else "重新读取问题文件，改用更小的修法。"
+                    ),
+                )
+                store.save_child_memory(fix_memory)
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=issue.file_path,
+                    error=runtime_result.agent_error,
+                    summary=summary,
+                    build_command=build_command,
+                    build_output=build_output,
+                    retryable_failure=True,
+                    failure_kind=failure_kind,
+                    performance_metrics=runtime_metrics,
+                    attempt_events=attempt_events,
+                    **result_metadata,
+                )
+
+            changed_files = tuple(dict.fromkeys(agent._collect_modified_files(workspace_path)))
+            changes = [{"file": changed_file, "action": "modified"} for changed_file in changed_files]
+            fallback_before_texts: dict[str, str] = {}
+            normalized_issue_path = str(issue.file_path or "").replace("\\", "/").lstrip("/")
+            if normalized_issue_path and original_issue_file_content is not None:
+                fallback_before_texts[normalized_issue_path] = original_issue_file_content
+            reviewed_changes = agent._build_attempt_file_changes(
+                workspace_path,
+                changed_files,
+                fallback_before_texts=(fallback_before_texts or None),
+            )
+        finally:
+            cls._cleanup_attempt_workspace_state(workspace_path)
+        reviewer_result = DiffReviewer.review(edit_contract=edit_contract, file_changes=reviewed_changes)
+        patch_summary = cls._build_patch_summary(reviewed_changes)
+        current_issue_path = workspace_path / issue.file_path.lstrip("/")
+        current_issue_file_content = (
+            current_issue_path.read_text(encoding="utf-8", errors="replace")
+            if current_issue_path.exists()
+            else ""
+        )
+        fix_memory = append_child_agent_memory_turn(
+            fix_memory,
+            attempt_number=len(fix_memory.turns) + 1,
+            decision="patched",
+            summary=patch_summary or "已生成 patch。",
+            workspace_state="attempt_patch",
+            next_action="等待 Review 子Agent 审查。",
+        )
+        store.save_child_memory(fix_memory)
+
+        if reviewer_result.status == "retry":
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=changes,
+                build_passed=False,
+                error="Filesystem boundary rejected the patch",
+                summary=reviewer_result.summary,
+                build_command=build_command,
+                build_output=reviewer_result.to_retry_message(),
+                retryable_failure=True,
+                failure_kind="reviewer",
+                reviewer_result=reviewer_result.to_dict(),
+                performance_metrics=runtime_metrics,
+                attempt_events=attempt_events,
+                **result_metadata,
+            )
+
+        review_run = cls._run_prompt_only_role_session(
+            role="review",
+            workspace_path=workspace_path,
+            system_prompt=build_review_role_system_prompt(),
+            user_prompt=build_review_role_user_prompt(
+                issue=issue,
+                code_context=code_context,
+                patch_summary=patch_summary,
+                current_file_content=current_issue_file_content,
+                working_memory=working_memory,
+                review_memory=review_memory,
+            ),
+            max_turns=4,
+            agent_env=agent.agent_env,
+            explicit_model=agent.model,
+        )
+        review_decision = cls._parse_role_decision(
+            raw_text=review_run.response_text,
+            allowed_decisions=("approve", "retry"),
+            fallback_decision="retry",
+            fallback_summary="Review 子Agent 未给出可用结论。",
+        )
+        review_memory = append_child_agent_memory_turn(
+            review_memory,
+            attempt_number=len(review_memory.turns) + 1,
+            decision=review_decision.decision,
+            summary=review_decision.summary,
+            findings=review_decision.findings,
+            constraints=review_decision.constraints,
+            workspace_state="attempt_patch",
+            next_action=(
+                "等待 Main 裁决。"
+                if review_decision.decision == "approve"
+                else "根据 review 约束换一种修法。"
+            ),
+        )
+        store.save_child_memory(review_memory)
+        if review_decision.decision != "approve":
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=changes,
+                error=review_decision.summary,
+                summary="Review 子Agent拒绝当前 patch。",
+                build_command=build_command,
+                build_output=review_decision.raw_text or review_decision.summary,
+                retryable_failure=True,
+                failure_kind="review_agent",
+                reviewer_result=reviewer_result.to_dict(),
+                performance_metrics=runtime_metrics,
+                attempt_events=attempt_events,
+                **result_metadata,
+            )
+
+        main_run = cls._run_prompt_only_role_session(
+            role="main",
+            workspace_path=workspace_path,
+            system_prompt=build_main_role_system_prompt(),
+            user_prompt=build_main_role_user_prompt(
+                issue=issue,
+                patch_summary=patch_summary,
+                review_result={
+                    "decision": review_decision.decision,
+                    "summary": review_decision.summary,
+                    "findings": list(review_decision.findings),
+                    "constraints": list(review_decision.constraints),
+                },
+                working_memory=working_memory,
+                main_memory=main_memory,
+            ),
+            max_turns=3,
+            agent_env=agent.agent_env,
+            explicit_model=agent.model,
+        )
+        main_decision = cls._parse_role_decision(
+            raw_text=main_run.response_text,
+            allowed_decisions=("compile", "retry"),
+            fallback_decision="retry",
+            fallback_summary="Main 裁决未批准进入编译阶段。",
+        )
+        main_memory = append_child_agent_memory_turn(
+            main_memory,
+            attempt_number=len(main_memory.turns) + 1,
+            decision=main_decision.decision,
+            summary=main_decision.summary,
+            constraints=main_decision.constraints,
+            workspace_state="attempt_patch",
+            next_action=(
+                "进入编译阶段。"
+                if main_decision.decision == "compile"
+                else "回到 Fix 子Agent 继续修复。"
+            ),
+        )
+        store.save_child_memory(main_memory)
+        if main_decision.decision != "compile":
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=changes,
+                error=main_decision.summary,
+                summary="Main 裁决要求继续修复后再编译。",
+                build_command=build_command,
+                build_output=main_decision.raw_text or main_decision.summary,
+                retryable_failure=True,
+                failure_kind="main_decision",
+                reviewer_result=reviewer_result.to_dict(),
+                performance_metrics=runtime_metrics,
+                attempt_events=attempt_events,
+                **result_metadata,
+            )
+
+        verification = FixVerifier.evaluate_attempt(
+            issue=issue,
+            workspace_path=workspace_path,
+            build_command=build_command,
+            edit_contract=edit_contract,
+            guardrail_mode=guardrail_mode,
+            scope=scope,
+            reviewed_changes=reviewed_changes,
+            original_issue_file_content=original_issue_file_content,
+            current_issue_file_content=current_issue_file_content,
+            build_runner=subprocess.run,
+            scope_validator=cls._validate_issue_edit_scope,
+            rule_validator=cls._run_rule_specific_validation,
+        )
+        if not verification.build_passed:
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=changes,
+                build_passed=False,
+                build_verification_failed=True,
+                error="Issue changes failed local build verification",
+                summary=main_decision.summary or "编译未通过。",
+                build_command=build_command,
+                build_output=verification.combined_output,
+                retryable_failure=True,
+                failure_kind="build",
+                reviewer_result=reviewer_result.to_dict(),
+                performance_metrics=cls._merge_performance_metrics(
+                    runtime_metrics,
+                    build_invoked=verification.build_invoked,
+                    build_duration_seconds=verification.build_duration_seconds,
+                ),
+                attempt_events=attempt_events,
+                **result_metadata,
+            )
+
+        return FixResult(
+            success=True,
+            issue_key=issue.key,
+            file_path=issue.file_path,
+            changes=changes,
+            build_passed=True,
+            summary=main_decision.summary or "Patch 已通过子Agent审查并完成编译。",
+            build_command=build_command,
+            build_output=verification.build_output,
+            reviewer_result=reviewer_result.to_dict(),
+            performance_metrics=cls._merge_performance_metrics(
+                runtime_metrics,
+                build_invoked=verification.build_invoked,
+                build_duration_seconds=verification.build_duration_seconds,
+            ),
+            attempt_events=attempt_events,
+            **result_metadata,
+        )
 
     @staticmethod
     def _resolve_guardrail_mode(agent_env: dict[str, str] | None = None) -> str:
@@ -1326,6 +2001,12 @@ class ClaudeFixAgent:
         if normalized in {"scope", "contract_review"}:
             return normalized
         return "scope"
+
+    @staticmethod
+    def _resolve_execution_mode(agent_env: dict[str, str] | None = None) -> str:
+        """Resolve the configured issue execution mode."""
+
+        return resolve_execution_mode(agent_env)
 
     @classmethod
     def _build_issue_plan(
@@ -1348,12 +2029,14 @@ class ClaudeFixAgent:
         validation_start = scope.validation_start_line if scope is not None else issue.line
         validation_end = scope.validation_end_line if scope is not None else issue.line
         guardrail_mode = cls._resolve_guardrail_mode(agent_env)
+        execution_mode = cls._resolve_execution_mode(agent_env)
         return IssuePlanner.plan_issue(
             issue_key=issue.key,
             rule_id=issue.rule,
             file_path=issue.file_path,
             issue_line=issue.line,
             guardrail_mode=guardrail_mode,
+            execution_mode=execution_mode,
             scope_mode=scope_mode,
             scope_start_line=scope_start,
             scope_end_line=scope_end,
@@ -1393,13 +2076,9 @@ class ClaudeFixAgent:
     ) -> tuple[ToolPolicy, Any]:
         """Build the runtime tool policy plus the canonical visible toolset snapshot."""
 
-        allow_file_creation = bool(getattr(edit_contract, "allow_file_creation", False))
-        allowed_new_file_roots = (
-            getattr(edit_contract, "allowed_new_file_roots", ())
-            if allow_file_creation
-            else ()
-        )
-        runtime_builtin_tools = build_fix_runtime_tools(include_create_file_tool=allow_file_creation)
+        allow_file_creation = False
+        allowed_new_file_roots: tuple[str, ...] = ()
+        runtime_builtin_tools = build_fix_runtime_tools(include_create_file_tool=False)
         registry = build_fix_tool_registry(
             runtime_builtin_tools,
             mcp_tool_names,
@@ -1925,6 +2604,51 @@ class ClaudeFixAgent:
         return "maximum number of turns" in text
 
     @classmethod
+    def _classify_runtime_contract_agent_error(
+        cls,
+        agent_error: str,
+    ) -> tuple[str, str] | None:
+        text = str(agent_error or "").strip()
+        normalized = text.lower()
+        if "当前 retry 已禁用 helper_extract" in text or "helper_extract" in normalized:
+            return "helper_extract_runtime_guard", text
+        return None
+
+    @classmethod
+    def _classify_fix_role_failure(
+        cls,
+        *,
+        agent_error: str,
+        attempt_events: tuple[AttemptRuntimeEvent, ...] | list[AttemptRuntimeEvent],
+    ) -> tuple[str, str, str, str]:
+        """Normalize fix child-agent failures into retry-meaningful categories."""
+
+        error_text = str(agent_error or "").strip()
+        invalid_write_tool_input = cls._extract_invalid_write_tool_input_message(attempt_events)
+        if invalid_write_tool_input:
+            return (
+                "tool_input_invalid",
+                "Fix 子Agent发出了无效的 Edit/MultiEdit/Write 工具调用。",
+                "Edit/MultiEdit/Write 调用缺少必要参数；先 Read 精确片段，再提交完整 patch。",
+                invalid_write_tool_input,
+            )
+        runtime_contract = cls._classify_runtime_contract_agent_error(error_text)
+        if runtime_contract is not None:
+            _code, detail = runtime_contract
+            return (
+                "runtime_contract_violation",
+                "Fix 子Agent触发了运行时 contract 护栏。",
+                "运行时 contract 护栏拒绝了当前修法，下一轮必须换一种更小的修法。",
+                detail or error_text,
+            )
+        return (
+            "fix_agent",
+            "Fix 子Agent执行失败。",
+            "Fix 子Agent执行失败。",
+            error_text,
+        )
+
+    @classmethod
     def _should_salvage_agent_error(
         cls,
         *,
@@ -1946,6 +2670,7 @@ class ClaudeFixAgent:
         build_command: str = "dotnet build",
         retry_feedback: str = "",
         retry_context: RetryContext | None = None,
+        working_memory: IssueWorkingMemory | None = None,
     ) -> FixResult:
         """Fix a single SonarQube issue using Claude Code."""
         # Prepare workspace
@@ -2020,8 +2745,9 @@ class ClaudeFixAgent:
                 skip_reason=planner_skip_reason,
                 failure_kind="planner_skip",
                 performance_metrics={"build_invoked": False},
-            )
-        edit_contract = issue_plan.edit_contract
+        )
+        edit_contract = self._normalize_edit_contract_for_child_agents(issue_plan.edit_contract)
+        execution_mode = str(getattr(edit_contract, "execution_mode", "")).strip()
         engine_routing_decision = route_engine_for_issue(
             rule_id=issue.rule,
             edit_contract=edit_contract,
@@ -2038,77 +2764,13 @@ class ClaudeFixAgent:
             "repair_plan": getattr(edit_contract, "repair_plan", None),
             "plan_precheck": getattr(edit_contract, "plan_precheck", None),
             "guardrail_mode": guardrail_mode,
+            "execution_mode": execution_mode,
             "execution_profile": str(getattr(edit_contract, "execution_profile", "full_path")),
             "fast_path_enabled": bool(getattr(edit_contract, "fast_path_enabled", False)),
             "rollout_flags": tuple(getattr(edit_contract, "rollout_flags", ()) or ()),
             "engine_routing_decision": engine_routing_decision,
+            "issue_working_memory": working_memory,
         }
-        if engine_routing_decision.should_skip:
-            performance_metrics = {
-                "execution_profile": str(getattr(edit_contract, "execution_profile", "full_path")),
-                "fast_path_enabled": bool(getattr(edit_contract, "fast_path_enabled", False)),
-                "engine_routing_decision": engine_routing_decision.to_dict(),
-                "build_invoked": False,
-            }
-            return FixResult(
-                success=False,
-                issue_key=issue.key,
-                file_path=str(file_path),
-                error=engine_routing_decision.skip_reason,
-                summary="Engine routing rejected the issue before any model attempt.",
-                build_command=build_command.strip() or "dotnet build",
-                build_output=engine_routing_decision.skip_reason,
-                skipped=True,
-                skip_reason=engine_routing_decision.skip_reason,
-                failure_kind="engine_router_skip",
-                performance_metrics=performance_metrics,
-                **result_metadata,
-            )
-        if engine_routing_decision.resolved_engine == "roslyn":
-            return self._run_roslyn_fix_path(
-                issue=issue,
-                workspace_path=workspace_path,
-                build_command=build_command.strip() or "dotnet build",
-                edit_contract=edit_contract,
-                guardrail_mode=guardrail_mode,
-                scope=scope,
-                original_issue_file_content=original_issue_file_content,
-                result_metadata=result_metadata,
-            )
-        plan_precheck = getattr(edit_contract, "plan_precheck", None)
-        if bool(getattr(plan_precheck, "blocking", False)):
-            performance_metrics = {
-                "execution_profile": str(getattr(edit_contract, "execution_profile", "full_path")),
-                "fast_path_enabled": bool(getattr(edit_contract, "fast_path_enabled", False)),
-                "plan_first_enabled": bool(getattr(edit_contract, "plan_first_enabled", False)),
-                "plan_precheck_blocking": True,
-                "engine_routing_decision": engine_routing_decision.to_dict(),
-                "build_invoked": False,
-            }
-            detail_lines = [str(getattr(plan_precheck, "summary", "")).strip()]
-            detail_lines.extend(
-                str(item).strip() for item in getattr(plan_precheck, "details", ()) if str(item).strip()
-            )
-            detail_lines.extend(
-                f"重试建议: {item}"
-                for item in getattr(plan_precheck, "guidance", ())
-                if str(item).strip()
-            )
-            plan_output = "\n".join(line for line in detail_lines if line)
-            return FixResult(
-                success=False,
-                issue_key=issue.key,
-                file_path=str(file_path),
-                error=str(getattr(plan_precheck, "summary", "")).strip() or "Plan precheck rejected the edit.",
-                summary="Plan precheck rejected the edit before any file changes.",
-                build_command=build_command.strip() or "dotnet build",
-                build_output=plan_output,
-                retryable_failure=False,
-                failure_kind="plan_conflict",
-                performance_metrics=performance_metrics,
-                **result_metadata,
-            )
-
         sonar_mcp_runtime = build_sonar_mcp_runtime(self.agent_env)
         tool_policy, visible_toolset = self._build_fix_tool_policy_bundle(
             edit_contract,
@@ -2117,27 +2779,71 @@ class ClaudeFixAgent:
         )
         result_metadata["visible_toolset"] = visible_toolset
 
+        return self._run_role_orchestrated_flow(
+            agent=self,
+            issue=issue,
+            workspace_path=workspace_path,
+            build_command=build_command.strip() or "dotnet build",
+            code_context=code_context,
+            rule_details=rule_details,
+            scope=scope,
+            original_issue_file_content=original_issue_file_content,
+            retry_feedback=retry_feedback,
+            working_memory=working_memory,
+            edit_contract=edit_contract,
+            guardrail_mode=guardrail_mode,
+            visible_toolset=visible_toolset,
+            tool_policy=tool_policy,
+            result_metadata=result_metadata,
+            execution_schedule=execution_schedule,
+        )
+
         # Build prompts
-        system_prompt_result = self._build_system_prompt_result(workspace_path)
+        system_prompt_result = self._build_system_prompt_result(
+            workspace_path,
+            edit_contract=edit_contract,
+        )
         system_prompt = system_prompt_result.prompt
         resolved_build_command = build_command.strip() or "dotnet build"
+        effective_working_memory = working_memory
         user_prompt_result = self._build_user_prompt_result(
             issue,
             code_context,
-            self._load_csharp_quality_gate(issue, edit_contract),
-            self._build_scope_guidance(issue, scope),
+            (
+                ""
+                if is_simple_loop_execution_mode(execution_mode)
+                else self._load_csharp_quality_gate(issue, edit_contract)
+            ),
+            self._build_scope_guidance(issue, scope, edit_contract),
             rule_details,
             resolved_build_command,
             retry_feedback,
             retry_context,
-            edit_contract_section=self._build_edit_contract_section(edit_contract),
-            repair_plan_section=self._build_repair_plan_section(edit_contract),
-            prefetched_context_section=self._build_prefetched_context_section(edit_contract),
+            edit_contract_section=(
+                ""
+                if is_simple_loop_execution_mode(execution_mode)
+                else self._build_edit_contract_section(edit_contract)
+            ),
+            repair_plan_section=(
+                ""
+                if is_simple_loop_execution_mode(execution_mode)
+                else self._build_repair_plan_section(edit_contract)
+            ),
+            prefetched_context_section=(
+                ""
+                if is_simple_loop_execution_mode(execution_mode)
+                else self._build_prefetched_context_section(edit_contract)
+            ),
             execution_mode_section=self._build_execution_mode_section(edit_contract),
             workspace_path=workspace_path,
             edit_contract=edit_contract,
             visible_tool_names=visible_toolset.visible_tools,
+            working_memory=effective_working_memory,
+            model_hint=(self.model or ""),
         )
+        if getattr(user_prompt_result, "issue_working_memory", None) is not None:
+            effective_working_memory = user_prompt_result.issue_working_memory
+            result_metadata["issue_working_memory"] = effective_working_memory
         user_prompt = user_prompt_result.prompt
         prompt_budget_report = IssuePromptBuilder.build_prompt_budget_report(
             system_prompt_result,
@@ -2177,6 +2883,11 @@ class ClaudeFixAgent:
                 "prompt_reference_document": prompt_budget_report.reference_document_path,
                 "visible_tools": ",".join(visible_toolset.visible_tools),
                 "hidden_tools_count": str(len(visible_toolset.hidden_tools)),
+                "helper_extract_runtime_guard": (
+                    "true"
+                    if "helper_extract" not in tuple(getattr(edit_contract, "allowed_capabilities", ()) or ())
+                    else "false"
+                ),
             }
         )
         runtime = AgentRuntime(
@@ -2648,6 +3359,43 @@ class ClaudeFixAgent:
                 if invalid_write_tool_input and not changes:
                     runtime_result = replace(runtime_result, agent_error=None)
                 else:
+                    runtime_contract_violation = self._classify_runtime_contract_agent_error(
+                        runtime_result.agent_error
+                    )
+                    if runtime_contract_violation is not None:
+                        boundary_code, boundary_summary = runtime_contract_violation
+                        self._append_attempt_event(
+                            attempt_events,
+                            AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                            stage="runtime_contract_violation",
+                            payload={
+                                "success": False,
+                                "failure_kind": "runtime_contract_violation",
+                                "code": boundary_code,
+                            },
+                            runtime_result=runtime_result,
+                        )
+                        return FixResult(
+                            success=False,
+                            issue_key=issue.key,
+                            file_path=str(file_path),
+                            changes=changes,
+                            error=runtime_result.agent_error,
+                            summary="Runtime contract violation requires a narrower retry",
+                            build_command=resolved_build_command,
+                            build_output=runtime_result.agent_error,
+                            failure_kind="runtime_contract_violation",
+                            retryable_failure=True,
+                            boundary_failure_code=boundary_code,
+                            boundary_failure_summary=boundary_summary,
+                            performance_metrics=self._merge_performance_metrics(
+                                runtime_performance_metrics,
+                                build_duration_seconds=0.0,
+                                build_invoked=False,
+                            ),
+                            attempt_events=tuple(attempt_events),
+                            **result_metadata,
+                        )
                     self._append_attempt_event(
                         attempt_events,
                         AttemptRuntimeEventKind.ATTEMPT_FINISHED,
@@ -2750,25 +3498,41 @@ class ClaudeFixAgent:
             semantic_precheck_result = verification.semantic_precheck_result
             quality_gate_result = verification.quality_gate_result
             review_gate_result = verification.review_gate_result
+            post_fix_check_result = verification.post_fix_check_result
             boundary_failure_code = verification.boundary_failure_code
             boundary_failure_summary = verification.boundary_failure_summary
             secondary_boundary_failure_codes = verification.secondary_boundary_failure_codes
             if getattr(performance_flags, "review_gate", True):
                 review_gate_summary = str(getattr(review_gate_result, "summary", "")).strip()
-                print(
-                    "  [TRACE] Review gate: "
-                    f"status={getattr(review_gate_result, 'status', '')}, "
-                    f"invoked={bool(getattr(review_gate_result, 'invoked', False))}, "
-                    f"findings={len(getattr(review_gate_result, 'findings', ()) or ())}, "
-                    f"decisions={len(getattr(review_gate_result, 'decisions', ()) or ())}",
-                    flush=True,
-                )
-                if review_gate_summary:
-                    print(f"  [TRACE] Review gate summary: {review_gate_summary}", flush=True)
+                review_gate_invoked = bool(getattr(review_gate_result, "invoked", False))
+                if review_gate_invoked:
+                    print(
+                        "  [TRACE] Review gate: "
+                        f"status={getattr(review_gate_result, 'status', '')}, "
+                        "invoked=True, "
+                        f"findings={len(getattr(review_gate_result, 'findings', ()) or ())}, "
+                        f"decisions={len(getattr(review_gate_result, 'decisions', ()) or ())}",
+                        flush=True,
+                    )
+                    if review_gate_summary:
+                        print(f"  [TRACE] Review gate summary: {review_gate_summary}", flush=True)
+                else:
+                    print(
+                        "  [TRACE] Optional patch audit skipped: "
+                        f"status={getattr(review_gate_result, 'status', '')}, "
+                        f"findings={len(getattr(review_gate_result, 'findings', ()) or ())}, "
+                        f"decisions={len(getattr(review_gate_result, 'decisions', ()) or ())}",
+                        flush=True,
+                    )
+                    if review_gate_summary:
+                        print(
+                            f"  [TRACE] Optional patch audit reason: {review_gate_summary}",
+                            flush=True,
+                        )
                 review_gate_model = str(getattr(review_gate_result, "model_display", "")).strip()
-                if review_gate_model:
+                if review_gate_invoked and review_gate_model:
                     print(f"  [TRACE] Review gate model: {review_gate_model}", flush=True)
-                if getattr(review_gate_result, "invoked", False):
+                if review_gate_invoked:
                     waived_count = sum(
                         1
                         for item in (getattr(review_gate_result, "decisions", ()) or ())
@@ -2790,6 +3554,7 @@ class ClaudeFixAgent:
                             print(f"  [TRACE] Review gate feedback: {text}", flush=True)
             performance_metrics = self._merge_performance_metrics(
                 runtime_performance_metrics,
+                execution_mode=execution_mode,
                 fast_compile_invoked=verification.fast_compile_invoked,
                 fast_compile_passed=verification.fast_compile_passed,
                 fast_compile_duration_seconds=verification.fast_compile_duration_seconds,
@@ -2991,6 +3756,46 @@ class ClaudeFixAgent:
                     **result_metadata,
                 )
 
+            if (
+                is_simple_loop_execution_mode(execution_mode)
+                and str(getattr(post_fix_check_result, "issue_status", "")).strip() == "FAIL"
+            ):
+                self._append_attempt_event(
+                    attempt_events,
+                    AttemptRuntimeEventKind.ATTEMPT_FINISHED,
+                    stage="post_fix_check",
+                    payload={"success": False, "failure_kind": "post_fix_check"},
+                    runtime_result=runtime_result,
+                )
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=str(file_path),
+                    changes=changes,
+                    build_passed=build_passed,
+                    build_verification_failed=False,
+                    error="Simple-loop post-fix check failed",
+                    summary=f"Fixed {len(changes)} file(s)",
+                    build_command=resolved_build_command,
+                    build_output=verification.combined_output,
+                    retryable_failure=True,
+                    failure_kind="post_fix_check",
+                    reviewer_result=reviewer_result.to_dict(),
+                    semantic_precheck_result=semantic_precheck_result.to_dict(),
+                    quality_gate_result=quality_gate_result.to_dict(),
+                    review_gate_result=review_gate_result.to_dict(),
+                    post_fix_check_result=post_fix_check_result.to_dict(),
+                    follow_ups=reviewer_result.follow_ups,
+                    boundary_failure_code=boundary_failure_code,
+                    boundary_failure_summary=boundary_failure_summary,
+                    secondary_boundary_failure_codes=secondary_boundary_failure_codes,
+                    performance_metrics=performance_metrics,
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=patch_salvaged,
+                    attempt_events=tuple(attempt_events),
+                    **result_metadata,
+                )
+
             rule_validation_message = verification.rule_validation_message
             if rule_validation_message:
                 self._append_attempt_event(
@@ -3017,6 +3822,7 @@ class ClaudeFixAgent:
                     semantic_precheck_result=semantic_precheck_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
                     review_gate_result=review_gate_result.to_dict(),
+                    post_fix_check_result=post_fix_check_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
                     boundary_failure_code=boundary_failure_code,
                     boundary_failure_summary=boundary_failure_summary,
@@ -3053,6 +3859,7 @@ class ClaudeFixAgent:
                     semantic_precheck_result=semantic_precheck_result.to_dict(),
                     quality_gate_result=quality_gate_result.to_dict(),
                     review_gate_result=review_gate_result.to_dict(),
+                    post_fix_check_result=post_fix_check_result.to_dict(),
                     follow_ups=reviewer_result.follow_ups,
                     boundary_failure_code=boundary_failure_code,
                     boundary_failure_summary=boundary_failure_summary,
@@ -3077,13 +3884,18 @@ class ClaudeFixAgent:
                 file_path=str(file_path),
                 changes=changes,
                 build_passed=build_passed,
-                summary=f"Fixed {len(changes)} file(s)",
+                summary=(
+                    f"Fixed {len(changes)} file(s)"
+                    if str(getattr(post_fix_check_result, "issue_status", "")).strip() != "UNKNOWN"
+                    else f"Fixed {len(changes)} file(s); local issue status is UNKNOWN and awaits final Sonar confirmation"
+                ),
                 build_command=resolved_build_command,
                 build_output=build_output,
                 reviewer_result=reviewer_result.to_dict(),
                 semantic_precheck_result=semantic_precheck_result.to_dict(),
                 quality_gate_result=quality_gate_result.to_dict(),
                 review_gate_result=review_gate_result.to_dict(),
+                post_fix_check_result=post_fix_check_result.to_dict(),
                 follow_ups=reviewer_result.follow_ups,
                 boundary_failure_code=boundary_failure_code,
                 boundary_failure_summary=boundary_failure_summary,

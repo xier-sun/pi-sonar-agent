@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "rules": {
+    "csharpsquid:S3358": {
+      "family": "expression",
+      "title": "嵌套三元运算符",
+      "issue_validator": "rule_policy_validator",
+      "self_check": [
+        "目标语句里最多保留一层简单 ?:，不要把嵌套三元原样留在原处。",
+        "优先在当前表达式附近改成局部变量、if/else 或语句 lambda，不要为此新增类级 public helper。"
+      ],
+      "blocker_checks": [
+        "language_feature_incompatible",
+        "async_contract_break",
+        "forbidden_scope_change"
+      ]
+    },
+    "csharpsquid:S3776": {
+      "family": "complexity",
+      "title": "方法认知复杂度过高",
+      "issue_validator": "s3776_method_complexity",
+      "self_check": [
+        "优先在原方法体内收口复杂度，先拆 guard clause、扁平化分支，再考虑 private helper。",
+        "不要把匿名类型、nullable-heavy 状态或 dynamic 边界搬进新 helper。",
+        "保持公开签名稳定，除非当前 patch 已明确提供完整传播闭包。"
+      ],
+      "blocker_checks": [
+        "language_feature_incompatible",
+        "async_contract_break",
+        "public_signature_drift",
+        "helper_type_shape_break",
+        "forbidden_scope_change"
+      ],
+      "validator_config": {
+        "pass_complexity_threshold": 15,
+        "fail_complexity_threshold": 30
+      }
+    },
+    "csharpsquid:S107": {
+      "family": "signature",
+      "title": "方法参数过多",
+      "issue_validator": "s107_parameter_count",
+      "self_check": [
+        "优先做最小参数收敛，不要顺手重写业务逻辑。",
+        "如果当前方法是 public/protected、接口实现或 override，默认先保守，不要贸然扩散签名。"
+      ],
+      "blocker_checks": [
+        "language_feature_incompatible",
+        "async_contract_break",
+        "public_signature_drift",
+        "forbidden_scope_change"
+      ],
+      "validator_config": {
+        "max_parameters": 7
+      }
+    },
+    "csharpsquid:S1172": {
+      "family": "signature",
+      "title": "移除未使用的参数",
+      "issue_validator": "s1172_unused_parameter",
+      "self_check": [
+        "优先只处理当前 issue 对应的未使用参数，不要顺手改同方法里的其他签名问题。",
+        "如果签名是公开面、接口实现或 override，只有在能同步传播时才删参数。"
+      ],
+      "blocker_checks": [
+        "language_feature_incompatible",
+        "async_contract_break",
+        "public_signature_drift",
+        "forbidden_scope_change"
+      ]
+    },
+    "csharpsquid:S1481": {
+      "family": "cleanup",
+      "title": "移除未使用的局部变量",
+      "issue_validator": "s1481_unused_local",
+      "self_check": [
+        "只删除或使用当前 issue 对应的局部变量，不要顺手清整个方法。",
+        "这是最小删除型补丁，不要引入新的 helper、async 改名或签名变化。"
+      ],
+      "blocker_checks": [
+        "language_feature_incompatible",
+        "forbidden_scope_change"
+      ]
+    },
+    "csharpsquid:S1144": {
+      "family": "cleanup",
+      "title": "移除未使用的 private 成员",
+      "issue_validator": "s1144_unused_private_member",
+      "self_check": [
+        "优先直接删除当前未使用的 private 成员本身，不要扩散到同文件更远位置。",
+        "不要为了修复这个删除型规则引入新的公开成员或大范围重构。"
+      ],
+      "blocker_checks": [
+        "language_feature_incompatible",
+        "forbidden_scope_change"
+      ]
+    }
+  },
+  "blocker_categories": {
+    "compile_errors": {
+      "title": "编译错误",
+      "summary": "Patch 仍然不能通过编译。"
+    },
+    "language_feature_incompatible": {
+      "title": "语言特性不兼容",
+      "summary": "Patch 使用了仓库当前语言版本不支持的 C# 特性。",
+      "semantic_finding_ids": [
+        "lang_feature_incompatible",
+        "language_feature_incompatible"
+      ],
+      "quality_gate_rule_ids": [
+        "language_feature_compatibility"
+      ]
+    },
+    "async_contract_break": {
+      "title": "async 合同破坏",
+      "summary": "Patch 引入了 async/await 合同错误。",
+      "semantic_finding_ids": [
+        "async_without_await"
+      ],
+      "quality_gate_rule_ids": [
+        "async_requires_await",
+        "async_signature"
+      ]
+    },
+    "public_signature_drift": {
+      "title": "公开签名漂移",
+      "summary": "Patch 在没有完整传播闭包时漂移了公开签名。",
+      "semantic_finding_ids": [
+        "public_surface_drift"
+      ]
+    },
+    "helper_type_shape_break": {
+      "title": "helper 类型形状破坏",
+      "summary": "Patch 通过 helper 提取引入了匿名类型、nullable 或 dynamic 边界问题。",
+      "semantic_finding_ids": [
+        "dynamic_helper_signature_boundary",
+        "helper_extraction_type_break",
+        "nullable_type_mismatch",
+        "anonymous_type_leak",
+        "anonymous_type_helper_boundary"
+      ]
+    },
+    "forbidden_scope_change": {
+      "title": "越界范围变更",
+      "summary": "Patch 已超出当前 issue 允许的最小修复范围。",
+      "semantic_finding_ids": [
+        "repair_plan_contract_violation"
+      ]
+    }
+  }
+}

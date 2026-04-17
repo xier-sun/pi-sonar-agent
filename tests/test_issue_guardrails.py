@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pi_sonar_agent.agent.claude_agent import ClaudeFixAgent, SonarIssue
 from pi_sonar_agent.core.diff_reviewer import DiffReviewer, FollowUpItem, ReviewedFileChange
+from pi_sonar_agent.core.diff_reviewer import ReviewedLineOperation
 from pi_sonar_agent.core.follow_up_store import FollowUpStore
 from pi_sonar_agent.core.issue_contract import EditContract
 from pi_sonar_agent.core.issue_planner import IssuePlanner
@@ -39,7 +40,7 @@ def test_issue_planner_builds_edit_contract_for_contract_review() -> None:
     assert "Quality Gate Notes" in plan.prompt_guidance
 
 
-def test_issue_planner_enables_file_creation_when_rule_profile_declares_it() -> None:
+def test_issue_planner_disables_file_creation_in_simple_loop() -> None:
     plan = IssuePlanner.plan_issue(
         issue_key="ISSUE-S107",
         rule_id="csharpsquid:S107",
@@ -54,19 +55,18 @@ def test_issue_planner_enables_file_creation_when_rule_profile_declares_it() -> 
         workspace_rules="keep patches small",
     )
 
-    assert plan.edit_contract.allow_file_creation is True
-    assert plan.edit_contract.allowed_new_file_roots == ("src",)
-    assert "Allowed New File Roots: src" in plan.prompt_guidance
+    assert plan.edit_contract.allow_file_creation is False
+    assert plan.edit_contract.allowed_new_file_roots == ()
 
 
-def test_editor_policy_keeps_write_when_file_creation_is_allowed() -> None:
+def test_editor_policy_keeps_write_for_existing_files_when_file_creation_is_disabled() -> None:
     contract = EditContract(
         issue_key="ISSUE-CREATEFILE",
         rule_id="csharpsquid:S107",
         guardrail_mode="contract_review",
         target_files=("src/Foo.cs",),
-        allow_file_creation=True,
-        allowed_new_file_roots=("src",),
+        allow_file_creation=False,
+        allowed_new_file_roots=(),
         patch_only=True,
     )
 
@@ -74,7 +74,8 @@ def test_editor_policy_keeps_write_when_file_creation_is_allowed() -> None:
     constraints = EditorPolicy.render_prompt_constraints(contract)
 
     assert "Write" in allowed_tools
-    assert "新建文件优先使用 Write" in constraints
+    assert "新建文件优先使用 Write" not in constraints
+    assert "Write 只能用于重写已有文件，不能借此创建新文件" in constraints
 
 
 def test_issue_planner_includes_repo_capability_guidance(tmp_path: Path) -> None:
@@ -113,7 +114,7 @@ def test_issue_planner_includes_repo_capability_guidance(tmp_path: Path) -> None
     assert any("record" in item for item in plan.edit_contract.repo_capability_hints)
 
 
-def test_diff_reviewer_records_extra_touched_file_as_soft_audit() -> None:
+def test_diff_reviewer_allows_existing_file_modification_without_scope_audit() -> None:
     contract = EditContract(
         issue_key="ISSUE-2",
         rule_id="csharpsquid:S6562",
@@ -136,13 +137,12 @@ def test_diff_reviewer_records_extra_touched_file_as_soft_audit() -> None:
     )
 
     assert result.status == "pass"
-    assert result.violations[0].type == "extra_touched_file"
-    assert result.follow_ups
-    assert result.follow_ups[0].file == "src/Bar.cs"
-    assert result.metrics["drift_score"] >= 3
+    assert result.violations == ()
+    assert result.follow_ups == ()
+    assert result.metrics["drift_score"] == 0
 
 
-def test_diff_reviewer_allows_created_file_inside_declared_root() -> None:
+def test_diff_reviewer_rejects_created_file_even_if_root_was_declared() -> None:
     contract = EditContract(
         issue_key="ISSUE-CREATE",
         rule_id="csharpsquid:S107",
@@ -165,6 +165,40 @@ def test_diff_reviewer_allows_created_file_inside_declared_root() -> None:
                 before_exists=False,
                 after_exists=True,
                 after_changed_lines=(1, 2),
+            ),
+        ),
+    )
+
+    assert result.status == "retry"
+    assert any(item.type == "file_created" for item in result.violations)
+
+
+def test_diff_reviewer_allows_private_helper_addition() -> None:
+    contract = EditContract(
+        issue_key="ISSUE-NO-HELPER",
+        rule_id="csharpsquid:S3776",
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        validation_plan=("build", "diff_review"),
+        scope_mode="method",
+    )
+    result = DiffReviewer.review(
+        edit_contract=contract,
+        file_changes=(
+            ReviewedFileChange(
+                file="src/Foo.cs",
+                changed_lines=(18,),
+                before_changed_lines=(18,),
+                after_changed_lines=(18,),
+                diff_text="@@ -17,0 +18,4 @@\n+    private decimal ComputeReturnedQty(\n+        OrderItem item)\n+    {\n+    }\n",
+                hunk_count=1,
+                line_operations=(
+                    ReviewedLineOperation(
+                        kind="add",
+                        after_line=18,
+                        text="    private decimal ComputeReturnedQty(",
+                    ),
+                ),
             ),
         ),
     )
@@ -281,7 +315,7 @@ def test_fix_issue_contract_review_allows_same_file_drift_and_records_audit(monk
 
     import pi_sonar_agent.agent.claude_agent as claude_agent_module
 
-    def fake_run(func):
+    def fake_fix_run(*args, **kwargs):
         source_file.write_text(
             "\n".join(
                 [
@@ -298,9 +332,24 @@ def test_fix_issue_contract_review_allows_same_file_drift_and_records_audit(monk
             + "\n",
             encoding="utf-8",
         )
-        return None
+        return claude_agent_module.AgentRuntimeResult()
 
-    monkeypatch.setattr(claude_agent_module.anyio, "run", fake_run)
+    monkeypatch.setattr(agent, "_run_runtime_with_continuation", fake_fix_run)
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_run_prompt_only_role_session",
+        classmethod(
+            lambda cls, **kwargs: claude_agent_module.RoleAgentRunResult(
+                role=str(kwargs.get("role", "")),
+                response_text=(
+                    '{"decision":"approve","summary":"代码符合门禁，可以进入编译。","findings":[],"constraints":[]}'
+                    if kwargs.get("role") == "review"
+                    else '{"decision":"compile","summary":"进入编译阶段。","constraints":[]}'
+                ),
+            )
+        ),
+    )
 
     class FakeCompletedProcess:
         returncode = 0
@@ -319,8 +368,5 @@ def test_fix_issue_contract_review_allows_same_file_drift_and_records_audit(monk
     assert result.retryable_failure is False
     assert result.guardrail_mode == "contract_review"
     assert result.reviewer_result["status"] == "pass"
-    assert any(
-        item["type"] == "outside_primary_region"
-        for item in result.reviewer_result["violations"]
-    )
-    assert result.follow_ups
+    assert result.reviewer_result["violations"] == []
+    assert result.follow_ups == ()

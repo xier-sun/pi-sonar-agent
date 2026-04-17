@@ -1,0 +1,37 @@
+"""Execution mode helpers for headless simple-loop flows."""
+
+from __future__ import annotations
+
+from pi_sonar_agent.core.project_env import read_project_env
+
+SIMPLE_LOOP_EXECUTION_MODE = "simple_loop"
+STRICT_EXECUTION_MODE = SIMPLE_LOOP_EXECUTION_MODE
+
+
+def normalize_execution_mode(
+    value: str | None,
+    *,
+    default: str = SIMPLE_LOOP_EXECUTION_MODE,
+) -> str:
+    """Normalize configured execution mode to the only supported runtime mode."""
+
+    normalized = str(value or "").strip().lower()
+    if normalized in {SIMPLE_LOOP_EXECUTION_MODE, "strict"}:
+        return SIMPLE_LOOP_EXECUTION_MODE
+    return SIMPLE_LOOP_EXECUTION_MODE if not str(default or "").strip() else SIMPLE_LOOP_EXECUTION_MODE
+
+
+def resolve_execution_mode(agent_env: dict[str, str] | None = None) -> str:
+    """Resolve issue execution mode from agent env or project env."""
+
+    raw_value = (
+        (agent_env or {}).get("ISSUE_EXECUTION_MODE")
+        or read_project_env().get("ISSUE_EXECUTION_MODE", "")
+    )
+    return normalize_execution_mode(raw_value)
+
+
+def is_simple_loop_execution_mode(value: str | None) -> bool:
+    """Return True when the current execution mode is simple_loop."""
+
+    return normalize_execution_mode(value) == SIMPLE_LOOP_EXECUTION_MODE
