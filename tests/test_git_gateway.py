@@ -8,6 +8,7 @@ import pytest
 
 from pi_sonar_agent.core.git_gateway import (
     GitRepositoryGateway,
+    REMOTE_BRANCH_CHECK_TIMEOUT_SECONDS,
     build_authenticated_remote_url,
     redact_remote_url,
     resolve_base_branch,
@@ -253,3 +254,22 @@ def test_git_repository_gateway_branch_exists_returns_false_for_missing_branch()
     )
 
     assert gateway.branch_exists("missing-branch") is False
+
+
+def test_git_repository_gateway_branch_exists_raises_timeout_with_actionable_message() -> None:
+    def fake_runner(command: str, *, cwd: Path | None = None, timeout=None, check: bool = True):
+        raise subprocess.TimeoutExpired(command, timeout or 0)
+
+    gateway = GitRepositoryGateway(
+        remote_url="https://dev.azure.com/acme/project/_git/repo",
+        pat="secret",
+        command_runner=fake_runner,
+    )
+
+    with pytest.raises(RuntimeError) as exc_info:
+        gateway.branch_exists("main")
+
+    message = str(exc_info.value)
+    assert f"timed out after {REMOTE_BRANCH_CHECK_TIMEOUT_SECONDS}s" in message
+    assert "interactive credentials" in message
+    assert "***:***@dev.azure.com" in message

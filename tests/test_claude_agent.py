@@ -8,6 +8,11 @@ from pi_sonar_agent.agent.claude_agent import (
     ClaudeFixAgent,
     SonarIssue,
 )
+from pi_sonar_agent.core.agent_role_prompts import (
+    build_main_role_user_prompt,
+    build_review_role_system_prompt,
+    build_review_role_user_prompt,
+)
 from pi_sonar_agent.agent.rule_policies import (
     CONDITIONAL_CHAIN_SCOPE_MODE,
     CONTROL_BLOCK_SCOPE_MODE,
@@ -20,12 +25,15 @@ from pi_sonar_agent.agent.rule_policies import (
 from pi_sonar_agent.agent.rule_validators import validate_rule_fix
 from pi_sonar_agent.core.agent_runtime import AgentRuntimeError, AgentRuntimeResult
 from pi_sonar_agent.core.agent_role_prompts import build_fix_role_user_prompt
+from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange, ReviewedLineOperation
 from pi_sonar_agent.core.events import AttemptRuntimeEvent, AttemptRuntimeEventKind
 from pi_sonar_agent.core.issue_contract import EditContract
 from pi_sonar_agent.core.quality_gate import QualityGateRule
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.scope_guard import IssueEditScope
 from pi_sonar_agent.core.tool_surface import build_allowed_fix_tool_rules
+from pi_sonar_agent.core.memory.child_agent_memory import create_initial_child_agent_memory
+from pi_sonar_agent.core.memory.issue_working_memory import IssueWorkingMemory
 
 
 def test_parse_role_decision_extracts_json_payload() -> None:
@@ -40,6 +48,13 @@ def test_parse_role_decision_extracts_json_payload() -> None:
     assert decision.summary == "可以进入编译。"
     assert decision.findings == ("无明显门禁阻塞",)
     assert decision.constraints == ("保持最小改动",)
+
+
+def test_builtin_fix_tools_include_grep_and_glob() -> None:
+    assert "Read" in BUILTIN_FIX_TOOLS
+    assert "Grep" in BUILTIN_FIX_TOOLS
+    assert "Glob" in BUILTIN_FIX_TOOLS
+    assert "Write" in BUILTIN_FIX_TOOLS
 
 
 def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
@@ -201,6 +216,372 @@ def test_classify_runtime_contract_agent_error_helper_extract_guard() -> None:
         "helper_extract_runtime_guard",
         "当前 retry 已禁用 helper_extract，但你刚刚仍新增了 private helper/private method。",
     )
+
+
+def test_stabilize_review_decision_generates_actionable_retry_constraints() -> None:
+    issue = SonarIssue(
+        key="issue-review-fallback",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    decision = ClaudeFixAgent._parse_role_decision(
+        raw_text="patch 摘要与当前代码不一致，目标方法复杂度仍然偏高。",
+        allowed_decisions=("approve", "retry"),
+        fallback_decision="retry",
+        fallback_summary="Review 子Agent 未给出可用结论。",
+    )
+
+    stabilized = ClaudeFixAgent._stabilize_review_decision(
+        issue=issue,
+        patch_summary="src/Foo.cs: + helper call ; - inline branch",
+        decision=decision,
+    )
+
+    assert stabilized.decision == "retry"
+    assert stabilized.summary == "Review 子Agent要求继续修复，并已生成下一轮可执行约束。"
+    assert stabilized.constraints
+    assert any("patch 摘要" in item or "当前代码" in item for item in stabilized.constraints)
+
+
+def test_stabilize_review_decision_approves_s3776_when_retry_only_requests_complexity_proof() -> None:
+    issue = SonarIssue(
+        key="issue-s3776-proof",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=42,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    decision = ClaudeFixAgent._parse_role_decision(
+        raw_text=(
+            '{"decision":"retry","summary":"patch 摘要未提供修复前后复杂度数值，无法确认是否降至 <=30。",'
+            '"findings":["当前 patch 已改到目标方法","patch 摘要未提供复杂度数值"],'
+            '"constraints":["请提供复杂度数值证明"]}'
+        ),
+        allowed_decisions=("approve", "retry"),
+        fallback_decision="retry",
+        fallback_summary="Review 子Agent 未给出可用结论。",
+    )
+
+    stabilized = ClaudeFixAgent._stabilize_review_decision(
+        issue=issue,
+        patch_summary="\n".join(
+            [
+                "target_file=src/Foo.cs",
+                "target_method=TargetMethod",
+                "touched_target_method=yes",
+                "scope=target_method_only",
+                "target_preview=+ if (a) return;",
+            ]
+        ),
+        decision=decision,
+    )
+
+    assert stabilized.decision == "approve"
+    assert "post-check" in stabilized.summary
+    assert stabilized.constraints == ()
+
+
+def test_stabilize_review_decision_approves_when_retry_only_refers_to_baseline_or_external_build_state() -> None:
+    issue = SonarIssue(
+        key="issue-review-baseline-state",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=42,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    decision = ClaudeFixAgent._parse_role_decision(
+        raw_text=(
+            '{"decision":"retry","summary":"当前 patch 方向合理，但 build=fail 状态表明存在编译风险，需要确认当前 baseline 代码的完整性后再审查",'
+            '"findings":["目标方法已被修改","build=fail 可能来自 baseline 问题","NU1301 无法加载源 https://api.nuget.org/v3/index.json"],'
+            '"constraints":["请确认 build=fail 是 baseline 代码问题还是当前 patch 引入的问题"]}'
+        ),
+        allowed_decisions=("approve", "retry"),
+        fallback_decision="retry",
+        fallback_summary="Review 子Agent 未给出可用结论。",
+    )
+
+    stabilized = ClaudeFixAgent._stabilize_review_decision(
+        issue=issue,
+        patch_summary="\n".join(
+            [
+                "target_file=src/Foo.cs",
+                "target_method=ProcessAsync",
+                "touched_target_method=yes",
+                "scope=target_method_only",
+                "target_preview=+ if (!matched) continue;",
+            ]
+        ),
+        decision=decision,
+    )
+
+    assert stabilized.decision == "approve"
+    assert "外部构建/回滚状态" in stabilized.summary
+    assert stabilized.constraints == ()
+
+
+def test_stabilize_main_decision_falls_back_to_compile_after_review_approval() -> None:
+    review_decision = ClaudeFixAgent._parse_role_decision(
+        raw_text='{"decision":"approve","summary":"可以进入编译。","findings":["方向正确"],"constraints":[]}',
+        allowed_decisions=("approve", "retry"),
+        fallback_decision="retry",
+        fallback_summary="Review 子Agent 未给出可用结论。",
+    )
+    main_decision = ClaudeFixAgent._parse_role_decision(
+        raw_text="",
+        allowed_decisions=("compile", "retry"),
+        fallback_decision="retry",
+        fallback_summary="Main 裁决未批准进入编译阶段。",
+    )
+
+    stabilized = ClaudeFixAgent._stabilize_main_decision(
+        review_decision=review_decision,
+        decision=main_decision,
+    )
+
+    assert stabilized.decision == "compile"
+    assert stabilized.summary == "可以进入编译。"
+
+
+def test_review_role_prompts_stay_review_focused() -> None:
+    issue = SonarIssue(
+        key="issue-review-focus",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=1127,
+        component="BI:OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    system_prompt = build_review_role_system_prompt()
+    user_prompt = build_review_role_user_prompt(
+        issue=issue,
+        code_context="1127 | if (flag) { if (other) { Process(); } }",
+        patch_summary="OpenAuth.App/Finance/HistoricalOverdueImportService.cs: 提取了局部条件并改成早返回。",
+        current_file_content="\n".join(
+            f"line {index}" for index in range(1, 120)
+        ),
+        working_memory=IssueWorkingMemory(
+            version=1,
+            issue_key="issue-review-focus",
+            rule_id="csharpsquid:S3776",
+            current_goal="修复当前 issue",
+            authoritative_workspace_state="attempt_patch",
+            rollback_reason="上一轮 patch 已撤销，当前 patch 重新生成。",
+            rejected_strategies=("不要同步改 sibling 方法",),
+            last_updated_at="2026-04-17T00:00:00+00:00",
+        ),
+        review_memory=create_initial_child_agent_memory(
+            issue_key="issue-review-focus",
+            role="review",
+            focus="只判断当前 patch 是否值得进入编译",
+        ),
+    )
+
+    assert "你不是 Fix 子Agent" in system_prompt
+    assert "不做修复设计" in system_prompt
+    assert "不要要求“复杂度数值证明”" in system_prompt
+    assert "最终是否满足 <=30 由编译后的 post-check 继续确认" in system_prompt
+    assert "【当前 patch 摘要】" in user_prompt
+    assert "【目标方法附近代码】" in user_prompt
+    assert "【当前文件内容】" not in user_prompt
+    assert "【C# 质量门禁参考】" not in user_prompt
+    assert "Edit 必须" not in user_prompt
+    assert "不要要求同步改相似 sibling 方法" in user_prompt
+
+
+def test_review_role_prompt_can_focus_on_current_attempt_patch_state() -> None:
+    issue = SonarIssue(
+        key="issue-review-attempt-patch",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=41,
+        component="BI:OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    user_prompt = build_review_role_user_prompt(
+        issue=issue,
+        code_context="41 | foreach (var group in groupedOrders) { ... }",
+        patch_summary="\n".join(
+            [
+                "target_file=OpenAuth.Core/OpenAuth.App/Finance/ReturnUnRelNewOrderProcessor.cs",
+                "target_method=ProcessAsync",
+                "touched_target_method=yes",
+                "scope=target_method_only",
+            ]
+        ),
+        current_file_content="\n".join(f"line {index}" for index in range(1, 120)),
+        working_memory=IssueWorkingMemory(
+            version=1,
+            issue_key="issue-review-attempt-patch",
+            rule_id="csharpsquid:S3776",
+            current_goal="修复当前 issue",
+            authoritative_workspace_state="attempt_patch",
+            latest_verification="当前 patch 已生成，等待 Review 子Agent 基于当前代码审查。",
+            next_action="只审查当前 patch。",
+            last_updated_at="2026-04-17T00:00:00+00:00",
+        ),
+        review_memory=create_initial_child_agent_memory(
+            issue_key="issue-review-attempt-patch",
+            role="review",
+            focus="只判断当前 patch 是否值得进入编译",
+        ),
+    )
+
+    assert "当前工作区状态: attempt_patch" in user_prompt
+    assert "等待 Review 子Agent 基于当前代码审查" in user_prompt
+
+
+def test_fix_role_prompt_includes_minimal_quality_constraints() -> None:
+    issue = SonarIssue(
+        key="issue-fix-gate",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = build_fix_role_user_prompt(
+        issue=issue,
+        code_context="  18 | if (flag) { if (other) { Process(); } }",
+        file_path_candidates=("src/Foo.cs",),
+        working_memory=None,
+        fix_memory=None,
+        retry_feedback="",
+    )
+
+    assert "【Fix 质量约束】" in prompt
+    assert "不要顺手补 XML 注释" in prompt
+    assert "不要留下 async 无 await" in prompt
+    assert "不要为了绕过类型问题引入 dynamic" in prompt
+    assert "【Review 门禁要点】" not in prompt
+
+
+def test_build_patch_summary_focuses_on_issue_target_method() -> None:
+    issue = SonarIssue(
+        key="issue-patch-summary",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=3,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    current_file_content = "\n".join(
+        [
+            "public class FooService",
+            "{",
+            "    public void TargetMethod()",
+            "    {",
+            "        if (a)",
+            "        {",
+            "            Process();",
+            "        }",
+            "    }",
+            "",
+            "    private static bool Helper(int value)",
+            "    {",
+            "        return value > 0;",
+            "    }",
+            "}",
+        ]
+    )
+
+    patch_summary = ClaudeFixAgent._build_patch_summary(
+        issue=issue,
+        edit_contract=EditContract(
+            issue_key="issue-patch-summary",
+            rule_id="csharpsquid:S3776",
+            guardrail_mode="scope",
+            target_files=("src/Foo.cs",),
+            execution_mode="simple_loop",
+        ),
+        current_issue_file_content=current_file_content,
+        reviewed_changes=(
+            ReviewedFileChange(
+                file="src/Foo.cs",
+                diff_text="\n".join(
+                    [
+                        "@@ -5 +5 @@",
+                        "-        if (a && b)",
+                        "+        if (a)",
+                        "@@ -10,0 +11,4 @@",
+                        "+    private static bool Helper(int value)",
+                        "+    {",
+                        "+        return value > 0;",
+                        "+    }",
+                    ]
+                ),
+                after_changed_lines=(5, 11, 12, 13, 14),
+                line_operations=(
+                    ReviewedLineOperation(kind="delete", before_line=5, after_line=5, text="        if (a && b)"),
+                    ReviewedLineOperation(kind="add", before_line=5, after_line=5, text="        if (a)"),
+                    ReviewedLineOperation(kind="add", before_line=10, after_line=11, text="    private static bool Helper(int value)"),
+                    ReviewedLineOperation(kind="add", before_line=10, after_line=12, text="    {"),
+                    ReviewedLineOperation(kind="add", before_line=10, after_line=13, text="        return value > 0;"),
+                    ReviewedLineOperation(kind="add", before_line=10, after_line=14, text="    }"),
+                ),
+            ),
+        ),
+    )
+
+    assert "target_file=src/Foo.cs" in patch_summary
+    assert "target_method=TargetMethod" in patch_summary
+    assert "touched_target_method=yes" in patch_summary
+    assert "changed_methods=TargetMethod, Helper" in patch_summary
+    assert "scope=target_file_expanded" in patch_summary
+    assert "risk_flags=helper_added, sibling_method_touched" in patch_summary
+
+
+def test_main_role_prompt_uses_compile_gate_policy() -> None:
+    issue = SonarIssue(
+        key="issue-main-gate",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=42,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = build_main_role_user_prompt(
+        issue=issue,
+        patch_summary="target_file=src/Foo.cs\ntarget_method=TargetMethod\ntouched_target_method=yes",
+        review_result={
+            "decision": "approve",
+            "summary": "可以进入编译。",
+            "findings": ["已改到目标方法"],
+            "constraints": [],
+        },
+        working_memory=IssueWorkingMemory(
+            version=1,
+            issue_key="issue-main-gate",
+            rule_id="csharpsquid:S3776",
+            current_goal="修复当前 issue",
+            authoritative_workspace_state="attempt_patch",
+            last_updated_at="2026-04-17T00:00:00+00:00",
+        ),
+        main_memory=create_initial_child_agent_memory(
+            issue_key="issue-main-gate",
+            role="main",
+            focus="判断是否进入编译",
+        ),
+    )
+
+    assert "【Main 裁决门禁】" in prompt
+    assert "不重做 review，也不设计修法" in prompt
+    assert "不要因为 XML 注释、sealed、static、中文注释等非当前 issue 必要项而拒绝进入编译" in prompt
+    assert "如果 review 已 approve" in prompt
 
 
 def test_build_user_prompt_renders_workspace_retry_references() -> None:
@@ -529,14 +910,14 @@ def test_build_user_prompt_includes_visible_tool_summary() -> None:
             "how_to_fix": "提取私有方法，减少嵌套层级。",
         },
         'dotnet build "src/Foo.sln"',
-        visible_tool_names=("Read", "Edit", "MultiEdit", "Bash", "Finish"),
+        visible_tool_names=("Read", "Grep", "Glob", "Edit", "MultiEdit", "Bash", "Finish"),
     )
 
-    assert "当前 attempt 可用工具: Read, Edit, MultiEdit, Bash, Finish" in prompt
+    assert "【当前可用工具】" in prompt
+    assert "Read, Grep, Glob, Edit, MultiEdit, Bash, Finish" in prompt
     assert "【推荐构建命令】" not in prompt
-    assert "【构建执行】" in prompt
-    assert "构建与验证由外层流程统一执行" in prompt
-    assert "不要在 Bash 中执行 dotnet restore/build/test" in prompt
+    assert "外层统一执行 build 和 post-check" in prompt
+    assert "先用 Glob/Grep" in prompt
 
 
 def test_build_user_prompt_keeps_build_command_when_build_tool_is_visible() -> None:
@@ -1067,8 +1448,8 @@ def test_fix_issue_downgrades_complex_plan_instead_of_hard_blocking(monkeypatch,
     assert runtime_requests
 
 
-def test_builtin_tool_policy_allows_editing_tools_without_bash() -> None:
-    assert BUILTIN_FIX_TOOLS == ["Read", "Edit", "MultiEdit", "Write"]
+def test_builtin_tool_policy_allows_read_edit_search_tools_without_bash() -> None:
+    assert BUILTIN_FIX_TOOLS == ["Read", "Grep", "Glob", "Edit", "MultiEdit", "Write"]
     assert "Bash" not in BUILTIN_FIX_TOOLS
     assert MCP_FIX_TOOLS == []
     assert "mcp__sonar-fix__git_add" not in MCP_FIX_TOOLS
@@ -1103,6 +1484,7 @@ def test_build_fix_role_user_prompt_prefers_relative_path_and_summarizes_invalid
 
     assert "- 主文件相对路径: OpenAuth.Core/OpenAuth.App/Finance/Foo.cs" in prompt
     assert "- 读取和编辑时只使用上面的仓库相对路径，不要先尝试带前导 / 的路径。" in prompt
+    assert "先用 Glob/Grep" in prompt
     assert "Edit 必须带 file_path、old_string、new_string" in prompt
     assert "required parameter `old_string` is missing" not in prompt
     assert "\"content_preview\"" not in prompt

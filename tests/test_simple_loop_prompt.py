@@ -46,23 +46,6 @@ def test_simple_loop_rule_guards_add_hard_constraints_after_type_shape_retry() -
     assert "IQueryable<T>" not in section
 
 
-def test_strict_rule_guards_do_not_add_simple_loop_hard_constraints() -> None:
-    section = IssuePromptBuilder.build_rule_guard_section(
-        "csharpsquid:S3776",
-        retry_context=RetryContext(
-            source_attempt_number=2,
-            failure_kind="build",
-            failure_fingerprints=("helper_extraction_type_break", "nullable_type_mismatch"),
-            primary_failure_fingerprint="helper_extraction_type_break",
-        ),
-        execution_mode="strict",
-    )
-
-    assert "禁止新增 helper/private 方法" not in section
-    assert "禁止使用 dynamic" not in section
-    assert "显式参数、返回值或字段" in section
-
-
 def test_simple_loop_rule_guards_include_refactor_safety_constraints_without_retry() -> None:
     section = IssuePromptBuilder.build_rule_guard_section(
         "csharpsquid:S3358",

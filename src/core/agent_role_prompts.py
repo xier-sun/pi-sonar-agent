@@ -19,17 +19,59 @@ from pi_sonar_agent.core.memory.issue_working_memory import (
 QUALITY_GATE_SKILL_PATH = Path(r"C:\Users\neware\.claude\skills\csharp-quality-gate\SKILL.md")
 
 
-def load_quality_gate_skill_excerpt(*, max_chars: int = 2200) -> str:
-    """Load a concise quality-gate reference for the review agent."""
+def load_quality_gate_fix_digest() -> str:
+    """Load the minimal quality-gate constraints that should guide the fix agent."""
 
     try:
-        text = QUALITY_GATE_SKILL_PATH.read_text(encoding="utf-8")
+        QUALITY_GATE_SKILL_PATH.read_text(encoding="utf-8")
     except Exception:
-        return ""
-    normalized = str(text or "").strip()
-    if len(normalized) <= max_chars:
-        return normalized
-    return normalized[: max_chars - 3].rstrip() + "..."
+        pass
+    return "\n".join(
+        [
+            "- 只吸收与当前 issue 直接相关的最小质量约束；不要顺手补 XML 注释、中文注释、sealed、DI 或命名统一化。",
+            "- 对 S3776 等复杂度问题，优先在目标方法体内做最小重写、提前返回、条件扁平化，不要顺手做整段架构重构。",
+            "- 新增 async 逻辑前先确认需要真实 await；不要留下 async 无 await、async void 或半截 Async 改名。",
+            "- 保持类型与签名稳定；不要为了绕过类型问题引入 dynamic、宽泛 object 参数或不必要的新 DTO。",
+            "- 优先删除本轮引入的冗余局部变量、无用 using 和死代码，但不要为纯风格做额外大改。",
+        ]
+    )
+
+
+def load_quality_gate_review_digest() -> str:
+    """Load a compact review-only digest derived from the quality-gate skill."""
+
+    try:
+        QUALITY_GATE_SKILL_PATH.read_text(encoding="utf-8")
+    except Exception:
+        pass
+    return "\n".join(
+        [
+            "- 只审查当前 patch 是否值得进入编译，不做修复设计，不扩大发散范围。",
+            "- 重点看当前 issue 是否真正改到目标方法，而不是只移动变量、改调用点或做无关整理。",
+            "- 重点看是否引入明显的语法、类型、签名、async 或作用域风险。",
+            "- 对 S3776，请基于当前代码判断是否已实质降低复杂度；不要要求 fix agent 额外提供复杂度数值证明或完整方法说明。",
+            "- S3776 最终是否满足 <=30 由编译后的 post-check 再确认；review 阶段只拦明显跑偏或明显硬风险。",
+            "- decision=retry 时，constraints 只给 1-3 条最小可执行约束；不得要求同步重构相似 sibling 方法。",
+        ]
+    )
+
+
+def load_quality_gate_main_digest() -> str:
+    """Load the minimal compile-gating policy used by the main decision agent."""
+
+    try:
+        QUALITY_GATE_SKILL_PATH.read_text(encoding="utf-8")
+    except Exception:
+        pass
+    return "\n".join(
+        [
+            "- 只判断当前 patch 是否值得进入编译，不重做 review，也不设计修法。",
+            "- 只有当 patch 已改到当前 issue 目标方法、没有明显语法/类型/async/签名硬风险时，才允许 compile。",
+            "- 不要因为 XML 注释、sealed、static、中文注释等非当前 issue 必要项而拒绝进入编译。",
+            "- 如果 review 已 approve，而 main 看不到新的明确 blocker，优先进入编译而不是继续空转。",
+            "- decision=retry 时，constraints 只保留进入下一轮前最关键的 1-3 条约束。",
+        ]
+    )
 
 
 def build_fix_role_system_prompt() -> str:
@@ -38,11 +80,10 @@ def build_fix_role_system_prompt() -> str:
 规则：
 - 只修当前 issue，不顺手修其他问题
 - 只允许修改已有文件；禁止创建文件、删除文件、重命名文件
-- 优先直接对给出的仓库相对路径使用 Read/Edit/MultiEdit/Write；只有候选路径都不对时才用 Bash 做只读搜索
+- 优先直接对给出的仓库相对路径使用 Read/Edit/Write；路径不确定时先用 Glob/Grep，再用 Bash 做只读搜索或诊断
 - Edit 必须同时提供 file_path、old_string、new_string；MultiEdit 必须提供 file_path 和至少一个 edits 项；Write 只能重写已有文件
-- 不要自行执行 dotnet restore/build/test；编译由外层统一执行
+- 优先做更小、更直接的局部修改；如果上一轮策略被否定，必须换一种更小的修法
 - 不要输出长篇解释；直接读代码、编辑、完成后简短说明修法
-- 如果上一轮策略被否定，必须换一种更小的修法，不要机械重复
 """
 
 
@@ -96,8 +137,13 @@ def build_review_role_system_prompt() -> str:
 
 规则：
 - 你不修改代码，只做审查
-- 重点判断：当前 issue 是否看起来已修、代码是否违反核心 C# 质量门禁、是否会在编译或运行时引入明显风险
-- 只基于当前 patch、当前代码和给定质量门禁做判断
+- 你不是 Fix 子Agent，不做修复设计，不输出重构方案，不扩大发散到相似方法或相邻问题
+- 重点判断：当前 issue 是否看起来已修、当前 patch 是否值得进入编译、是否会引入明显的编译/运行风险
+- 只基于当前 issue、当前 patch、目标方法附近代码和给定门禁做判断
+- 对 S3776，不要要求“复杂度数值证明”“完整方法说明”“额外解释提取了哪些逻辑”；你应直接阅读代码自行判断
+- 对 S3776，最终是否满足 <=30 由编译后的 post-check 继续确认；review 阶段只拦明显跑偏和明显硬风险
+- 如果不能明确 approve，就返回 retry；但 retry 只能给 1-3 条下一轮可直接执行的最小约束
+- findings 用于解释你看到的事实；constraints 用于告诉 Fix 子Agent 下一轮具体怎么改
 - 输出必须是 JSON，对象字段固定为:
   {"decision":"approve|retry","summary":"...","findings":["..."],"constraints":["..."]}
 """
@@ -111,6 +157,7 @@ def build_main_role_system_prompt() -> str:
 - 你的任务不是做风格评论，而是判断“现在值不值得编译”
 - 如果 patch 方向明显不对，返回 retry
 - 如果 patch 已基本符合 issue 和代码规范要求，返回 compile
+- 如果返回 retry，constraints 里必须写出 Fix 子Agent 下一轮可执行的约束
 - 输出必须是 JSON，对象字段固定为:
   {"decision":"compile|retry","summary":"...","constraints":["..."]}
 """
@@ -128,6 +175,7 @@ def build_fix_role_user_prompt(
     candidate_lines = "\n".join(f"- {item}" for item in file_path_candidates if str(item).strip())
     primary_candidate = _select_primary_candidate(issue, file_path_candidates)
     retry_feedback_text = _summarize_fix_retry_feedback(retry_feedback)
+    quality_gate = load_quality_gate_fix_digest()
     sections = [
         "请直接修复当前 Sonar issue。",
         "【当前问题】",
@@ -147,6 +195,14 @@ def build_fix_role_user_prompt(
         "【候选相对路径】",
         candidate_lines or "- 无",
     ]
+    if quality_gate:
+        sections.extend(
+            [
+                "",
+                "【Fix 质量约束】",
+                quality_gate,
+            ]
+        )
     if retry_feedback_text:
         sections.extend(
             [
@@ -160,14 +216,14 @@ def build_fix_role_user_prompt(
             "",
             "【工具使用提醒】",
             "- 读取和编辑时只使用上面的仓库相对路径，不要先尝试带前导 / 的路径。",
-            "- 优先直接 Read 主文件相对路径；只有候选路径都失败时才用 Bash 搜索。",
+            "- 优先直接 Read/Edit/Write 主文件相对路径；路径不确定时先用 Glob/Grep，最后才用 Bash 做只读搜索。",
             "- Edit 必须带 file_path、old_string、new_string；不要发送空 Edit。",
             "- MultiEdit 必须带 file_path 和至少一个 edits 项；Write 只允许重写已有文件。",
             "",
             "【执行要求】",
             "- 只修当前 issue",
             "- 只修改已有文件；禁止创建/删除文件",
-            "- 不要自行构建",
+            "- 外层会统一决定是否编译；本轮优先把 patch 修对",
             "- 完成后简短说明你改了什么即可",
         ]
     )
@@ -183,32 +239,37 @@ def build_review_role_user_prompt(
     working_memory: IssueWorkingMemory | None,
     review_memory: ChildAgentMemory | None,
 ) -> str:
-    quality_gate = load_quality_gate_skill_excerpt()
+    quality_gate = load_quality_gate_review_digest()
+    target_excerpt = _build_review_target_excerpt(
+        issue=issue,
+        code_context=code_context,
+        current_file_content=current_file_content,
+    )
+    state_digest = _build_review_state_digest(
+        working_memory=working_memory,
+        review_memory=review_memory,
+    )
     sections = [
-        "请审查当前 patch 是否已经足够进入编译阶段。",
+        "请只做 patch 审查，判断当前 patch 是否已经足够进入编译阶段。",
         "【当前问题】",
         f"- Issue Key: {getattr(issue, 'key', '')}",
         f"- 规则ID: {getattr(issue, 'rule', '')}",
         f"- 问题描述: {getattr(issue, 'message', '')}",
-        "",
-        "【原始定位上下文】",
-        str(code_context or "").strip(),
+        f"- 目标文件: {_normalize_relative_path(str(getattr(issue, 'file_path', '') or '')) or '未知'}",
+        f"- 目标行: {getattr(issue, 'line', '')}",
         "",
         "【当前 patch 摘要】",
         str(patch_summary or "").strip(),
         "",
-        "【当前文件内容】",
-        str(current_file_content or "").strip(),
+        target_excerpt,
         "",
-        render_issue_working_memory(working_memory),
-        "",
-        render_child_agent_memory(review_memory),
+        state_digest,
     ]
     if quality_gate:
         sections.extend(
             [
                 "",
-                "【C# 质量门禁参考】",
+                "【Review 门禁要点】",
                 quality_gate,
             ]
         )
@@ -218,11 +279,101 @@ def build_review_role_user_prompt(
             "【输出要求】",
             "- 只输出 JSON",
             '- decision 只能是 "approve" 或 "retry"',
-            "- findings 用于说明你看到的风险或通过点",
-            "- constraints 用于给 Fix 子Agent 下一轮的明确约束",
+            "- summary 必须是一句明确结论，不能留空",
+            "- findings 只写当前 patch 的事实判断，不写泛泛风格建议",
+            "- constraints 用于给 Fix 子Agent 下一轮的明确约束；decision=retry 时 constraints 至少提供 1 条",
+            "- constraints 必须限制在当前 issue 目标方法和当前 patch，不要要求同步改相似 sibling 方法",
         ]
     )
     return "\n".join(section for section in sections if str(section).strip()).strip()
+
+
+def _build_review_target_excerpt(*, issue: Any, code_context: str, current_file_content: str) -> str:
+    sections = ["【目标方法附近代码】"]
+    original_context = str(code_context or "").strip()
+    if original_context:
+        sections.extend(
+            [
+                "- 原始定位片段:",
+                original_context,
+            ]
+        )
+    current_excerpt = _slice_review_file_excerpt(
+        current_file_content,
+        line_hint=getattr(issue, "line", 0),
+        window=26,
+        max_chars=2600,
+    )
+    if current_excerpt:
+        sections.extend(
+            [
+                "- 当前文件局部摘录:",
+                current_excerpt,
+            ]
+        )
+    if len(sections) == 1:
+        sections.append("- 无可用代码摘录")
+    return "\n".join(sections).strip()
+
+
+def _slice_review_file_excerpt(
+    current_file_content: str,
+    *,
+    line_hint: Any,
+    window: int,
+    max_chars: int,
+) -> str:
+    text = str(current_file_content or "").replace("\r\n", "\n")
+    if not text.strip():
+        return ""
+    lines = text.split("\n")
+    try:
+        line_number = int(line_hint or 0)
+    except (TypeError, ValueError):
+        line_number = 0
+    if line_number > 0:
+        start = max(line_number - 1 - window, 0)
+        end = min(line_number - 1 + window + 1, len(lines))
+        excerpt_lines = lines[start:end]
+    else:
+        excerpt_lines = lines[: min(len(lines), window * 2)]
+        start = 0
+    numbered = [f"{start + index + 1:>4} | {line}" for index, line in enumerate(excerpt_lines)]
+    excerpt = "\n".join(numbered).strip()
+    if len(excerpt) <= max_chars:
+        return excerpt
+    return excerpt[: max_chars - 3].rstrip() + "..."
+
+
+def _build_review_state_digest(
+    *,
+    working_memory: IssueWorkingMemory | None,
+    review_memory: ChildAgentMemory | None,
+) -> str:
+    lines = ["【当前审查状态】"]
+    if working_memory is not None:
+        workspace_state = str(getattr(working_memory, "authoritative_workspace_state", "") or "").strip()
+        if workspace_state:
+            lines.append(f"- 当前工作区状态: {workspace_state}")
+        rollback_reason = str(getattr(working_memory, "rollback_reason", "") or "").strip()
+        if rollback_reason:
+            lines.append(f"- 回滚说明: {rollback_reason}")
+        latest_verification = str(getattr(working_memory, "latest_verification", "") or "").strip()
+        if latest_verification:
+            lines.append(f"- 最近验证: {latest_verification}")
+        rejected = tuple(getattr(working_memory, "rejected_strategies", ()) or ())
+        if rejected:
+            lines.append("- 已否定策略: " + "；".join(str(item).strip() for item in rejected[:3] if str(item).strip()))
+    if review_memory is not None:
+        latest_summary = str(getattr(review_memory, "latest_summary", "") or "").strip()
+        if latest_summary:
+            lines.append(f"- 上轮 review 摘要: {latest_summary}")
+        latest_constraints = tuple(getattr(review_memory, "latest_constraints", ()) or ())
+        if latest_constraints:
+            lines.append("- 上轮 review 约束: " + "；".join(str(item).strip() for item in latest_constraints[:3] if str(item).strip()))
+    if len(lines) == 1:
+        lines.append("- 无额外审查状态")
+    return "\n".join(lines).strip()
 
 
 def build_main_role_user_prompt(
@@ -233,6 +384,7 @@ def build_main_role_user_prompt(
     working_memory: IssueWorkingMemory | None,
     main_memory: ChildAgentMemory | None,
 ) -> str:
+    quality_gate = load_quality_gate_main_digest()
     sections = [
         "请裁决当前 patch 是否值得进入编译阶段。",
         "【当前问题】",
@@ -253,6 +405,15 @@ def build_main_role_user_prompt(
         "【裁决规则】",
         '- 如果 patch 方向明显不对，输出 {"decision":"retry", ...}',
         '- 如果 patch 已具备进入编译的价值，输出 {"decision":"compile", ...}',
+        '- 如果输出 retry，constraints 至少包含 1 条下一轮可执行约束',
         "- 只输出 JSON",
     ]
+    if quality_gate:
+        sections.extend(
+            [
+                "",
+                "【Main 裁决门禁】",
+                quality_gate,
+            ]
+        )
     return "\n".join(section for section in sections if str(section).strip()).strip()

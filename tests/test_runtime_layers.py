@@ -134,6 +134,7 @@ def test_tool_policy_allows_bash_commands_but_rejects_filesystem_mutation() -> N
 
     allowed = policy.classify("Bash", {"command": "find . -name FinanceHomeApp.cs"})
     harmless_echo = policy.classify("Bash", {"command": "echo 修复完成"})
+    allowed_build = policy.classify("Bash", {"command": "dotnet build OpenAuth.Core/OpenAuth.Core.WebApi.sln"})
     blocked_delete = policy.classify("Bash", {"command": "Remove-Item Foo.cs"})
     blocked_write = policy.classify("Bash", {"command": "Set-Content Foo.cs 'class Foo {}'"})
     finish_allowed = policy.classify("Finish")
@@ -142,6 +143,7 @@ def test_tool_policy_allows_bash_commands_but_rejects_filesystem_mutation() -> N
     assert allowed.kind == ToolKind.CONTROLLED
     assert allowed.matched_rule == "windows-shell-safe"
     assert harmless_echo.allowed is True
+    assert allowed_build.allowed is True
     assert blocked_delete.allowed is False
     assert blocked_delete.policy_violation is True
     assert blocked_write.allowed is False
@@ -354,20 +356,22 @@ def test_tool_policy_allows_write_on_existing_file_when_write_is_generally_visib
 
 def test_build_visible_toolset_keeps_prompt_runtime_and_policy_in_sync() -> None:
     registry = build_fix_tool_registry(
-        builtin_tools=["Read", "Edit", "MultiEdit", "Write", "Bash", "Finish"],
+        builtin_tools=["Read", "Grep", "Glob", "Edit", "MultiEdit", "Write", "Bash", "Finish"],
         mcp_tools=["mcp__sonarqube__issue_show", "mcp__sonarqube__project_overview"],
         forbidden_tools={"mcp__sonar-fix__git_push"},
     )
 
     toolset = build_visible_toolset(
         registry,
-        ["Read", "Edit", "MultiEdit", "mcp__sonarqube__issue_show"],
+        ["Read", "Grep", "Glob", "Edit", "MultiEdit", "mcp__sonarqube__issue_show"],
         include_controlled_bash=True,
         bash_file_creation_roots=("src/generated",),
         create_file_tool_roots=("src/generated",),
     )
 
     assert "Bash" in toolset.visible_tools
+    assert "Grep" in toolset.visible_tools
+    assert "Glob" in toolset.visible_tools
     assert "Write" in toolset.visible_tools
     assert "Finish" in toolset.visible_tools
     assert "Write(create_file_under=src/generated)" in toolset.allowed_tools

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,7 @@ _RUNTIME_STAGE_EXCLUDE_PREFIXES: tuple[str, ...] = (
     ".pi-sonar-agent-runtime",
     ".git/pi-sonar-agent-runtime",
 )
+REMOTE_BRANCH_CHECK_TIMEOUT_SECONDS = 20
 
 
 class CommandRunner(Protocol):
@@ -179,7 +181,7 @@ class GitRepositoryGateway:
                     "git ls-remote --heads "
                     f"{_shell_quote(remote_url)} {_shell_quote(ref_name)}"
                 ),
-                timeout=60,
+                timeout=REMOTE_BRANCH_CHECK_TIMEOUT_SECONDS,
                 check=False,
             )
         except subprocess.CalledProcessError as exc:
@@ -187,6 +189,13 @@ class GitRepositoryGateway:
             detail_suffix = f": {details}" if details else ""
             raise RuntimeError(
                 f"Git check branch {branch} failed for {self.redacted_remote_url}{detail_suffix}"
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(
+                "Git check branch "
+                f"{branch} timed out after {REMOTE_BRANCH_CHECK_TIMEOUT_SECONDS}s for {self.redacted_remote_url}. "
+                "The remote may be unreachable or Git may be waiting for interactive credentials; "
+                "the agent now forces non-interactive git execution, so please re-run and inspect network/auth if this persists."
             ) from exc
 
         if getattr(result, "returncode", 0) != 0:
@@ -398,6 +407,17 @@ def _run_command_quiet(
 ) -> subprocess.CompletedProcess[str]:
     """Run a shell command without echoing raw process output to the console."""
 
+    env = os.environ.copy()
+    stripped_command = str(command or "").strip().lower()
+    if stripped_command.startswith("git "):
+        env.update(
+            {
+                "GIT_TERMINAL_PROMPT": "0",
+                "GCM_INTERACTIVE": "Never",
+                "GIT_ASKPASS": "",
+                "SSH_ASKPASS": "",
+            }
+        )
     result = subprocess.run(
         command,
         shell=True,
@@ -407,6 +427,7 @@ def _run_command_quiet(
         encoding="utf-8",
         errors="replace",
         timeout=timeout,
+        env=env,
     )
 
     if check and result.returncode != 0:

@@ -7,9 +7,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pi_sonar_agent.agent.rule_policies import get_rule_policy
-from pi_sonar_agent.core.light_check_catalog import (
-    render_simple_loop_refactor_safety_constraints,
-)
 from pi_sonar_agent.core.memory.issue_compaction import maybe_compact_issue_prompt
 from pi_sonar_agent.core.memory.issue_working_memory import (
     IssueWorkingMemory,
@@ -29,23 +26,6 @@ if TYPE_CHECKING:
     from pi_sonar_agent.agent.claude_agent import SonarIssue
 
 
-SONAR_FIX_SYSTEM_PROMPT = """你是一个严格的 .NET/C# 资深工程师，专门修复 SonarQube 问题。
-
-目标：
-1. 准确理解 Sonar issue 的根因
-2. 只做最小且可编译的修复
-3. 保持业务语义和公开行为稳定
-
-硬约束：
-- 只使用当前运行时真正可见的工具
-- 不要执行 git add / git commit / git push
-- 不要通过 shell 直接改写已有源码
-- build/test/retry 由外层流程统一执行
-- 复杂度类问题默认优先保持公开签名不变，优先 private/local/sync-first 重构
-- C# 重构安全边界（所有规则通用，S3776/S1200/S1541 等提取类修复必读：d:/MyProjects/pi-sonar-agent/docs/sonar-fix-playbook.md
-"""
-
-
 SIMPLE_LOOP_SYSTEM_PROMPT = """你是一个严格的 .NET/C# 资深工程师，专门修复 SonarQube 问题。
 
 当前运行在 headless simple-loop 模式。
@@ -62,58 +42,6 @@ SIMPLE_LOOP_SYSTEM_PROMPT = """你是一个严格的 .NET/C# 资深工程师，�
 - 不要通过 shell 直接改写已有源码
 - 不要自行执行 dotnet restore/build/test；构建与验证由外层统一执行
 - 不要输出长篇推理，不要做无关重构，不要顺手修其他 issue
-"""
-
-
-SONAR_FIX_USER_PROMPT_TEMPLATE = """请修复以下 SonarQube 代码问题，只处理当前 issue。
-
-【问题详情】
-- Issue Key: {issue_key}
-- 规则ID: {rule_id}
-- 规则名称: {rule_name}
-- 问题描述: {message}
-- 严重程度: {severity}
-- 文件路径: {file_path}
-- 报错行号: {line}
-
-【SonarQube 精确定位】
-{issue_location_guidance}
-
-【SonarQube 规则说明（问题原因/风险）】
-{rule_description}
-
-【SonarQube 修复建议】
-{rule_fix_guidance}
-
-【代码上下文】（包含问题行及前后代码）
-{code_context}
-
-{working_memory_section}
-{prefetched_context_section}
-{edit_contract_section}
-{repair_plan_section}
-{quality_gate_section}
-{rule_guard_section}
-{tool_surface_section}
-{execution_mode_section}
-
-【允许修改范围】
-{scope_guidance}
-
-{build_command_section}
-
-{retry_feedback_section}
-{durable_memory_section}
-
-【执行要求】
-- 只修当前 Issue Key，不扩展到同文件其他 issue
-- 不做无关重构、批量格式化或路径试错
-- 不要顺手修复本文件中其他位置的相同规则问题
-- 读取和编辑文件时只使用仓库内相对路径
-- 当前优先直接操作的问题文件相对路径候选：
-{file_path_candidates}
-- 如果第一个路径不存在，优先尝试更短候选路径；不要用 Bash 通过拼接仓库根目录反复试错
-- 如果 Edit Contract 明确声明了额外传播目标文件，只能在这些相对路径内同步修改签名、接口声明、调用点和 `nameof(...)`
 """
 
 
@@ -319,30 +247,23 @@ class IssuePromptBuilder:
         """Render rule-specific prompt guards when configured."""
 
         policy = get_rule_policy(rule_id)
-        simple_loop_enabled = is_simple_loop_execution_mode(execution_mode)
         guards: list[str] = []
-        if not simple_loop_enabled:
-            guards.extend(policy.prompt_guards)
-            guards.extend(render_simple_loop_refactor_safety_constraints(rule_id, max_items=6))
         if retry_context is not None:
-            if not simple_loop_enabled:
-                guards.extend(policy.retry_prompt_guards)
-            if simple_loop_enabled:
-                retry_fingerprints = {
-                    str(item).strip()
-                    for item in getattr(retry_context, "failure_fingerprints", ()) or ()
-                    if str(item).strip()
-                }
-                if retry_fingerprints.intersection(
-                    {"helper_extraction_type_break", "nullable_type_mismatch"}
-                ):
-                    guards.extend(
-                        (
-                            "本轮硬约束：禁止新增 helper/private 方法，必须在当前方法体内收口复杂度或类型流转。",
-                            "本轮硬约束：禁止使用 dynamic 作为参数、返回值或中间兜底类型。",
-                            "本轮硬约束：禁止让匿名类型或 nullable-heavy 状态跨方法边界流动。",
-                        )
+            retry_fingerprints = {
+                str(item).strip()
+                for item in getattr(retry_context, "failure_fingerprints", ()) or ()
+                if str(item).strip()
+            }
+            if retry_fingerprints.intersection(
+                {"helper_extraction_type_break", "nullable_type_mismatch"}
+            ):
+                guards.extend(
+                    (
+                        "本轮硬约束：禁止新增 helper/private 方法，必须在当前方法体内收口复杂度或类型流转。",
+                        "本轮硬约束：禁止使用 dynamic 作为参数、返回值或中间兜底类型。",
+                        "本轮硬约束：禁止让匿名类型或 nullable-heavy 状态跨方法边界流动。",
                     )
+                )
         if not guards:
             return ""
 
@@ -503,11 +424,7 @@ class IssuePromptBuilder:
     ) -> PromptBuildResult:
         """Compose the fix system prompt with optional workspace rules."""
 
-        base_prompt = (
-            SIMPLE_LOOP_SYSTEM_PROMPT
-            if is_simple_loop_execution_mode(execution_mode)
-            else SONAR_FIX_SYSTEM_PROMPT
-        )
+        base_prompt = SIMPLE_LOOP_SYSTEM_PROMPT
         prompt = ResourceLoader.compose_system_prompt(
             base_prompt,
             workspace_path,
@@ -650,7 +567,7 @@ class IssuePromptBuilder:
             if visible_tool_names:
                 lines.append(f"【当前可用工具】\n- {render_visible_tool_summary(visible_tool_names)}")
             if bash_visible:
-                bash_line = "- Bash 只用于搜索、查看和诊断，不要在 Bash 中 build。"
+                bash_line = "- 优先直接对给出的相对路径使用 Read/Edit/Write；路径不确定时先用 Glob/Grep，再用 Bash 做只读搜索或诊断。"
                 if bool(getattr(edit_contract, "allow_file_creation", False)):
                     bash_line += " 如需新建允许的新文件，优先使用 Write。"
                 lines.append(bash_line)
@@ -824,8 +741,6 @@ class IssuePromptBuilder:
             "",
         ).strip()
         execution_mode = str(getattr(edit_contract, "execution_mode", "") or "").strip()
-        simple_loop_enabled = is_simple_loop_execution_mode(execution_mode)
-
         quality_gate_section = ""
         quality_gate = cls.normalize_prompt_text(quality_gate_text, "").strip()
         if quality_gate:
@@ -924,11 +839,7 @@ class IssuePromptBuilder:
             f"- {candidate}"
             for candidate in cls.build_workspace_relative_candidates(issue.file_path, workspace_path)
         )
-        durable_memory_section = (
-            ""
-            if simple_loop_enabled
-            else cls._render_durable_memory_section(edit_contract)
-        )
+        durable_memory_section = ""
         retry_feedback_section = cls._render_retry_feedback_section(
             retry_feedback_text=retry_feedback_text,
             retry_context=retry_context,
@@ -936,43 +847,21 @@ class IssuePromptBuilder:
             truncated_sections=truncated_sections,
         )
 
-        if simple_loop_enabled:
-            inline_sections = {
-                "rule_description": "",
-                "rule_fix_guidance": rule_fix_guidance,
-                "quality_gate_section": "",
-                "rule_guard_section": rule_guard_section,
-                "edit_contract_section": "",
-                "repair_plan_section": "",
-                "prefetched_context_section": "",
-                "tool_surface_section": tool_surface_section,
-                "execution_mode_section": "",
-            }
-            externalized_sections = ()
-            reference_document_path = ""
-        else:
-            inline_sections, externalized_sections, reference_document_path = (
-                cls._maybe_externalize_reference_sections(
-                    workspace_path=workspace_path,
-                    rule_description=rule_description,
-                    rule_fix_guidance=rule_fix_guidance,
-                    quality_gate_section=quality_gate_section,
-                    rule_guard_section=rule_guard_section,
-                    edit_contract_section=compact_edit_contract,
-                    repair_plan_section=compact_repair_plan,
-                    prefetched_context_section=compact_prefetched_context,
-                    tool_surface_section=tool_surface_section,
-                    execution_mode_section=compact_execution_mode,
-                    code_context=compact_code_context,
-                    retry_feedback_section=retry_feedback_section,
-                )
-            )
+        inline_sections = {
+            "rule_description": "",
+            "rule_fix_guidance": rule_fix_guidance,
+            "quality_gate_section": "",
+            "rule_guard_section": rule_guard_section,
+            "edit_contract_section": "",
+            "repair_plan_section": "",
+            "prefetched_context_section": "",
+            "tool_surface_section": tool_surface_section,
+            "execution_mode_section": "",
+        }
+        externalized_sections = ()
+        reference_document_path = ""
 
-        prompt_template = (
-            SIMPLE_LOOP_USER_PROMPT_TEMPLATE
-            if simple_loop_enabled
-            else SONAR_FIX_USER_PROMPT_TEMPLATE
-        )
+        prompt_template = SIMPLE_LOOP_USER_PROMPT_TEMPLATE
 
         draft_prompt = prompt_template.format(
             issue_key=issue.key,

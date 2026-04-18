@@ -67,7 +67,7 @@ from pi_sonar_agent.core.state import (
 from pi_sonar_agent.core.state_store import RunStateStore
 from pi_sonar_agent.fixers.build_gate import format_build_failure_report
 
-DEFAULT_MAX_BUILD_RETRIES = 3
+DEFAULT_MAX_BUILD_RETRIES = 5
 EARLY_RETRY_ABORT_MIN_ATTEMPTS = 5
 EARLY_RETRY_ABORT_MIN_ATTEMPTS_NO_CHANGE = 2
 EARLY_RETRY_ABORT_MIN_ATTEMPTS_FIRST_RESPONSE_TIMEOUT = 2

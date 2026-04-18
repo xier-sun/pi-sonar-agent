@@ -9,6 +9,7 @@ This module provides the main agent class that:
 
 import asyncio
 import json
+import re
 import shutil
 import subprocess
 import time
@@ -65,6 +66,7 @@ from pi_sonar_agent.core.memory.child_agent_memory import (
     create_initial_child_agent_memory,
 )
 from pi_sonar_agent.core.memory.issue_working_memory import IssueWorkingMemory
+from pi_sonar_agent.core.memory.issue_working_memory import merge_issue_working_memory
 from pi_sonar_agent.core.memory.working_memory_store import WorkingMemoryStore
 from pi_sonar_agent.core.mcp_servers import build_sonar_mcp_runtime
 from pi_sonar_agent.core.model_gateway import ResultEvent, TextEvent, ToolCallEvent, TraceEvent
@@ -72,6 +74,7 @@ from pi_sonar_agent.core.perf_flags import load_performance_flags
 from pi_sonar_agent.core.policy import ToolPolicy
 from pi_sonar_agent.core.project_env import read_project_env
 from pi_sonar_agent.core.quality_gate import render_quality_gate_prompt
+from pi_sonar_agent.core.quality_gate_verifier import QualityGateVerifier
 from pi_sonar_agent.core.registry import build_fix_tool_registry, build_visible_toolset
 from pi_sonar_agent.core.resource_loader import DEFAULT_CSHARP_QUALITY_GATE_FILE, ResourceLoader
 from pi_sonar_agent.core.retry_context import RetryContext
@@ -1415,24 +1418,248 @@ class ClaudeFixAgent:
 
     @staticmethod
     def _build_patch_summary(
+        issue: SonarIssue,
+        edit_contract: Any,
+        current_issue_file_content: str,
         reviewed_changes: tuple[ReviewedFileChange, ...],
     ) -> str:
-        """Build a concise patch summary for review/main agents."""
+        """Build a target-aware patch summary for review/main agents."""
 
-        sections: list[str] = []
-        for change in reviewed_changes[:3]:
-            preview_lines: list[str] = []
-            for raw_line in str(change.diff_text or "").splitlines():
-                stripped = raw_line.rstrip()
-                if stripped.startswith(("+++", "---", "@@")):
-                    continue
-                if stripped.startswith(("+", "-")):
-                    preview_lines.append(stripped[:160])
-                if len(preview_lines) >= 6:
-                    break
-            body = " ; ".join(preview_lines)
-            sections.append(f"{change.file}: {body or 'modified'}")
+        normalized_issue_path = str(issue.file_path or "").replace("\\", "/").lstrip("/")
+        target_change = next(
+            (change for change in reviewed_changes if str(change.file or "").replace("\\", "/").lstrip("/") == normalized_issue_path),
+            None,
+        )
+        target_method_name, target_window = ClaudeFixAgent._resolve_target_method_window(
+            issue=issue,
+            edit_contract=edit_contract,
+            file_content=current_issue_file_content,
+        )
+        changed_files = tuple(
+            dict.fromkeys(
+                str(change.file or "").replace("\\", "/").lstrip("/")
+                for change in reviewed_changes
+                if str(change.file or "").strip()
+            )
+        )
+        changed_methods = ClaudeFixAgent._collect_changed_method_names(
+            target_change=target_change,
+            current_file_content=current_issue_file_content,
+        )
+        touched_target_method = ClaudeFixAgent._target_method_was_touched(
+            target_change=target_change,
+            target_method_name=target_method_name,
+            target_window=target_window,
+        )
+        helper_added = ClaudeFixAgent._patch_added_private_helper(reviewed_changes)
+        scope = ClaudeFixAgent._classify_patch_scope(
+            normalized_issue_path=normalized_issue_path,
+            changed_files=changed_files,
+            changed_methods=changed_methods,
+            target_method_name=target_method_name,
+            touched_target_method=touched_target_method,
+        )
+        risk_flags: list[str] = []
+        if not touched_target_method:
+            risk_flags.append("target_method_not_touched")
+        if helper_added:
+            risk_flags.append("helper_added")
+        if any(item for item in changed_methods if item and item != target_method_name):
+            risk_flags.append("sibling_method_touched")
+        if any(path for path in changed_files if path != normalized_issue_path):
+            risk_flags.append("cross_file_change")
+        preview = ClaudeFixAgent._build_target_patch_preview(
+            target_change=target_change,
+            target_window=target_window,
+        )
+
+        sections = [
+            f"target_file={normalized_issue_path or 'unknown'}",
+            f"target_method={target_method_name or 'unknown'}",
+            f"touched_target_method={'yes' if touched_target_method else 'no'}",
+        ]
+        if changed_files:
+            sections.append("changed_files=" + ", ".join(changed_files[:4]))
+        if changed_methods:
+            sections.append("changed_methods=" + ", ".join(changed_methods[:6]))
+        sections.append(f"scope={scope}")
+        if risk_flags:
+            sections.append("risk_flags=" + ", ".join(dict.fromkeys(risk_flags)))
+        if preview:
+            sections.append("target_preview=" + preview)
         return "\n".join(section for section in sections if section).strip()
+
+    @staticmethod
+    def _resolve_target_method_window(
+        *,
+        issue: SonarIssue,
+        edit_contract: Any,
+        file_content: str,
+    ) -> tuple[str, Any | None]:
+        repair_plan = getattr(edit_contract, "repair_plan", None)
+        primary_method_name = str(getattr(repair_plan, "primary_method_name", "") or "").strip()
+        lines = str(file_content or "").splitlines()
+        target_line = int(getattr(issue, "start_line", 0) or getattr(issue, "line", 0) or 0)
+        window = None
+        if lines and target_line > 0:
+            window = QualityGateVerifier._find_enclosing_method(lines, target_line)
+            if window is None:
+                total_lines = len(lines)
+                start = max(1, target_line - 5)
+                end = min(total_lines, target_line + 5)
+                for candidate_line in range(start, end + 1):
+                    window = QualityGateVerifier._build_method_window(lines, candidate_line)
+                    if window is not None:
+                        break
+        method_name = primary_method_name or str(getattr(window, "name", "") or "").strip()
+        return method_name, window
+
+    @staticmethod
+    def _collect_changed_method_names(
+        *,
+        target_change: ReviewedFileChange | None,
+        current_file_content: str,
+    ) -> tuple[str, ...]:
+        if target_change is None or not str(current_file_content or "").strip():
+            return ()
+        lines = str(current_file_content or "").splitlines()
+        candidate_lines = sorted(
+            {
+                int(line)
+                for line in (
+                    *(target_change.after_changed_lines or ()),
+                    *(
+                        int(getattr(operation, "after_line", 0) or 0)
+                        for operation in (target_change.line_operations or ())
+                    ),
+                )
+                if int(line) > 0
+            }
+        )
+        method_names: list[str] = []
+        for line_number in candidate_lines:
+            if line_number <= 0 or line_number > len(lines):
+                continue
+            method = QualityGateVerifier._find_enclosing_method(lines, line_number)
+            if method is None:
+                method = QualityGateVerifier._build_method_window(lines, line_number)
+            name = str(getattr(method, "name", "") or "").strip()
+            if name and name not in method_names:
+                method_names.append(name)
+        return tuple(method_names)
+
+    @staticmethod
+    def _target_method_was_touched(
+        *,
+        target_change: ReviewedFileChange | None,
+        target_method_name: str,
+        target_window: Any | None,
+    ) -> bool:
+        if target_change is None:
+            return False
+        normalized_target_method = str(target_method_name or "").strip()
+        if normalized_target_method:
+            for line_number in target_change.after_changed_lines or ():
+                if not int(line_number or 0):
+                    continue
+                method = None
+                # method lookup requires current file content and is handled earlier via changed_methods;
+                # fall back to target window intersection below when the summary cannot resolve by name.
+            for operation in target_change.line_operations or ():
+                if normalized_target_method and normalized_target_method in str(getattr(operation, "text", "") or ""):
+                    return True
+        if target_window is None:
+            return False
+        start_line = int(getattr(target_window, "start_line", 0) or 0)
+        end_line = int(getattr(target_window, "end_line", 0) or 0)
+        if start_line <= 0 or end_line <= 0:
+            return False
+        for line_number in target_change.after_changed_lines or ():
+            if start_line <= int(line_number or 0) <= end_line:
+                return True
+        for operation in target_change.line_operations or ():
+            after_line = int(getattr(operation, "after_line", 0) or 0)
+            before_line = int(getattr(operation, "before_line", 0) or 0)
+            if (after_line and start_line <= after_line <= end_line) or (
+                before_line and start_line <= before_line <= end_line
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _patch_added_private_helper(
+        reviewed_changes: tuple[ReviewedFileChange, ...],
+    ) -> bool:
+        for change in reviewed_changes:
+            for operation in change.line_operations or ():
+                if str(getattr(operation, "kind", "")).strip() != "add":
+                    continue
+                if DiffReviewer._is_private_method_declaration(str(getattr(operation, "text", "") or "")):
+                    return True
+        return False
+
+    @staticmethod
+    def _classify_patch_scope(
+        *,
+        normalized_issue_path: str,
+        changed_files: tuple[str, ...],
+        changed_methods: tuple[str, ...],
+        target_method_name: str,
+        touched_target_method: bool,
+    ) -> str:
+        if not changed_files:
+            return "no_change"
+        if any(path for path in changed_files if path != normalized_issue_path):
+            return "cross_file"
+        normalized_target_method = str(target_method_name or "").strip()
+        if changed_methods and normalized_target_method:
+            if all(name == normalized_target_method for name in changed_methods):
+                return "target_method_only"
+            return "target_file_expanded"
+        if touched_target_method:
+            return "target_method_only"
+        return "target_file_unclear"
+
+    @staticmethod
+    def _build_target_patch_preview(
+        *,
+        target_change: ReviewedFileChange | None,
+        target_window: Any | None,
+    ) -> str:
+        if target_change is None:
+            return ""
+        preview_lines: list[str] = []
+        start_line = int(getattr(target_window, "start_line", 0) or 0)
+        end_line = int(getattr(target_window, "end_line", 0) or 0)
+        for operation in target_change.line_operations or ():
+            text = " ".join(str(getattr(operation, "text", "") or "").split())
+            if not text:
+                continue
+            before_line = int(getattr(operation, "before_line", 0) or 0)
+            after_line = int(getattr(operation, "after_line", 0) or 0)
+            in_target_window = bool(
+                start_line and end_line and (
+                    (after_line and start_line <= after_line <= end_line)
+                    or (before_line and start_line <= before_line <= end_line)
+                )
+            )
+            if start_line and end_line and not in_target_window:
+                continue
+            marker = "+" if str(getattr(operation, "kind", "")).strip() == "add" else "-"
+            preview_lines.append(f"{marker} {text[:140]}")
+            if len(preview_lines) >= 6:
+                break
+        if preview_lines:
+            return " | ".join(preview_lines)
+        for raw_line in str(target_change.diff_text or "").splitlines():
+            stripped = raw_line.rstrip()
+            if stripped.startswith(("+++", "---", "@@")):
+                continue
+            if stripped.startswith(("+", "-")):
+                preview_lines.append(stripped[:140])
+            if len(preview_lines) >= 6:
+                break
+        return " | ".join(preview_lines)
 
     @staticmethod
     def _extract_json_payload(raw_text: str) -> dict[str, Any]:
@@ -1488,6 +1715,344 @@ class ClaudeFixAgent:
             findings=findings,
             constraints=constraints,
             raw_text=str(raw_text or "").strip(),
+        )
+
+    @staticmethod
+    def _extract_actionable_plaintext_lines(raw_text: str, *, max_items: int = 3) -> tuple[str, ...]:
+        lines: list[str] = []
+        for raw_line in str(raw_text or "").splitlines():
+            line = str(raw_line or "").strip()
+            if not line or line.startswith("```"):
+                continue
+            line = re.sub(r"^[\-\*\d\.\)\s]+", "", line).strip()
+            line = line.strip('",')
+            if not line:
+                continue
+            lowered = line.lower()
+            if lowered in {"approve", "retry", "compile"}:
+                continue
+            if lowered.endswith("{") or lowered.endswith("}") or lowered in {
+                "decision",
+                "summary",
+                "findings",
+                "constraints",
+            }:
+                continue
+            if line not in lines:
+                lines.append(line)
+            if len(lines) >= max_items:
+                break
+        return tuple(lines)
+
+    @classmethod
+    def _build_review_retry_constraints(
+        cls,
+        *,
+        issue: SonarIssue,
+        raw_text: str,
+        patch_summary: str,
+        fallback_constraints: tuple[str, ...] = (),
+    ) -> tuple[str, ...]:
+        constraints: list[str] = [
+            "先 Read 当前目标文件和目标方法，确认当前代码状态，再提交更小、更直接的 patch。",
+            "只修改已有文件；不要创建、删除、移动或重命名文件。",
+        ]
+        normalized = " ".join(str(raw_text or "").split()).lower()
+        if patch_summary:
+            constraints.append("先核对 patch 摘要与当前代码是否一致；如果不一致，以当前文件内容为准重新编辑。")
+        if any(marker in normalized for marker in ("mismatch", "不一致", "摘要", "patch")):
+            constraints.append("重新读取已修改文件，确保下一轮修改真正落在当前目标方法，而不是停留在过期 patch 上。")
+        if issue.rule == "csharpsquid:S3776" or any(marker in normalized for marker in ("复杂度", "认知复杂度")):
+            constraints.append("继续围绕目标方法本体降复杂度，优先扁平化条件、早返回和局部重排，不要只改周边调用。")
+        if any(marker in normalized for marker in ("build", "编译", "cs0", "cs1", "cs2", "cs3", "cs4")):
+            constraints.append("如果上一轮已经暴露编译错误，本轮先消掉这些编译错误，再继续 issue 修复。")
+        if any(marker in normalized for marker in ("helper", "private method", "private helper")):
+            constraints.append("如果 review 指出 helper 路线不稳，下一轮回到现有方法体内收口，不要继续提取新 helper。")
+        for item in fallback_constraints:
+            text = str(item).strip()
+            if text and text not in constraints:
+                constraints.append(text)
+        return tuple(dict.fromkeys(item for item in constraints if item))[:3]
+
+    @staticmethod
+    def _parse_patch_summary_facts(patch_summary: str) -> dict[str, str]:
+        facts: dict[str, str] = {}
+        for raw_line in str(patch_summary or "").splitlines():
+            line = str(raw_line or "").strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            normalized_key = str(key or "").strip().lower()
+            normalized_value = str(value or "").strip()
+            if normalized_key and normalized_value:
+                facts[normalized_key] = normalized_value
+        return facts
+
+    @classmethod
+    def _review_retry_is_missing_s3776_proof(
+        cls,
+        *,
+        issue: SonarIssue,
+        decision: RoleDecision,
+        patch_summary: str,
+    ) -> bool:
+        if str(getattr(issue, "rule", "") or "").strip() != "csharpsquid:S3776":
+            return False
+        combined = "\n".join(
+            part
+            for part in (
+                str(decision.summary or "").strip(),
+                str(decision.raw_text or "").strip(),
+                *tuple(str(item).strip() for item in (decision.findings or ()) if str(item).strip()),
+                *tuple(str(item).strip() for item in (decision.constraints or ()) if str(item).strip()),
+            )
+            if part
+        )
+        normalized = " ".join(combined.split()).lower()
+        proof_markers = (
+            "复杂度数值",
+            "认知复杂度度量值",
+            "修复前32",
+            "修复前后",
+            "≤30",
+            "<=30",
+            "无法确认",
+            "无法验证",
+            "完整方法",
+            "完整代码",
+            "target_preview",
+            "patch 摘要未提供",
+            "provide",
+            "proof",
+        )
+        if not any(marker.lower() in normalized for marker in proof_markers):
+            return False
+        hard_risk_markers = (
+            "语法错误",
+            "编译错误",
+            "cs0",
+            "cs1",
+            "cs2",
+            "cs3",
+            "cs4",
+            "类型风险",
+            "签名",
+            "scope",
+            "作用域",
+            "nullable",
+            "匿名类型",
+            "dynamic",
+            "不兼容",
+            "类型不匹配",
+            "无法编译",
+            "hard blocker",
+        )
+        if any(marker.lower() in normalized for marker in hard_risk_markers):
+            return False
+        facts = cls._parse_patch_summary_facts(patch_summary)
+        if facts.get("touched_target_method", "").strip().lower() != "yes":
+            return False
+        scope = str(facts.get("scope", "") or "").strip().lower()
+        if scope == "cross_file":
+            return False
+        return True
+
+    @classmethod
+    def _review_retry_is_non_patch_flow_control(
+        cls,
+        *,
+        decision: RoleDecision,
+        patch_summary: str,
+    ) -> bool:
+        combined = "\n".join(
+            part
+            for part in (
+                str(decision.summary or "").strip(),
+                str(decision.raw_text or "").strip(),
+                *tuple(str(item).strip() for item in (decision.findings or ()) if str(item).strip()),
+                *tuple(str(item).strip() for item in (decision.constraints or ()) if str(item).strip()),
+            )
+            if part
+        )
+        normalized = " ".join(combined.split()).lower()
+        flow_control_markers = (
+            "build=fail",
+            "issue_baseline",
+            "baseline",
+            "无实质 patch",
+            "无 patch 需要审查",
+            "当前工作区已回滚至 baseline",
+            "上一轮 patch 已撤销",
+            "确认当前 baseline 代码的完整性",
+            "baseline 代码问题",
+            "baseline 问题",
+            "前次 review 摘要显示已同意进入编译",
+            "nu1301",
+            "nuget.org",
+            "nuget.azure.cn",
+            "无法加载源",
+            "不知道这样的主机",
+        )
+        if not any(marker in normalized for marker in flow_control_markers):
+            return False
+        hard_risk_markers = (
+            "语法错误",
+            "类型错误",
+            "类型风险",
+            "签名",
+            "nullable",
+            "匿名类型",
+            "dynamic",
+            "不兼容",
+            "类型不匹配",
+            "cs0",
+            "cs1",
+            "cs2",
+            "cs3",
+            "cs4",
+        )
+        if any(marker in normalized for marker in hard_risk_markers):
+            return False
+        facts = cls._parse_patch_summary_facts(patch_summary)
+        if facts.get("touched_target_method", "").strip().lower() != "yes":
+            return False
+        scope = str(facts.get("scope", "") or "").strip().lower()
+        if scope == "cross_file":
+            return False
+        return True
+
+    @classmethod
+    def _stabilize_review_decision(
+        cls,
+        *,
+        issue: SonarIssue,
+        patch_summary: str,
+        decision: RoleDecision,
+    ) -> RoleDecision:
+        findings = decision.findings or cls._extract_actionable_plaintext_lines(
+            decision.raw_text,
+            max_items=3,
+        )
+        if (
+            decision.decision == "retry"
+            and cls._review_retry_is_missing_s3776_proof(
+                issue=issue,
+                decision=decision,
+                patch_summary=patch_summary,
+            )
+        ):
+            return RoleDecision(
+                decision="approve",
+                summary="Review 子Agent未发现编译前硬风险；S3776 是否 <=30 将在编译后的 post-check 再确认。",
+                findings=tuple(
+                    item
+                    for item in findings
+                    if not any(
+                        marker in str(item or "").lower()
+                        for marker in (
+                            "复杂度数值",
+                            "认知复杂度度量值",
+                            "完整方法",
+                            "完整代码",
+                            "target_preview",
+                            "修复前",
+                            "修复后",
+                            "≤30",
+                            "<=30",
+                        )
+                    )
+                ),
+                constraints=(),
+                raw_text=decision.raw_text,
+            )
+        if (
+            decision.decision == "retry"
+            and cls._review_retry_is_non_patch_flow_control(
+                decision=decision,
+                patch_summary=patch_summary,
+            )
+        ):
+            return RoleDecision(
+                decision="approve",
+                summary="Review 子Agent未发现当前 patch 的编译前硬风险；上一轮外部构建/回滚状态不作为当前 patch 的拒绝理由。",
+                findings=tuple(
+                    item
+                    for item in findings
+                    if not any(
+                        marker in str(item or "").lower()
+                        for marker in (
+                            "build=fail",
+                            "baseline",
+                            "issue_baseline",
+                            "回滚",
+                            "无 patch",
+                            "无实质 patch",
+                            "nu1301",
+                            "nuget.org",
+                            "nuget.azure.cn",
+                            "无法加载源",
+                        )
+                    )
+                ),
+                constraints=(),
+                raw_text=decision.raw_text,
+            )
+        constraints = decision.constraints
+        if decision.decision == "retry" and not constraints:
+            constraints = cls._build_review_retry_constraints(
+                issue=issue,
+                raw_text=decision.raw_text or decision.summary,
+                patch_summary=patch_summary,
+                fallback_constraints=findings,
+            )
+        summary = str(decision.summary or "").strip()
+        if not summary or summary == "Review 子Agent 未给出可用结论。":
+            summary = (
+                "Review 子Agent认为当前 patch 可以进入编译。"
+                if decision.decision == "approve"
+                else "Review 子Agent要求继续修复，并已生成下一轮可执行约束。"
+            )
+        return RoleDecision(
+            decision=decision.decision,
+            summary=summary,
+            findings=findings,
+            constraints=constraints,
+            raw_text=decision.raw_text,
+        )
+
+    @classmethod
+    def _stabilize_main_decision(
+        cls,
+        *,
+        review_decision: RoleDecision,
+        decision: RoleDecision,
+    ) -> RoleDecision:
+        summary = str(decision.summary or "").strip()
+        constraints = decision.constraints or review_decision.constraints
+        if (
+            decision.decision == "retry"
+            and review_decision.decision == "approve"
+            and summary == "Main 裁决未批准进入编译阶段。"
+        ):
+            return RoleDecision(
+                decision="compile",
+                summary=review_decision.summary or "Review 已批准，主裁决回退为进入编译阶段。",
+                findings=review_decision.findings,
+                constraints=(),
+                raw_text=decision.raw_text,
+            )
+        if not summary or summary == "Main 裁决未批准进入编译阶段。":
+            summary = (
+                "Main 裁决允许进入编译阶段。"
+                if decision.decision == "compile"
+                else "Main 裁决要求继续修复，并保留了下一轮约束。"
+            )
+        return RoleDecision(
+            decision=decision.decision,
+            summary=summary,
+            findings=decision.findings,
+            constraints=constraints,
+            raw_text=decision.raw_text,
         )
 
     @classmethod
@@ -1782,13 +2347,31 @@ class ClaudeFixAgent:
             )
         finally:
             cls._cleanup_attempt_workspace_state(workspace_path)
-        reviewer_result = DiffReviewer.review(edit_contract=edit_contract, file_changes=reviewed_changes)
-        patch_summary = cls._build_patch_summary(reviewed_changes)
         current_issue_path = workspace_path / issue.file_path.lstrip("/")
         current_issue_file_content = (
             current_issue_path.read_text(encoding="utf-8", errors="replace")
             if current_issue_path.exists()
             else ""
+        )
+        reviewer_result = DiffReviewer.review(edit_contract=edit_contract, file_changes=reviewed_changes)
+        patch_summary = cls._build_patch_summary(
+            issue=issue,
+            edit_contract=edit_contract,
+            current_issue_file_content=current_issue_file_content,
+            reviewed_changes=reviewed_changes,
+        )
+        review_working_memory = (
+            merge_issue_working_memory(
+                working_memory,
+                authoritative_workspace_state="attempt_patch",
+                latest_patch_summary=patch_summary,
+                latest_verification="当前 patch 已生成，等待 Review 子Agent 基于当前代码审查。",
+                latest_retryable_failure="",
+                rollback_reason="",
+                next_action="先审查当前 patch 是否值得进入编译，不要把上一轮外部构建/回滚状态当作当前 patch 风险。",
+            )
+            if working_memory is not None
+            else None
         )
         fix_memory = append_child_agent_memory_turn(
             fix_memory,
@@ -1828,7 +2411,7 @@ class ClaudeFixAgent:
                 code_context=code_context,
                 patch_summary=patch_summary,
                 current_file_content=current_issue_file_content,
-                working_memory=working_memory,
+                working_memory=review_working_memory,
                 review_memory=review_memory,
             ),
             max_turns=4,
@@ -1836,10 +2419,15 @@ class ClaudeFixAgent:
             explicit_model=agent.model,
         )
         review_decision = cls._parse_role_decision(
-            raw_text=review_run.response_text,
+            raw_text=review_run.response_text or review_run.agent_error or "",
             allowed_decisions=("approve", "retry"),
             fallback_decision="retry",
             fallback_summary="Review 子Agent 未给出可用结论。",
+        )
+        review_decision = cls._stabilize_review_decision(
+            issue=issue,
+            patch_summary=patch_summary,
+            decision=review_decision,
         )
         review_memory = append_child_agent_memory_turn(
             review_memory,
@@ -1887,7 +2475,7 @@ class ClaudeFixAgent:
                     "findings": list(review_decision.findings),
                     "constraints": list(review_decision.constraints),
                 },
-                working_memory=working_memory,
+                working_memory=review_working_memory,
                 main_memory=main_memory,
             ),
             max_turns=3,
@@ -1895,10 +2483,14 @@ class ClaudeFixAgent:
             explicit_model=agent.model,
         )
         main_decision = cls._parse_role_decision(
-            raw_text=main_run.response_text,
+            raw_text=main_run.response_text or main_run.agent_error or "",
             allowed_decisions=("compile", "retry"),
             fallback_decision="retry",
             fallback_summary="Main 裁决未批准进入编译阶段。",
+        )
+        main_decision = cls._stabilize_main_decision(
+            review_decision=review_decision,
+            decision=main_decision,
         )
         main_memory = append_child_agent_memory_turn(
             main_memory,

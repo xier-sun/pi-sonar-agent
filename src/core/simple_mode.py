@@ -5,7 +5,6 @@ from __future__ import annotations
 from pi_sonar_agent.core.project_env import read_project_env
 
 SIMPLE_LOOP_EXECUTION_MODE = "simple_loop"
-STRICT_EXECUTION_MODE = SIMPLE_LOOP_EXECUTION_MODE
 
 
 def normalize_execution_mode(
@@ -15,10 +14,9 @@ def normalize_execution_mode(
 ) -> str:
     """Normalize configured execution mode to the only supported runtime mode."""
 
-    normalized = str(value or "").strip().lower()
-    if normalized in {SIMPLE_LOOP_EXECUTION_MODE, "strict"}:
-        return SIMPLE_LOOP_EXECUTION_MODE
-    return SIMPLE_LOOP_EXECUTION_MODE if not str(default or "").strip() else SIMPLE_LOOP_EXECUTION_MODE
+    del value
+    del default
+    return SIMPLE_LOOP_EXECUTION_MODE
 
 
 def resolve_execution_mode(agent_env: dict[str, str] | None = None) -> str:

@@ -152,7 +152,7 @@
 - [src/core/issue_retry.py](../src/core/issue_retry.py) 会在每个 issue 开始前建立工作区基线
 - 当前 issue 失败时只回滚本 issue 改动
 - 之前成功 issue 的改动必须保留
-- 单 issue 默认最多重试 3 次
+- 单 issue 默认最多重试 5 次
 
 ## 8. “有改动”不等于“修复成功”
 

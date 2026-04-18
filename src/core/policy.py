@@ -174,11 +174,6 @@ class ToolPolicy:
         re.compile(r"(?im)\btouch\b"),
         re.compile(r"(?m)(?<![<\d])>(?![&])"),
     )
-    _BUILD_SHELL_PATTERNS = (
-        re.compile(r"(?i)\bdotnet\s+(?:build|restore|test)\b"),
-        re.compile(r"(?i)\bmsbuild\b"),
-        re.compile(r"(?i)\bnuget\s+restore\b"),
-    )
     _HARMLESS_SHELL_COMMANDS = frozenset(
         {
             "cd",
@@ -333,13 +328,6 @@ class ToolPolicy:
         return any(pattern.search(normalized_command) for pattern in cls._BASH_CREATE_COMMAND_MARKERS)
 
     @classmethod
-    def _is_build_shell_command(cls, command: str) -> bool:
-        normalized_command = str(command or "").strip()
-        if not normalized_command:
-            return False
-        return any(pattern.search(normalized_command) for pattern in cls._BUILD_SHELL_PATTERNS)
-
-    @classmethod
     def _is_harmless_shell_command(cls, command: str) -> bool:
         normalized_command = str(command or "").strip()
         if not normalized_command:
@@ -375,16 +363,6 @@ class ToolPolicy:
             command = self._normalize_shell_command(payload)
             scoped_rules = self._scoped_rules.get(normalized_tool_name, ())
             if normalized_tool_name in self._allowed_lookup or normalized_tool_name in self._scoped_rules:
-                if self._is_build_shell_command(command):
-                    return ToolDecision(
-                        tool_name=normalized_tool_name,
-                        allowed=False,
-                        kind=spec.kind,
-                        tags=spec.tags,
-                        reason="Build/test commands are controlled by the outer workflow; do not run dotnet build/restore/test from Bash.",
-                        policy_violation=True,
-                        severity="critical",
-                    )
                 if self._allows_bash_file_creation(command, scoped_rules=scoped_rules):
                     return ToolDecision(
                         tool_name=normalized_tool_name,

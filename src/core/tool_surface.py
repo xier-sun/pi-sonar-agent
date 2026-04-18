@@ -6,7 +6,7 @@ from collections.abc import Iterable
 
 from pi_sonar_agent.core.project_env import read_project_env
 
-BASE_BUILTIN_FIX_TOOLS = ("Read", "Edit", "MultiEdit", "Write")
+BASE_BUILTIN_FIX_TOOLS = ("Read", "Grep", "Glob", "Edit", "MultiEdit", "Write")
 CREATE_FILE_TOOL = "Write"
 CONTROLLED_BASH_TOOL = "Bash"
 CONTROLLED_SHELL_DISPLAY_NAME = "Bash"
@@ -101,14 +101,9 @@ def render_controlled_bash_prompt_constraints(
     )
     constraints = [
         "如果使用 shell 工具（工具名 Bash），请只写 bash 兼容命令；不要写 PowerShell 或 CMD 语法。",
-        "允许使用 Bash 做搜索、查看、诊断、echo 等无害操作。",
-        "如果路径不确定，优先使用 prompt 中给出的仓库相对路径候选；不要靠手工拼接仓库根目录反复试错。",
-        "优先使用单条无副作用的诊断命令；不要把 Bash 当成源码编辑器。",
+        "优先直接对给出的仓库相对路径使用 Read/Edit/Write；路径不确定时先用 Glob/Grep，再用 Bash 做搜索或诊断。",
+        "允许使用 Bash 做搜索、查看、诊断等无副作用操作；不要把 Bash 当成源码编辑器。",
     ]
-    if not allow_build_commands:
-        constraints.append(
-            "不要在 Bash 中执行 dotnet restore/build/test、msbuild 或 nuget restore；构建与验证由外层流程统一执行。"
-        )
     if allow_file_creation and normalized_roots:
         constraints.append(
             "如果需要创建尚不存在的新文件，允许使用 Write 工具，但新文件只能落在声明目录内。"

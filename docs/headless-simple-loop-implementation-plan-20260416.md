@@ -40,7 +40,7 @@
   - 已新增 `ISSUE_EXECUTION_MODE`
   - 已新增 `src/core/simple_mode.py`
   - 已把 `execution_mode` 接入 `EditContract`、planner、agent、artifact
-  - 当前以 `opt-in` 方式接入，默认仍保持 `strict`，避免一次性切默认行为带来大回归
+  - 当前代码已统一收口到 `simple_loop`，`strict` 仅作为历史实施记录，不再是有效执行模式
 - `已完成` `P0-2` build-first verifier 主链
   - `simple_loop` 下已切换为 `boundary -> build -> post_check`
   - 已关闭 `semantic_precheck / propagation / quality_gate / rule_validation / fast_compile` 的 build 前阻断
@@ -86,9 +86,9 @@
 - `已完成` `P2-2` 规则族修复手册
   - 已新增 `docs/sonar-fix-playbook.md`
   - simple-loop prompt 已接入按规则族抽取的自检 guidance
-- `已完成` `P2-3` strict/simple 目录进一步隔离
-  - 已新增 `src/core/strict/` 兼容入口
-  - 已把 `semantic_precheck / propagation_verifier / review_gate / repair_plan / failure_fingerprint / lessons_store` 明确标记为 strict 侧能力
+- `已完成` `P2-3` 历史 strict 残留收口
+  - 历史 `src/core/strict/` 兼容入口已删除
+  - `semantic_precheck / propagation_verifier / review_gate / repair_plan / failure_fingerprint / lessons_store` 已回归主实现或退出 simple-loop 主链
   - 现阶段保留旧 import 路径兼容，避免一次性大重构破坏现有调用方
 - `已完成` `P2-4` helper-extract 降级闭环修复
   - `allowed_change_kinds` 已受 `allowed_capabilities` 约束；禁用 `helper_extract` 后不再向模型暴露 `extract-private-helper`
@@ -154,7 +154,7 @@
   - 已去掉 helper/scope/同文件漂移等本地 contract 审核
   - 本地 `FixVerifier` 已降为“filesystem boundary + build”，不再承担本地 semantic/quality/review_gate 判决
 - `已完成` `P3-5` 编译重试上限收紧
-  - `DEFAULT_MAX_BUILD_RETRIES` 已从 `5` 收紧为 `3`
+  - `DEFAULT_MAX_BUILD_RETRIES` 当前默认为 `5`
   - 超过 3 轮编译仍失败时，外层继续按 issue baseline 回滚并跳过
 
 本轮新增验证：
@@ -439,19 +439,15 @@
 
 ## 6. 新的执行模式
 
-建议新增统一模式：
+当前统一模式：
 
 - `ISSUE_EXECUTION_MODE=simple_loop`
 
 目标：
 
-1. 不推翻现有复杂模式
-2. 默认走最简闭环时用 `simple_loop`
-3. 保守验证或批量审计场景再回到 `strict` 模式
-
-建议同时保留：
-
-- `ISSUE_EXECUTION_MODE=strict`
+1. 只保留最简闭环主链
+2. 所有 issue 修复统一走 `simple_loop`
+3. 历史 strict 文案仅保留在实施记录中，不再作为运行选项
 
 ### 6.1 simple_loop 的行为
 
@@ -463,16 +459,9 @@
 4. 轻量 issue 校验和新阻塞检查取代大量 build 前门禁
 5. retry feedback 只保留“修当前 issue 所需的关键信息”
 
-### 6.2 strict 的行为
+### 6.2 历史说明
 
-`strict` 保留现有工程能力，但不作为默认主链。
-
-适用场景：
-
-1. 高风险规则
-2. 多文件传播
-3. 大范围签名重构
-4. 离线审查/回放
+此前文档中出现的 `strict` 相关描述属于历史实施记录。当前代码已经移除 `strict` 运行模式和对应兼容壳，运行时只保留 `simple_loop`。
 
 ---
 

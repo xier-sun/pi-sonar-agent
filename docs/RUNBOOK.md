@@ -337,7 +337,7 @@ OPENAI_MODEL=glm-4.7
 4. 运行 issue 级构建验证
 5. 运行 scope/diff reviewer
 6. 失败时只回滚当前 issue 的改动
-7. 最多重试 3 次
+7. 最多重试 5 次
 
 ### 6.3 整轮运行
 
