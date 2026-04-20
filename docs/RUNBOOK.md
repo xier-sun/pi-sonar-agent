@@ -18,6 +18,7 @@
 - `dotnet` 可用，且目标仓库能在本机正常构建
 - 能访问 SonarQube
 - 能访问 Azure DevOps 仓库和 PR API
+- 已安装 Claude Code CLI，并且当前用户能正常运行 `claude --version`
 
 ## 2. 安装
 
@@ -52,7 +53,7 @@ python3 -m pip install -e ".[dev]"
 
 ### 3.1 `.env`
 
-至少需要这些变量：
+最少需要这些变量：
 
 - `SONARQUBE_HOST`
 - `SONARQUBE_TOKEN`
@@ -70,13 +71,12 @@ python3 -m pip install -e ".[dev]"
 - `SOLUTION_PATH`
 - `MAX_ISSUES`
 - `ISSUE_GUARDRAIL_MODE`
+- `ISSUE_EXECUTION_MODE`
 
-`ISSUE_GUARDRAIL_MODE` 支持：
+注意：
 
-- `scope`
-- `contract_review`
-
-未设置时默认是 `scope`。
+- `ISSUE_EXECUTION_MODE` 当前会被规范化为 `simple_loop`，其他值不会开启旧执行分支。
+- `ISSUE_GUARDRAIL_MODE` 支持 `scope` 和 `contract_review`，默认值是 `scope`。
 
 ### 3.2 模型配置
 
@@ -84,27 +84,66 @@ python3 -m pip install -e ".[dev]"
 
 #### Anthropic 兼容配置
 
+优先推荐显式使用 `ANTHROPIC_API_KEY`：
+
+```env
+ANTHROPIC_BASE_URL=https://your-gateway/api/anthropic
+ANTHROPIC_API_KEY=your_key
+ANTHROPIC_DEFAULT_SONNET_MODEL=glm-5
+```
+
+#### 只提供 `ANTHROPIC_AUTH_TOKEN` 的场景
+
 ```env
 ANTHROPIC_BASE_URL=https://your-gateway/api/anthropic
 ANTHROPIC_AUTH_TOKEN=your_token
-ANTHROPIC_DEFAULT_SONNET_MODEL=glm-4.7
+ANTHROPIC_DEFAULT_SONNET_MODEL=glm-5
 ```
+
+当前实现的注意事项：
+
+- 对第三方 `ANTHROPIC_BASE_URL`，自动化链路会走 Claude Code CLI 的 `bare` 模式。
+- 当前第三方兼容逻辑可能把 `ANTHROPIC_AUTH_TOKEN` 桥接成 `ANTHROPIC_API_KEY`。
+- 因此本地交互式 Claude Code 和自动化 bare 链路不一定完全等价。
+
+如果你本地 `claude` 能用，但自动化日志里出现 `401 authentication_failed`：
+
+1. 优先显式配置 `ANTHROPIC_API_KEY`
+2. 核对 `ANTHROPIC_BASE_URL` 是否真的是 Anthropic-compatible endpoint
+3. 再看 provider 是否接受 `x-api-key` 这套认证，而不是别的私有头
 
 #### OpenAI 风格代理
 
 ```env
 OPENAI_API_KEY=your_key
 OPENAI_BASE_URL=https://your-gateway/api/coding/paas/v4
-OPENAI_MODEL=glm-4.7
+OPENAI_MODEL=glm-5
 ```
 
-系统会自动把 `OPENAI_*` 转成 Claude SDK 可消费的 `ANTHROPIC_*` 兼容变量。
+系统会自动把 `OPENAI_*` 转成 Claude SDK 可消费的兼容 `ANTHROPIC_*` 变量。
 
-### 3.3 `data/targets.json`
+### 3.3 可选 Review Gate 配置
 
-`targets.json` 的根节点必须是一个数组。每个元素代表一个 target，也就是“一个 Sonar 项目 + 一个 ADO 仓库 + 一个作者过滤条件”的组合。
+如果希望 patch 审核走独立模型链路，可配置：
 
-- 零参数运行 `run.py` 时，只会读取数组中的第一个 target 作为默认值
+- `PI_SONAR_REVIEW_GATE_ENABLED`
+- `PI_SONAR_REVIEW_GATE_BASE_URL`
+- `PI_SONAR_REVIEW_GATE_API_KEY`
+- `PI_SONAR_REVIEW_GATE_AUTH_TOKEN`
+- `PI_SONAR_REVIEW_GATE_MODEL`
+- `PI_SONAR_REVIEW_GATE_TIMEOUT_SECONDS`
+
+说明：
+
+- Review gate 默认开启。
+- 如果未显式配置 review gate 模型，会回退到主修复模型。
+- Review gate 可以和主修复模型使用不同 provider / key。
+
+### 3.4 `data/targets.json`
+
+`targets.json` 的根节点必须是数组。每个元素代表一个 target，也就是“一个 Sonar 项目 + 一个 ADO 仓库 + 一个作者过滤条件”的组合。
+
+- 零参数运行 `run.py` 时，只会读取数组中的第一个 target
 - 批量运行 `python -m pi_sonar_agent.batch_runner data\targets.json` 时，会遍历整个数组
 
 推荐示例：
@@ -130,101 +169,37 @@ OPENAI_MODEL=glm-4.7
 
 #### 必填字段
 
-下面 3 个字段是 target 的最小闭环，缺任意一个都会在启动时直接失败：
-
 - `project_key`
-  含义：SonarQube 项目 Key，用来拉取该项目的 open issues。
-  用法：必须和 SonarQube 中项目的真实 key 一致。
-  示例：`"project_key": "Neware_BI_60e40c96-7c07-478e-a859-a65a1afd6af0"`
-
 - `repository`
-  含义：Azure DevOps 仓库名，用来查询远端地址、clone 仓库、创建分支和 PR。
-  用法：填 ADO 仓库名，不是本地目录名，也不是完整 URL。
-  示例：`"repository": "BI"`
-
 - `author`
-  含义：Sonar issue 的作者过滤条件，只处理该作者关联的 issues。
-  用法：通常填邮箱；系统会把它作为本轮 issue 拉取条件。
-  示例：`"author": "pengxiru@neware.com.cn"`
 
-#### 可选字段
+#### 常用可选字段
 
 - `reviewer_email`
-  含义：PR 审阅人邮箱。
-  用法：如果提供，创建 PR 后会尝试解析成 ADO 身份并加为 reviewer。
-  默认：空字符串，表示不强制指定 reviewer。
-  说明：单目标入口和批量入口都优先读取 `targets.json` 里的这个值。
-
 - `dingtalk_userid`
-  含义：钉钉接收人 userId。
-  用法：如果配置了钉钉通知能力，会优先尝试把通知发给这个 userId。
-  默认：空字符串，表示由数据库映射或 webhook 回退逻辑决定。
-  说明：单目标入口和批量入口都优先读取 `targets.json` 里的这个值。
-
+- `issue_keys`
 - `max_issues`
-  含义：本轮最多处理多少个 issue。
-  用法：用于限制单个 target 的处理规模，便于小批量试跑。
-  示例：`"max_issues": 30`
-  默认：
-  单目标入口中，未配置时默认 `0`，表示不限制。
-  批量入口中，未配置时默认 `3`，表示每个 target 最多处理 3 个 issue。
-
 - `base_branch`
-  含义：仓库基线分支。
-  用法：系统会直接按这个分支做初始 clone、创建修复分支，并把 PR 合并目标指向它。
-  示例：`"base_branch": "develop"` 或 `"base_branch": "main"`
-  默认：`develop`
-  说明：当前 `base_branch` 不从 `.env` 读取；单目标入口可以被 CLI `--base-branch` 覆盖。
-
 - `build_command`
-  含义：构建命令。
-  用法：用于单 issue 修复后的本地构建验证，以及最终 PR 前构建验证。
-  示例：`"build_command": "dotnet build"`
-  默认：未配置时会回退到 `dotnet build`
-
 - `test_command`
-  含义：测试命令。
-  用法：在最终构建验证阶段，如果提供了这个字段，系统会在 build 之后继续跑测试。
-  示例：`"test_command": "dotnet test"`
-  默认：空，表示不额外跑测试命令。
-
 - `solution_path`
-  含义：`.sln` 或 `.csproj` 的相对路径。
-  用法：用于帮助 build/test 在正确的解决方案或项目范围内运行，也会进入 PR 说明和运行报告。
-  示例：`"solution_path": "OpenAuth.Core/OpenAuth.Core.WebApi.sln"`
-  默认：空，表示直接在仓库工作区根目录运行构建命令。
 
 #### 仅批量入口生效的字段
 
-下面两个字段不会进入 `TargetConfig`，而是由批量入口 [src/batch_runner.py](../src/batch_runner.py) 直接读取：
-
 - `keep_workspace`
-  含义：是否保留该 target 的工作区。
-  用法：设为 `true` 时，本轮批量运行结束后保留工作区，便于人工排查和复现。
-  示例：`"keep_workspace": true`
-  默认：`false`
-  说明：单目标入口要保留工作区时，请用 CLI 参数 `--keep-workspace`，而不是依赖 `targets.json`。
-
 - `skip_build_gate`
-  含义：是否跳过最终 build/test gate。
-  用法：设为 `true` 时，该 target 在批量模式下会跳过最终构建校验。
-  示例：`"skip_build_gate": true`
-  默认：`false`
-  说明：单目标入口要跳过最终构建校验时，请用 CLI 参数 `--skip-build`。
 
-#### 配置建议
+说明：
 
-- 布尔值优先用 JSON 原生 `true` / `false`
-- `keep_workspace`、`skip_build_gate` 即使用字符串 `"true"`、`"1"`、`"yes"`、`"on"` 目前也会被识别，但不建议依赖这个兼容行为
-- 同一个仓库如果在多个 target 中重复出现，建议保持 `base_branch`、`solution_path`、`build_command` 一致，避免运行语义漂移
-- 如果只是本地单次调试，优先用 `run.py` CLI 参数覆盖，不要频繁改 `targets.json`
+- 单目标入口要保留工作区时，请用 CLI 参数 `--keep-workspace`
+- 单目标入口要跳过最终构建时，请用 CLI 参数 `--skip-build`
 
-### 3.4 可选数据库配置
+### 3.5 可选数据库配置
 
 如果需要：
 
 - MySQL 状态同步
-- 按 `author` 回查钉钉用户
+- 按 `author` 回查 DingTalk userId
 
 还可以在 `.env` 中配置：
 
@@ -235,16 +210,53 @@ OPENAI_MODEL=glm-4.7
 - `DB_NAME`
 - `DB_CONNECT_TIMEOUT`
 
-数据库不可用时不会阻塞主流程，系统会退回到本地 artifact 和事件日志。
+当前 userId 反查行为：
 
-### 3.5 可选钉钉配置
+- 只有在 `.env` 同时存在 `DB_HOST/DB_USER/DB_PASSWORD/DB_NAME` 时，系统才会创建 MySQL client
+- 查询 SQL 固定为：
+
+```sql
+SELECT UserId
+FROM erp4.dingtalkuserdetail
+WHERE Email = %s
+LIMIT 1
+```
+
+- 其中 `Email = %s` 的入参是 `targets.json` 中当前 target 的 `author`
+- 如果 `DB_*` 未配置，系统不会报错，而是直接跳过数据库反查，最终 `DingTalk UserId` 显示为 `unresolved`
+
+### 3.6 可选钉钉配置
 
 如果需要发送通知，可以配置其中一套：
 
 - 企业应用私信：`DINGTALK_APPKEY`、`DINGTALK_APPSECRET`、`DINGTALK_AGENTID`
 - 机器人 webhook：`DINGTALK_WEBHOOK`、`DINGTALK_SECRET`
 
-如果 target 中已经有 `dingtalk_userid`，系统会优先尝试企业应用私信；失败后再回退到 webhook。
+当前收件人解析优先级：
+
+1. `targets.json.dingtalk_userid`
+2. MySQL `author` 反查
+3. `unresolved`
+
+如果企业应用能力可用并且解析出了 `dingtalk_userid`，系统会优先尝试私信；否则走 webhook。
+
+### 3.7 常用运行时 / 性能开关
+
+常见环境变量：
+
+- `PI_SONAR_ENABLE_CONTROLLED_BASH`
+- `PI_SONAR_GIT_CLONE_DEPTH`
+- `PI_SONAR_REVIEW_GATE_ENABLED`
+- `PI_SONAR_PERF_FAST_PATH`
+- `PI_SONAR_PERF_FAST_PATH_MAX_TURNS`
+- `PI_SONAR_PERF_CONTINUATION_RETRY`
+- `PI_SONAR_PERF_CONTINUATION_RETRY_LIMIT`
+
+当前默认值里几个容易关注的点：
+
+- issue turn floor 是 `16`
+- `fast_path_max_turns` 默认 `20`
+- `git_clone_depth` 默认 `50`
 
 ## 4. 配置优先级
 
@@ -255,7 +267,10 @@ OPENAI_MODEL=glm-4.7
 - `max_issues`: CLI > `.env` > `targets.json`
 - `base_branch`: CLI `--base-branch` > `targets.json.base_branch` > 默认值 `develop`
 
-注意：当前 `base_branch` 不从 `.env` 读取。
+注意：
+
+- `base_branch` 当前不从 `.env` 读取
+- `reviewer_email` / `dingtalk_userid` 当前优先取 `targets.json` 显式值
 
 ### 4.2 批量入口
 
@@ -263,7 +278,7 @@ OPENAI_MODEL=glm-4.7
 
 - `base_branch`: `target.base_branch` > 默认值 `develop`
 - `max_issues`: `target.max_issues` > 默认值 `3`
-- `keep_workspace` / `skip_build_gate`: 直接读取 target
+- `keep_workspace` / `skip_build_gate`: 直接读取当前 target
 
 ## 5. 运行方式
 
@@ -271,12 +286,6 @@ OPENAI_MODEL=glm-4.7
 
 ```powershell
 .\.venv\Scripts\python.exe run.py
-```
-
-或：
-
-```powershell
-.\.venv\Scripts\pi-sonar-agent.exe
 ```
 
 ### 5.2 单目标，临时覆盖参数
@@ -318,133 +327,124 @@ OPENAI_MODEL=glm-4.7
 
 ### 6.1 启动前校验
 
-正式入口会先做 preflight：
+启动阶段会统一校验：
 
-- 校验模型配置能否解析
-- 校验 `SONARQUBE_*`、`ADO_*` 必填变量
-- 校验工作区目录可写
-- 校验远端 `base_branch` 存在
+- 模型环境
+- Sonar / ADO 必填配置
+- 工作区可写
+- 远端 `base_branch` 存在
 
-如果这里失败，说明问题还没进入 issue 修复阶段。
+### 6.2 工作区准备
 
-### 6.2 单 issue
+每个 target 会：
 
-每个 issue 都会：
+1. 解析 reviewer 和 DingTalk 收件人
+2. 拉取指定作者的 Sonar issues
+3. 清理旧工作区
+4. 直接按生效 `base_branch` clone 仓库
 
-1. 保存 Git 工作区基线
-2. 生成 `EditContract`
-3. 调用模型修复
-4. 运行 issue 级构建验证
-5. 运行 scope/diff reviewer
-6. 失败时只回滚当前 issue 的改动
-7. 最多重试 5 次
+### 6.3 单 issue 尝试
 
-### 6.3 整轮运行
+每个 issue 会：
 
-整轮运行只会把“已保留下来并且最终构建通过”的改动推到分支和 PR。
+1. 建立 issue baseline
+2. 读取代码上下文
+3. 生成 `IssuePlan` 和 `EditContract`
+4. 组装 simple-loop prompt
+5. 执行 fix agent
+6. 外层统一运行 build / post-check / review gate
+7. 按结果决定成功、重试或跳过
 
-## 7. 输出内容
+### 6.4 最终交付
 
-### 7.1 日志
+所有 issue 结束后会：
 
-- `logs/runs/`: 整轮运行日志
-- `logs/issue_attempts/`: issue 级重试日志
+1. 跑最终构建
+2. 生成 PR 说明
+3. 推送修复分支
+4. 创建 PR
+5. 添加 reviewer
+6. 发送钉钉通知
 
-### 7.2 结构化工件
+## 7. 日志与工件
 
-- `logs/run_artifacts/<run_label>/run_summary.json`
-- `logs/run_artifacts/<run_label>/events.jsonl`
-- `logs/run_artifacts/<run_label>/targets/<repo>__<author>/target_summary.json`
-- `logs/issue_artifacts/<repo>/<run_label>/<issue>/attempt-xx/`
+关键目录：
 
-单个 attempt 目录下重点看：
+- `logs/runs/`: 整轮控制台日志
+- `logs/issue_attempts/`: 单 issue attempt 日志
+- `logs/run_artifacts/`: run / target summary 与 `events.jsonl`
+- `logs/issue_artifacts/`: prompt、patch、review/build 结果
+- `logs/follow_ups/`: incidental fix / technical debt follow-up
+- `logs/pr_descriptions/`: PR 描述本地副本
+- `.agent_workspaces/`: 当前工作区
 
-- `edit_contract.json`
-- `prompt_context.json`
-- `patch.diff`
-- `reviewer_result.json`
-- `build_result.json`
-- `attempt_summary.json`
+建议排障顺序：
 
-### 7.3 其他输出
-
-- `logs/follow_ups/`: reviewer 识别到的后续技术债
-- `logs/pr_descriptions/`: 本地 PR 说明副本；PR 创建成功后会作为附件上传到 Azure DevOps
-- `.agent_workspaces/`: 临时工作区
-
-## 8. 常见排障顺序
-
-建议按下面顺序排查：
-
-1. `logs/runs/run_<timestamp>.log`
+1. `logs/runs/<run_label>.log`
 2. `logs/run_artifacts/<run_label>/run_summary.json`
 3. `logs/run_artifacts/<run_label>/events.jsonl`
-4. `logs/issue_artifacts/<repo>/<run_label>/<issue>/attempt-xx/build_result.json`
-5. `logs/issue_artifacts/<repo>/<run_label>/<issue>/attempt-xx/reviewer_result.json`
-6. `logs/issue_attempts/<repo>_<issue_key>_<timestamp>.log`
-7. `.agent_workspaces/` 中保留下来的工作区
+4. `logs/issue_artifacts/<repo>/<run_label>/<issue>/`
+5. 保留下来的 `.agent_workspaces/`
 
-## 9. 常见问题
+## 8. 常见问题
 
-### 9.1 `缺少环境变量`
+### 8.1 `401 authentication_failed`
 
-先检查 `.env` 是否已加载，并确认运行的是仓库内虚拟环境：
+通常优先排查：
 
-```powershell
-.\.venv\Scripts\python.exe run.py
-```
+- `.env` 中的 `ANTHROPIC_BASE_URL`
+- 当前 provider 是否要求 `ANTHROPIC_API_KEY`
+- 当前运行是否在第三方 endpoint 下进入了 `bare` 模式
+- 本地交互式 Claude Code 和自动化 bare 链路是否使用了不同认证方式
 
-### 9.2 `远端基线分支不存在`
+如果日志里出现：
 
-说明 `base_branch` 配错了，或该分支在远端仓库中不存在。当前系统会在 clone 前就失败。
+- `mode=bare`
+- `apiKeySource=ANTHROPIC_API_KEY`
 
-### 9.3 `WORKSPACE_ROOT 不可写`
+优先显式配置 `ANTHROPIC_API_KEY`，不要只依赖 `ANTHROPIC_AUTH_TOKEN`。
 
-检查：
+### 8.2 `Reached maximum number of turns`
 
-- `WORKSPACE_ROOT` 是否指向了受限目录
-- 当前账号是否有写权限
-- 是否有杀毒软件或 IDE 占用
+这表示子 agent 在当前 attempt 内超过了回合上限，不是 `dotnet build` 的编译错误。
 
-### 9.4 `MSBUILD : error MSB1003`
+当前默认 turn floor 为 `16`，部分规则 profile 会更高。遇到该问题时，先看：
 
-通常说明没有配置 `solution_path`，或者 `build_command` 不能直接在仓库根运行。
+- 当前规则的实际修法是否收敛
+- 是否有无效工具调用或无效 Edit payload
+- 是否在 fix prompt 里反复小步搜索、迟迟不落 patch
 
-### 9.5 模型能连通，但迟迟没有返回
+### 8.3 `DingTalk UserId: (unresolved)`
 
-先看运行日志里的 timeout 信息；当前系统已经区分：
+这不一定代表数据库查询报错，常见原因有三类：
 
-- SDK 初始化超时
-- 首响应超时
-- 后续响应空闲超时
-- 单 issue 总时长超时
+1. `targets.json` 没有显式配置 `dingtalk_userid`
+2. `.env` 没有配置 `DB_HOST/DB_USER/DB_PASSWORD/DB_NAME`，所以数据库回查被直接跳过
+3. 数据库里 `erp4.dingtalkuserdetail` 没有匹配 `author` 邮箱的记录
 
-如果是第三方网关，请优先检查其对 Claude SDK 工具调用协议的兼容性。
+### 8.4 Review Gate 一直 `retry`
 
-### 9.6 patch 被 reviewer 拒绝
+优先看：
 
-说明当前改动超出了 `EditContract` 声明的文件或校验窗口。先看：
-
+- `review_gate_result`
+- `retry_context`
 - `reviewer_result.json`
-- `edit_contract.json`
-- `patch.diff`
 
-## 10. 本地验证命令
+Review gate 的职责是拦“方向不对但能编译”的 patch，尤其是 propagation、contract drift、规则未真正消除这类问题。
+
+### 8.5 SDK init 里工具比 request 少
+
+request snapshot 里会声明完整 fix tool surface，但第三方 provider / CLI init trace 可能只回部分工具。
+
+排障时请同时看：
+
+- request snapshot 里的 `tools` / `allowed_tools`
+- SDK `init` 里的 `tools`
+- 是否实际出现 `No such tool available` 或 provider 兼容限制
+
+## 9. 本地验证
 
 ```powershell
 .\.venv\Scripts\python.exe -m ruff check .
 .\.venv\Scripts\python.exe -m pytest -q
 ```
-
-如果只想先小流量试跑：
-
-```powershell
-.\.venv\Scripts\python.exe run.py --max-issues 1 --keep-workspace
-```
-
-## 11. 相关文档
-
-- [README.md](../README.md)
-- [PROJECT_GUIDE.md](../PROJECT_GUIDE.md)
-- [docs/ENGINEERING_MEMORY.md](ENGINEERING_MEMORY.md)
-- [docs/AGENT_REFACTOR_PLAN.md](AGENT_REFACTOR_PLAN.md)
