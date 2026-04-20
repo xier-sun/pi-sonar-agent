@@ -42,6 +42,8 @@
       "issue_validator": "s107_parameter_count",
       "self_check": [
         "优先做最小参数收敛，不要顺手重写业务逻辑。",
+        "S107 只有在目标方法最终签名参数总数 <=7 时才算完成；8/9 个参数仍然失败。",
+        "改完后重新读取目标方法声明并重数顶层参数，确认 <=7 后再结束。",
         "如果当前方法是 public/protected、接口实现或 override，默认先保守，不要贸然扩散签名。"
       ],
       "blocker_checks": [

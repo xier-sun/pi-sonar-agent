@@ -281,6 +281,8 @@ CLIENT_CONNECT_TIMEOUT_SECONDS = 60
 FIRST_RESPONSE_TIMEOUT_SECONDS = 120
 FOLLOW_UP_RESPONSE_TIMEOUT_SECONDS = 180
 ISSUE_HARD_TIMEOUT_SECONDS = 900
+S107_FIX_GUIDE_SOURCE_PATH = Path(__file__).resolve().parents[2] / "docs" / "s107-fix-guide.md"
+S107_FIX_GUIDE_WORKSPACE_RELATIVE_PATH = ".pi-sonar-agent-runtime/s107-fix-guide.md"
 
 
 # ============== Main Agent Class ==============
@@ -297,7 +299,7 @@ class ClaudeFixAgent:
         sonar_token: str,
         sonar_org: str | None = None,
         workspace_root: str = ".agent_workspaces",
-        max_turns: int = 10,
+        max_turns: int = 16,
         max_budget_usd: float = 5.0,
         agent_env: dict[str, str] | None = None,
         model: str | None = None,
@@ -406,6 +408,25 @@ class ClaudeFixAgent:
     @staticmethod
     def _attempt_state_root(workspace_path: Path) -> Path:
         return workspace_path / ".git" / "pi-sonar-agent-attempt-state"
+
+    @classmethod
+    def _sync_s107_fix_guide(cls, workspace_path: Path) -> str:
+        """Ensure the S107 guide is readable from the active fix workspace."""
+
+        source_path = S107_FIX_GUIDE_SOURCE_PATH
+        if not source_path.exists():
+            return ""
+        target_path = workspace_path / S107_FIX_GUIDE_WORKSPACE_RELATIVE_PATH
+        try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
+        except Exception:
+            return ""
+        return S107_FIX_GUIDE_WORKSPACE_RELATIVE_PATH
+
+    def _resolve_runtime_builtin_tools(self, workspace_path: Path) -> tuple[str, ...]:
+        del workspace_path
+        return build_fix_runtime_tools(include_create_file_tool=False)
 
     @staticmethod
     def _read_file_bytes(file_path: Path) -> bytes:
@@ -2185,6 +2206,7 @@ class ClaudeFixAgent:
         tool_policy: ToolPolicy,
         result_metadata: dict[str, Any],
         execution_schedule: Any,
+        runtime_builtin_tools: tuple[str, ...],
     ) -> FixResult:
         """Run the new main -> fix -> review -> compile orchestration flow."""
 
@@ -2227,7 +2249,7 @@ class ClaudeFixAgent:
             cwd=str(workspace_path),
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            tools=build_fix_runtime_tools(include_create_file_tool=False),
+            tools=runtime_builtin_tools,
             allowed_tools=tool_policy.allowed_tool_names(),
             max_turns=int(getattr(execution_schedule, "effective_max_turns", 8) or 8),
             max_budget_usd=agent.max_budget_usd,
@@ -2648,6 +2670,7 @@ class ClaudeFixAgent:
         *,
         mcp_tool_names: tuple[str, ...] | list[str] = (),
         workspace_path: Path | None = None,
+        runtime_builtin_tools: tuple[str, ...] | None = None,
     ) -> ToolPolicy:
         """Build the runtime tool policy for single-issue fix attempts."""
 
@@ -2655,6 +2678,7 @@ class ClaudeFixAgent:
             edit_contract,
             mcp_tool_names=mcp_tool_names,
             workspace_path=workspace_path,
+            runtime_builtin_tools=runtime_builtin_tools,
         )
         return policy
 
@@ -2665,12 +2689,15 @@ class ClaudeFixAgent:
         *,
         mcp_tool_names: tuple[str, ...] | list[str] = (),
         workspace_path: Path | None = None,
+        runtime_builtin_tools: tuple[str, ...] | None = None,
     ) -> tuple[ToolPolicy, Any]:
         """Build the runtime tool policy plus the canonical visible toolset snapshot."""
 
         allow_file_creation = False
         allowed_new_file_roots: tuple[str, ...] = ()
-        runtime_builtin_tools = build_fix_runtime_tools(include_create_file_tool=False)
+        runtime_builtin_tools = runtime_builtin_tools or build_fix_runtime_tools(
+            include_create_file_tool=False
+        )
         registry = build_fix_tool_registry(
             runtime_builtin_tools,
             mcp_tool_names,
@@ -3364,12 +3391,16 @@ class ClaudeFixAgent:
             "issue_working_memory": working_memory,
         }
         sonar_mcp_runtime = build_sonar_mcp_runtime(self.agent_env)
+        runtime_builtin_tools = self._resolve_runtime_builtin_tools(workspace_path)
         tool_policy, visible_toolset = self._build_fix_tool_policy_bundle(
             edit_contract,
             mcp_tool_names=sonar_mcp_runtime.tool_names,
             workspace_path=workspace_path,
+            runtime_builtin_tools=runtime_builtin_tools,
         )
         result_metadata["visible_toolset"] = visible_toolset
+        if str(getattr(issue, "rule", "") or "").strip() == "csharpsquid:S107":
+            self._sync_s107_fix_guide(workspace_path)
 
         return self._run_role_orchestrated_flow(
             agent=self,
@@ -3388,6 +3419,7 @@ class ClaudeFixAgent:
             tool_policy=tool_policy,
             result_metadata=result_metadata,
             execution_schedule=execution_schedule,
+            runtime_builtin_tools=runtime_builtin_tools,
         )
 
         # Build prompts

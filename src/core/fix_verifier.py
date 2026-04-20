@@ -16,6 +16,7 @@ from pi_sonar_agent.core.quality_gate import QualityGateResult
 from pi_sonar_agent.core.review_gate import ReviewGateResult
 from pi_sonar_agent.core.scope_guard import IssueEditScope
 from pi_sonar_agent.core.semantic_precheck import SemanticPrecheckResult
+from pi_sonar_agent.core.simple_mode import is_simple_loop_execution_mode
 from pi_sonar_agent.core.simple_post_check import PostFixCheckResult, SimplePostCheck
 
 if TYPE_CHECKING:
@@ -398,6 +399,7 @@ class FixVerifier:
 
         build_passed = False
         build_output = ""
+        execution_mode = str(getattr(edit_contract, "execution_mode", "") or "").strip()
         boundary_outcome = BoundaryRuntime.review(
             issue_key=issue.key,
             rule_id=issue.rule,
@@ -447,7 +449,28 @@ class FixVerifier:
             )
             build_duration_seconds = time.monotonic() - build_started_at
 
-        combined_output_parts = [part for part in [build_output.strip(), guardrail_message] if part]
+        if (
+            build_passed
+            and current_issue_file_content is not None
+            and is_simple_loop_execution_mode(execution_mode)
+            and str(getattr(issue, "rule", "") or "").strip() == "csharpsquid:S107"
+        ):
+            post_fix_check_result = SimplePostCheck.review(
+                issue=issue,
+                current_issue_file_content=current_issue_file_content,
+                semantic_precheck_result=semantic_precheck_result,
+                quality_gate_result=quality_gate_result,
+            )
+
+        post_fix_retry_message = ""
+        if str(getattr(post_fix_check_result, "issue_status", "")).strip().upper() == "FAIL":
+            post_fix_retry_message = str(getattr(post_fix_check_result, "retry_message", "") or "").strip()
+
+        combined_output_parts = [
+            part
+            for part in [build_output.strip(), guardrail_message, post_fix_retry_message]
+            if part
+        ]
         combined_output = "\n\n".join(combined_output_parts)
 
         return VerificationOutcome(

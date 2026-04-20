@@ -44,6 +44,8 @@ SIMPLE_LOOP_SYSTEM_PROMPT = """你是一个严格的 .NET/C# 资深工程师，�
 - 不要输出长篇推理，不要做无关重构，不要顺手修其他 issue
 """
 
+S107_FIX_GUIDE_RELATIVE_PATH = ".pi-sonar-agent-runtime/s107-fix-guide.md"
+
 
 SIMPLE_LOOP_USER_PROMPT_TEMPLATE = """请只修复以下 SonarQube issue，并优先完成最小可编译修复。
 
@@ -248,6 +250,20 @@ class IssuePromptBuilder:
 
         policy = get_rule_policy(rule_id)
         guards: list[str] = []
+        normalized_rule_id = str(rule_id or "").strip()
+        if (
+            normalized_rule_id == "csharpsquid:S107"
+            and is_simple_loop_execution_mode(execution_mode)
+        ):
+            guards.extend(
+                (
+                    "本轮硬约束：S107 只有在目标方法最终签名参数总数降到 <=7 时才算修复完成；8/9 个参数都算失败。",
+                    "本轮硬约束：修改后必须重新读取目标方法声明并重数顶层参数，确认 <=7 再结束本轮。",
+                    "不要提交“方向正确但仍 >7 个参数”的半成品；tuple 合并或局部打包只有在最终签名 <=7 时才有效。",
+                    f"如果当前 S107 case 比较复杂（例如参数仍明显 >9、调用点不止一个、或存在多组 batch/preloaded/calculation state），先读取 `{S107_FIX_GUIDE_RELATIVE_PATH}` 再开始编辑。",
+                    "优先一次成型地完成上下文类型、目标方法签名、方法体参数访问和全部调用点修改；不要用一连串零碎 replace_all 把 turn 耗尽。",
+                )
+            )
         if retry_context is not None:
             retry_fingerprints = {
                 str(item).strip()

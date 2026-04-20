@@ -31,7 +31,7 @@ from pi_sonar_agent.core.issue_contract import EditContract
 from pi_sonar_agent.core.quality_gate import QualityGateRule
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.scope_guard import IssueEditScope
-from pi_sonar_agent.core.tool_surface import build_allowed_fix_tool_rules
+from pi_sonar_agent.core.tool_surface import build_allowed_fix_tool_rules, build_fix_runtime_tools
 from pi_sonar_agent.core.memory.child_agent_memory import create_initial_child_agent_memory
 from pi_sonar_agent.core.memory.issue_working_memory import IssueWorkingMemory
 
@@ -467,6 +467,84 @@ def test_fix_role_prompt_includes_minimal_quality_constraints() -> None:
     assert "【Review 门禁要点】" not in prompt
 
 
+def test_fix_role_prompt_adds_s107_hard_constraints() -> None:
+    issue = SonarIssue(
+        key="issue-fix-s107",
+        rule="csharpsquid:S107",
+        message="方法参数过多",
+        line=1778,
+        component="BI:OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = build_fix_role_user_prompt(
+        issue=issue,
+        code_context="1778 | private async Task ProcessSingleOrderInternal(...)",
+        file_path_candidates=("OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",),
+        working_memory=None,
+        fix_memory=None,
+        retry_feedback="",
+    )
+
+    assert "【当前规则的硬约束】" in prompt
+    assert "参数总数降到 <=7" in prompt
+    assert "8 个或 9 个参数仍然算失败" in prompt
+    assert "重新读取目标方法声明" in prompt
+    assert ".pi-sonar-agent-runtime/s107-fix-guide.md" in prompt
+    assert "先读取" in prompt
+
+
+def test_resolve_issue_max_turns_uses_global_floor_of_16() -> None:
+    agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
+    issue = SonarIssue(
+        key="issue-turn-floor",
+        rule="csharpsquid:S4487",
+        message="移除未读取的 private 字段",
+        line=8,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    assert agent._resolve_issue_max_turns(issue) == 16
+
+
+def test_sync_s107_fix_guide_writes_runtime_copy(tmp_path) -> None:
+    written = ClaudeFixAgent._sync_s107_fix_guide(tmp_path)
+
+    assert written == ".pi-sonar-agent-runtime/s107-fix-guide.md"
+    runtime_copy = tmp_path / ".pi-sonar-agent-runtime" / "s107-fix-guide.md"
+    assert runtime_copy.exists()
+    assert "S107 Fix Guide" in runtime_copy.read_text(encoding="utf-8")
+
+
+def test_review_role_prompt_adds_s107_count_gate() -> None:
+    issue = SonarIssue(
+        key="issue-review-s107",
+        rule="csharpsquid:S107",
+        message="方法参数过多",
+        line=869,
+        component="BI:OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueCalculationService.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = build_review_role_user_prompt(
+        issue=issue,
+        code_context="869 | private void ProcessAcceptanceAndQualityAssurance(...)",
+        patch_summary="target_method=ProcessAcceptanceAndQualityAssurance",
+        current_file_content="\n".join(f"line {index}" for index in range(1, 120)),
+        working_memory=None,
+        review_memory=None,
+    )
+
+    assert "【当前规则的审查要点】" in prompt
+    assert "只有当目标方法当前签名参数总数已 <=7 时才能 approve" in prompt
+    assert "方向正确" in prompt
+    assert "重数顶层参数个数" in prompt
+
+
 def test_build_patch_summary_focuses_on_issue_target_method() -> None:
     issue = SonarIssue(
         key="issue-patch-summary",
@@ -582,6 +660,35 @@ def test_main_role_prompt_uses_compile_gate_policy() -> None:
     assert "不重做 review，也不设计修法" in prompt
     assert "不要因为 XML 注释、sealed、static、中文注释等非当前 issue 必要项而拒绝进入编译" in prompt
     assert "如果 review 已 approve" in prompt
+
+
+def test_main_role_prompt_adds_s107_compile_gate() -> None:
+    issue = SonarIssue(
+        key="issue-main-s107",
+        rule="csharpsquid:S107",
+        message="方法参数过多",
+        line=1778,
+        component="BI:OpenAuth.Core/OpenAuth.App/Finance/HistoricalOverdueImportService.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = build_main_role_user_prompt(
+        issue=issue,
+        patch_summary="target_method=ProcessSingleOrderInternal\ncurrent_parameter_count=9",
+        review_result={
+            "decision": "approve",
+            "summary": "方向正确，但当前仍为 9 个参数。",
+            "findings": ["已合并部分参数"],
+            "constraints": [],
+        },
+        working_memory=None,
+        main_memory=None,
+    )
+
+    assert "【当前规则的编译门槛】" in prompt
+    assert "只有当目标方法当前签名参数总数已 <=7 时才允许 compile" in prompt
+    assert "方向正确但未达阈值" in prompt
 
 
 def test_build_user_prompt_renders_workspace_retry_references() -> None:
@@ -1582,6 +1689,19 @@ def test_claude_fix_tool_policy_bundle_exposes_write_for_create_file_contract(tm
     )
     assert rewrite_decision.allowed is True
     assert create_decision.allowed is False
+
+
+def test_resolve_runtime_builtin_tools_keeps_full_fix_toolset(tmp_path) -> None:
+    agent = ClaudeFixAgent(
+        sonar_host="https://sonar.example",
+        sonar_token="token",
+        agent_env={"ANTHROPIC_BASE_URL": "https://proxy.example/anthropic"},
+        model="MiniMax-M2.7",
+    )
+
+    assert agent._resolve_runtime_builtin_tools(tmp_path) == build_fix_runtime_tools(
+        include_create_file_tool=False
+    )
 
 
 def test_fix_issue_attaches_sonar_mcp_runtime_when_configured(monkeypatch, tmp_path) -> None:

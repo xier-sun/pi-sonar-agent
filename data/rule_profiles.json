@@ -274,9 +274,9 @@
       "requires_solution_path": true,
       "complexity_level": "complex",
       "agent_config": {
-        "max_turns": 12,
-        "max_token_budget": 320000,
-        "max_files": 8,
+        "max_turns": 20,
+        "max_token_budget": 256000,
+        "max_files": 10,
         "allowed_operations": ["read_file", "search_in_project", "get_file_outline", "apply_edit", "create_file", "list_files", "run_build", "finish"],
         "strategy_hint": "优先创建兼容当前仓库语言版本的参数对象，并同步更新当前 solution 内所有调用点；仅在仓库明确支持时才使用 record；遇到接口、端点、override 或 params/ref/out/in 风险时跳过。"
       }

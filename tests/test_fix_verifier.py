@@ -2104,6 +2104,81 @@ def test_fix_verifier_simple_loop_runs_build_before_post_check(monkeypatch, tmp_
     assert build_calls == ["build"]
 
 
+def test_fix_verifier_simple_loop_runs_s107_post_check(monkeypatch, tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-simple-loop-s107",
+        rule="csharpsquid:S107",
+        message="方法参数过多",
+        line=3,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    contract = EditContract(
+        issue_key=issue.key,
+        rule_id=issue.rule,
+        guardrail_mode="scope",
+        target_files=("src/Foo.cs",),
+        execution_mode="simple_loop",
+        validation_plan=("build",),
+    )
+    reviewed_changes = (
+        ReviewedFileChange(
+            file="src/Foo.cs",
+            changed_lines=(3,),
+            before_changed_lines=(3,),
+            after_changed_lines=(3,),
+            diff_text=(
+                "@@ -3,1 +3,1 @@\n"
+                "-    private void Process(int a, int b, int c, int d, int e, int f, int g, int h, int i)\n"
+                "+    private void Process(int a, int b, int c, int d, int e, int f, int g, int h)\n"
+            ),
+            hunk_count=1,
+        ),
+    )
+
+    build_calls: list[str] = []
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = "build ok"
+        stderr = ""
+
+    def fake_run(*args, **kwargs):
+        build_calls.append("build")
+        return FakeCompletedProcess()
+
+    monkeypatch.setattr("pi_sonar_agent.core.fix_verifier.subprocess.run", fake_run)
+
+    outcome = FixVerifier.evaluate_attempt(
+        issue=issue,
+        workspace_path=tmp_path,
+        build_command='dotnet build "src/Foo.sln"',
+        edit_contract=contract,
+        guardrail_mode="scope",
+        scope=None,
+        reviewed_changes=reviewed_changes,
+        current_issue_file_content="\n".join(
+            [
+                "class Foo",
+                "{",
+                "    private void Process(int a, int b, int c, int d, int e, int f, int g, int h)",
+                "    {",
+                "    }",
+                "}",
+            ]
+        )
+        + "\n",
+    )
+
+    assert outcome.build_invoked is True
+    assert outcome.build_passed is True
+    assert outcome.post_fix_check_result.issue_status == "FAIL"
+    assert "still exposes 8 parameters" in outcome.post_fix_check_result.issue_check.summary
+    assert "still exposes 8 parameters" in outcome.combined_output
+    assert build_calls == ["build"]
+
+
 def test_fix_verifier_runs_build_when_review_gate_waives_propagation(monkeypatch, tmp_path) -> None:
     issue = SonarIssue(
         key="issue-review-gate-pass",

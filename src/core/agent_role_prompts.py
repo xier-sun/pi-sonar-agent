@@ -17,6 +17,7 @@ from pi_sonar_agent.core.memory.issue_working_memory import (
 )
 
 QUALITY_GATE_SKILL_PATH = Path(r"C:\Users\neware\.claude\skills\csharp-quality-gate\SKILL.md")
+S107_FIX_GUIDE_RELATIVE_PATH = ".pi-sonar-agent-runtime/s107-fix-guide.md"
 
 
 def load_quality_gate_fix_digest() -> str:
@@ -70,6 +71,47 @@ def load_quality_gate_main_digest() -> str:
             "- 不要因为 XML 注释、sealed、static、中文注释等非当前 issue 必要项而拒绝进入编译。",
             "- 如果 review 已 approve，而 main 看不到新的明确 blocker，优先进入编译而不是继续空转。",
             "- decision=retry 时，constraints 只保留进入下一轮前最关键的 1-3 条约束。",
+        ]
+    )
+
+
+def _build_rule_specific_fix_requirements(issue: Any) -> str:
+    if str(getattr(issue, "rule", "") or "").strip() != "csharpsquid:S107":
+        return ""
+    return "\n".join(
+        [
+            "【当前规则的硬约束】",
+            "- S107 只有在目标方法最终签名参数总数降到 <=7 时才算修复完成；8 个或 9 个参数仍然算失败。",
+            "- 改完后必须重新读取目标方法声明，按顶层参数重新计数，确认 <=7 后再结束本轮。",
+            "- 不要提交“方向正确但仍未达阈值”的半成品；例如只合并两个参数但总数仍 >7，不算完成。",
+            f"- 遇到复杂 S107（例如参数仍明显 >9、调用点不止一个、或混有多组 batch/preloaded/calculation state）时，先读取 `{S107_FIX_GUIDE_RELATIVE_PATH}` 再动手。",
+            "- 如果当前方法是 private/internal 且调用点可控，优先收敛成同文件局部参数对象或私有上下文类型。",
+            "- 优先一次性完成上下文类型、目标方法签名、方法体参数访问和全部调用点更新；不要靠一连串零碎替换把 turns 耗尽。",
+        ]
+    )
+
+
+def _build_rule_specific_review_requirements(issue: Any) -> str:
+    if str(getattr(issue, "rule", "") or "").strip() != "csharpsquid:S107":
+        return ""
+    return "\n".join(
+        [
+            "【当前规则的审查要点】",
+            "- 对 S107，只有当目标方法当前签名参数总数已 <=7 时才能 approve。",
+            "- 如果当前签名仍然 >7，必须 retry；不要因为“方向正确”“已合并部分参数”或“编译通过”而放行。",
+            "- 请直接查看当前目标方法签名并重数顶层参数个数；tuple、局部变量或中间包装只按最终方法签名计数。",
+        ]
+    )
+
+
+def _build_rule_specific_main_requirements(issue: Any) -> str:
+    if str(getattr(issue, "rule", "") or "").strip() != "csharpsquid:S107":
+        return ""
+    return "\n".join(
+        [
+            "【当前规则的编译门槛】",
+            "- 对 S107，只有当目标方法当前签名参数总数已 <=7 时才允许 compile。",
+            "- 如果 review 或 patch 摘要已经表明“当前仍为 8/9 个参数”或“方向正确但未达阈值”，必须输出 retry。",
         ]
     )
 
@@ -176,6 +218,7 @@ def build_fix_role_user_prompt(
     primary_candidate = _select_primary_candidate(issue, file_path_candidates)
     retry_feedback_text = _summarize_fix_retry_feedback(retry_feedback)
     quality_gate = load_quality_gate_fix_digest()
+    rule_specific_requirements = _build_rule_specific_fix_requirements(issue)
     sections = [
         "请直接修复当前 Sonar issue。",
         "【当前问题】",
@@ -203,6 +246,8 @@ def build_fix_role_user_prompt(
                 quality_gate,
             ]
         )
+    if rule_specific_requirements:
+        sections.extend(["", rule_specific_requirements])
     if retry_feedback_text:
         sections.extend(
             [
@@ -240,6 +285,7 @@ def build_review_role_user_prompt(
     review_memory: ChildAgentMemory | None,
 ) -> str:
     quality_gate = load_quality_gate_review_digest()
+    rule_specific_requirements = _build_rule_specific_review_requirements(issue)
     target_excerpt = _build_review_target_excerpt(
         issue=issue,
         code_context=code_context,
@@ -273,6 +319,8 @@ def build_review_role_user_prompt(
                 quality_gate,
             ]
         )
+    if rule_specific_requirements:
+        sections.extend(["", rule_specific_requirements])
     sections.extend(
         [
             "",
@@ -385,6 +433,7 @@ def build_main_role_user_prompt(
     main_memory: ChildAgentMemory | None,
 ) -> str:
     quality_gate = load_quality_gate_main_digest()
+    rule_specific_requirements = _build_rule_specific_main_requirements(issue)
     sections = [
         "请裁决当前 patch 是否值得进入编译阶段。",
         "【当前问题】",
@@ -416,4 +465,6 @@ def build_main_role_user_prompt(
                 quality_gate,
             ]
         )
+    if rule_specific_requirements:
+        sections.extend(["", rule_specific_requirements])
     return "\n".join(section for section in sections if str(section).strip()).strip()

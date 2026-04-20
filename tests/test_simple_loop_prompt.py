@@ -55,6 +55,19 @@ def test_simple_loop_rule_guards_include_refactor_safety_constraints_without_ret
     assert section == ""
 
 
+def test_simple_loop_rule_guards_include_s107_parameter_threshold() -> None:
+    section = IssuePromptBuilder.build_rule_guard_section(
+        "csharpsquid:S107",
+        execution_mode="simple_loop",
+    )
+
+    assert "S107 只有在目标方法最终签名参数总数降到 <=7 时才算修复完成" in section
+    assert "重新读取目标方法声明并重数顶层参数" in section
+    assert "方向正确但仍 >7 个参数" in section
+    assert ".pi-sonar-agent-runtime/s107-fix-guide.md" in section
+    assert "先读取" in section
+
+
 def test_scope_guidance_does_not_suggest_helper_extract_when_capability_is_disabled() -> None:
     issue = type("Issue", (), {"rule": "csharpsquid:S3776"})()
     scope = IssueEditScope(
