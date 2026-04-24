@@ -6,9 +6,13 @@ from claude_agent_sdk import ResultMessage
 
 from pi_sonar_agent.agent.claude_agent import ClaudeFixAgent
 from pi_sonar_agent.core.model_env import (
+    abort_publish_enabled,
     build_agent_env,
+    build_issue_model_route,
     load_project_env,
+    resolve_model_tiers,
     resolve_agent_model,
+    second_pass_enabled,
     validate_agent_env,
 )
 
@@ -198,3 +202,62 @@ def test_extract_agent_error_uses_result_message_fields() -> None:
     assert (
         ClaudeFixAgent._extract_agent_error(message) == "Failed to authenticate | quota exhausted"
     )
+
+
+def test_build_issue_model_route_uses_tier_ladder_configuration(tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "PI_SONAR_MODEL_TIER1_ANTHROPIC_MODEL=claude-sonnet-4-6",
+                "PI_SONAR_MODEL_TIER1_ANTHROPIC_API_KEY=tier1-key",
+                "PI_SONAR_MODEL_TIER2_ANTHROPIC_MODEL=claude-opus-4-1",
+                "PI_SONAR_MODEL_TIER2_ANTHROPIC_API_KEY=tier2-key",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    tiers = resolve_model_tiers(env_file)
+    first_pass_route = build_issue_model_route(env_file, second_pass=False)
+    second_pass_route = build_issue_model_route(env_file, second_pass=True)
+
+    assert tiers["tier1"].explicit_model == "claude-sonnet-4-6"
+    assert tiers["tier2"].explicit_model == "claude-opus-4-1"
+    assert [item.explicit_model for item in first_pass_route] == [
+        "claude-sonnet-4-6",
+        "claude-opus-4-1",
+    ]
+    assert [item.explicit_model for item in second_pass_route] == [
+        "claude-opus-4-1",
+        "claude-sonnet-4-6",
+    ]
+    assert resolve_agent_model(env_file) == "claude-sonnet-4-6"
+    assert build_agent_env(env_file)["ANTHROPIC_MODEL"] == "claude-sonnet-4-6"
+
+
+def test_route_feature_flags_read_from_project_env(tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "PI_SONAR_SECOND_PASS_ENABLED=false",
+                "PI_SONAR_ABORT_PUBLISH_ENABLED=no",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert second_pass_enabled(env_file) is False
+    assert abort_publish_enabled(env_file) is False
+
+
+def test_build_issue_model_route_keeps_default_tier1_when_no_model_is_configured(tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("", encoding="utf-8")
+
+    route = build_issue_model_route(env_file, second_pass=False)
+
+    assert len(route) == 1
+    assert route[0].tier_name == "tier1"
+    assert route[0].explicit_model is None

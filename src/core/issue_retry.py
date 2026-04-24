@@ -2054,6 +2054,7 @@ def process_issue_with_retries(
     state_store: RunStateStore | None = None,
     lessons_store: LessonsStore | None = None,
     max_build_retries: int = DEFAULT_MAX_BUILD_RETRIES,
+    seed_retry_feedback: str = "",
 ) -> FixResult:
     """Retry a single issue fix on build failure, then roll back only that issue if needed."""
 
@@ -2072,12 +2073,14 @@ def process_issue_with_retries(
     active_retry_baseline = baseline
     best_s3776_candidate: _BestS3776Candidate | None = None
     retry_context: RetryContext | None = None
-    retry_feedback = ""
+    retry_feedback = str(seed_retry_feedback or "").strip()
     attempt_states: list[AttemptState] = []
     current_working_memory = (
         working_memory_store.load(issue.key) or create_initial_issue_working_memory(issue)
     )
     working_memory_store.save(current_working_memory)
+    if retry_feedback:
+        logger.write("Seed retry feedback for initial attempt:\n" + retry_feedback)
 
     def write_attempt_artifacts(
         *,

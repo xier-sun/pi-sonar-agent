@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pi_sonar_agent.core.run_coordinator as run_coordinator_module
 from pi_sonar_agent.agent.claude_agent import FixResult
+from pi_sonar_agent.core.model_env import ModelTierConfig
 from pi_sonar_agent.core.perf_flags import PerformanceFlags
 from pi_sonar_agent.core.preflight import RuntimeEnvironment
 from pi_sonar_agent.core.run_coordinator import RunCoordinator, TargetRunOptions
@@ -1151,3 +1152,580 @@ def test_run_target_filters_policy_skipped_rules_before_issue_limits(
     assert seen_issue_keys == ["keep-me"]
     output = capsys.readouterr().out
     assert "已排除 1 个策略跳过规则的 issues" in output
+
+
+def _patch_two_tier_model_route(monkeypatch, *, enable_second_pass: bool = True) -> tuple[ModelTierConfig, ModelTierConfig]:
+    import pi_sonar_agent.core.model_env as model_env_module
+
+    tier1 = ModelTierConfig(
+        tier_name="tier1",
+        explicit_model="tier1-model",
+        agent_env={"ANTHROPIC_MODEL": "tier1-model"},
+        configured=True,
+        source="test",
+    )
+    tier2 = ModelTierConfig(
+        tier_name="tier2",
+        explicit_model="tier2-model",
+        agent_env={"ANTHROPIC_MODEL": "tier2-model"},
+        configured=True,
+        source="test",
+    )
+    monkeypatch.setattr(
+        model_env_module,
+        "resolve_model_tiers",
+        lambda *args, **kwargs: {"tier1": tier1, "tier2": tier2},
+    )
+    monkeypatch.setattr(
+        model_env_module,
+        "build_issue_model_route",
+        lambda *args, **kwargs: (tier2, tier1) if kwargs.get("second_pass") else (tier1, tier2),
+    )
+    monkeypatch.setattr(
+        model_env_module,
+        "second_pass_enabled",
+        lambda *args, **kwargs: enable_second_pass,
+    )
+    monkeypatch.setattr(
+        model_env_module,
+        "abort_publish_enabled",
+        lambda *args, **kwargs: True,
+    )
+    return tier1, tier2
+
+
+def test_run_coordinator_retries_unresolved_issues_in_second_pass_with_tier2_first(
+    monkeypatch,
+    tmp_path,
+    capsys,
+) -> None:
+    runtime_env = RuntimeEnvironment(
+        sonar_host="https://sonar.example",
+        sonar_token="sonar-token",
+        sonar_org="sonar-org",
+        ado_base_url="https://dev.azure.com/acme",
+        ado_org="acme",
+        ado_project="pi",
+        ado_pat="ado-token",
+        workspace_root=tmp_path / "workspaces",
+    )
+    target_config = TargetConfig(
+        project_key="project-a",
+        repository="repo-a",
+        author="alice@example.com",
+        reviewer_email="",
+        dingtalk_userid="",
+        base_branch="develop",
+        base_branch_source="targets.json.base_branch",
+        build_command="dotnet build Foo.sln",
+        test_command=None,
+        solution_path="Foo.sln",
+        max_issues=1,
+    )
+
+    monkeypatch.setattr(run_coordinator_module, "ensure_workspace_writable", lambda workspace_root: None)
+    monkeypatch.setattr(run_coordinator_module, "ensure_remote_branch_exists", lambda **kwargs: None)
+    monkeypatch.setattr(
+        run_coordinator_module,
+        "prune_old_workspaces",
+        lambda workspace_root, keep_latest=1: SimpleNamespace(removed=(), failed=()),
+    )
+
+    class FakeArtifactWriter:
+        def write_target_state(self, target_state):
+            summary_path = tmp_path / "run-artifacts" / "target_summary.json"
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text("{}", encoding="utf-8")
+            return summary_path
+
+    monkeypatch.setattr(run_coordinator_module, "ArtifactWriter", FakeArtifactWriter)
+
+    class FakeGitRepositoryGateway:
+        def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
+            self.remote_url = remote_url
+
+        def clone_branch(self, workspace_path: Path, branch: str, *, depth: int | None = None) -> None:
+            workspace_path.mkdir(parents=True, exist_ok=True)
+
+        def install_local_excludes(self, workspace_path: Path) -> None:
+            return None
+
+        def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
+            raise AssertionError("publish_branch should not be called when skip_build is true")
+
+    monkeypatch.setattr(run_coordinator_module, "GitRepositoryGateway", FakeGitRepositoryGateway)
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    import pi_sonar_agent.core.db_client as db_client_module
+    import pi_sonar_agent.core.dingtalk as dingtalk_module
+    import pi_sonar_agent.core.issue_retry as issue_retry_module
+    import pi_sonar_agent.core.recipient_resolution as recipient_module
+    import pi_sonar_agent.fixers.build_gate as build_gate_module
+    import pi_sonar_agent.integrations.ado as ado_module
+    import pi_sonar_agent.integrations.sonar as sonar_module
+
+    _patch_two_tier_model_route(monkeypatch, enable_second_pass=True)
+    monkeypatch.setattr(db_client_module, "create_mysql_client_from_env", lambda: None)
+    monkeypatch.setattr(
+        recipient_module,
+        "resolve_recipients",
+        lambda **kwargs: SimpleNamespace(
+            reviewer_email="",
+            reviewer_source="author",
+            dingtalk_userid="",
+            dingtalk_source="author",
+        ),
+    )
+    monkeypatch.setattr(dingtalk_module, "create_dingtalk_client_from_env", lambda: None)
+    monkeypatch.setattr(build_gate_module, "resolve_build_command", lambda command, solution_path: command)
+
+    class FakeAdoClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_remote_url(self, repository: str) -> str:
+            return f"https://dev.azure.com/acme/project/_git/{repository}"
+
+    class FakeSonarClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_open_issues(self, project_key: str, author: str) -> list[dict]:
+            return [
+                {
+                    "key": "issue-1",
+                    "rule": "csharpsquid:S1125",
+                    "message": "first",
+                    "line": 10,
+                    "component": "project-a:src/Foo.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                }
+            ]
+
+    class FakeClaudeFixAgent:
+        def __init__(self, *args, **kwargs):
+            self.model = kwargs.get("model")
+
+    call_records: list[tuple[str, str]] = []
+
+    def fake_process_issue_with_retries(**kwargs):
+        call_records.append(
+            (
+                str(kwargs["agent"].model),
+                str(kwargs.get("seed_retry_feedback", "") or ""),
+            )
+        )
+        if kwargs["agent"].model == "tier1-model":
+            return FixResult(
+                success=False,
+                issue_key=kwargs["issue"].key,
+                file_path="src/Foo.cs",
+                error="Agent completed without modifying any files",
+                summary="No change",
+                attempts=5,
+                skipped=True,
+                skip_reason="No change after retries",
+                failure_kind="no_change",
+            )
+        return FixResult(
+            success=True,
+            issue_key=kwargs["issue"].key,
+            file_path="src/Foo.cs",
+            summary="Fixed on second pass",
+            attempts=1,
+            changes=[{"file": "src/Foo.cs"}],
+            build_passed=True,
+        )
+
+    monkeypatch.setattr(ado_module, "AzureDevOpsClient", FakeAdoClient)
+    monkeypatch.setattr(sonar_module, "SonarQubeClient", FakeSonarClient)
+    monkeypatch.setattr(claude_agent_module, "ClaudeFixAgent", FakeClaudeFixAgent)
+    monkeypatch.setattr(issue_retry_module, "process_issue_with_retries", fake_process_issue_with_retries)
+
+    coordinator = RunCoordinator(runtime_env)
+    result = coordinator.run_target(
+        target_config,
+        TargetRunOptions(run_label="20260423190000", show_banner=False, skip_build=True),
+    )
+
+    assert result.ok is True
+    assert result.successful == 1
+    assert result.skipped == 0
+    assert [item[0] for item in call_records] == ["tier1-model", "tier2-model"]
+    assert call_records[0][1] == ""
+    assert "第二轮增强修复交接" in call_records[1][1]
+    assert "第一轮最终状态: no_change" in call_records[1][1]
+    output = capsys.readouterr().out
+    assert "第二轮增强修复" in output
+
+
+def test_run_coordinator_fails_over_to_tier2_when_first_tier_times_out(
+    monkeypatch,
+    tmp_path,
+    capsys,
+) -> None:
+    runtime_env = RuntimeEnvironment(
+        sonar_host="https://sonar.example",
+        sonar_token="sonar-token",
+        sonar_org="sonar-org",
+        ado_base_url="https://dev.azure.com/acme",
+        ado_org="acme",
+        ado_project="pi",
+        ado_pat="ado-token",
+        workspace_root=tmp_path / "workspaces",
+    )
+    target_config = TargetConfig(
+        project_key="project-a",
+        repository="repo-a",
+        author="alice@example.com",
+        reviewer_email="",
+        dingtalk_userid="",
+        base_branch="develop",
+        base_branch_source="targets.json.base_branch",
+        build_command="dotnet build Foo.sln",
+        test_command=None,
+        solution_path="Foo.sln",
+        max_issues=1,
+    )
+
+    monkeypatch.setattr(run_coordinator_module, "ensure_workspace_writable", lambda workspace_root: None)
+    monkeypatch.setattr(run_coordinator_module, "ensure_remote_branch_exists", lambda **kwargs: None)
+    monkeypatch.setattr(
+        run_coordinator_module,
+        "prune_old_workspaces",
+        lambda workspace_root, keep_latest=1: SimpleNamespace(removed=(), failed=()),
+    )
+
+    class FakeArtifactWriter:
+        def write_target_state(self, target_state):
+            summary_path = tmp_path / "run-artifacts" / "target_summary.json"
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text("{}", encoding="utf-8")
+            return summary_path
+
+    monkeypatch.setattr(run_coordinator_module, "ArtifactWriter", FakeArtifactWriter)
+
+    class FakeGitRepositoryGateway:
+        def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
+            self.remote_url = remote_url
+
+        def clone_branch(self, workspace_path: Path, branch: str, *, depth: int | None = None) -> None:
+            workspace_path.mkdir(parents=True, exist_ok=True)
+
+        def install_local_excludes(self, workspace_path: Path) -> None:
+            return None
+
+        def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
+            raise AssertionError("publish_branch should not be called when skip_build is true")
+
+    monkeypatch.setattr(run_coordinator_module, "GitRepositoryGateway", FakeGitRepositoryGateway)
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    import pi_sonar_agent.core.db_client as db_client_module
+    import pi_sonar_agent.core.dingtalk as dingtalk_module
+    import pi_sonar_agent.core.issue_retry as issue_retry_module
+    import pi_sonar_agent.core.recipient_resolution as recipient_module
+    import pi_sonar_agent.fixers.build_gate as build_gate_module
+    import pi_sonar_agent.integrations.ado as ado_module
+    import pi_sonar_agent.integrations.sonar as sonar_module
+
+    _patch_two_tier_model_route(monkeypatch, enable_second_pass=False)
+    monkeypatch.setattr(db_client_module, "create_mysql_client_from_env", lambda: None)
+    monkeypatch.setattr(
+        recipient_module,
+        "resolve_recipients",
+        lambda **kwargs: SimpleNamespace(
+            reviewer_email="",
+            reviewer_source="author",
+            dingtalk_userid="",
+            dingtalk_source="author",
+        ),
+    )
+    monkeypatch.setattr(dingtalk_module, "create_dingtalk_client_from_env", lambda: None)
+    monkeypatch.setattr(build_gate_module, "resolve_build_command", lambda command, solution_path: command)
+
+    class FakeAdoClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_remote_url(self, repository: str) -> str:
+            return f"https://dev.azure.com/acme/project/_git/{repository}"
+
+    class FakeSonarClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_open_issues(self, project_key: str, author: str) -> list[dict]:
+            return [
+                {
+                    "key": "issue-1",
+                    "rule": "csharpsquid:S1125",
+                    "message": "first",
+                    "line": 10,
+                    "component": "project-a:src/Foo.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                }
+            ]
+
+    class FakeClaudeFixAgent:
+        def __init__(self, *args, **kwargs):
+            self.model = kwargs.get("model")
+
+    call_records: list[tuple[str, str]] = []
+
+    def fake_process_issue_with_retries(**kwargs):
+        call_records.append(
+            (
+                str(kwargs["agent"].model),
+                str(kwargs.get("seed_retry_feedback", "") or ""),
+            )
+        )
+        if kwargs["agent"].model == "tier1-model":
+            return FixResult(
+                success=False,
+                issue_key=kwargs["issue"].key,
+                file_path="src/Foo.cs",
+                error="Model response timed out",
+                summary="timeout",
+                attempts=5,
+                skipped=True,
+                skip_reason="Model response timed out",
+                failure_kind="model_timeout",
+                model_timeout_stage="first_response_timeout",
+            )
+        return FixResult(
+            success=True,
+            issue_key=kwargs["issue"].key,
+            file_path="src/Foo.cs",
+            summary="Recovered on fallback tier",
+            attempts=1,
+            changes=[{"file": "src/Foo.cs"}],
+            build_passed=True,
+        )
+
+    monkeypatch.setattr(ado_module, "AzureDevOpsClient", FakeAdoClient)
+    monkeypatch.setattr(sonar_module, "SonarQubeClient", FakeSonarClient)
+    monkeypatch.setattr(claude_agent_module, "ClaudeFixAgent", FakeClaudeFixAgent)
+    monkeypatch.setattr(issue_retry_module, "process_issue_with_retries", fake_process_issue_with_retries)
+
+    coordinator = RunCoordinator(runtime_env)
+    result = coordinator.run_target(
+        target_config,
+        TargetRunOptions(run_label="20260423191000", show_banner=False, skip_build=True),
+    )
+
+    assert result.ok is True
+    assert result.successful == 1
+    assert [item[0] for item in call_records] == ["tier1-model", "tier2-model"]
+    assert call_records[0][1] == ""
+    assert "模型切梯交接" in call_records[1][1]
+    assert "上一梯结果: model_timeout" in call_records[1][1]
+    output = capsys.readouterr().out
+    assert "切换到下一梯" in output
+
+
+def test_run_coordinator_publishes_partial_pr_after_model_outage_abort(
+    monkeypatch,
+    tmp_path,
+    capsys,
+) -> None:
+    runtime_env = RuntimeEnvironment(
+        sonar_host="https://sonar.example",
+        sonar_token="sonar-token",
+        sonar_org="sonar-org",
+        ado_base_url="https://dev.azure.com/acme",
+        ado_org="acme",
+        ado_project="pi",
+        ado_pat="ado-token",
+        workspace_root=tmp_path / "workspaces",
+    )
+    target_config = TargetConfig(
+        project_key="project-a",
+        repository="repo-a",
+        author="alice@example.com",
+        reviewer_email="",
+        dingtalk_userid="",
+        base_branch="develop",
+        base_branch_source="targets.json.base_branch",
+        build_command="dotnet build Foo.sln",
+        test_command=None,
+        solution_path="Foo.sln",
+        max_issues=0,
+    )
+
+    monkeypatch.setattr(run_coordinator_module, "ensure_workspace_writable", lambda workspace_root: None)
+    monkeypatch.setattr(run_coordinator_module, "ensure_remote_branch_exists", lambda **kwargs: None)
+    monkeypatch.setattr(
+        run_coordinator_module,
+        "prune_old_workspaces",
+        lambda workspace_root, keep_latest=1: SimpleNamespace(removed=(), failed=()),
+    )
+
+    class FakeArtifactWriter:
+        def write_target_state(self, target_state):
+            summary_path = tmp_path / "run-artifacts" / "target_summary.json"
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text("{}", encoding="utf-8")
+            return summary_path
+
+    monkeypatch.setattr(run_coordinator_module, "ArtifactWriter", FakeArtifactWriter)
+
+    publish_calls: list[tuple[str, str]] = []
+    captured: dict[str, object] = {}
+
+    class FakeGitRepositoryGateway:
+        def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
+            self.remote_url = remote_url
+
+        def clone_branch(self, workspace_path: Path, branch: str, *, depth: int | None = None) -> None:
+            workspace_path.mkdir(parents=True, exist_ok=True)
+            (workspace_path / "src").mkdir(parents=True, exist_ok=True)
+            (workspace_path / "src" / "Foo.cs").write_text("class Foo {}", encoding="utf-8")
+
+        def install_local_excludes(self, workspace_path: Path) -> None:
+            return None
+
+        def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
+            publish_calls.append((branch, commit_message))
+
+    monkeypatch.setattr(run_coordinator_module, "GitRepositoryGateway", FakeGitRepositoryGateway)
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    import pi_sonar_agent.core.db_client as db_client_module
+    import pi_sonar_agent.core.dingtalk as dingtalk_module
+    import pi_sonar_agent.core.issue_retry as issue_retry_module
+    import pi_sonar_agent.core.recipient_resolution as recipient_module
+    import pi_sonar_agent.fixers.build_gate as build_gate_module
+    import pi_sonar_agent.integrations.ado as ado_module
+    import pi_sonar_agent.integrations.sonar as sonar_module
+
+    _patch_two_tier_model_route(monkeypatch, enable_second_pass=False)
+    monkeypatch.setattr(db_client_module, "create_mysql_client_from_env", lambda: None)
+    monkeypatch.setattr(
+        recipient_module,
+        "resolve_recipients",
+        lambda **kwargs: SimpleNamespace(
+            reviewer_email="",
+            reviewer_source="author",
+            dingtalk_userid="",
+            dingtalk_source="author",
+        ),
+    )
+    monkeypatch.setattr(dingtalk_module, "create_dingtalk_client_from_env", lambda: None)
+    monkeypatch.setattr(
+        build_gate_module,
+        "run_local_build",
+        lambda *args, **kwargs: {
+            "succeeded": True,
+            "build_command": "dotnet build Foo.sln",
+            "test_command": "",
+        },
+    )
+    monkeypatch.setattr(build_gate_module, "resolve_build_command", lambda command, solution_path: command)
+    monkeypatch.setattr(build_gate_module, "format_build_failure_report", lambda *args, **kwargs: "")
+
+    class FakeAdoClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_remote_url(self, repository: str) -> str:
+            return f"https://dev.azure.com/acme/project/_git/{repository}"
+
+        def create_pull_request(
+            self,
+            repository: str,
+            title: str,
+            description: str,
+            source_branch: str,
+            target_branch: str = "develop",
+            reviewer_email: str | None = None,
+        ):
+            captured["title"] = title
+            captured["description"] = description
+            return SimpleNamespace(
+                pr_id=21,
+                url="https://dev.azure.com/acme/project/_git/repo-a/pullrequest/21",
+            )
+
+        def upload_pull_request_attachment(self, *args, **kwargs):
+            return SimpleNamespace(file_name="report.txt", url="https://dev.azure.com/report.txt")
+
+        def update_pull_request_description(self, *args, **kwargs):
+            return SimpleNamespace(pr_id=21)
+
+    class FakeSonarClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_open_issues(self, project_key: str, author: str) -> list[dict]:
+            return [
+                {
+                    "key": "issue-1",
+                    "rule": "csharpsquid:S1125",
+                    "message": "first",
+                    "line": 10,
+                    "component": "project-a:src/Foo.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                },
+                {
+                    "key": "issue-2",
+                    "rule": "csharpsquid:S1125",
+                    "message": "second",
+                    "line": 20,
+                    "component": "project-a:src/Foo.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                },
+            ]
+
+    class FakeClaudeFixAgent:
+        def __init__(self, *args, **kwargs):
+            self.model = kwargs.get("model")
+
+    def fake_process_issue_with_retries(**kwargs):
+        issue_key = kwargs["issue"].key
+        model = str(kwargs["agent"].model)
+        if issue_key == "issue-1":
+            return FixResult(
+                success=True,
+                issue_key=issue_key,
+                file_path="src/Foo.cs",
+                summary="Fixed the issue",
+                attempts=1,
+                changes=[{"file": "src/Foo.cs"}],
+                build_passed=True,
+            )
+        return FixResult(
+            success=False,
+            issue_key=issue_key,
+            file_path="src/Foo.cs",
+            error=f"{model} timed out",
+            summary="timeout",
+            attempts=5,
+            skipped=True,
+            skip_reason=f"{model} timed out",
+            failure_kind="model_timeout",
+            model_timeout_stage="first_response_timeout",
+        )
+
+    monkeypatch.setattr(ado_module, "AzureDevOpsClient", FakeAdoClient)
+    monkeypatch.setattr(sonar_module, "SonarQubeClient", FakeSonarClient)
+    monkeypatch.setattr(claude_agent_module, "ClaudeFixAgent", FakeClaudeFixAgent)
+    monkeypatch.setattr(issue_retry_module, "process_issue_with_retries", fake_process_issue_with_retries)
+
+    coordinator = RunCoordinator(runtime_env)
+    result = coordinator.run_target(
+        target_config,
+        TargetRunOptions(run_label="20260423192000", show_banner=False),
+    )
+
+    assert result.ok is False
+    assert result.successful == 1
+    assert result.pr_url.endswith("/21")
+    assert publish_calls
+    assert str(captured["title"]).startswith("Partial Fix:")
+    output = capsys.readouterr().out
+    assert "优先发布已修结果" in output

@@ -16,6 +16,7 @@ from typing import Any
 import anyio
 
 from pi_sonar_agent.core.attempt_changes import AttemptFileChangeBuilder
+from pi_sonar_agent.core.attempt_todo import AttemptTodoStore, build_todo_write_reminder
 from pi_sonar_agent.core.events import AttemptEventStream, AttemptRuntimeEventKind
 from pi_sonar_agent.core.hooks import AttemptFinalizeContext, HookPipeline, ToolCallContext
 from pi_sonar_agent.core.model_gateway import (
@@ -75,6 +76,8 @@ class AgentRuntimeResult:
     edit_nudge_count: int = 0
     successful_edit_count: int = 0
     invalid_write_tool_input_count: int = 0
+    todo_write_count: int = 0
+    todo_reminder_count: int = 0
     runtime_events: tuple[Any, ...] = ()
 
 
@@ -89,6 +92,13 @@ class AgentRuntimeError(RuntimeError):
 
 def _normalize_match_text(value: str) -> str:
     return " ".join(str(value or "").replace("\r\n", "\n").split())
+
+
+def _safe_positive_int(value: Any, default: int) -> int:
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return max(1, int(default))
 
 
 def _extract_invalid_write_tool_input_from_preview(preview: str) -> str:
@@ -453,6 +463,30 @@ class AgentRuntime:
         successful_edit_count = 0
         invalid_write_tool_input_count = 0
         invalid_write_tool_input_message = ""
+        todo_write_tool_name = normalize_tool_name(
+            str(request.metadata.get("todo_write_tool_name", "") or "")
+        )
+        todo_write_display_name = str(
+            request.metadata.get("todo_write_display_name", "") or "TodoWrite"
+        ).strip() or "TodoWrite"
+        todo_write_nag_threshold = _safe_positive_int(
+            request.metadata.get("todo_write_nag_threshold"),
+            default=3,
+        )
+        todo_write_max_reminders = _safe_positive_int(
+            request.metadata.get("todo_write_max_reminders"),
+            default=2,
+        )
+        todo_write_count = 0
+        todo_reminder_count = 0
+        non_todo_tool_results_since_write = 0
+        todo_issue_key = str(request.metadata.get("issue_key", "") or "").strip()
+        todo_role = str(request.metadata.get("todo_role", "") or "fix").strip() or "fix"
+        todo_store = (
+            AttemptTodoStore(Path(request.cwd), todo_issue_key, role=todo_role)
+            if todo_write_tool_name and todo_issue_key
+            else None
+        )
         def format_preview(value: str, *, max_chars: int = 1200) -> str:
             text = str(value or "").replace("\r\n", "\n").strip()
             if len(text) <= max_chars:
@@ -517,6 +551,9 @@ class AgentRuntime:
                 "mcp_mode",
                 "mcp_read_only",
                 "mcp_warning",
+                "todo_write_tool_name",
+                "todo_write_nag_threshold",
+                "todo_write_max_reminders",
             ):
                 value = request.metadata.get(key)
                 if value not in (None, ""):
@@ -664,6 +701,8 @@ class AgentRuntime:
                 edit_nudge_count=edit_nudge_count,
                 successful_edit_count=successful_edit_count,
                 invalid_write_tool_input_count=invalid_write_tool_input_count,
+                todo_write_count=todo_write_count,
+                todo_reminder_count=todo_reminder_count,
                 runtime_events=event_stream.snapshot(),
             )
 
@@ -786,6 +825,7 @@ class AgentRuntime:
 
         async def run_once() -> AgentRuntimeResult:
             nonlocal agent_error, assistant_text_chars, assistant_text_events, captured_exception, first_edit_at, saw_result_event, timeout_stage, pending_tool_result_name, last_edit_tool_name, last_edit_raw_payload, edit_nudge_count, consecutive_non_edit_calls, pending_edit_nudge, first_response_deadline_at, successful_edit_count, invalid_write_tool_input_count, invalid_write_tool_input_message
+            nonlocal todo_write_count, todo_reminder_count, non_todo_tool_results_since_write
 
             print("  [TRACE] 正在初始化 Claude SDK Client...", flush=True)
             update_status("client_connecting")
@@ -856,6 +896,45 @@ class AgentRuntime:
                     update_status("edit_nudge", first_response=True)
                     await session.send(nudge_message)
 
+                async def maybe_send_todo_reminder(trigger_stage: str) -> None:
+                    nonlocal non_todo_tool_results_since_write, todo_reminder_count
+                    if not todo_write_tool_name:
+                        return
+                    if non_todo_tool_results_since_write < todo_write_nag_threshold:
+                        return
+                    if todo_reminder_count >= todo_write_max_reminders:
+                        return
+                    reminder_state = None
+                    if todo_store is not None:
+                        try:
+                            reminder_state = todo_store.load()
+                        except Exception:
+                            reminder_state = None
+                    reminder_message = build_todo_write_reminder(
+                        tool_name=todo_write_tool_name,
+                        state=reminder_state,
+                        display_name=todo_write_display_name,
+                    )
+                    non_todo_tool_results_since_write = 0
+                    todo_reminder_count += 1
+                    print(
+                        "  [TRACE] TodoWrite reminder 已发送: "
+                        f"index={todo_reminder_count}, stage={trigger_stage}",
+                        flush=True,
+                    )
+                    event_stream.emit(
+                        AttemptRuntimeEventKind.TODO_REMINDER_SENT,
+                        stage=trigger_stage,
+                        payload={
+                            "index": todo_reminder_count,
+                            "threshold": todo_write_nag_threshold,
+                            "tool_name": todo_write_tool_name,
+                            "message": reminder_message,
+                        },
+                    )
+                    update_status("todo_reminder", first_response=True)
+                    await session.send(reminder_message)
+
                 async def finalize_pending_tool_result(
                     *,
                     preview: str = "",
@@ -864,6 +943,7 @@ class AgentRuntime:
                     nonlocal consecutive_non_edit_calls, pending_edit_nudge
                     nonlocal invalid_write_tool_input_count, invalid_write_tool_input_message
                     nonlocal agent_error
+                    nonlocal todo_write_count, non_todo_tool_results_since_write
 
                     tool_name = str(pending_tool_result_name or "").strip()
                     if not tool_name:
@@ -875,6 +955,17 @@ class AgentRuntime:
                         payload={"tool_name": tool_name},
                     )
                     pending_tool_result_name = None
+
+                    if todo_write_tool_name:
+                        if tool_name == todo_write_tool_name:
+                            todo_write_count += 1
+                            non_todo_tool_results_since_write = 0
+                            consecutive_non_edit_calls = 0
+                            pending_edit_nudge = False
+                            return False
+                        if tool_name != "Finish":
+                            non_todo_tool_results_since_write += 1
+                            await maybe_send_todo_reminder("tool_result")
 
                     if tool_name not in {"Edit", "MultiEdit", "Write"}:
                         await maybe_send_edit_nudge("tool_result")
@@ -985,6 +1076,9 @@ class AgentRuntime:
                         )
                         if tool_name in {"Edit", "MultiEdit", "Write"}:
                             pending_edit_nudge = False
+                        elif todo_write_tool_name and tool_name == todo_write_tool_name:
+                            pending_edit_nudge = False
+                            consecutive_non_edit_calls = 0
                         elif successful_edit_count <= 0:
                             consecutive_non_edit_calls += 1
                             if consecutive_non_edit_calls >= EDIT_NUDGE_THRESHOLD:
@@ -1125,6 +1219,8 @@ class AgentRuntime:
                     "edit_nudge_count": edit_nudge_count,
                     "successful_edit_count": successful_edit_count,
                     "invalid_write_tool_input_count": invalid_write_tool_input_count,
+                    "todo_write_count": todo_write_count,
+                    "todo_reminder_count": todo_reminder_count,
                     "warning_tool_uses": list(warning_tool_uses),
                 },
             )

@@ -136,6 +136,8 @@ def test_user_prompt_includes_working_memory_before_retry_feedback() -> None:
     assert "【当前工作记忆】" in prompt
     assert "当前工作区状态: issue_baseline" in prompt
     assert "【上次尝试的失败信息】" in prompt
+    assert "=== DYNAMIC_BOUNDARY ===" in prompt
+    assert "<system-reminder>" in prompt
     assert prompt.index("【当前工作记忆】") < prompt.index("【上次尝试的失败信息】")
 
 
@@ -249,7 +251,7 @@ def test_user_prompt_adds_compaction_boundary_after_retry_depth(tmp_path: Path) 
     assert result.issue_working_memory.compaction_generation == 1
 
 
-def test_user_prompt_places_durable_memory_after_retry_feedback() -> None:
+def test_user_prompt_surfaces_durable_memory_in_support_layer() -> None:
     edit_contract = EditContract(
         issue_key="ISSUE-4",
         rule_id="csharpsquid:S3776",
@@ -310,10 +312,11 @@ def test_user_prompt_places_durable_memory_after_retry_feedback() -> None:
         edit_contract=edit_contract,
     )
 
-    assert "【长期参考】" not in prompt
-    assert "避免再次提取 helper。" not in prompt
-    assert "避免再引入 async_without_await。" not in prompt
+    assert "【长期参考】" in prompt
+    assert "避免再次提取 helper。" in prompt
+    assert "避免再引入 async_without_await。" in prompt
     assert "【上次尝试的失败信息】" in prompt
+    assert prompt.index("【长期参考】") < prompt.index("=== DYNAMIC_BOUNDARY ===")
 
 
 def test_simple_loop_prompt_omits_heavy_sections_by_default() -> None:

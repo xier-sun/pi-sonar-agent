@@ -6,6 +6,7 @@ import json
 import shutil
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 from pi_sonar_agent.core.artifact_writer import ArtifactWriter
 from pi_sonar_agent.core.git_gateway import GitRepositoryGateway
@@ -58,6 +59,15 @@ class TargetRunResult:
     target_state: TargetState | None = None
 
 
+@dataclass(frozen=True)
+class _IssueExecutionRecord:
+    """Final execution record retained for one issue in the target summary."""
+
+    issue_payload: dict[str, Any]
+    sonar_issue: Any
+    result: Any
+
+
 class RunCoordinator:
     """Shared coordinator for single-target execution."""
 
@@ -77,7 +87,12 @@ class RunCoordinator:
         from pi_sonar_agent.core.db_client import create_mysql_client_from_env
         from pi_sonar_agent.core.dingtalk import create_dingtalk_client_from_env
         from pi_sonar_agent.core.issue_retry import process_issue_with_retries
-        from pi_sonar_agent.core.model_env import build_agent_env, resolve_agent_model
+        from pi_sonar_agent.core.model_env import (
+            abort_publish_enabled,
+            build_issue_model_route,
+            resolve_model_tiers,
+            second_pass_enabled,
+        )
         from pi_sonar_agent.core.pr_description import (
             PullRequestIssueSummary,
             build_local_pr_report_path,
@@ -117,6 +132,12 @@ class RunCoordinator:
         skipped = 0
         policy_skipped = 0
         issue_processing_started = False
+        issue_records: dict[str, _IssueExecutionRecord] = {}
+        issue_order: list[str] = []
+        abort_error = ""
+        abort_startup_failure = False
+        abort_before_first_issue = True
+        abort_publish_allowed = abort_publish_enabled()
 
         def finalize_target_result(result: TargetRunResult) -> TargetRunResult:
             rollout_flags = load_performance_flags().enabled_flags()
@@ -233,6 +254,360 @@ class RunCoordinator:
                     continue
             return summary, tuple(dict.fromkeys(item for item in findings if item)), drift_score
 
+        def mark_target_abort(*, error: str, startup_failure: bool = False) -> None:
+            nonlocal abort_error, abort_startup_failure, abort_before_first_issue
+            normalized_error = str(error).strip() or "target aborted"
+            if abort_error:
+                return
+            abort_error = normalized_error
+            abort_startup_failure = startup_failure
+            abort_before_first_issue = not issue_processing_started
+            self.state_store.record_target_aborted(
+                run_label=options.run_label,
+                project_key=target_config.project_key,
+                repository=target_config.repository,
+                author=target_config.author,
+                base_branch=target_config.base_branch,
+                total_issues=total_issues,
+                error=normalized_error,
+                before_first_issue=abort_before_first_issue,
+                startup_failure=startup_failure,
+                payload={
+                    "scope_audit_mode": "scope_soft_audit",
+                    "completed_issue_count": len(issue_states),
+                },
+            )
+            print(f"[ERR] target aborted: {normalized_error}")
+
+        def refresh_issue_rollup() -> list[PullRequestIssueSummary]:
+            nonlocal issue_states, successful, skipped, failed, policy_skipped
+            issue_states = [
+                record.result.issue_state
+                for issue_key in issue_order
+                for record in [issue_records[issue_key]]
+                if isinstance(record.result.issue_state, IssueState)
+            ]
+
+            summaries: list[PullRequestIssueSummary] = []
+            successful = 0
+            skipped = 0
+            failed = 0
+            policy_skipped = 0
+            for issue_key in issue_order:
+                record = issue_records[issue_key]
+                result = record.result
+                sonar_issue = record.sonar_issue
+                issue_payload = record.issue_payload
+                issue_rule = sonar_issue.rule
+                issue_line = sonar_issue.start_line or sonar_issue.line
+                file_path = sonar_issue.file_path.lstrip("/")
+                compliance_summary = build_compliance_summary(
+                    getattr(getattr(result, "edit_contract", None), "quality_gate_rules", ()),
+                    getattr(result, "quality_gate_result", None),
+                )
+                boundary_audit_summary, boundary_audit_findings, boundary_drift_score = extract_boundary_audit(result)
+
+                if result.success:
+                    successful += 1
+                    local_issue_status = str(
+                        getattr(getattr(result, "post_fix_check_result", None), "get", lambda _key, _default=None: None)("issue_status", None)
+                        if isinstance(getattr(result, "post_fix_check_result", None), dict)
+                        else getattr(getattr(result, "post_fix_check_result", None), "issue_status", "")
+                    ).strip()
+                    issue_summary_text = "已完成修复，并通过该 issue 的本地构建验证。"
+                    if local_issue_status == "UNKNOWN":
+                        issue_summary_text = "已完成修复并通过本地构建验证，但当前规则缺少可靠的本地判定器，最终状态待 Sonar 正式分析确认。"
+                    if result.attempts > 1:
+                        issue_summary_text = (
+                            f"经过 {result.attempts} 次尝试后，已完成修复，并通过该 issue 的本地构建验证。"
+                        )
+                        if local_issue_status == "UNKNOWN":
+                            issue_summary_text = (
+                                f"经过 {result.attempts} 次尝试后，已完成修复并通过本地构建验证，但当前规则缺少可靠的本地判定器，最终状态待 Sonar 正式分析确认。"
+                            )
+                    summaries.append(
+                        PullRequestIssueSummary(
+                            status="FIXED",
+                            rule=issue_rule,
+                            file_path=file_path,
+                            line=issue_line,
+                            message=issue_payload.get("message", ""),
+                            issue_key=issue_payload.get("key", ""),
+                            attempts=result.attempts,
+                            summary=issue_summary_text,
+                            changed_files=tuple(
+                                change.get("file", "") for change in result.changes if change.get("file")
+                            ),
+                            compliance_status=compliance_summary.status,
+                            compliance_summary=compliance_summary.summary,
+                            active_quality_gate_rules=tuple(
+                                check.rule_id for check in compliance_summary.checks
+                            ),
+                            hard_quality_gate_failures=compliance_summary.failed_rule_count,
+                            soft_quality_gate_findings=compliance_summary.soft_finding_count,
+                            boundary_audit_summary=boundary_audit_summary,
+                            boundary_audit_findings=boundary_audit_findings,
+                            boundary_drift_score=boundary_drift_score,
+                        )
+                    )
+                    continue
+
+                message = result.skip_reason or result.error or "修复失败"
+                if result.skipped:
+                    if result.failure_kind == "policy_skip":
+                        policy_skipped += 1
+                        issue_summary_text = "该 issue 按规则策略默认跳过，建议人工处理，未纳入本 PR。"
+                    else:
+                        skipped += 1
+                        issue_summary_text = "达到最大重试次数后仍未通过构建校验，当前 issue 的改动已回滚，未纳入本 PR。"
+                    summaries.append(
+                        PullRequestIssueSummary(
+                            status="SKIPPED",
+                            rule=issue_rule,
+                            file_path=file_path,
+                            line=issue_line,
+                            message=issue_payload.get("message", ""),
+                            issue_key=issue_payload.get("key", ""),
+                            attempts=result.attempts,
+                            summary=issue_summary_text,
+                            skip_reason=result.skip_reason or message,
+                            issue_log_path=result.issue_log_path,
+                            compliance_status=compliance_summary.status,
+                            compliance_summary=compliance_summary.summary,
+                            active_quality_gate_rules=tuple(
+                                check.rule_id for check in compliance_summary.checks
+                            ),
+                            hard_quality_gate_failures=compliance_summary.failed_rule_count,
+                            soft_quality_gate_findings=compliance_summary.soft_finding_count,
+                            boundary_audit_summary=boundary_audit_summary,
+                            boundary_audit_findings=boundary_audit_findings,
+                            boundary_drift_score=boundary_drift_score,
+                        )
+                    )
+                    continue
+
+                failed += 1
+                summaries.append(
+                    PullRequestIssueSummary(
+                        status="FAILED",
+                        rule=issue_rule,
+                        file_path=file_path,
+                        line=issue_line,
+                        message=issue_payload.get("message", ""),
+                        issue_key=issue_payload.get("key", ""),
+                        attempts=result.attempts,
+                        summary="修复未完成，当前 issue 未纳入本 PR。",
+                        skip_reason=result.error or message,
+                        issue_log_path=result.issue_log_path,
+                        compliance_status=compliance_summary.status,
+                        compliance_summary=compliance_summary.summary,
+                        active_quality_gate_rules=tuple(
+                            check.rule_id for check in compliance_summary.checks
+                        ),
+                        hard_quality_gate_failures=compliance_summary.failed_rule_count,
+                        soft_quality_gate_findings=compliance_summary.soft_finding_count,
+                        boundary_audit_summary=boundary_audit_summary,
+                        boundary_audit_findings=boundary_audit_findings,
+                        boundary_drift_score=boundary_drift_score,
+                    )
+                )
+            return summaries
+
+        def _result_failure_texts(result: Any) -> str:
+            parts = [
+                str(getattr(result, "failure_kind", "") or "").strip(),
+                str(getattr(result, "error", "") or "").strip(),
+                str(getattr(result, "skip_reason", "") or "").strip(),
+                str(getattr(result, "build_output", "") or "").strip(),
+            ]
+            return "\n".join(part for part in parts if part).lower()
+
+        def is_model_availability_result(result: Any) -> bool:
+            if bool(getattr(result, "success", False)):
+                return False
+            failure_kind = str(getattr(result, "failure_kind", "") or "").strip()
+            if failure_kind == "model_timeout":
+                return True
+            if failure_kind not in {"runtime_error", "fix_agent", "review_gate"}:
+                return False
+            text = _result_failure_texts(result)
+            markers = (
+                "429",
+                "rate limit",
+                "too many requests",
+                "quota",
+                "overloaded",
+                "service unavailable",
+                "bad gateway",
+                "gateway timeout",
+                "timed out",
+                "timeout",
+                "connection reset",
+                "connection aborted",
+                "connection timed out",
+                "temporarily unavailable",
+                "provider unavailable",
+                "未完成初始化",
+                "没有返回首个响应",
+                "没有返回后续响应",
+            )
+            return any(marker in text for marker in markers)
+
+        def is_model_availability_exception(exc: BaseException) -> bool:
+            text = str(exc or "").strip().lower()
+            markers = (
+                "429",
+                "rate limit",
+                "too many requests",
+                "quota",
+                "overloaded",
+                "service unavailable",
+                "bad gateway",
+                "gateway timeout",
+                "timed out",
+                "timeout",
+                "connection reset",
+                "connection aborted",
+                "connection timed out",
+                "temporarily unavailable",
+                "provider unavailable",
+                "没有返回首个响应",
+                "没有返回后续响应",
+                "未完成初始化",
+            )
+            return any(marker in text for marker in markers)
+
+        def should_retry_in_second_pass(result: Any) -> bool:
+            if bool(getattr(result, "success", False)):
+                return False
+            if str(getattr(result, "failure_kind", "") or "").strip() in {
+                "policy_skip",
+                "engine_router_skip",
+                "roslyn_cannot_fix_safely",
+                "roslyn_candidate_not_applied",
+            }:
+                return False
+            return True
+
+        def _clip_handoff_text(value: str, *, max_chars: int = 420, max_lines: int = 14) -> str:
+            text = str(value or "").replace("\r\n", "\n").strip()
+            if not text:
+                return ""
+            lines = text.splitlines()
+            if len(lines) > max_lines:
+                lines = lines[:max_lines]
+                text = "\n".join(lines).rstrip() + "\n..."
+            else:
+                text = "\n".join(lines)
+            if len(text) > max_chars:
+                text = text[: max_chars - 3].rstrip() + "..."
+            return text
+
+        def build_model_handoff_feedback_from_result(
+            *,
+            result: Any,
+            from_tier_name: str,
+            from_tier_model: str,
+            to_tier_model: str,
+            reason_label: str,
+        ) -> str:
+            failure_kind = str(getattr(result, "failure_kind", "") or "").strip() or "unknown_failure"
+            summary = (
+                str(getattr(result, "skip_reason", "") or "").strip()
+                or str(getattr(result, "error", "") or "").strip()
+                or str(getattr(result, "summary", "") or "").strip()
+            )
+            details = _clip_handoff_text(
+                str(getattr(result, "build_output", "") or "").strip(),
+            )
+            parts = [
+                "【模型切梯交接】",
+                f"- 来源模型: {from_tier_model or from_tier_name}",
+                f"- 目标模型: {to_tier_model}",
+                f"- 触发原因: {reason_label}",
+                f"- 上一梯结果: {failure_kind}",
+            ]
+            if summary:
+                parts.append(f"- 摘要: {summary}")
+            if details:
+                parts.extend(
+                    [
+                        "【失败细节摘要】",
+                        details,
+                    ]
+                )
+            parts.append(
+                "【交接要求】\n"
+                + "\n".join(
+                    [
+                        "- 当前 issue 的工作区和 working memory 已保留，请先读取当前文件状态再继续。",
+                        "- 结合上面的失败信息换一种修法，不要机械重复上一梯已经失败的动作。",
+                    ]
+                )
+            )
+            return "\n".join(part for part in parts if str(part).strip())
+
+        def build_model_handoff_feedback_from_exception(
+            *,
+            exc: BaseException,
+            from_tier_name: str,
+            from_tier_model: str,
+            to_tier_model: str,
+            reason_label: str,
+        ) -> str:
+            details = _clip_handoff_text(str(exc or ""))
+            parts = [
+                "【模型切梯交接】",
+                f"- 来源模型: {from_tier_model or from_tier_name}",
+                f"- 目标模型: {to_tier_model}",
+                f"- 触发原因: {reason_label}",
+                "- 上一梯结果: provider/session error",
+            ]
+            if details:
+                parts.append(f"- 摘要: {details}")
+            parts.append(
+                "【交接要求】\n"
+                + "\n".join(
+                    [
+                        "- 上一梯在当前 issue 上未完成有效响应，请直接基于当前工作区状态重新接手。",
+                        "- 先读取当前文件和已有提示，再继续修复，不要假设上一梯已经完成任何关键修改。",
+                    ]
+                )
+            )
+            return "\n".join(part for part in parts if str(part).strip())
+
+        def build_second_pass_seed_feedback(*, previous_result: Any) -> str:
+            failure_kind = str(getattr(previous_result, "failure_kind", "") or "").strip() or "unresolved"
+            summary = (
+                str(getattr(previous_result, "skip_reason", "") or "").strip()
+                or str(getattr(previous_result, "error", "") or "").strip()
+                or str(getattr(previous_result, "summary", "") or "").strip()
+            )
+            details = _clip_handoff_text(str(getattr(previous_result, "build_output", "") or "").strip())
+            parts = [
+                "【第二轮增强修复交接】",
+                f"- 第一轮最终状态: {failure_kind}",
+            ]
+            if summary:
+                parts.append(f"- 第一轮摘要: {summary}")
+            if details:
+                parts.extend(
+                    [
+                        "【第一轮失败细节摘要】",
+                        details,
+                    ]
+                )
+            parts.append(
+                "【第二轮要求】\n"
+                + "\n".join(
+                    [
+                        "- 当前 issue 在第一轮未解决，请基于当前工作区和已有 working memory 换一种更强策略。",
+                        "- 优先避免重复第一轮已经证明无效的修法。",
+                    ]
+                )
+            )
+            return "\n".join(part for part in parts if str(part).strip())
+
         try:
             ado_client = AzureDevOpsClient(
                 self.runtime_env.ado_base_url,
@@ -291,13 +666,16 @@ class RunCoordinator:
                 self.runtime_env.sonar_token,
                 self.runtime_env.sonar_org,
             )
-            agent = ClaudeFixAgent(
-                self.runtime_env.sonar_host,
-                self.runtime_env.sonar_token,
-                self.runtime_env.sonar_org,
-                agent_env=build_agent_env(),
-                model=resolve_agent_model(),
-            )
+            model_tiers = resolve_model_tiers()
+            first_pass_route = build_issue_model_route(second_pass=False)
+            second_pass_route = build_issue_model_route(second_pass=True)
+            second_pass_allowed = second_pass_enabled()
+            if first_pass_route:
+                first_pass_preview = " -> ".join(tier.display_name for tier in first_pass_route)
+                print(f"[INFO] 第一轮模型路由: {first_pass_preview}")
+            if second_pass_allowed and second_pass_route:
+                second_pass_preview = " -> ".join(tier.display_name for tier in second_pass_route)
+                print(f"[INFO] 第二轮模型路由: {second_pass_preview}")
             dingtalk_client = create_dingtalk_client_from_env()
 
             print("正在获取 SonarQube issues...")
@@ -403,7 +781,8 @@ class RunCoordinator:
                 target_config.base_branch,
                 depth=clone_depth,
             )
-            git_gateway.install_local_excludes(workspace)
+            if hasattr(git_gateway, "install_local_excludes"):
+                git_gateway.install_local_excludes(workspace)
         except Exception as exc:
             return abort_target(error=f"仓库克隆失败: {exc}", startup_failure=True)
 
@@ -421,12 +800,148 @@ class RunCoordinator:
         except Exception as exc:
             print(f"[WARN] 仓库能力指纹生成失败: {exc}")
 
-        issue_summaries: list[PullRequestIssueSummary] = []
         build_command = target_config.build_command or "dotnet build"
         test_command = target_config.test_command
         solution_path = target_config.solution_path
+        def build_agent_for_tier(tier) -> ClaudeFixAgent:
+            return ClaudeFixAgent(
+                self.runtime_env.sonar_host,
+                self.runtime_env.sonar_token,
+                self.runtime_env.sonar_org,
+                agent_env=dict(tier.agent_env),
+                model=tier.explicit_model,
+            )
+
+        def annotate_routed_result(result, *, tier_name: str, tier_model: str, pass_name: str) -> None:
+            performance_metrics = dict(getattr(result, "performance_metrics", {}) or {})
+            performance_metrics.update(
+                {
+                    "model_route_tier": tier_name,
+                    "model_route_model": tier_model,
+                    "model_route_pass": pass_name,
+                }
+            )
+            result.performance_metrics = performance_metrics
+
+        def log_issue_outcome(result) -> None:
+            if result.success:
+                suffix = f" (attempt {result.attempts})" if result.attempts > 1 else ""
+                print(f"  [OK] {result.summary}{suffix}")
+                return
+
+            label = "[SKIP]" if result.skipped else "[ERR]"
+            message = result.skip_reason or result.error or "修复失败"
+            print(f"  {label} {message}")
+            if result.build_output:
+                failure_report = format_build_failure_report(
+                    {
+                        "error": result.error or "",
+                        "build_command": result.build_command,
+                        "build_output": result.build_output,
+                    },
+                    max_lines=40,
+                )
+                if failure_report:
+                    print("  [ISSUE BUILD LOG]")
+                    print(failure_report)
+            if result.issue_log_path:
+                print(f"  [ISSUE LOG] {result.issue_log_path}")
+
+        def run_issue_with_model_route(
+            *,
+            issue_payload: dict[str, Any],
+            sonar_issue: SonarIssue,
+            issue_build_command: str,
+            second_pass: bool,
+            seed_retry_feedback: str = "",
+        ):
+            nonlocal issue_processing_started
+            route = second_pass_route if second_pass else first_pass_route
+            pass_name = "second_pass" if second_pass else "first_pass"
+            pass_label = "第二轮" if second_pass else "第一轮"
+            last_exception: BaseException | None = None
+            last_result = None
+            handoff_feedback = str(seed_retry_feedback or "").strip()
+            for route_index, tier in enumerate(route, start=1):
+                issue_line = sonar_issue.start_line or sonar_issue.line
+                print(
+                    f"  [MODEL] {pass_label} {route_index}/{len(route)}: "
+                    f"{tier.display_name}"
+                )
+                self.state_store.record_issue_started(
+                    run_label=options.run_label,
+                    repository=target_config.repository,
+                    author=target_config.author,
+                    project_key=target_config.project_key,
+                    issue_key=sonar_issue.key,
+                    rule_id=sonar_issue.rule,
+                    file_path=sonar_issue.file_path,
+                    line_number=issue_line,
+                )
+                issue_processing_started = True
+                try:
+                    result = process_issue_with_retries(
+                        agent=build_agent_for_tier(tier),
+                        issue=sonar_issue,
+                        workspace_path=workspace,
+                        build_command=issue_build_command,
+                        repository=target_config.repository,
+                        run_label=options.run_label,
+                        author=target_config.author,
+                        project_key=target_config.project_key,
+                        state_store=self.state_store,
+                        seed_retry_feedback=handoff_feedback,
+                    )
+                except Exception as exc:
+                    if is_model_availability_exception(exc) and route_index < len(route):
+                        last_exception = exc
+                        next_tier = route[route_index]
+                        handoff_feedback = build_model_handoff_feedback_from_exception(
+                            exc=exc,
+                            from_tier_name=tier.tier_name,
+                            from_tier_model=tier.display_name,
+                            to_tier_model=next_tier.display_name,
+                            reason_label="provider unavailable / timeout",
+                        )
+                        print(
+                            f"  [WARN] 当前模型不可用，切换到下一梯: "
+                            f"{tier.display_name} -> {next_tier.display_name} ({exc})"
+                        )
+                        continue
+                    raise
+
+                annotate_routed_result(
+                    result,
+                    tier_name=tier.tier_name,
+                    tier_model=tier.display_name,
+                    pass_name=pass_name,
+                )
+                if is_model_availability_result(result) and route_index < len(route):
+                    last_result = result
+                    next_tier = route[route_index]
+                    handoff_feedback = build_model_handoff_feedback_from_result(
+                        result=result,
+                        from_tier_name=tier.tier_name,
+                        from_tier_model=tier.display_name,
+                        to_tier_model=next_tier.display_name,
+                        reason_label="model availability failure",
+                    )
+                    print(
+                        f"  [WARN] 当前模型不可用，切换到下一梯: "
+                        f"{tier.display_name} -> {next_tier.display_name}"
+                    )
+                    continue
+                return result
+
+            if last_result is not None:
+                return last_result
+            if last_exception is not None:
+                raise last_exception
+            raise RuntimeError("No configured model tier is available for the current issue.")
 
         for index, issue in enumerate(issues, 1):
+            if abort_error:
+                break
             sonar_issue = SonarIssue.from_api_payload(issue)
             issue_rule = sonar_issue.rule
             issue_line = sonar_issue.start_line or sonar_issue.line
@@ -437,160 +952,94 @@ class RunCoordinator:
             )
 
             issue_build_command = resolve_build_command(build_command, solution_path)
-            self.state_store.record_issue_started(
-                run_label=options.run_label,
-                repository=target_config.repository,
-                author=target_config.author,
-                project_key=target_config.project_key,
-                issue_key=sonar_issue.key,
-                rule_id=sonar_issue.rule,
-                file_path=sonar_issue.file_path,
-                line_number=issue_line,
-            )
-            issue_processing_started = True
             try:
-                result = process_issue_with_retries(
-                    agent=agent,
-                    issue=sonar_issue,
-                    workspace_path=workspace,
-                    build_command=issue_build_command,
-                    repository=target_config.repository,
-                    run_label=options.run_label,
-                    author=target_config.author,
-                    project_key=target_config.project_key,
-                    state_store=self.state_store,
+                result = run_issue_with_model_route(
+                    issue_payload=issue,
+                    sonar_issue=sonar_issue,
+                    issue_build_command=issue_build_command,
+                    second_pass=False,
+                    seed_retry_feedback="",
                 )
             except Exception as exc:
-                return abort_target(error=f"issue pipeline failed: {exc}", startup_failure=False)
-            if isinstance(result.issue_state, IssueState):
-                issue_states.append(result.issue_state)
-            compliance_summary = build_compliance_summary(
-                getattr(getattr(result, "edit_contract", None), "quality_gate_rules", ()),
-                getattr(result, "quality_gate_result", None),
-            )
-            boundary_audit_summary, boundary_audit_findings, boundary_drift_score = extract_boundary_audit(result)
+                mark_target_abort(error=f"issue pipeline failed: {exc}", startup_failure=False)
+                break
 
-            if result.success:
-                suffix = f" (attempt {result.attempts})" if result.attempts > 1 else ""
-                print(f"  [OK] {result.summary}{suffix}")
-                successful += 1
-                local_issue_status = str(
-                    getattr(getattr(result, "post_fix_check_result", None), "get", lambda _key, _default=None: None)("issue_status", None)
-                    if isinstance(getattr(result, "post_fix_check_result", None), dict)
-                    else getattr(getattr(result, "post_fix_check_result", None), "issue_status", "")
-                ).strip()
-                issue_summary_text = "已完成修复，并通过该 issue 的本地构建验证。"
-                if local_issue_status == "UNKNOWN":
-                    issue_summary_text = "已完成修复并通过本地构建验证，但当前规则缺少可靠的本地判定器，最终状态待 Sonar 正式分析确认。"
-                if result.attempts > 1:
-                    issue_summary_text = (
-                        f"经过 {result.attempts} 次尝试后，已完成修复，并通过该 issue 的本地构建验证。"
-                    )
-                    if local_issue_status == "UNKNOWN":
-                        issue_summary_text = (
-                            f"经过 {result.attempts} 次尝试后，已完成修复并通过本地构建验证，但当前规则缺少可靠的本地判定器，最终状态待 Sonar 正式分析确认。"
-                        )
-                issue_summaries.append(
-                    PullRequestIssueSummary(
-                        status="FIXED",
-                        rule=issue_rule,
-                        file_path=file_path,
-                        line=issue_line,
-                        message=issue.get("message", ""),
-                        issue_key=issue.get("key", ""),
-                        attempts=result.attempts,
-                        summary=issue_summary_text,
-                        changed_files=tuple(
-                            change.get("file", "") for change in result.changes if change.get("file")
-                        ),
-                        compliance_status=compliance_summary.status,
-                        compliance_summary=compliance_summary.summary,
-                        active_quality_gate_rules=tuple(
-                            check.rule_id for check in compliance_summary.checks
-                        ),
-                        hard_quality_gate_failures=compliance_summary.failed_rule_count,
-                        soft_quality_gate_findings=compliance_summary.soft_finding_count,
-                        boundary_audit_summary=boundary_audit_summary,
-                        boundary_audit_findings=boundary_audit_findings,
-                        boundary_drift_score=boundary_drift_score,
-                    )
+            issue_records[sonar_issue.key] = _IssueExecutionRecord(
+                issue_payload=issue,
+                sonar_issue=sonar_issue,
+                result=result,
+            )
+            if sonar_issue.key not in issue_order:
+                issue_order.append(sonar_issue.key)
+            log_issue_outcome(result)
+            refresh_issue_rollup()
+            if is_model_availability_result(result):
+                mark_target_abort(
+                    error=(
+                        f"all model tiers were unavailable while processing issue "
+                        f"{sonar_issue.key}: {result.error or result.skip_reason or result.failure_kind}"
+                    ),
+                    startup_failure=False,
                 )
-            else:
-                label = "[SKIP]" if result.skipped else "[ERR]"
-                message = result.skip_reason or result.error or "修复失败"
-                print(f"  {label} {message}")
-                if result.build_output:
-                    failure_report = format_build_failure_report(
-                        {
-                            "error": result.error or "",
-                            "build_command": result.build_command,
-                            "build_output": result.build_output,
-                        },
-                        max_lines=40,
+                break
+
+        if (
+            not abort_error
+            and second_pass_allowed
+            and model_tiers["tier2"].configured
+            and tuple(item.display_name for item in second_pass_route) != tuple(item.display_name for item in first_pass_route)
+        ):
+            unresolved_issues = [
+                issue_records[issue_key].issue_payload
+                for issue_key in issue_order
+                if should_retry_in_second_pass(issue_records[issue_key].result)
+            ]
+            if unresolved_issues:
+                print(f"\n[INFO] 第一轮结束后仍有 {len(unresolved_issues)} 个 unresolved issues，开始第二轮增强修复...")
+            for index, issue in enumerate(unresolved_issues, 1):
+                if abort_error:
+                    break
+                sonar_issue = SonarIssue.from_api_payload(issue)
+                issue_rule = sonar_issue.rule
+                issue_line = sonar_issue.start_line or sonar_issue.line
+                file_path = sonar_issue.file_path.lstrip("/")
+                print(
+                    f"\n[SECOND PASS {index}/{len(unresolved_issues)}] 修复: "
+                    f"{issue_rule} → {file_path}:{issue_line}"
+                )
+                issue_build_command = resolve_build_command(build_command, solution_path)
+                try:
+                    previous_result = issue_records[sonar_issue.key].result
+                    result = run_issue_with_model_route(
+                        issue_payload=issue,
+                        sonar_issue=sonar_issue,
+                        issue_build_command=issue_build_command,
+                        second_pass=True,
+                        seed_retry_feedback=build_second_pass_seed_feedback(
+                            previous_result=previous_result,
+                        ),
                     )
-                    if failure_report:
-                        print("  [ISSUE BUILD LOG]")
-                        print(failure_report)
-                if result.issue_log_path:
-                    print(f"  [ISSUE LOG] {result.issue_log_path}")
-                if result.skipped:
-                    if result.failure_kind == "policy_skip":
-                        policy_skipped += 1
-                        issue_summary_text = "该 issue 按规则策略默认跳过，建议人工处理，未纳入本 PR。"
-                    else:
-                        skipped += 1
-                        issue_summary_text = "达到最大重试次数后仍未通过构建校验，当前 issue 的改动已回滚，未纳入本 PR。"
-                    issue_summaries.append(
-                        PullRequestIssueSummary(
-                            status="SKIPPED",
-                            rule=issue_rule,
-                            file_path=file_path,
-                            line=issue_line,
-                            message=issue.get("message", ""),
-                            issue_key=issue.get("key", ""),
-                            attempts=result.attempts,
-                            summary=issue_summary_text,
-                            skip_reason=result.skip_reason or message,
-                            issue_log_path=result.issue_log_path,
-                            compliance_status=compliance_summary.status,
-                            compliance_summary=compliance_summary.summary,
-                            active_quality_gate_rules=tuple(
-                                check.rule_id for check in compliance_summary.checks
-                            ),
-                            hard_quality_gate_failures=compliance_summary.failed_rule_count,
-                            soft_quality_gate_findings=compliance_summary.soft_finding_count,
-                            boundary_audit_summary=boundary_audit_summary,
-                            boundary_audit_findings=boundary_audit_findings,
-                            boundary_drift_score=boundary_drift_score,
-                        )
+                except Exception as exc:
+                    mark_target_abort(error=f"second-pass issue pipeline failed: {exc}", startup_failure=False)
+                    break
+                issue_records[sonar_issue.key] = _IssueExecutionRecord(
+                    issue_payload=issue,
+                    sonar_issue=sonar_issue,
+                    result=result,
+                )
+                log_issue_outcome(result)
+                refresh_issue_rollup()
+                if is_model_availability_result(result):
+                    mark_target_abort(
+                        error=(
+                            f"all model tiers were unavailable during second pass for issue "
+                            f"{sonar_issue.key}: {result.error or result.skip_reason or result.failure_kind}"
+                        ),
+                        startup_failure=False,
                     )
-                else:
-                    failed += 1
-                    issue_summary_text = "修复未完成，当前 issue 未纳入本 PR。"
-                    issue_summaries.append(
-                        PullRequestIssueSummary(
-                            status="FAILED",
-                            rule=issue_rule,
-                            file_path=file_path,
-                            line=issue_line,
-                            message=issue.get("message", ""),
-                            issue_key=issue.get("key", ""),
-                            attempts=result.attempts,
-                            summary=issue_summary_text,
-                            skip_reason=result.error or message,
-                            issue_log_path=result.issue_log_path,
-                            compliance_status=compliance_summary.status,
-                            compliance_summary=compliance_summary.summary,
-                            active_quality_gate_rules=tuple(
-                                check.rule_id for check in compliance_summary.checks
-                            ),
-                            hard_quality_gate_failures=compliance_summary.failed_rule_count,
-                            soft_quality_gate_findings=compliance_summary.soft_finding_count,
-                            boundary_audit_summary=boundary_audit_summary,
-                            boundary_audit_findings=boundary_audit_findings,
-                            boundary_drift_score=boundary_drift_score,
-                        )
-                    )
+                    break
+
+        issue_summaries = refresh_issue_rollup()
 
         attempted = successful + skipped + failed
         effective_rate = (
@@ -659,10 +1108,20 @@ class RunCoordinator:
             )
             print(f"[INFO] PR 详细说明已保存: {local_pr_report_path.as_posix()}")
 
-        should_create_pr = build_passed and successful > 0 and not options.skip_build
+        should_create_pr = (
+            (build_passed and successful > 0 and not options.skip_build)
+            or (bool(abort_error) and abort_publish_allowed and successful > 0)
+        )
         if should_create_pr:
+            if abort_error:
+                print("[INFO] 检测到 target 中断，优先发布已修结果...")
             print("[INFO] 创建 Pull Request...")
             branch = f"fix/sonar-{target_config.author.split('@')[0]}-{options.run_label}"
+            pr_title = (
+                f"Partial Fix: 修复 {successful} 个 SonarQube 问题"
+                if abort_error or not build_passed
+                else f"Fix: 修复 {successful} 个 SonarQube 问题"
+            )
             pr_description = build_summary_pull_request_description(
                 author=target_config.author,
                 base_branch=target_config.base_branch,
@@ -693,7 +1152,7 @@ class RunCoordinator:
                 )
                 pr = ado_client.create_pull_request(
                     repository=target_config.repository,
-                    title=f"Fix: 修复 {successful} 个 SonarQube 问题",
+                    title=pr_title,
                     description=pr_description,
                     source_branch=branch,
                     target_branch=target_config.base_branch,
@@ -753,6 +1212,9 @@ class RunCoordinator:
                 pr_error = str(exc)
                 print(f"[WARN] PR 创建失败: {pr_error}")
 
+        if abort_error and not pr_url and not pr_error:
+            pr_error = abort_error
+
         should_notify = bool(dingtalk_client and pr_url)
         if should_notify:
             try:
@@ -781,6 +1243,8 @@ class RunCoordinator:
             f"失败: {failed}, 策略排除: {policy_skipped}, "
             f"构建: {'通过' if build_passed else '失败'}"
         )
+        if abort_error:
+            print(f"中断原因: {abort_error}")
         if pr_url:
             print(f"PR: {pr_url}")
         elif pr_error:
@@ -788,8 +1252,8 @@ class RunCoordinator:
 
         return finalize_target_result(
             TargetRunResult(
-                ok=build_passed,
-                issues=len(issues),
+                ok=build_passed and not bool(abort_error),
+                issues=total_issues,
                 successful=successful,
                 skipped=skipped,
                 failed=failed,

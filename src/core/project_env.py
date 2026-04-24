@@ -13,7 +13,7 @@ from pathlib import Path
 
 import dotenv
 
-MODEL_ENV_KEYS = (
+BASE_MODEL_ENV_KEYS = (
     "ANTHROPIC_MODEL",
     "ANTHROPIC_AUTH_TOKEN",
     "ANTHROPIC_API_KEY",
@@ -40,7 +40,21 @@ MODEL_ENV_KEYS = (
     "OPENAI_MODEL",
 )
 
-PROJECT_ENV_KEYS = MODEL_ENV_KEYS + (
+
+def _tier_env_keys(prefix: str) -> tuple[str, ...]:
+    return tuple(f"{prefix}{key}" for key in BASE_MODEL_ENV_KEYS)
+
+
+MODEL_TIER1_ENV_KEYS = _tier_env_keys("PI_SONAR_MODEL_TIER1_")
+MODEL_TIER2_ENV_KEYS = _tier_env_keys("PI_SONAR_MODEL_TIER2_")
+MODEL_ROUTE_ENV_KEYS = (
+    "PI_SONAR_SECOND_PASS_ENABLED",
+    "PI_SONAR_ABORT_PUBLISH_ENABLED",
+)
+
+MODEL_ENV_KEYS = BASE_MODEL_ENV_KEYS + MODEL_TIER1_ENV_KEYS + MODEL_TIER2_ENV_KEYS
+
+PROJECT_ENV_KEYS = MODEL_ENV_KEYS + MODEL_ROUTE_ENV_KEYS + (
     "SONARQUBE_HOST",
     "SONARQUBE_TOKEN",
     "SONARQUBE_ORG",

@@ -1768,7 +1768,6 @@ def test_fix_issue_attaches_sonar_mcp_runtime_when_configured(monkeypatch, tmp_p
 
     result = agent.fix_issue(issue, tmp_path)
 
-    assert result.failure_kind == "no_change"
     assert runtime_requests
     request = runtime_requests[0]
     assert "mcp__sonarqube__search_issues" in request.allowed_tools

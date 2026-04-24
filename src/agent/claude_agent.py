@@ -49,6 +49,7 @@ from pi_sonar_agent.core.agent_role_prompts import (
 from pi_sonar_agent.core.attempt_changes import AttemptFileChangeBuilder
 from pi_sonar_agent.core.attempt_context import AttemptContextCache
 from pi_sonar_agent.core.attempt_scheduler import AttemptScheduler
+from pi_sonar_agent.core.attempt_todo import AttemptTodoStore, build_attempt_todo_runtime
 from pi_sonar_agent.core.claude_adapter import ClaudeAdapter, ClaudeSDKDependencies
 from pi_sonar_agent.core.continuation_recovery import ContinuationRecovery
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange
@@ -244,6 +245,7 @@ class FixResult:
     execution_mode: str = ""
     post_fix_check_result: Any | None = None
     issue_working_memory: Any | None = None
+    attempt_todo_state: Any | None = None
 
 
 @dataclass(frozen=True)
@@ -1043,6 +1045,8 @@ class ClaudeFixAgent:
             "invalid_write_tool_input_count": int(
                 getattr(runtime_result, "invalid_write_tool_input_count", 0) or 0
             ),
+            "todo_write_count": int(getattr(runtime_result, "todo_write_count", 0) or 0),
+            "todo_reminder_count": int(getattr(runtime_result, "todo_reminder_count", 0) or 0),
         }
 
     @staticmethod
@@ -1115,6 +1119,10 @@ class ClaudeFixAgent:
                 getattr(first_result, "invalid_write_tool_input_count", 0) or 0
             )
             + int(getattr(second_result, "invalid_write_tool_input_count", 0) or 0),
+            todo_write_count=int(getattr(first_result, "todo_write_count", 0) or 0)
+            + int(getattr(second_result, "todo_write_count", 0) or 0),
+            todo_reminder_count=int(getattr(first_result, "todo_reminder_count", 0) or 0)
+            + int(getattr(second_result, "todo_reminder_count", 0) or 0),
             runtime_events=tuple(merged_events),
         )
 
@@ -2204,6 +2212,7 @@ class ClaudeFixAgent:
         guardrail_mode: str,
         visible_toolset: Any,
         tool_policy: ToolPolicy,
+        sonar_mcp_runtime: Any,
         result_metadata: dict[str, Any],
         execution_schedule: Any,
         runtime_builtin_tools: tuple[str, ...],
@@ -2211,6 +2220,14 @@ class ClaudeFixAgent:
         """Run the new main -> fix -> review -> compile orchestration flow."""
 
         store = WorkingMemoryStore(workspace_path)
+        attempt_todo_store = AttemptTodoStore(workspace_path, issue.key, role="fix")
+        attempt_todo_runtime = build_attempt_todo_runtime(
+            attempt_todo_store,
+            agent_env=agent.agent_env,
+        )
+        attempt_todo_state = (
+            attempt_todo_store.reset() if attempt_todo_runtime.enabled else None
+        )
         fix_memory = cls._load_child_memory(
             store=store,
             issue_key=issue.key,
@@ -2230,7 +2247,18 @@ class ClaudeFixAgent:
             focus="决定当前 patch 是否进入编译阶段。",
         )
 
-        system_prompt = build_fix_role_system_prompt()
+        def current_result_metadata() -> dict[str, Any]:
+            payload = dict(result_metadata)
+            if attempt_todo_runtime.enabled:
+                try:
+                    payload["attempt_todo_state"] = attempt_todo_store.load()
+                except Exception:
+                    payload["attempt_todo_state"] = None
+            return payload
+
+        system_prompt = build_fix_role_system_prompt(
+            todo_write_tool_name=attempt_todo_runtime.visible_tool_name,
+        )
         file_path_candidates = IssuePromptBuilder.build_workspace_relative_candidates(
             issue.file_path,
             workspace_path,
@@ -2240,6 +2268,8 @@ class ClaudeFixAgent:
             code_context=code_context,
             file_path_candidates=file_path_candidates,
             working_memory=working_memory,
+            attempt_todo_state=attempt_todo_state,
+            todo_write_tool_name=attempt_todo_runtime.visible_tool_name,
             fix_memory=fix_memory,
             retry_feedback=retry_feedback,
         )
@@ -2255,13 +2285,33 @@ class ClaudeFixAgent:
             max_budget_usd=agent.max_budget_usd,
             stderr_handler=agent._handle_cli_stderr,
             build_command=build_command,
-            mcp_servers={},
+            mcp_servers={
+                **dict(getattr(sonar_mcp_runtime, "server_configs", {}) or {}),
+                **attempt_todo_runtime.server_configs,
+            },
         )
         gateway_request.metadata.update(
             {
                 "issue_key": issue.key,
                 "role": "fix",
                 "helper_extract_runtime_guard": "false",
+                "mcp_servers": ",".join(
+                    sorted(tuple(getattr(sonar_mcp_runtime, "server_configs", {}) or {}))
+                ),
+                "mcp_tools_count": str(
+                    len(tuple(getattr(sonar_mcp_runtime, "tool_names", ()) or ()))
+                ),
+                "mcp_mode": str(getattr(sonar_mcp_runtime, "mode", "") or ""),
+                "mcp_read_only": (
+                    "true" if bool(getattr(sonar_mcp_runtime, "read_only", False)) else "false"
+                ),
+                "mcp_warning": str(getattr(sonar_mcp_runtime, "warning", "") or ""),
+                "visible_tools": ",".join(tuple(getattr(visible_toolset, "visible_tools", ()) or ())),
+                "todo_write_tool_name": attempt_todo_runtime.visible_tool_name,
+                "todo_write_display_name": attempt_todo_runtime.display_name,
+                "todo_write_nag_threshold": str(attempt_todo_runtime.nag_threshold),
+                "todo_write_max_reminders": str(attempt_todo_runtime.max_reminders),
+                "todo_role": "fix",
             }
         )
         runtime = AgentRuntime(
@@ -2319,7 +2369,7 @@ class ClaudeFixAgent:
                     failure_kind=failure_kind,
                     performance_metrics=runtime_metrics,
                     attempt_events=attempt_events,
-                    **result_metadata,
+                    **current_result_metadata(),
                 )
             runtime_metrics = agent._build_runtime_performance_metrics(runtime_result)
             attempt_events = tuple(getattr(runtime_result, "runtime_events", ()) or ())
@@ -2353,11 +2403,53 @@ class ClaudeFixAgent:
                     failure_kind=failure_kind,
                     performance_metrics=runtime_metrics,
                     attempt_events=attempt_events,
-                    **result_metadata,
+                    **current_result_metadata(),
                 )
 
+            attempt_head_changed = cls._attempt_head_changed(workspace_path)
+            used_forbidden_tool = bool(runtime_result.forbidden_tool_uses) or attempt_head_changed
             changed_files = tuple(dict.fromkeys(agent._collect_modified_files(workspace_path)))
             changes = [{"file": changed_file, "action": "modified"} for changed_file in changed_files]
+            if used_forbidden_tool:
+                fallback_build_passed, fallback_build_output = agent._run_local_build_fallback(
+                    workspace_path,
+                    build_command,
+                )
+                output_parts = ["修复阶段使用了被禁止的工具，当前尝试已作废。"]
+                if runtime_result.forbidden_tool_uses:
+                    output_parts.append(
+                        "禁止工具: " + ", ".join(dict.fromkeys(runtime_result.forbidden_tool_uses))
+                    )
+                if attempt_head_changed:
+                    output_parts.append("检测到当前 attempt 改写了 Git HEAD/提交历史。")
+                if fallback_build_output:
+                    output_parts.append(fallback_build_output)
+                fix_memory = append_child_agent_memory_turn(
+                    fix_memory,
+                    attempt_number=len(fix_memory.turns) + 1,
+                    decision="retry",
+                    summary="Fix 子Agent 使用了被禁止的工具。",
+                    workspace_state="issue_baseline",
+                    next_action="重新读取问题文件，改用允许的 Read/Edit/Write 工具完成最小修复。",
+                )
+                store.save_child_memory(fix_memory)
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=issue.file_path,
+                    changes=changes,
+                    build_passed=fallback_build_passed,
+                    build_verification_failed=not fallback_build_passed,
+                    error="Forbidden tool used during issue fix",
+                    summary="Fix 子Agent 使用了被禁止的工具，当前 attempt 已作废。",
+                    build_command=build_command,
+                    build_output="\n\n".join(part for part in output_parts if part),
+                    retryable_failure=True,
+                    failure_kind="forbidden_tool",
+                    performance_metrics=runtime_metrics,
+                    attempt_events=attempt_events,
+                    **current_result_metadata(),
+                )
             fallback_before_texts: dict[str, str] = {}
             normalized_issue_path = str(issue.file_path or "").replace("\\", "/").lstrip("/")
             if normalized_issue_path and original_issue_file_content is not None:
@@ -2421,7 +2513,7 @@ class ClaudeFixAgent:
                 reviewer_result=reviewer_result.to_dict(),
                 performance_metrics=runtime_metrics,
                 attempt_events=attempt_events,
-                **result_metadata,
+                **current_result_metadata(),
             )
 
         review_run = cls._run_prompt_only_role_session(
@@ -2481,7 +2573,7 @@ class ClaudeFixAgent:
                 reviewer_result=reviewer_result.to_dict(),
                 performance_metrics=runtime_metrics,
                 attempt_events=attempt_events,
-                **result_metadata,
+                **current_result_metadata(),
             )
 
         main_run = cls._run_prompt_only_role_session(
@@ -2543,7 +2635,7 @@ class ClaudeFixAgent:
                 reviewer_result=reviewer_result.to_dict(),
                 performance_metrics=runtime_metrics,
                 attempt_events=attempt_events,
-                **result_metadata,
+                **current_result_metadata(),
             )
 
         verification = FixVerifier.evaluate_attempt(
@@ -2581,7 +2673,7 @@ class ClaudeFixAgent:
                     build_duration_seconds=verification.build_duration_seconds,
                 ),
                 attempt_events=attempt_events,
-                **result_metadata,
+                **current_result_metadata(),
             )
 
         return FixResult(
@@ -2600,7 +2692,7 @@ class ClaudeFixAgent:
                 build_duration_seconds=verification.build_duration_seconds,
             ),
             attempt_events=attempt_events,
-            **result_metadata,
+            **current_result_metadata(),
         )
 
     @staticmethod
@@ -3391,10 +3483,15 @@ class ClaudeFixAgent:
             "issue_working_memory": working_memory,
         }
         sonar_mcp_runtime = build_sonar_mcp_runtime(self.agent_env)
+        attempt_todo_store = AttemptTodoStore(workspace_path, issue.key, role="fix")
+        attempt_todo_runtime = build_attempt_todo_runtime(
+            attempt_todo_store,
+            agent_env=self.agent_env,
+        )
         runtime_builtin_tools = self._resolve_runtime_builtin_tools(workspace_path)
         tool_policy, visible_toolset = self._build_fix_tool_policy_bundle(
             edit_contract,
-            mcp_tool_names=sonar_mcp_runtime.tool_names,
+            mcp_tool_names=sonar_mcp_runtime.tool_names + attempt_todo_runtime.tool_names,
             workspace_path=workspace_path,
             runtime_builtin_tools=runtime_builtin_tools,
         )
@@ -3417,6 +3514,7 @@ class ClaudeFixAgent:
             guardrail_mode=guardrail_mode,
             visible_toolset=visible_toolset,
             tool_policy=tool_policy,
+            sonar_mcp_runtime=sonar_mcp_runtime,
             result_metadata=result_metadata,
             execution_schedule=execution_schedule,
             runtime_builtin_tools=runtime_builtin_tools,

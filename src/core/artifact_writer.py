@@ -148,6 +148,10 @@ class ArtifactWriter:
                     getattr(result, "issue_working_memory", None),
                     None,
                 ),
+                "attempt_todo_state": _serialize_optional_payload(
+                    getattr(result, "attempt_todo_state", None),
+                    None,
+                ),
                 "prompt_budget_report": _serialize_optional_payload(
                     getattr(result, "prompt_budget_report", None),
                     None,

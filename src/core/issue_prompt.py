@@ -12,6 +12,7 @@ from pi_sonar_agent.core.memory.issue_working_memory import (
     IssueWorkingMemory,
     render_issue_working_memory,
 )
+from pi_sonar_agent.core.prompt_pipeline import PromptPipelineBuilder
 from pi_sonar_agent.core.registry import BUILD_TOOL_NAMES
 from pi_sonar_agent.core.resource_loader import ResourceLoader
 from pi_sonar_agent.core.retry_context import RetryContext, render_retry_context
@@ -45,44 +46,6 @@ SIMPLE_LOOP_SYSTEM_PROMPT = """你是一个严格的 .NET/C# 资深工程师，�
 """
 
 S107_FIX_GUIDE_RELATIVE_PATH = ".pi-sonar-agent-runtime/s107-fix-guide.md"
-
-
-SIMPLE_LOOP_USER_PROMPT_TEMPLATE = """请只修复以下 SonarQube issue，并优先完成最小可编译修复。
-
-【当前问题】
-- Issue Key: {issue_key}
-- 规则ID: {rule_id}
-- 问题描述: {message}
-- 严重程度: {severity}
-- 文件路径: {file_path}
-- 报错行号: {line}
-
-【精确定位】
-{issue_location_guidance}
-
-【SonarQube 修复建议】
-{rule_fix_guidance}
-
-【问题代码】
-{code_context}
-
-{working_memory_section}
-{rule_guard_section}
-
-【允许修改范围】
-{scope_guidance}
-
-{tool_surface_section}
-{retry_feedback_section}
-
-【执行要求】
-- 先完成当前 issue 的最小可编译修复
-- 只使用仓库内相对路径；优先直接操作下面这些候选路径：
-{file_path_candidates}
-- 如果上一轮策略失败或已回滚，请换一种更小的修法，不要机械重复已撤销的改法
-- 外层统一执行 build 和 post-check；本轮不要自行构建
-- 不要顺手修复本文件中其他 issue，不要做大重构
-"""
 
 
 @dataclass(frozen=True)
@@ -320,6 +283,8 @@ class IssuePromptBuilder:
         prefetched_context_section: str,
         tool_surface_section: str,
         execution_mode_section: str,
+        build_command_section: str,
+        durable_memory_section: str,
     ) -> str:
         sections = ["# Sonar Fix Reference", "", "以下内容为本次修复的详细约束与参考资料。"]
         for title, content in (
@@ -332,6 +297,8 @@ class IssuePromptBuilder:
             ("预取上下文", prefetched_context_section),
             ("工具策略", tool_surface_section),
             ("执行模式", execution_mode_section),
+            ("构建/验证约束", build_command_section),
+            ("长期参考", durable_memory_section),
         ):
             text = str(content or "").strip()
             if not text:
@@ -353,6 +320,8 @@ class IssuePromptBuilder:
         prefetched_context_section: str,
         tool_surface_section: str,
         execution_mode_section: str,
+        build_command_section: str,
+        durable_memory_section: str,
         code_context: str,
         retry_feedback_section: str,
     ) -> tuple[dict[str, str], tuple[str, ...], str]:
@@ -366,6 +335,8 @@ class IssuePromptBuilder:
             "prefetched_context_section": prefetched_context_section,
             "tool_surface_section": tool_surface_section,
             "execution_mode_section": execution_mode_section,
+            "build_command_section": build_command_section,
+            "durable_memory_section": durable_memory_section,
         }
         if workspace_path is None:
             return inline_sections, (), ""
@@ -381,6 +352,8 @@ class IssuePromptBuilder:
                 prefetched_context_section,
                 tool_surface_section,
                 execution_mode_section,
+                build_command_section,
+                durable_memory_section,
                 code_context,
                 retry_feedback_section,
             )
@@ -401,6 +374,8 @@ class IssuePromptBuilder:
                 prefetched_context_section=prefetched_context_section,
                 tool_surface_section=tool_surface_section,
                 execution_mode_section=execution_mode_section,
+                build_command_section=build_command_section,
+                durable_memory_section=durable_memory_section,
             ),
             encoding="utf-8",
         )
@@ -417,6 +392,8 @@ class IssuePromptBuilder:
             "prefetched_context_section",
             "tool_surface_section",
             "execution_mode_section",
+            "build_command_section",
+            "durable_memory_section",
         )
         inline_sections.update(
             {
@@ -427,6 +404,8 @@ class IssuePromptBuilder:
                 "prefetched_context_section": "【预取上下文】\n- 详细上下文见参考文件；先围绕问题位置和 contract 修复。",
                 "tool_surface_section": f"【工具策略】\n- {reference_hint}",
                 "execution_mode_section": "【执行模式】\n- 执行细节见参考文件；优先做最小、可回滚的改动。",
+                "build_command_section": "【构建/验证约束】\n- 详细构建与验证策略见参考文件；不要在本轮自行接管外层 build/post-check。",
+                "durable_memory_section": "【长期参考】\n- 详细长期经验见参考文件；当前 issue 的工作记忆和当前代码状态优先。",
             }
         )
         return inline_sections, externalized, reference_relative_path
@@ -441,13 +420,29 @@ class IssuePromptBuilder:
         """Compose the fix system prompt with optional workspace rules."""
 
         base_prompt = SIMPLE_LOOP_SYSTEM_PROMPT
-        prompt = ResourceLoader.compose_system_prompt(
-            base_prompt,
-            workspace_path,
-            max_chars=cls.SYSTEM_PROMPT_TARGET_CHARS,
-            max_project_rule_chars=1400,
-            max_workspace_rule_chars=1400,
+        project_rules = ResourceLoader.truncate_for_prompt(
+            ResourceLoader.load_project_rules(),
+            1400,
+            max_lines=80,
         )
+        workspace_rules = ResourceLoader.truncate_for_prompt(
+            ResourceLoader.load_workspace_rules(workspace_path),
+            1400,
+            max_lines=80,
+        )
+        pipeline = PromptPipelineBuilder()
+        pipeline.add_core("system_core", base_prompt)
+        if project_rules:
+            pipeline.add_support("project_rules", "【Agent 长期规则】\n" + project_rules.strip())
+        if workspace_rules:
+            pipeline.add_support("workspace_rules", "【仓库长期规则】\n" + workspace_rules.strip())
+        prompt = pipeline.build().prompt
+        if len(prompt) > cls.SYSTEM_PROMPT_TARGET_CHARS:
+            prompt = ResourceLoader.truncate_for_prompt(
+                prompt,
+                cls.SYSTEM_PROMPT_TARGET_CHARS,
+                max_lines=220,
+            )
         return PromptBuildResult(
             prompt=prompt,
             target_chars=cls.SYSTEM_PROMPT_TARGET_CHARS,
@@ -725,6 +720,82 @@ class IssuePromptBuilder:
         lines.append("这些长期经验只作为补充参考；当前工作记忆和当前代码状态优先。")
         return "\n".join(lines)
 
+    @staticmethod
+    def _build_current_issue_section(issue: Any, workspace_relative_file_path: str) -> str:
+        return "\n".join(
+            [
+                "【当前问题】",
+                f"- Issue Key: {getattr(issue, 'key', '')}",
+                f"- 规则ID: {getattr(issue, 'rule', '')}",
+                f"- 问题描述: {getattr(issue, 'message', '')}",
+                f"- 严重程度: {getattr(issue, 'severity', '')}",
+                f"- 文件路径: {workspace_relative_file_path}",
+                f"- 报错行号: {getattr(issue, 'start_line', None) or getattr(issue, 'line', '')}",
+            ]
+        )
+
+    @staticmethod
+    def _build_execution_requirements_section(file_path_candidates: str) -> str:
+        return "\n".join(
+            [
+                "【执行要求】",
+                "- 先完成当前 issue 的最小可编译修复",
+                "- 只使用仓库内相对路径；优先直接操作下面这些候选路径：",
+                file_path_candidates,
+                "- 如果上一轮策略失败或已回滚，请换一种更小的修法，不要机械重复已撤销的改法",
+                "- 外层统一执行 build 和 post-check；本轮不要自行构建",
+                "- 不要顺手修复本文件中其他 issue，不要做大重构",
+            ]
+        )
+
+    @classmethod
+    def _render_simple_loop_user_prompt(
+        cls,
+        *,
+        issue: Any,
+        workspace_relative_file_path: str,
+        issue_location_guidance: str,
+        rule_fix_guidance: str,
+        code_context: str,
+        scope_guidance: str,
+        file_path_candidates: str,
+        support_sections: dict[str, str],
+        dynamic_sections: dict[str, str],
+    ) -> str:
+        pipeline = PromptPipelineBuilder()
+        pipeline.add_core("task_intro", "请只修复以下 SonarQube issue，并优先完成最小可编译修复。")
+        pipeline.add_core(
+            "current_issue",
+            cls._build_current_issue_section(issue, workspace_relative_file_path),
+        )
+        pipeline.add_core("issue_location_guidance", "【精确定位】\n" + issue_location_guidance)
+        pipeline.add_core("rule_fix_guidance", "【SonarQube 修复建议】\n" + rule_fix_guidance)
+        pipeline.add_core("code_context", "【问题代码】\n" + code_context)
+        pipeline.add_core("scope_guidance", "【允许修改范围】\n" + scope_guidance)
+        for name in (
+            "rule_description",
+            "quality_gate_section",
+            "rule_guard_section",
+            "edit_contract_section",
+            "repair_plan_section",
+            "prefetched_context_section",
+            "build_command_section",
+            "durable_memory_section",
+        ):
+            pipeline.add_support(name, support_sections.get(name, ""))
+        pipeline.add_core(
+            "execution_requirements",
+            cls._build_execution_requirements_section(file_path_candidates),
+        )
+        for name in (
+            "tool_surface_section",
+            "execution_mode_section",
+            "working_memory_section",
+            "retry_feedback_section",
+        ):
+            pipeline.add_dynamic(name, dynamic_sections.get(name, ""))
+        return pipeline.build().prompt
+
     @classmethod
     def build_user_prompt_result(
         cls,
@@ -850,12 +921,23 @@ class IssuePromptBuilder:
             truncated_sections=truncated_sections,
         )
 
+        compact_durable_memory = cls._clip_section(
+            cls._render_durable_memory_section(edit_contract),
+            "",
+            max_chars=1000,
+            max_lines=28,
+            section_name="durable_memory_section",
+            truncated_sections=truncated_sections,
+        )
         workspace_relative_file_path = cls.render_workspace_relative_path(issue.file_path)
         file_path_candidates = "\n".join(
             f"- {candidate}"
             for candidate in cls.build_workspace_relative_candidates(issue.file_path, workspace_path)
         )
-        durable_memory_section = ""
+        normalized_scope_guidance = cls.normalize_prompt_text(
+            scope_guidance,
+            "- 只允许修改 SonarQube 指向的那一处问题，不要修改本文件其他同类位置。",
+        )
         retry_feedback_section = cls._render_retry_feedback_section(
             retry_feedback_text=retry_feedback_text,
             retry_context=retry_context,
@@ -863,51 +945,34 @@ class IssuePromptBuilder:
             truncated_sections=truncated_sections,
         )
 
-        inline_sections = {
+        support_sections = {
             "rule_description": "",
-            "rule_fix_guidance": rule_fix_guidance,
-            "quality_gate_section": "",
+            "quality_gate_section": quality_gate_section,
             "rule_guard_section": rule_guard_section,
-            "edit_contract_section": "",
-            "repair_plan_section": "",
-            "prefetched_context_section": "",
-            "tool_surface_section": tool_surface_section,
-            "execution_mode_section": "",
+            "edit_contract_section": compact_edit_contract,
+            "repair_plan_section": compact_repair_plan,
+            "prefetched_context_section": compact_prefetched_context,
+            "build_command_section": build_command_section,
+            "durable_memory_section": compact_durable_memory,
         }
-        externalized_sections = ()
-        reference_document_path = ""
+        dynamic_sections = {
+            "tool_surface_section": tool_surface_section,
+            "execution_mode_section": compact_execution_mode,
+            "working_memory_section": compact_working_memory,
+            "retry_feedback_section": retry_feedback_section,
+        }
 
-        prompt_template = SIMPLE_LOOP_USER_PROMPT_TEMPLATE
-
-        draft_prompt = prompt_template.format(
-            issue_key=issue.key,
-            rule_id=issue.rule,
-            rule_name=cls.normalize_prompt_text(rule_details.get("name", ""), "未提供"),
-            message=issue.message,
-            severity=issue.severity,
-            file_path=workspace_relative_file_path,
-            line=issue.start_line or issue.line,
+        draft_prompt = cls._render_simple_loop_user_prompt(
+            issue=issue,
+            workspace_relative_file_path=workspace_relative_file_path,
             issue_location_guidance=cls.build_issue_location_guidance(issue),
-            rule_description=inline_sections["rule_description"],
-            rule_fix_guidance=inline_sections["rule_fix_guidance"],
+            rule_fix_guidance=rule_fix_guidance,
             code_context=compact_code_context,
-            working_memory_section=compact_working_memory,
-            quality_gate_section=inline_sections["quality_gate_section"],
-            rule_guard_section=inline_sections["rule_guard_section"],
-            edit_contract_section=inline_sections["edit_contract_section"],
-            repair_plan_section=inline_sections["repair_plan_section"],
-            prefetched_context_section=inline_sections["prefetched_context_section"],
-            tool_surface_section=inline_sections["tool_surface_section"],
-            execution_mode_section=inline_sections["execution_mode_section"],
-            scope_guidance=cls.normalize_prompt_text(
-                scope_guidance,
-                "- 只允许修改 SonarQube 指向的那一处问题，不要修改本文件其他同类位置。",
-            ),
-            build_command_section=build_command_section,
-            retry_feedback_section=retry_feedback_section,
-            durable_memory_section=durable_memory_section,
+            scope_guidance=normalized_scope_guidance,
             file_path_candidates=file_path_candidates,
-        ).strip()
+            support_sections=support_sections,
+            dynamic_sections=dynamic_sections,
+        )
         effective_working_memory, compaction_decision = maybe_compact_issue_prompt(
             issue_key=issue.key,
             rule_id=issue.rule,
@@ -941,36 +1006,85 @@ class IssuePromptBuilder:
                 )
                 if str(item).strip()
             )
+        support_sections.update(
+            {
+                "quality_gate_section": quality_gate_section,
+                "rule_guard_section": rule_guard_section,
+                "edit_contract_section": compact_edit_contract,
+                "repair_plan_section": compact_repair_plan,
+                "prefetched_context_section": compact_prefetched_context,
+                "build_command_section": build_command_section,
+                "durable_memory_section": compact_durable_memory,
+            }
+        )
+        dynamic_sections.update(
+            {
+                "tool_surface_section": tool_surface_section,
+                "execution_mode_section": compact_execution_mode,
+                "working_memory_section": compact_working_memory,
+                "retry_feedback_section": retry_feedback_section,
+            }
+        )
+        externalized_sections: tuple[str, ...] = ()
+        reference_document_path = ""
+        total_reference_chars = cls._estimate_prompt_chars(
+            (
+                quality_gate_section,
+                compact_edit_contract,
+                compact_repair_plan,
+                compact_prefetched_context,
+                build_command_section,
+                compact_durable_memory,
+            )
+        )
+        if total_reference_chars > cls.PROMPT_INLINE_THRESHOLD:
+            externalized_inline_sections, externalized_sections, reference_document_path = (
+                cls._maybe_externalize_reference_sections(
+                    workspace_path=workspace_path,
+                    rule_description="",
+                    rule_fix_guidance=rule_fix_guidance,
+                    quality_gate_section=quality_gate_section,
+                    rule_guard_section=rule_guard_section,
+                    edit_contract_section=compact_edit_contract,
+                    repair_plan_section=compact_repair_plan,
+                    prefetched_context_section=compact_prefetched_context,
+                    tool_surface_section=tool_surface_section,
+                    execution_mode_section=compact_execution_mode,
+                    build_command_section=build_command_section,
+                    durable_memory_section=compact_durable_memory,
+                    code_context=compact_code_context,
+                    retry_feedback_section=retry_feedback_section,
+                )
+            )
+            support_sections.update(
+                {
+                    "quality_gate_section": externalized_inline_sections.get("quality_gate_section", ""),
+                    "rule_guard_section": externalized_inline_sections.get("rule_guard_section", ""),
+                    "edit_contract_section": externalized_inline_sections.get("edit_contract_section", ""),
+                    "repair_plan_section": externalized_inline_sections.get("repair_plan_section", ""),
+                    "prefetched_context_section": externalized_inline_sections.get("prefetched_context_section", ""),
+                    "build_command_section": externalized_inline_sections.get("build_command_section", ""),
+                    "durable_memory_section": externalized_inline_sections.get("durable_memory_section", ""),
+                }
+            )
+            dynamic_sections.update(
+                {
+                    "tool_surface_section": externalized_inline_sections.get("tool_surface_section", ""),
+                    "execution_mode_section": externalized_inline_sections.get("execution_mode_section", ""),
+                }
+            )
 
-        prompt = prompt_template.format(
-            issue_key=issue.key,
-            rule_id=issue.rule,
-            rule_name=cls.normalize_prompt_text(rule_details.get("name", ""), "未提供"),
-            message=issue.message,
-            severity=issue.severity,
-            file_path=workspace_relative_file_path,
-            line=issue.start_line or issue.line,
+        prompt = cls._render_simple_loop_user_prompt(
+            issue=issue,
+            workspace_relative_file_path=workspace_relative_file_path,
             issue_location_guidance=cls.build_issue_location_guidance(issue),
-            rule_description=inline_sections["rule_description"],
-            rule_fix_guidance=inline_sections["rule_fix_guidance"],
+            rule_fix_guidance=rule_fix_guidance,
             code_context=compact_code_context,
-            working_memory_section=compact_working_memory,
-            quality_gate_section=inline_sections["quality_gate_section"],
-            rule_guard_section=inline_sections["rule_guard_section"],
-            edit_contract_section=inline_sections["edit_contract_section"],
-            repair_plan_section=inline_sections["repair_plan_section"],
-            prefetched_context_section=inline_sections["prefetched_context_section"],
-            tool_surface_section=inline_sections["tool_surface_section"],
-            execution_mode_section=inline_sections["execution_mode_section"],
-            scope_guidance=cls.normalize_prompt_text(
-                scope_guidance,
-                "- 只允许修改 SonarQube 指向的那一处问题，不要修改本文件其他同类位置。",
-            ),
-            build_command_section=build_command_section,
-            retry_feedback_section=retry_feedback_section,
-            durable_memory_section=durable_memory_section,
+            scope_guidance=normalized_scope_guidance,
             file_path_candidates=file_path_candidates,
-        ).strip()
+            support_sections=support_sections,
+            dynamic_sections=dynamic_sections,
+        )
 
         if len(prompt) > cls.USER_PROMPT_TARGET_CHARS:
             compact_code_context = cls._clip_section(
@@ -981,54 +1095,36 @@ class IssuePromptBuilder:
                 section_name="code_context_compact_retry",
                 truncated_sections=truncated_sections,
             )
-            prompt = prompt_template.format(
-                issue_key=issue.key,
-                rule_id=issue.rule,
-                rule_name=cls.normalize_prompt_text(rule_details.get("name", ""), "未提供"),
-                message=issue.message,
-                severity=issue.severity,
-                file_path=workspace_relative_file_path,
-                line=issue.start_line or issue.line,
+            prompt = cls._render_simple_loop_user_prompt(
+                issue=issue,
+                workspace_relative_file_path=workspace_relative_file_path,
                 issue_location_guidance=cls.build_issue_location_guidance(issue),
-                rule_description=inline_sections["rule_description"],
-                rule_fix_guidance=inline_sections["rule_fix_guidance"],
+                rule_fix_guidance=rule_fix_guidance,
                 code_context=compact_code_context,
-                working_memory_section=compact_working_memory,
-                quality_gate_section=inline_sections["quality_gate_section"],
-                rule_guard_section=inline_sections["rule_guard_section"],
-                edit_contract_section=inline_sections["edit_contract_section"],
-                repair_plan_section=inline_sections["repair_plan_section"],
-                prefetched_context_section=inline_sections["prefetched_context_section"],
-                tool_surface_section=inline_sections["tool_surface_section"],
-                execution_mode_section=inline_sections["execution_mode_section"],
-                scope_guidance=cls.normalize_prompt_text(
-                    scope_guidance,
-                    "- 只允许修改 SonarQube 指向的那一处问题，不要修改本文件其他同类位置。",
-                ),
-                build_command_section=build_command_section,
-                retry_feedback_section=retry_feedback_section,
-                durable_memory_section=durable_memory_section,
+                scope_guidance=normalized_scope_guidance,
                 file_path_candidates=file_path_candidates,
-            ).strip()
+                support_sections=support_sections,
+                dynamic_sections=dynamic_sections,
+            )
 
         return PromptBuildResult(
             prompt=prompt,
             target_chars=cls.USER_PROMPT_TARGET_CHARS,
             section_chars={
-                "rule_description": len(inline_sections["rule_description"]),
-                "rule_fix_guidance": len(inline_sections["rule_fix_guidance"]),
+                "rule_description": len(support_sections["rule_description"]),
+                "rule_fix_guidance": len(rule_fix_guidance),
                 "code_context": len(compact_code_context),
                 "working_memory_section": len(compact_working_memory),
-                "quality_gate_section": len(inline_sections["quality_gate_section"]),
-                "rule_guard_section": len(inline_sections["rule_guard_section"]),
-                "edit_contract_section": len(inline_sections["edit_contract_section"]),
-                "repair_plan_section": len(inline_sections["repair_plan_section"]),
-                "prefetched_context_section": len(inline_sections["prefetched_context_section"]),
-                "tool_surface_section": len(inline_sections["tool_surface_section"]),
-                "execution_mode_section": len(inline_sections["execution_mode_section"]),
-                "build_command_section": len(build_command_section),
+                "quality_gate_section": len(support_sections["quality_gate_section"]),
+                "rule_guard_section": len(support_sections["rule_guard_section"]),
+                "edit_contract_section": len(support_sections["edit_contract_section"]),
+                "repair_plan_section": len(support_sections["repair_plan_section"]),
+                "prefetched_context_section": len(support_sections["prefetched_context_section"]),
+                "tool_surface_section": len(dynamic_sections["tool_surface_section"]),
+                "execution_mode_section": len(dynamic_sections["execution_mode_section"]),
+                "build_command_section": len(support_sections["build_command_section"]),
                 "retry_feedback_section": len(retry_feedback_section),
-                "durable_memory_section": len(durable_memory_section),
+                "durable_memory_section": len(support_sections["durable_memory_section"]),
             },
             truncated_sections=tuple(dict.fromkeys(truncated_sections)),
             externalized_sections=externalized_sections,

@@ -15,6 +15,11 @@ from pi_sonar_agent.core.memory.issue_working_memory import (
     IssueWorkingMemory,
     render_issue_working_memory,
 )
+from pi_sonar_agent.core.prompt_pipeline import PromptPipelineBuilder
+from pi_sonar_agent.core.attempt_todo import (
+    AttemptTodoState,
+    render_attempt_todo_prompt_section,
+)
 
 QUALITY_GATE_SKILL_PATH = Path(r"C:\Users\neware\.claude\skills\csharp-quality-gate\SKILL.md")
 S107_FIX_GUIDE_RELATIVE_PATH = ".pi-sonar-agent-runtime/s107-fix-guide.md"
@@ -116,8 +121,11 @@ def _build_rule_specific_main_requirements(issue: Any) -> str:
     )
 
 
-def build_fix_role_system_prompt() -> str:
-    return """你是 Fix 子Agent，职责只有一个：在当前工作区内直接修改代码，完成当前 Sonar issue 的最小修复。
+def build_fix_role_system_prompt(*, todo_write_tool_name: str = "") -> str:
+    pipeline = PromptPipelineBuilder()
+    pipeline.add_core(
+        "fix_role",
+        """你是 Fix 子Agent，职责只有一个：在当前工作区内直接修改代码，完成当前 Sonar issue 的最小修复。
 
 规则：
 - 只修当前 issue，不顺手修其他问题
@@ -126,7 +134,9 @@ def build_fix_role_system_prompt() -> str:
 - Edit 必须同时提供 file_path、old_string、new_string；MultiEdit 必须提供 file_path 和至少一个 edits 项；Write 只能重写已有文件
 - 优先做更小、更直接的局部修改；如果上一轮策略被否定，必须换一种更小的修法
 - 不要输出长篇解释；直接读代码、编辑、完成后简短说明修法
-"""
+""",
+    )
+    return pipeline.build().prompt
 
 
 def _normalize_relative_path(value: str) -> str:
@@ -175,7 +185,10 @@ def _summarize_fix_retry_feedback(retry_feedback: str) -> str:
 
 
 def build_review_role_system_prompt() -> str:
-    return """你是 Review 子Agent，职责是审查当前 patch 是否符合 C# 代码质量门禁和当前 issue 修复目标。
+    pipeline = PromptPipelineBuilder()
+    pipeline.add_core(
+        "review_role",
+        """你是 Review 子Agent，职责是审查当前 patch 是否符合 C# 代码质量门禁和当前 issue 修复目标。
 
 规则：
 - 你不修改代码，只做审查
@@ -188,11 +201,16 @@ def build_review_role_system_prompt() -> str:
 - findings 用于解释你看到的事实；constraints 用于告诉 Fix 子Agent 下一轮具体怎么改
 - 输出必须是 JSON，对象字段固定为:
   {"decision":"approve|retry","summary":"...","findings":["..."],"constraints":["..."]}
-"""
+""",
+    )
+    return pipeline.build().prompt
 
 
 def build_main_role_system_prompt() -> str:
-    return """你是 Main 裁决 Agent，职责是综合 Fix 子Agent和 Review 子Agent的结果，决定当前 patch 是否进入编译阶段。
+    pipeline = PromptPipelineBuilder()
+    pipeline.add_core(
+        "main_role",
+        """你是 Main 裁决 Agent，职责是综合 Fix 子Agent和 Review 子Agent的结果，决定当前 patch 是否进入编译阶段。
 
 规则：
 - 你不修改代码
@@ -202,7 +220,27 @@ def build_main_role_system_prompt() -> str:
 - 如果返回 retry，constraints 里必须写出 Fix 子Agent 下一轮可执行的约束
 - 输出必须是 JSON，对象字段固定为:
   {"decision":"compile|retry","summary":"...","constraints":["..."]}
-"""
+""",
+    )
+    return pipeline.build().prompt
+
+
+def _render_role_prompt(
+    *,
+    intro: str,
+    core_sections: list[str],
+    support_sections: list[str],
+    dynamic_sections: list[str],
+) -> str:
+    pipeline = PromptPipelineBuilder()
+    pipeline.add_core("intro", intro)
+    for index, section in enumerate(core_sections, start=1):
+        pipeline.add_core(f"core_{index}", section)
+    for index, section in enumerate(support_sections, start=1):
+        pipeline.add_support(f"support_{index}", section)
+    for index, section in enumerate(dynamic_sections, start=1):
+        pipeline.add_dynamic(f"dynamic_{index}", section)
+    return pipeline.build().prompt
 
 
 def build_fix_role_user_prompt(
@@ -210,69 +248,69 @@ def build_fix_role_user_prompt(
     issue: Any,
     code_context: str,
     file_path_candidates: tuple[str, ...],
-    working_memory: IssueWorkingMemory | None,
-    fix_memory: ChildAgentMemory | None,
-    retry_feedback: str,
+    working_memory: IssueWorkingMemory | None = None,
+    attempt_todo_state: AttemptTodoState | None = None,
+    todo_write_tool_name: str = "",
+    fix_memory: ChildAgentMemory | None = None,
+    retry_feedback: str = "",
 ) -> str:
     candidate_lines = "\n".join(f"- {item}" for item in file_path_candidates if str(item).strip())
     primary_candidate = _select_primary_candidate(issue, file_path_candidates)
     retry_feedback_text = _summarize_fix_retry_feedback(retry_feedback)
     quality_gate = load_quality_gate_fix_digest()
     rule_specific_requirements = _build_rule_specific_fix_requirements(issue)
-    sections = [
-        "请直接修复当前 Sonar issue。",
+    core_sections = [
         "【当前问题】",
         f"- Issue Key: {getattr(issue, 'key', '')}",
         f"- 规则ID: {getattr(issue, 'rule', '')}",
         f"- 问题描述: {getattr(issue, 'message', '')}",
         f"- 主文件相对路径: {primary_candidate or '未知'}",
         f"- 行号: {getattr(issue, 'line', '')}",
-        "",
         "【问题代码】",
         str(code_context or "").strip(),
-        "",
-        render_issue_working_memory(working_memory),
-        "",
-        render_child_agent_memory(fix_memory),
-        "",
         "【候选相对路径】",
         candidate_lines or "- 无",
+        "【执行要求】\n"
+        + "\n".join(
+            [
+                "- 只修当前 issue",
+                "- 只修改已有文件；禁止创建/删除文件",
+                "- 外层会统一决定是否编译；本轮优先把 patch 修对",
+                "- 完成后简短说明你改了什么即可",
+            ]
+        ),
     ]
+    support_sections: list[str] = []
     if quality_gate:
-        sections.extend(
-            [
-                "",
-                "【Fix 质量约束】",
-                quality_gate,
-            ]
-        )
+        support_sections.append("【Fix 质量约束】\n" + quality_gate)
     if rule_specific_requirements:
-        sections.extend(["", rule_specific_requirements])
-    if retry_feedback_text:
-        sections.extend(
+        support_sections.append(rule_specific_requirements)
+    dynamic_sections = [
+        render_issue_working_memory(working_memory),
+        render_attempt_todo_prompt_section(
+            attempt_todo_state,
+            tool_name=todo_write_tool_name,
+        ),
+        render_child_agent_memory(fix_memory),
+        "【工具使用提醒】\n"
+        + "\n".join(
             [
-                "",
-                "【上轮失败信息】",
-                retry_feedback_text,
+                "- 读取和编辑时只使用上面的仓库相对路径，不要先尝试带前导 / 的路径。",
+                "- 优先直接 Read/Edit/Write 主文件相对路径；路径不确定时先用 Glob/Grep，最后才用 Bash 做只读搜索。",
+                "- Edit 必须带 file_path、old_string、new_string；不要发送空 Edit。",
+                "- MultiEdit 必须带 file_path 和至少一个 edits 项；Write 只允许重写已有文件。",
+                "- 如果当前修复明显不是一步就能完成，并且 TodoWrite 工具可用，请先维护当前 attempt 的执行清单再继续动手。",
             ]
-        )
-    sections.extend(
-        [
-            "",
-            "【工具使用提醒】",
-            "- 读取和编辑时只使用上面的仓库相对路径，不要先尝试带前导 / 的路径。",
-            "- 优先直接 Read/Edit/Write 主文件相对路径；路径不确定时先用 Glob/Grep，最后才用 Bash 做只读搜索。",
-            "- Edit 必须带 file_path、old_string、new_string；不要发送空 Edit。",
-            "- MultiEdit 必须带 file_path 和至少一个 edits 项；Write 只允许重写已有文件。",
-            "",
-            "【执行要求】",
-            "- 只修当前 issue",
-            "- 只修改已有文件；禁止创建/删除文件",
-            "- 外层会统一决定是否编译；本轮优先把 patch 修对",
-            "- 完成后简短说明你改了什么即可",
-        ]
+        ),
+    ]
+    if retry_feedback_text:
+        dynamic_sections.append("【上轮失败信息】\n" + retry_feedback_text)
+    return _render_role_prompt(
+        intro="请直接修复当前 Sonar issue。",
+        core_sections=core_sections,
+        support_sections=support_sections,
+        dynamic_sections=dynamic_sections,
     )
-    return "\n".join(section for section in sections if str(section).strip()).strip()
 
 
 def build_review_role_user_prompt(
@@ -295,45 +333,40 @@ def build_review_role_user_prompt(
         working_memory=working_memory,
         review_memory=review_memory,
     )
-    sections = [
-        "请只做 patch 审查，判断当前 patch 是否已经足够进入编译阶段。",
+    core_sections = [
         "【当前问题】",
         f"- Issue Key: {getattr(issue, 'key', '')}",
         f"- 规则ID: {getattr(issue, 'rule', '')}",
         f"- 问题描述: {getattr(issue, 'message', '')}",
         f"- 目标文件: {_normalize_relative_path(str(getattr(issue, 'file_path', '') or '')) or '未知'}",
         f"- 目标行: {getattr(issue, 'line', '')}",
-        "",
         "【当前 patch 摘要】",
         str(patch_summary or "").strip(),
-        "",
         target_excerpt,
-        "",
-        state_digest,
-    ]
-    if quality_gate:
-        sections.extend(
+        "【输出要求】\n"
+        + "\n".join(
             [
-                "",
-                "【Review 门禁要点】",
-                quality_gate,
+                "- 只输出 JSON",
+                '- decision 只能是 "approve" 或 "retry"',
+                "- summary 必须是一句明确结论，不能留空",
+                "- findings 只写当前 patch 的事实判断，不写泛泛风格建议",
+                "- constraints 用于给 Fix 子Agent 下一轮的明确约束；decision=retry 时 constraints 至少提供 1 条",
+                "- constraints 必须限制在当前 issue 目标方法和当前 patch，不要要求同步改相似 sibling 方法",
             ]
-        )
+        ),
+    ]
+    support_sections: list[str] = []
+    if quality_gate:
+        support_sections.append("【Review 门禁要点】\n" + quality_gate)
     if rule_specific_requirements:
-        sections.extend(["", rule_specific_requirements])
-    sections.extend(
-        [
-            "",
-            "【输出要求】",
-            "- 只输出 JSON",
-            '- decision 只能是 "approve" 或 "retry"',
-            "- summary 必须是一句明确结论，不能留空",
-            "- findings 只写当前 patch 的事实判断，不写泛泛风格建议",
-            "- constraints 用于给 Fix 子Agent 下一轮的明确约束；decision=retry 时 constraints 至少提供 1 条",
-            "- constraints 必须限制在当前 issue 目标方法和当前 patch，不要要求同步改相似 sibling 方法",
-        ]
+        support_sections.append(rule_specific_requirements)
+    dynamic_sections = [state_digest]
+    return _render_role_prompt(
+        intro="请只做 patch 审查，判断当前 patch 是否已经足够进入编译阶段。",
+        core_sections=core_sections,
+        support_sections=support_sections,
+        dynamic_sections=dynamic_sections,
     )
-    return "\n".join(section for section in sections if str(section).strip()).strip()
 
 
 def _build_review_target_excerpt(*, issue: Any, code_context: str, current_file_content: str) -> str:
@@ -434,37 +467,37 @@ def build_main_role_user_prompt(
 ) -> str:
     quality_gate = load_quality_gate_main_digest()
     rule_specific_requirements = _build_rule_specific_main_requirements(issue)
-    sections = [
-        "请裁决当前 patch 是否值得进入编译阶段。",
+    core_sections = [
         "【当前问题】",
         f"- Issue Key: {getattr(issue, 'key', '')}",
         f"- 规则ID: {getattr(issue, 'rule', '')}",
         f"- 问题描述: {getattr(issue, 'message', '')}",
-        "",
         "【当前 patch 摘要】",
         str(patch_summary or "").strip(),
-        "",
         "【Review 子Agent结论】",
         json.dumps(review_result or {}, ensure_ascii=False, indent=2),
-        "",
-        render_issue_working_memory(working_memory),
-        "",
-        render_child_agent_memory(main_memory),
-        "",
-        "【裁决规则】",
-        '- 如果 patch 方向明显不对，输出 {"decision":"retry", ...}',
-        '- 如果 patch 已具备进入编译的价值，输出 {"decision":"compile", ...}',
-        '- 如果输出 retry，constraints 至少包含 1 条下一轮可执行约束',
-        "- 只输出 JSON",
-    ]
-    if quality_gate:
-        sections.extend(
+        "【裁决规则】\n"
+        + "\n".join(
             [
-                "",
-                "【Main 裁决门禁】",
-                quality_gate,
+                '- 如果 patch 方向明显不对，输出 {"decision":"retry", ...}',
+                '- 如果 patch 已具备进入编译的价值，输出 {"decision":"compile", ...}',
+                '- 如果输出 retry，constraints 至少包含 1 条下一轮可执行约束',
+                "- 只输出 JSON",
             ]
-        )
+        ),
+    ]
+    support_sections: list[str] = []
+    if quality_gate:
+        support_sections.append("【Main 裁决门禁】\n" + quality_gate)
     if rule_specific_requirements:
-        sections.extend(["", rule_specific_requirements])
-    return "\n".join(section for section in sections if str(section).strip()).strip()
+        support_sections.append(rule_specific_requirements)
+    dynamic_sections = [
+        render_issue_working_memory(working_memory),
+        render_child_agent_memory(main_memory),
+    ]
+    return _render_role_prompt(
+        intro="请裁决当前 patch 是否值得进入编译阶段。",
+        core_sections=core_sections,
+        support_sections=support_sections,
+        dynamic_sections=dynamic_sections,
+    )
