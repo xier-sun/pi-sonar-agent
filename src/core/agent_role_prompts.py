@@ -96,6 +96,43 @@ def _build_rule_specific_fix_requirements(issue: Any) -> str:
     )
 
 
+def _render_planner_lessons_section(planner_lessons: tuple[Any, ...] | list[Any]) -> str:
+    lessons = tuple(planner_lessons or ())
+    if not lessons:
+        return ""
+
+    lines = ["【长期经验】"]
+    rendered_count = 0
+    for lesson in lessons[:2]:
+        summary = str(getattr(lesson, "summary", "") or "").strip()
+        if not summary:
+            continue
+        source = str(getattr(lesson, "source", "") or "").strip() or "lesson"
+        selection_mode = str(getattr(lesson, "selection_mode", "") or "").strip()
+        selection_reason = str(getattr(lesson, "selection_reason", "") or "").strip()
+        count = int(getattr(lesson, "count", 0) or 0)
+        label = source
+        if count > 1:
+            label = f"{label} x{count}"
+        if selection_mode:
+            label = f"{label}/{selection_mode}"
+        lines.append(f"- [{label}] {summary}")
+        if selection_reason:
+            lines.append(f"  命中原因: {selection_reason}")
+        guidance = tuple(
+            str(item).strip()
+            for item in getattr(lesson, "guidance", ()) or ()
+            if str(item).strip()
+        )
+        if guidance:
+            lines.append(f"  优先做法: {guidance[0]}")
+        rendered_count += 1
+    if rendered_count == 0:
+        return ""
+    lines.append("这些经验只用于加速当前 issue 首轮判断；当前代码状态和当前工作记忆优先。")
+    return "\n".join(lines)
+
+
 def _build_rule_specific_review_requirements(issue: Any) -> str:
     if str(getattr(issue, "rule", "") or "").strip() != "csharpsquid:S107":
         return ""
@@ -248,6 +285,7 @@ def build_fix_role_user_prompt(
     issue: Any,
     code_context: str,
     file_path_candidates: tuple[str, ...],
+    planner_lessons: tuple[Any, ...] | list[Any] = (),
     working_memory: IssueWorkingMemory | None = None,
     attempt_todo_state: AttemptTodoState | None = None,
     todo_write_tool_name: str = "",
@@ -285,6 +323,9 @@ def build_fix_role_user_prompt(
         support_sections.append("【Fix 质量约束】\n" + quality_gate)
     if rule_specific_requirements:
         support_sections.append(rule_specific_requirements)
+    planner_lessons_section = _render_planner_lessons_section(planner_lessons)
+    if planner_lessons_section:
+        support_sections.append(planner_lessons_section)
     dynamic_sections = [
         render_issue_working_memory(working_memory),
         render_attempt_todo_prompt_section(

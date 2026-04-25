@@ -25,6 +25,7 @@ from pi_sonar_agent.core.artifact_writer import ArtifactWriter
 from pi_sonar_agent.core.failure_fingerprint import detect_failure_fingerprints
 from pi_sonar_agent.core.fix_verifier import FixVerifier
 from pi_sonar_agent.core.follow_up_store import FollowUpStore
+from pi_sonar_agent.core.issue_planner import IssuePlanner
 from pi_sonar_agent.core.lessons_store import LessonsStore
 from pi_sonar_agent.core.memory.evidence_state import (
     EVIDENCE_STATE_VERSION,
@@ -1632,6 +1633,78 @@ def _normalize_relative_path(value: str) -> str:
     return str(value or "").replace("\\", "/").lstrip("/").strip()
 
 
+def _derive_lesson_repo_slice(file_path: str) -> str:
+    normalized_path = _normalize_relative_path(file_path)
+    if not normalized_path:
+        return ""
+    parts = [part for part in normalized_path.split("/") if part]
+    directories = parts[:-1]
+    if len(directories) >= 2:
+        return "/".join(directories[:2])
+    if directories:
+        return directories[0]
+    return parts[0] if parts else ""
+
+
+def _derive_lesson_shape_tags(
+    *,
+    issue: SonarIssue,
+    result: FixResult,
+    workspace_path: Path,
+) -> tuple[str, ...]:
+    edit_contract = getattr(result, "edit_contract", None)
+    normalized_path = _normalize_relative_path(issue.file_path)
+    tags: list[str] = []
+
+    scope_mode = str(getattr(edit_contract, "scope_mode", "") or "").strip()
+    if scope_mode:
+        tags.append(f"scope:{scope_mode}")
+    boundary_profile = str(getattr(edit_contract, "boundary_profile", "") or "").strip()
+    if boundary_profile:
+        tags.append(f"boundary:{boundary_profile}")
+    for capability in getattr(edit_contract, "allowed_capabilities", ()) or ():
+        normalized_capability = str(capability or "").strip()
+        if normalized_capability in {
+            "helper_extract",
+            "signature_change",
+            "multi_file_refactor",
+            "method_cluster_delete",
+        }:
+            tags.append(f"cap:{normalized_capability}")
+    tags.extend(IssuePlanner._derive_path_shape_tags(normalized_path))
+
+    source_lines: list[str] = []
+    source_file = workspace_path / normalized_path if normalized_path else None
+    if source_file is not None and source_file.is_file():
+        try:
+            source_lines = source_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            source_lines = []
+    target_line_range = getattr(edit_contract, "target_line_range", ()) or ()
+    scope_start_line = int(target_line_range[0] or 0) if len(target_line_range) >= 2 else 0
+    scope_end_line = int(target_line_range[1] or 0) if len(target_line_range) >= 2 else 0
+    method_descriptor = IssuePlanner._find_primary_method_descriptor(
+        source_lines,
+        int(getattr(issue, "line", 0) or 0),
+        scope_start_line,
+        scope_end_line,
+    )
+    if method_descriptor is not None:
+        access = str(method_descriptor.get("access", "") or "").strip().lower()
+        if access:
+            tags.append(f"access:{access}")
+        tags.append(
+            "async:yes"
+            if bool(method_descriptor.get("is_async"))
+            else "async:no"
+        )
+        return_type = str(method_descriptor.get("return_type", "") or "").strip().lower()
+        if "task" in return_type:
+            tags.append("return:task_like")
+
+    return tuple(dict.fromkeys(tag for tag in tags if str(tag).strip()))
+
+
 def _build_file_content_fingerprint(file_path: Path) -> str:
     digest = hashlib.sha1()
     if not file_path.exists() or not file_path.is_file():
@@ -1668,6 +1741,8 @@ def _build_latest_retryable_failure_summary(
     result: FixResult,
     retry_context: RetryContext | None,
 ) -> str:
+    if bool(getattr(result, "success", False)):
+        return ""
     if retry_context is not None:
         if retry_context.summary:
             return str(retry_context.summary).strip()
@@ -1736,6 +1811,57 @@ def _derive_next_action(
     if bool(getattr(result, "skipped", False)):
         return "当前 issue 已停止自动修复，等待后续人工或策略升级处理。"
     return "继续围绕当前 issue 做最小修复。"
+
+
+def _derive_success_lesson_summary(
+    working_memory: IssueWorkingMemory,
+    result: FixResult,
+) -> str:
+    parts: list[str] = []
+    for item in (
+        str(getattr(working_memory, "latest_strategy_summary", "") or "").strip(),
+        str(getattr(working_memory, "latest_patch_summary", "") or "").strip(),
+        str(getattr(working_memory, "latest_verification", "") or "").strip(),
+        str(getattr(result, "summary", "") or "").strip(),
+    ):
+        text = str(item or "").strip()
+        if text and text not in parts:
+            parts.append(text)
+    if not parts:
+        return "Successful minimal patch passed local verification."
+    return "；".join(parts[:3])
+
+
+def _derive_success_lesson_guidance(
+    working_memory: IssueWorkingMemory,
+    result: FixResult,
+) -> tuple[str, ...]:
+    items: list[str] = []
+    changed_files = _normalize_changed_files(result)
+    if len(changed_files) == 1:
+        items.append("优先保持单文件最小补丁。")
+    edit_contract = getattr(result, "edit_contract", None)
+    allowed_capabilities = {
+        str(item).strip()
+        for item in getattr(edit_contract, "allowed_capabilities", ()) or ()
+        if str(item).strip()
+    }
+    if allowed_capabilities and "helper_extract" not in allowed_capabilities:
+        items.append("优先在当前方法或当前文件内收口，不要先提取 helper/private method。")
+    if allowed_capabilities and "signature_change" not in allowed_capabilities:
+        items.append("优先保持现有公开签名和调用链稳定。")
+    items.extend(
+        str(item).strip()
+        for item in getattr(working_memory, "accepted_constraints", ()) or ()
+        if str(item).strip()
+    )
+    deduped: list[str] = []
+    for item in items:
+        text = str(item or "").strip()
+        if not text or text in deduped:
+            continue
+        deduped.append(text)
+    return tuple(deduped[:4])
 
 
 def _build_compiler_error_evidence(
@@ -2115,6 +2241,65 @@ def process_issue_with_retries(
         attempt_states.append(attempt_state)
         return attempt_state
 
+    def finalize_success_result(
+        *,
+        attempt: int,
+        started_at: str,
+        finished_at: str,
+        duration_seconds: float,
+        result: FixResult,
+        success_retry_context: RetryContext | None,
+    ) -> FixResult:
+        nonlocal current_working_memory
+        current_working_memory = _update_issue_working_memory_from_result(
+            current_working_memory,
+            issue=issue,
+            result=result,
+            retry_context=success_retry_context,
+        )
+        working_memory_store.save(current_working_memory)
+        lessons_store.record_success(
+            repository=repository,
+            run_label=run_label,
+            issue_key=issue.key,
+            issue_rule_id=issue.rule,
+            summary=_derive_success_lesson_summary(current_working_memory, result),
+            guidance=_derive_success_lesson_guidance(current_working_memory, result),
+            scope_mode=str(
+                getattr(getattr(result, "edit_contract", None), "scope_mode", "") or ""
+            ).strip(),
+            guardrail_mode=str(getattr(result, "guardrail_mode", "") or "").strip(),
+            repo_slice=_derive_lesson_repo_slice(issue.file_path),
+            shape_tags=_derive_lesson_shape_tags(
+                issue=issue,
+                result=result,
+                workspace_path=workspace_path,
+            ),
+            quality_gate_rule_ids=tuple(
+                rule.rule_id
+                for rule in getattr(getattr(result, "edit_contract", None), "quality_gate_rules", ())
+            ),
+        )
+        logger.write(f"Attempt {attempt} succeeded: {result.summary}")
+        attempt_state = write_attempt_artifacts(
+            attempt=attempt,
+            started_at=started_at,
+            finished_at=finished_at,
+            duration_seconds=duration_seconds,
+            result=result,
+        )
+        if state_store is not None:
+            state_store.record_attempt_state(
+                attempt_state,
+                run_label=run_label,
+                repository=repository,
+                author=author,
+                project_key=project_key,
+                issue_key=issue.key,
+            )
+        result.issue_working_memory = current_working_memory
+        return finalize_result(result)
+
     def finalize_result(result: FixResult) -> FixResult:
         nonlocal current_working_memory
         result.artifact_root = issue_artifact_root.as_posix()
@@ -2187,32 +2372,14 @@ def process_issue_with_retries(
             attempt_duration_seconds = time.monotonic() - attempt_started_monotonic
 
             if result.success:
-                current_working_memory = _update_issue_working_memory_from_result(
-                    current_working_memory,
-                    issue=issue,
-                    result=result,
-                    retry_context=retry_context,
-                )
-                working_memory_store.save(current_working_memory)
-                logger.write(f"Attempt {attempt} succeeded: {result.summary}")
-                attempt_state = write_attempt_artifacts(
+                return finalize_success_result(
                     attempt=attempt,
                     started_at=attempt_started_at,
                     finished_at=attempt_finished_at,
                     duration_seconds=attempt_duration_seconds,
                     result=result,
+                    success_retry_context=retry_context,
                 )
-                if state_store is not None:
-                    state_store.record_attempt_state(
-                        attempt_state,
-                        run_label=run_label,
-                        repository=repository,
-                        author=author,
-                        project_key=project_key,
-                        issue_key=issue.key,
-                    )
-                result.issue_working_memory = current_working_memory
-                return finalize_result(result)
 
             if result.skipped and result.failure_kind == "policy_skip":
                 current_working_memory = merge_issue_working_memory(
@@ -2275,23 +2442,14 @@ def process_issue_with_retries(
                 )
                 if result.success:
                     logger.write("Extended build verification passed; salvaging current patch without another model retry.")
-                    attempt_state = write_attempt_artifacts(
+                    return finalize_success_result(
                         attempt=attempt,
                         started_at=attempt_started_at,
                         finished_at=attempt_finished_at,
                         duration_seconds=attempt_duration_seconds,
                         result=result,
+                        success_retry_context=next_retry_context,
                     )
-                    if state_store is not None:
-                        state_store.record_attempt_state(
-                            attempt_state,
-                            run_label=run_label,
-                            repository=repository,
-                            author=author,
-                            project_key=project_key,
-                            issue_key=issue.key,
-                        )
-                    return finalize_result(result)
                 next_retry_context = build_retry_context(
                     workspace_path,
                     result,
@@ -2324,6 +2482,12 @@ def process_issue_with_retries(
                 retry_context=next_retry_context,
                 scope_mode=str(getattr(getattr(result, "edit_contract", None), "scope_mode", "")).strip(),
                 guardrail_mode=str(getattr(result, "guardrail_mode", "")).strip(),
+                repo_slice=_derive_lesson_repo_slice(issue.file_path),
+                shape_tags=_derive_lesson_shape_tags(
+                    issue=issue,
+                    result=result,
+                    workspace_path=workspace_path,
+                ),
                 quality_gate_rule_ids=tuple(
                     rule.rule_id
                     for rule in getattr(getattr(result, "edit_contract", None), "quality_gate_rules", ())

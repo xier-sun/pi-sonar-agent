@@ -2267,6 +2267,7 @@ class ClaudeFixAgent:
             issue=issue,
             code_context=code_context,
             file_path_candidates=file_path_candidates,
+            planner_lessons=tuple(getattr(edit_contract, "planner_lessons", ()) or ()),
             working_memory=working_memory,
             attempt_todo_state=attempt_todo_state,
             todo_write_tool_name=attempt_todo_runtime.visible_tool_name,
@@ -2327,6 +2328,12 @@ class ClaudeFixAgent:
             hooks=HookPipeline(),
             run_sync=anyio.run,
         )
+        runtime_result = AgentRuntimeResult()
+        runtime_metrics: dict[str, Any] = {}
+        attempt_events: list[AttemptRuntimeEvent] = []
+        patch_salvaged = False
+        model_timeout_stage = ""
+        invalid_write_tool_input = ""
         cls._capture_attempt_workspace_state(workspace_path)
         try:
             try:
@@ -2336,80 +2343,247 @@ class ClaudeFixAgent:
                     execution_schedule=execution_schedule,
                     workspace_path=workspace_path,
                 )
-            except AgentRuntimeError as exc:
-                runtime_result = exc.partial_result
                 runtime_metrics = agent._build_runtime_performance_metrics(runtime_result)
-                attempt_events = tuple(getattr(runtime_result, "runtime_events", ()) or ())
-                failure_kind, summary, child_summary, build_output = cls._classify_fix_role_failure(
-                    agent_error=str(exc.cause or exc),
-                    attempt_events=attempt_events,
+                attempt_events = list(getattr(runtime_result, "runtime_events", ()) or ())
+            except AgentRuntimeError as exc:
+                runtime_result = exc.partial_result or AgentRuntimeResult()
+                runtime_metrics = agent._build_runtime_performance_metrics(runtime_result)
+                attempt_events = list(getattr(runtime_result, "runtime_events", ()) or ())
+                error_details = cls._format_exception_details(exc.cause) or str(exc.cause)
+                changed_files = tuple(dict.fromkeys(agent._collect_modified_files(workspace_path)))
+                changes = [{"file": changed_file, "action": "modified"} for changed_file in changed_files]
+                model_timeout = (
+                    isinstance(exc.cause, TimeoutError)
+                    or "没有返回首个响应" in error_details
+                    or "没有返回后续响应" in error_details
+                    or "单个 issue 在" in error_details
+                    or "未完成初始化" in error_details
                 )
-                fix_memory = append_child_agent_memory_turn(
-                    fix_memory,
-                    attempt_number=len(fix_memory.turns) + 1,
-                    decision="retry",
-                    summary=child_summary,
-                    workspace_state="issue_baseline",
-                    next_action=(
-                        "先 Read 当前目标文件，再用完整参数重新提交更精确的 patch。"
-                        if failure_kind == "tool_input_invalid"
-                        else "重新读取问题文件，改用更小的修法。"
-                    ),
+                model_timeout_stage = (
+                    str(runtime_metrics.get("model_timeout_stage", "")).strip()
+                    or cls._infer_timeout_stage(error_details)
                 )
-                store.save_child_memory(fix_memory)
+                invalid_write_tool_input = cls._extract_invalid_write_tool_input_message(attempt_events)
+                attempt_head_changed = cls._attempt_head_changed(workspace_path)
+                used_forbidden_tool = bool(runtime_result.forbidden_tool_uses) or attempt_head_changed
+                build_tool_failed = (
+                    runtime_result.last_tool_name == "mcp__sonar-fix__run_build"
+                    or (runtime_result.saw_build_tool and "exit code" in error_details.lower())
+                )
+                if model_timeout and AttemptScheduler.should_salvage_timeout(
+                    schedule=execution_schedule,
+                    changes_detected=bool(changes),
+                    used_forbidden_tool=used_forbidden_tool,
+                    build_tool_failed=build_tool_failed,
+                ):
+                    patch_salvaged = True
+                    runtime_metrics = cls._merge_performance_metrics(
+                        runtime_metrics,
+                        patch_salvaged=True,
+                        model_timeout_stage=model_timeout_stage,
+                    )
+                elif model_timeout:
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        error="Model response timed out",
+                        summary="Fix 子Agent 执行超时。",
+                        build_command=build_command,
+                        build_output=error_details,
+                        retryable_failure=True,
+                        failure_kind="model_timeout",
+                        performance_metrics=cls._merge_performance_metrics(
+                            runtime_metrics,
+                            patch_salvaged=False,
+                            model_timeout_stage=model_timeout_stage,
+                            build_invoked=False,
+                            build_duration_seconds=0.0,
+                        ),
+                        model_timeout_stage=model_timeout_stage,
+                        patch_salvaged=False,
+                        attempt_events=tuple(attempt_events),
+                        **current_result_metadata(),
+                    )
+                if used_forbidden_tool:
+                    fallback_build_passed, fallback_build_output = agent._run_local_build_fallback(
+                        workspace_path,
+                        build_command,
+                    )
+                    output_parts = ["修复阶段使用了被禁止的工具，当前尝试已作废。"]
+                    if runtime_result.forbidden_tool_uses:
+                        output_parts.append(
+                            "禁止工具: " + ", ".join(dict.fromkeys(runtime_result.forbidden_tool_uses))
+                        )
+                    if attempt_head_changed:
+                        output_parts.append("检测到当前 attempt 改写了 Git HEAD/提交历史。")
+                    if error_details:
+                        output_parts.append(error_details)
+                    if fallback_build_output:
+                        output_parts.append(fallback_build_output)
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        build_passed=fallback_build_passed,
+                        build_verification_failed=not fallback_build_passed,
+                        error="Forbidden tool used during issue fix",
+                        summary="Fix 子Agent 使用了被禁止的工具，当前 attempt 已作废。",
+                        build_command=build_command,
+                        build_output="\n\n".join(part for part in output_parts if part),
+                        retryable_failure=True,
+                        failure_kind="forbidden_tool",
+                        performance_metrics=cls._merge_performance_metrics(
+                            runtime_metrics,
+                            build_invoked=False,
+                            build_duration_seconds=0.0,
+                        ),
+                        attempt_events=tuple(attempt_events),
+                        **current_result_metadata(),
+                    )
+                if build_tool_failed:
+                    fallback_build_passed, fallback_build_output = agent._run_local_build_fallback(
+                        workspace_path,
+                        build_command,
+                    )
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        build_passed=fallback_build_passed,
+                        build_verification_failed=True,
+                        error="Build tool execution failed",
+                        summary="Fix 子Agent 调用了失败的 build 工具。",
+                        build_command=build_command,
+                        build_output="\n\n".join(
+                            part for part in ("run_build 工具执行异常。", error_details, fallback_build_output) if part
+                        ),
+                        retryable_failure=True,
+                        failure_kind="build_tool",
+                        performance_metrics=cls._merge_performance_metrics(
+                            runtime_metrics,
+                            build_invoked=False,
+                            build_duration_seconds=0.0,
+                        ),
+                        attempt_events=tuple(attempt_events),
+                        **current_result_metadata(),
+                    )
+                if not patch_salvaged:
+                    failure_kind, summary, child_summary, build_output = cls._classify_fix_role_failure(
+                        agent_error=error_details,
+                        attempt_events=attempt_events,
+                    )
+                    fix_memory = append_child_agent_memory_turn(
+                        fix_memory,
+                        attempt_number=len(fix_memory.turns) + 1,
+                        decision="retry",
+                        summary=child_summary,
+                        workspace_state="issue_baseline",
+                        next_action=(
+                            "先 Read 当前目标文件，再用完整参数重新提交更精确的 patch。"
+                            if failure_kind == "tool_input_invalid"
+                            else "重新读取问题文件，改用更小的修法。"
+                        ),
+                    )
+                    store.save_child_memory(fix_memory)
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        error=error_details,
+                        summary=summary,
+                        build_command=build_command,
+                        build_output=build_output,
+                        retryable_failure=True,
+                        failure_kind=failure_kind,
+                        performance_metrics=runtime_metrics,
+                        attempt_events=tuple(attempt_events),
+                        **current_result_metadata(),
+                    )
+            except Exception as exc:
+                error_details = cls._format_exception_details(exc) or str(exc)
+                changed_files = tuple(dict.fromkeys(agent._collect_modified_files(workspace_path)))
+                changes = [{"file": changed_file, "action": "modified"} for changed_file in changed_files]
+                model_timeout_stage = cls._infer_timeout_stage(error_details)
+                if model_timeout_stage:
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        error="Model response timed out",
+                        summary="Fix 子Agent 执行超时。",
+                        build_command=build_command,
+                        build_output=error_details,
+                        retryable_failure=True,
+                        failure_kind="model_timeout",
+                        performance_metrics=cls._merge_performance_metrics(
+                            runtime_metrics,
+                            patch_salvaged=False,
+                            model_timeout_stage=model_timeout_stage,
+                            build_invoked=False,
+                            build_duration_seconds=0.0,
+                        ),
+                        model_timeout_stage=model_timeout_stage,
+                        patch_salvaged=False,
+                        attempt_events=tuple(attempt_events),
+                        **current_result_metadata(),
+                    )
                 return FixResult(
                     success=False,
                     issue_key=issue.key,
                     file_path=issue.file_path,
-                    error=str(exc.cause or exc),
-                    summary=summary,
+                    changes=changes,
+                    error=error_details,
+                    summary="Fix 子Agent 执行异常。",
                     build_command=build_command,
-                    build_output=build_output,
+                    build_output=error_details,
                     retryable_failure=True,
-                    failure_kind=failure_kind,
-                    performance_metrics=runtime_metrics,
-                    attempt_events=attempt_events,
-                    **current_result_metadata(),
-                )
-            runtime_metrics = agent._build_runtime_performance_metrics(runtime_result)
-            attempt_events = tuple(getattr(runtime_result, "runtime_events", ()) or ())
-            if runtime_result.agent_error:
-                failure_kind, summary, child_summary, build_output = cls._classify_fix_role_failure(
-                    agent_error=runtime_result.agent_error,
-                    attempt_events=attempt_events,
-                )
-                fix_memory = append_child_agent_memory_turn(
-                    fix_memory,
-                    attempt_number=len(fix_memory.turns) + 1,
-                    decision="retry",
-                    summary=child_summary,
-                    workspace_state="issue_baseline",
-                    next_action=(
-                        "先 Read 当前目标文件，再用完整参数重新提交更精确的 patch。"
-                        if failure_kind == "tool_input_invalid"
-                        else "重新读取问题文件，改用更小的修法。"
+                    failure_kind="fix_agent",
+                    performance_metrics=cls._merge_performance_metrics(
+                        runtime_metrics,
+                        build_invoked=False,
+                        build_duration_seconds=0.0,
                     ),
-                )
-                store.save_child_memory(fix_memory)
-                return FixResult(
-                    success=False,
-                    issue_key=issue.key,
-                    file_path=issue.file_path,
-                    error=runtime_result.agent_error,
-                    summary=summary,
-                    build_command=build_command,
-                    build_output=build_output,
-                    retryable_failure=True,
-                    failure_kind=failure_kind,
-                    performance_metrics=runtime_metrics,
-                    attempt_events=attempt_events,
+                    attempt_events=tuple(attempt_events),
                     **current_result_metadata(),
                 )
 
-            attempt_head_changed = cls._attempt_head_changed(workspace_path)
-            used_forbidden_tool = bool(runtime_result.forbidden_tool_uses) or attempt_head_changed
+            invalid_write_tool_input = invalid_write_tool_input or cls._extract_invalid_write_tool_input_message(
+                attempt_events
+            )
             changed_files = tuple(dict.fromkeys(agent._collect_modified_files(workspace_path)))
             changes = [{"file": changed_file, "action": "modified"} for changed_file in changed_files]
+            if (
+                not changes
+                and not patch_salvaged
+                and not model_timeout_stage
+                and not runtime_result.agent_error
+                and int(getattr(runtime_result, "continuation_retry_count", 0) or 0) == 0
+                and bool(getattr(execution_schedule, "continuation_retry_enabled", False))
+                and not invalid_write_tool_input
+            ):
+                runtime_result = cls._run_no_change_continuation(
+                    runtime=runtime,
+                    gateway_request=gateway_request,
+                    initial_result=runtime_result,
+                    workspace_path=workspace_path,
+                )
+                attempt_events = list(getattr(runtime_result, "runtime_events", ()) or ())
+                runtime_metrics = cls._merge_performance_metrics(
+                    cls._build_runtime_performance_metrics(runtime_result),
+                    patch_salvaged=patch_salvaged,
+                    model_timeout_stage=model_timeout_stage,
+                )
+                invalid_write_tool_input = cls._extract_invalid_write_tool_input_message(attempt_events)
+                changed_files = tuple(dict.fromkeys(agent._collect_modified_files(workspace_path)))
+                changes = [{"file": changed_file, "action": "modified"} for changed_file in changed_files]
+
+            attempt_head_changed = cls._attempt_head_changed(workspace_path)
+            used_forbidden_tool = bool(runtime_result.forbidden_tool_uses) or attempt_head_changed
             if used_forbidden_tool:
                 fallback_build_passed, fallback_build_output = agent._run_local_build_fallback(
                     workspace_path,
@@ -2447,7 +2621,138 @@ class ClaudeFixAgent:
                     retryable_failure=True,
                     failure_kind="forbidden_tool",
                     performance_metrics=runtime_metrics,
-                    attempt_events=attempt_events,
+                    attempt_events=tuple(attempt_events),
+                    **current_result_metadata(),
+                )
+            if (
+                runtime_result.agent_error
+                and not patch_salvaged
+                and cls._should_salvage_agent_error(
+                    agent_error=runtime_result.agent_error,
+                    changes_detected=bool(changes),
+                    used_forbidden_tool=used_forbidden_tool,
+                    invalid_write_tool_input=invalid_write_tool_input,
+                )
+            ):
+                patch_salvaged = True
+                salvage_reason = (
+                    "agent_error_max_turns"
+                    if cls._is_max_turn_agent_error(runtime_result.agent_error)
+                    else "agent_error_invalid_write_burst"
+                )
+                runtime_metrics = cls._merge_performance_metrics(
+                    runtime_metrics,
+                    patch_salvaged=True,
+                    agent_error_salvaged=True,
+                    agent_error_salvage_reason=salvage_reason,
+                )
+            if runtime_result.agent_error and not patch_salvaged:
+                if invalid_write_tool_input and not changes:
+                    runtime_result = replace(runtime_result, agent_error=None)
+                else:
+                    runtime_contract = cls._classify_runtime_contract_agent_error(runtime_result.agent_error)
+                    if runtime_contract is not None:
+                        boundary_code, boundary_summary = runtime_contract
+                        return FixResult(
+                            success=False,
+                            issue_key=issue.key,
+                            file_path=issue.file_path,
+                            changes=changes,
+                            error=runtime_result.agent_error,
+                            summary="Runtime contract violation requires a narrower retry",
+                            build_command=build_command,
+                            build_output=runtime_result.agent_error,
+                            retryable_failure=True,
+                            failure_kind="runtime_contract_violation",
+                            boundary_failure_code=boundary_code,
+                            boundary_failure_summary=boundary_summary,
+                            performance_metrics=cls._merge_performance_metrics(
+                                runtime_metrics,
+                                build_invoked=False,
+                                build_duration_seconds=0.0,
+                            ),
+                            attempt_events=tuple(attempt_events),
+                            **current_result_metadata(),
+                        )
+                    failure_kind, summary, child_summary, build_output = cls._classify_fix_role_failure(
+                        agent_error=runtime_result.agent_error,
+                        attempt_events=attempt_events,
+                    )
+                    fix_memory = append_child_agent_memory_turn(
+                        fix_memory,
+                        attempt_number=len(fix_memory.turns) + 1,
+                        decision="retry",
+                        summary=child_summary,
+                        workspace_state="issue_baseline",
+                        next_action=(
+                            "先 Read 当前目标文件，再用完整参数重新提交更精确的 patch。"
+                            if failure_kind == "tool_input_invalid"
+                            else "重新读取问题文件，改用更小的修法。"
+                        ),
+                    )
+                    store.save_child_memory(fix_memory)
+                    return FixResult(
+                        success=False,
+                        issue_key=issue.key,
+                        file_path=issue.file_path,
+                        changes=changes,
+                        error=runtime_result.agent_error,
+                        summary=summary,
+                        build_command=build_command,
+                        build_output=build_output,
+                        retryable_failure=True,
+                        failure_kind=failure_kind,
+                        performance_metrics=runtime_metrics,
+                        attempt_events=tuple(attempt_events),
+                        **current_result_metadata(),
+                    )
+            if not changes:
+                failure_kind = "tool_input_invalid" if invalid_write_tool_input else (
+                    "model_timeout" if model_timeout_stage else "no_change"
+                )
+                error = (
+                    "Model emitted an invalid Edit/MultiEdit/Write call"
+                    if invalid_write_tool_input
+                    else ("Model response timed out" if model_timeout_stage else "Agent completed without modifying any files")
+                )
+                child_summary = (
+                    "Edit/MultiEdit/Write 调用缺少必要参数；先 Read 精确片段，再提交完整 patch。"
+                    if failure_kind == "tool_input_invalid"
+                    else ("Fix 子Agent 执行超时。" if failure_kind == "model_timeout" else "Fix 子Agent没有产生代码修改。")
+                )
+                fix_memory = append_child_agent_memory_turn(
+                    fix_memory,
+                    attempt_number=len(fix_memory.turns) + 1,
+                    decision="retry",
+                    summary=child_summary,
+                    workspace_state="issue_baseline",
+                    next_action=(
+                        "先 Read 当前目标文件，再用完整参数重新提交更精确的 patch。"
+                        if failure_kind == "tool_input_invalid"
+                        else "重新读取问题文件，改用更小的修法。"
+                    ),
+                )
+                store.save_child_memory(fix_memory)
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=issue.file_path,
+                    error=error,
+                    summary=child_summary,
+                    build_command=build_command,
+                    build_output=invalid_write_tool_input or "",
+                    retryable_failure=True,
+                    failure_kind=failure_kind,
+                    performance_metrics=cls._merge_performance_metrics(
+                        runtime_metrics,
+                        build_invoked=False,
+                        build_duration_seconds=0.0,
+                        patch_salvaged=patch_salvaged,
+                        model_timeout_stage=model_timeout_stage,
+                    ),
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=patch_salvaged,
+                    attempt_events=tuple(attempt_events),
                     **current_result_metadata(),
                 )
             fallback_before_texts: dict[str, str] = {}
@@ -2512,7 +2817,98 @@ class ClaudeFixAgent:
                 failure_kind="reviewer",
                 reviewer_result=reviewer_result.to_dict(),
                 performance_metrics=runtime_metrics,
-                attempt_events=attempt_events,
+                attempt_events=tuple(attempt_events),
+                **current_result_metadata(),
+            )
+
+        if patch_salvaged:
+            verification = FixVerifier.evaluate_attempt(
+                issue=issue,
+                workspace_path=workspace_path,
+                build_command=build_command,
+                edit_contract=edit_contract,
+                guardrail_mode=guardrail_mode,
+                scope=scope,
+                reviewed_changes=reviewed_changes,
+                original_issue_file_content=original_issue_file_content,
+                current_issue_file_content=current_issue_file_content,
+                build_runner=subprocess.run,
+                scope_validator=cls._validate_issue_edit_scope,
+                rule_validator=cls._run_rule_specific_validation,
+            )
+            if verification.rule_validation_message:
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=issue.file_path,
+                    changes=changes,
+                    build_passed=verification.build_passed,
+                    error="Rule-specific validation failed",
+                    summary="Salvaged patch failed rule-specific validation.",
+                    build_command=build_command,
+                    build_output=verification.rule_validation_message,
+                    retryable_failure=True,
+                    failure_kind="rule_validation",
+                    reviewer_result=reviewer_result.to_dict(),
+                    performance_metrics=cls._merge_performance_metrics(
+                        runtime_metrics,
+                        build_invoked=verification.build_invoked,
+                        build_duration_seconds=verification.build_duration_seconds,
+                        patch_salvaged=True,
+                        model_timeout_stage=model_timeout_stage,
+                    ),
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=True,
+                    attempt_events=tuple(attempt_events),
+                    **current_result_metadata(),
+                )
+            if not verification.build_passed:
+                return FixResult(
+                    success=False,
+                    issue_key=issue.key,
+                    file_path=issue.file_path,
+                    changes=changes,
+                    build_passed=False,
+                    build_verification_failed=True,
+                    error="Issue changes failed local build verification",
+                    summary="Salvaged patch failed local build verification.",
+                    build_command=build_command,
+                    build_output=verification.combined_output,
+                    retryable_failure=True,
+                    failure_kind="build",
+                    reviewer_result=reviewer_result.to_dict(),
+                    performance_metrics=cls._merge_performance_metrics(
+                        runtime_metrics,
+                        build_invoked=verification.build_invoked,
+                        build_duration_seconds=verification.build_duration_seconds,
+                        patch_salvaged=True,
+                        model_timeout_stage=model_timeout_stage,
+                    ),
+                    model_timeout_stage=model_timeout_stage,
+                    patch_salvaged=True,
+                    attempt_events=tuple(attempt_events),
+                    **current_result_metadata(),
+                )
+            return FixResult(
+                success=True,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=changes,
+                build_passed=True,
+                summary="Patch salvage passed local verification.",
+                build_command=build_command,
+                build_output=verification.build_output,
+                reviewer_result=reviewer_result.to_dict(),
+                performance_metrics=cls._merge_performance_metrics(
+                    runtime_metrics,
+                    build_invoked=verification.build_invoked,
+                    build_duration_seconds=verification.build_duration_seconds,
+                    patch_salvaged=True,
+                    model_timeout_stage=model_timeout_stage,
+                ),
+                model_timeout_stage=model_timeout_stage,
+                patch_salvaged=True,
+                attempt_events=tuple(attempt_events),
                 **current_result_metadata(),
             )
 
@@ -2572,7 +2968,7 @@ class ClaudeFixAgent:
                 failure_kind="review_agent",
                 reviewer_result=reviewer_result.to_dict(),
                 performance_metrics=runtime_metrics,
-                attempt_events=attempt_events,
+                attempt_events=tuple(attempt_events),
                 **current_result_metadata(),
             )
 
@@ -2634,7 +3030,7 @@ class ClaudeFixAgent:
                 failure_kind="main_decision",
                 reviewer_result=reviewer_result.to_dict(),
                 performance_metrics=runtime_metrics,
-                attempt_events=attempt_events,
+                attempt_events=tuple(attempt_events),
                 **current_result_metadata(),
             )
 
@@ -2652,6 +3048,28 @@ class ClaudeFixAgent:
             scope_validator=cls._validate_issue_edit_scope,
             rule_validator=cls._run_rule_specific_validation,
         )
+        if verification.rule_validation_message:
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=issue.file_path,
+                changes=changes,
+                build_passed=verification.build_passed,
+                error="Rule-specific validation failed",
+                summary=main_decision.summary or "规则级校验未通过。",
+                build_command=build_command,
+                build_output=verification.rule_validation_message,
+                retryable_failure=True,
+                failure_kind="rule_validation",
+                reviewer_result=reviewer_result.to_dict(),
+                performance_metrics=cls._merge_performance_metrics(
+                    runtime_metrics,
+                    build_invoked=verification.build_invoked,
+                    build_duration_seconds=verification.build_duration_seconds,
+                ),
+                attempt_events=tuple(attempt_events),
+                **current_result_metadata(),
+            )
         if not verification.build_passed:
             return FixResult(
                 success=False,
@@ -2672,7 +3090,7 @@ class ClaudeFixAgent:
                     build_invoked=verification.build_invoked,
                     build_duration_seconds=verification.build_duration_seconds,
                 ),
-                attempt_events=attempt_events,
+                attempt_events=tuple(attempt_events),
                 **current_result_metadata(),
             )
 
@@ -2691,7 +3109,7 @@ class ClaudeFixAgent:
                 build_invoked=verification.build_invoked,
                 build_duration_seconds=verification.build_duration_seconds,
             ),
-            attempt_events=attempt_events,
+            attempt_events=tuple(attempt_events),
             **current_result_metadata(),
         )
 
@@ -3496,6 +3914,32 @@ class ClaudeFixAgent:
             runtime_builtin_tools=runtime_builtin_tools,
         )
         result_metadata["visible_toolset"] = visible_toolset
+        if bool(getattr(engine_routing_decision, "should_skip", False)):
+            skip_reason = str(getattr(engine_routing_decision, "skip_reason", "") or "").strip()
+            return FixResult(
+                success=False,
+                skipped=True,
+                issue_key=issue.key,
+                file_path=str(file_path),
+                error=skip_reason or "Engine router skipped this issue.",
+                summary="Skipped by engine router",
+                build_command=build_command.strip() or "dotnet build",
+                build_output=skip_reason or "Engine router skipped this issue.",
+                skip_reason=skip_reason,
+                failure_kind="engine_router_skip",
+                **result_metadata,
+            )
+        if str(getattr(engine_routing_decision, "resolved_engine", "") or "").strip() == "roslyn":
+            return self._run_roslyn_fix_path(
+                issue=issue,
+                workspace_path=workspace_path,
+                build_command=build_command.strip() or "dotnet build",
+                edit_contract=edit_contract,
+                guardrail_mode=guardrail_mode,
+                scope=scope,
+                original_issue_file_content=original_issue_file_content,
+                result_metadata=result_metadata,
+            )
         if str(getattr(issue, "rule", "") or "").strip() == "csharpsquid:S107":
             self._sync_s107_fix_guide(workspace_path)
 

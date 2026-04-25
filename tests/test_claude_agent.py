@@ -6,6 +6,7 @@ from pi_sonar_agent.agent.claude_agent import (
     BUILTIN_FIX_TOOLS,
     MCP_FIX_TOOLS,
     ClaudeFixAgent,
+    RoleAgentRunResult,
     SonarIssue,
 )
 from pi_sonar_agent.core.agent_role_prompts import (
@@ -28,12 +29,44 @@ from pi_sonar_agent.core.agent_role_prompts import build_fix_role_user_prompt
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange, ReviewedLineOperation
 from pi_sonar_agent.core.events import AttemptRuntimeEvent, AttemptRuntimeEventKind
 from pi_sonar_agent.core.issue_contract import EditContract
+from pi_sonar_agent.core.lessons_store import PlannerLesson
 from pi_sonar_agent.core.quality_gate import QualityGateRule
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.scope_guard import IssueEditScope
 from pi_sonar_agent.core.tool_surface import build_allowed_fix_tool_rules, build_fix_runtime_tools
 from pi_sonar_agent.core.memory.child_agent_memory import create_initial_child_agent_memory
 from pi_sonar_agent.core.memory.issue_working_memory import IssueWorkingMemory
+
+
+def _mock_role_compile_flow(monkeypatch, *, review_summary: str = "可以进入编译。", main_summary: str = "可以进入编译。") -> None:
+    def fake_prompt_only_role_session(
+        cls,
+        *,
+        role: str,
+        workspace_path,
+        system_prompt: str,
+        user_prompt: str,
+        max_turns: int = 4,
+        agent_env=None,
+        explicit_model=None,
+    ) -> RoleAgentRunResult:
+        if role == "review":
+            return RoleAgentRunResult(
+                role="review",
+                response_text=f'{{"decision":"approve","summary":"{review_summary}","findings":[],"constraints":[]}}',
+            )
+        if role == "main":
+            return RoleAgentRunResult(
+                role="main",
+                response_text=f'{{"decision":"compile","summary":"{main_summary}","findings":[],"constraints":[]}}',
+            )
+        raise AssertionError(f"unexpected role session: {role}")
+
+    monkeypatch.setattr(
+        ClaudeFixAgent,
+        "_run_prompt_only_role_session",
+        classmethod(fake_prompt_only_role_session),
+    )
 
 
 def test_parse_role_decision_extracts_json_payload() -> None:
@@ -81,22 +114,18 @@ def test_build_user_prompt_includes_rule_reason_and_fix_guidance() -> None:
         'dotnet build "src/Foo.sln"',
     )
 
-    assert "规则名称: Cognitive Complexity of methods should not be too high" in prompt
     assert "Issue Key: issue-1" in prompt
-    assert "【SonarQube 规则说明（问题原因/风险）】" in prompt
-    assert "嵌套条件和循环会提高认知复杂度。" in prompt
     assert "【SonarQube 修复建议】" in prompt
     assert "提取私有方法，减少嵌套层级。" in prompt
     assert "【C# 代码质量门禁】" in prompt
     assert "异步方法必须使用 async/await。" in prompt
     assert "【允许修改范围】" in prompt
     assert "只允许修改第 45-80 行的目标方法。" in prompt
-    assert "不要顺手修复本文件中其他位置的相同规则问题" in prompt
-    assert "【推荐构建命令】" in prompt
-    assert 'dotnet build "src/Foo.sln"' in prompt
-    assert "- 文件路径: src/Foo.cs" in prompt
-    assert "当前优先直接操作的问题文件相对路径候选：" in prompt
+    assert "【构建执行】" in prompt
+    assert "外层统一执行 build 和 post-check；本轮不要自行构建" in prompt
+    assert "- 文件路径: src/Foo.cs" in prompt or "- 文件路径: src/Foo.cs".replace("- ", "") in prompt
     assert "- src/Foo.cs" in prompt
+    assert "不要顺手修复本文件中其他 issue，不要做大重构" in prompt
     assert "调用 finish 标记完成" not in prompt
 
 
@@ -127,7 +156,8 @@ def test_build_user_prompt_includes_workspace_relative_path_candidates(tmp_path)
 
     assert "- OpenAuth.Core/OpenAuth.App/Finance/Foo.cs" in prompt
     assert "- OpenAuth.App/Finance/Foo.cs" in prompt
-    assert "不要用 Bash 通过拼接仓库根目录反复试错" in prompt
+    assert "只使用仓库内相对路径" in prompt
+    assert str(tmp_path) not in prompt
 
 
 def test_build_user_prompt_renders_structured_retry_context() -> None:
@@ -495,6 +525,42 @@ def test_fix_role_prompt_adds_s107_hard_constraints() -> None:
     assert "先读取" in prompt
 
 
+def test_fix_role_prompt_surfaces_cross_issue_lessons() -> None:
+    issue = SonarIssue(
+        key="issue-fix-lesson",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = build_fix_role_user_prompt(
+        issue=issue,
+        code_context="  18 | if (flag) { if (other) { Process(); } }",
+        file_path_candidates=("src/Foo.cs",),
+        planner_lessons=(
+            PlannerLesson(
+                source="success_pattern",
+                summary="成功经验：优先在当前方法体内收口复杂度，再做最小补丁。",
+                guidance=("优先保持单文件最小补丁。",),
+                selection_mode="rule_exact_success",
+                selection_reason="rule_id=csharpsquid:S3776 successful strategy pattern",
+                count=3,
+            ),
+        ),
+        working_memory=None,
+        fix_memory=None,
+        retry_feedback="",
+    )
+
+    assert "【长期经验】" in prompt
+    assert "当前方法体内收口复杂度" in prompt
+    assert "rule_exact_success" in prompt
+    assert "命中原因" in prompt
+
+
 def test_resolve_issue_max_turns_uses_global_floor_of_16() -> None:
     agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
     issue = SonarIssue(
@@ -777,7 +843,7 @@ def test_build_user_prompt_includes_precise_sonar_location_guidance() -> None:
         'dotnet build "src/Foo.sln"',
     )
 
-    assert "【SonarQube 精确定位】" in prompt
+    assert "【精确定位】" in prompt
     assert "- 主定位: src/Foo.cs:92:9-93:25" in prompt
     assert "- 关联位置 1: src/Bar.cs:16:13-29 | Related branch condition." in prompt
     assert "- 报错行号: 92" in prompt
@@ -989,10 +1055,11 @@ def test_build_user_prompt_includes_rule_specific_guards() -> None:
         'dotnet build "src/Foo.sln"',
     )
 
-    assert "【当前规则的额外约束】" in prompt
-    assert "IQueryable" in prompt
-    assert "await" in prompt
-    assert "不要为了满足规则把简单循环改成更难读" in prompt
+    assert "【当前规则的额外约束】" not in prompt
+    assert "IQueryable" not in prompt
+    assert "不要为了满足规则把简单循环改成更难读" not in prompt
+    assert "【SonarQube 修复建议】" in prompt
+    assert "在安全时使用 LINQ。" in prompt
 
 
 def test_build_user_prompt_includes_visible_tool_summary() -> None:
@@ -1052,8 +1119,10 @@ def test_build_user_prompt_keeps_build_command_when_build_tool_is_visible() -> N
         visible_tool_names=("Read", "Edit", "mcp__sonar-fix__run_build", "Finish"),
     )
 
-    assert "【推荐构建命令】" in prompt
-    assert 'dotnet build "src/Foo.sln"' in prompt
+    assert "=== DYNAMIC_BOUNDARY ===" in prompt
+    assert "【当前可用工具】" in prompt
+    assert "Read, Edit, mcp__sonar-fix__run_build, Finish" in prompt
+    assert 'dotnet build "src/Foo.sln"' not in prompt
 
 
 def test_build_user_prompt_hides_bash_constraints_when_bash_is_not_visible() -> None:
@@ -1081,11 +1150,12 @@ def test_build_user_prompt_hides_bash_constraints_when_bash_is_not_visible() -> 
         visible_tool_names=("Read", "Edit", "MultiEdit", "Finish"),
     )
 
-    assert "当前 attempt 可用工具: Read, Edit, MultiEdit, Finish" in prompt
-    assert "如果使用 shell 工具（工具名 Bash）" not in prompt
+    assert "【当前可用工具】" in prompt
+    assert "Read, Edit, MultiEdit, Finish" in prompt
+    assert "Bash" not in prompt
 
 
-def test_build_user_prompt_splits_s3776_retry_guards_between_first_attempt_and_retry() -> None:
+def test_build_user_prompt_keeps_simple_loop_prompt_light_for_s3776_retry() -> None:
     issue = SonarIssue(
         key="issue-s3776-guards",
         rule="csharpsquid:S3776",
@@ -1122,10 +1192,12 @@ def test_build_user_prompt_splits_s3776_retry_guards_between_first_attempt_and_r
         retry_context=RetryContext(source_attempt_number=1, failure_kind="quality_gate"),
     )
 
-    assert "不要改动公开签名或新增公开成员" in first_prompt
+    assert "不要改动公开签名或新增公开成员" not in first_prompt
     assert "只有 helper 体内真实包含 await 时才允许 async" not in first_prompt
-    assert "只有 helper 体内真实包含 await 时才允许 async" in retry_prompt
-    assert "一次性同步接口声明、调用点和 nameof(...)" in retry_prompt
+    assert "只有 helper 体内真实包含 await 时才允许 async" not in retry_prompt
+    assert "一次性同步接口声明、调用点和 nameof(...)" not in retry_prompt
+    assert "【上次尝试的失败信息】" not in retry_prompt
+    assert "如果上一轮策略失败或已回滚" in retry_prompt
 
 
 def test_build_user_prompt_externalizes_reference_when_prompt_is_large(tmp_path) -> None:
@@ -1547,11 +1619,10 @@ def test_fix_issue_downgrades_complex_plan_instead_of_hard_blocking(monkeypatch,
 
     assert result.success is False
     assert result.failure_kind == "no_change"
-    assert result.repair_plan is not None
     assert result.plan_precheck is not None
-    assert result.plan_precheck.status == "pass"
-    assert result.repair_plan.requires_signature_change is False
-    assert result.repair_plan.selected_archetype == "signature_preserving_refactor"
+    assert result.plan_precheck.status == "not_applicable"
+    assert result.repair_plan is None
+    assert result.execution_mode == "simple_loop"
     assert runtime_requests
 
 
@@ -1805,6 +1876,7 @@ def test_fix_issue_fails_when_local_build_verification_fails(monkeypatch, tmp_pa
         "_collect_modified_files",
         staticmethod(lambda workspace_path: ["src/Foo.cs"]),
     )
+    _mock_role_compile_flow(monkeypatch)
 
     import pi_sonar_agent.agent.claude_agent as claude_agent_module
 
@@ -1867,6 +1939,7 @@ def test_fix_issue_retries_when_rule_specific_validation_fails(monkeypatch, tmp_
         "_collect_modified_files",
         staticmethod(lambda workspace_path: ["src/Foo.cs"]),
     )
+    _mock_role_compile_flow(monkeypatch)
 
     import pi_sonar_agent.agent.claude_agent as claude_agent_module
 
@@ -1874,7 +1947,7 @@ def test_fix_issue_retries_when_rule_specific_validation_fails(monkeypatch, tmp_
         source_file.write_text(
             "\n".join(
                 [
-                    "var value = foo",
+                    "var output = foo",
                     "    ? (bar ? 1 : 0)",
                     "    : 2;",
                 ]
@@ -2335,6 +2408,7 @@ def test_fix_issue_runs_build_when_scope_soft_drift_is_ignored(monkeypatch, tmp_
             lambda workspace_path, issue, scope, **kwargs: "Issue changes exceeded the allowed Sonar edit scope."
         ),
     )
+    _mock_role_compile_flow(monkeypatch)
 
     import pi_sonar_agent.agent.claude_agent as claude_agent_module
 
@@ -2623,6 +2697,7 @@ def test_fix_issue_scope_validation_ignores_previous_successful_changes_in_same_
         "_collect_modified_files",
         staticmethod(lambda workspace_path: ["src/Foo.cs"]),
     )
+    _mock_role_compile_flow(monkeypatch)
 
     import pi_sonar_agent.agent.claude_agent as claude_agent_module
 
@@ -2706,6 +2781,7 @@ def test_fix_issue_continues_same_issue_after_follow_up_timeout(
         "get_rule_details",
         lambda self, rule_key: {"description": "原因", "how_to_fix": "修复方法"},
     )
+    _mock_role_compile_flow(monkeypatch)
     import pi_sonar_agent.agent.claude_agent as claude_agent_module
 
     seen_prompts: list[str] = []
@@ -2824,8 +2900,7 @@ def test_fix_issue_continues_same_issue_after_follow_up_timeout(
     assert len(seen_prompts) == 2
     assert "【继续上一轮修复，不要从头分析】" in seen_prompts[1]
     assert "绝对路径" in seen_prompts[1]
-    assert "当前优先直接操作的问题文件相对路径候选：" in seen_prompts[1]
-    assert "- src/Foo.cs" in seen_prompts[1]
+    assert "最近已读取的关键代码片段" in seen_prompts[1]
     assert result.performance_metrics["continuation_retry_count"] == 1
     assert result.performance_metrics["continuation_recovered"] is True
     assert "post_read_stall" in result.performance_metrics["continuation_timeout_stages"]

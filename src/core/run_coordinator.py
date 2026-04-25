@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -17,7 +18,7 @@ from pi_sonar_agent.core.preflight import (
     ensure_workspace_writable,
 )
 from pi_sonar_agent.core.repo_capability import detect_repo_capability
-from pi_sonar_agent.core.run_logging import format_removed_workspaces
+from pi_sonar_agent.core.run_logging import current_run_timestamp, format_removed_workspaces
 from pi_sonar_agent.core.state import (
     IssueState,
     TargetState,
@@ -547,6 +548,58 @@ class RunCoordinator:
             )
             return "\n".join(part for part in parts if str(part).strip())
 
+        def audit_print(message: str) -> None:
+            print(f"[{current_run_timestamp()}] {message}")
+
+        def build_issue_marker(*, index: int, total: int, second_pass: bool) -> str:
+            if second_pass:
+                return f"[SECOND PASS {index}/{total}]"
+            return f"[{index}/{total}]"
+
+        def build_issue_descriptor(sonar_issue: SonarIssue) -> str:
+            issue_line = sonar_issue.start_line or sonar_issue.line
+            file_path = sonar_issue.file_path.lstrip("/")
+            return f"{sonar_issue.rule} → {file_path}:{issue_line} ({sonar_issue.key})"
+
+        def log_issue_start(*, index: int, total: int, sonar_issue: SonarIssue, second_pass: bool) -> None:
+            audit_print(
+                f"{build_issue_marker(index=index, total=total, second_pass=second_pass)} "
+                f"开始修复: {build_issue_descriptor(sonar_issue)}"
+            )
+
+        def log_issue_finish(
+            *,
+            index: int,
+            total: int,
+            sonar_issue: SonarIssue,
+            second_pass: bool,
+            result,
+            duration_seconds: float,
+        ) -> None:
+            marker = build_issue_marker(index=index, total=total, second_pass=second_pass)
+            descriptor = build_issue_descriptor(sonar_issue)
+            duration_label = f"{duration_seconds:.1f}s"
+            if result.success:
+                suffix = f", attempts={result.attempts}" if result.attempts > 1 else ""
+                summary = str(result.summary or "修复成功").strip()
+                audit_print(
+                    f"{marker} 修复完成: {descriptor}; 用时={duration_label}; "
+                    f"结果=success{suffix}; 摘要={summary}"
+                )
+                return
+
+            outcome = "skipped" if result.skipped else "failed"
+            reason = str(
+                result.skip_reason or result.error or getattr(result, "failure_kind", "") or "修复失败"
+            ).strip()
+            failure_kind = str(getattr(result, "failure_kind", "") or "").strip()
+            failure_suffix = f"; failure_kind={failure_kind}" if failure_kind else ""
+            audit_print(
+                f"{marker} 修复结束: {descriptor}; 用时={duration_label}; "
+                f"结果={outcome}{failure_suffix}; 原因={reason}"
+            )
+            return
+
         def build_model_handoff_feedback_from_exception(
             *,
             exc: BaseException,
@@ -864,9 +917,9 @@ class RunCoordinator:
             handoff_feedback = str(seed_retry_feedback or "").strip()
             for route_index, tier in enumerate(route, start=1):
                 issue_line = sonar_issue.start_line or sonar_issue.line
-                print(
-                    f"  [MODEL] {pass_label} {route_index}/{len(route)}: "
-                    f"{tier.display_name}"
+                audit_print(
+                    f"[MODEL] {pass_label} issue={sonar_issue.key} "
+                    f"{route_index}/{len(route)}: {tier.display_name}"
                 )
                 self.state_store.record_issue_started(
                     run_label=options.run_label,
@@ -903,8 +956,8 @@ class RunCoordinator:
                             to_tier_model=next_tier.display_name,
                             reason_label="provider unavailable / timeout",
                         )
-                        print(
-                            f"  [WARN] 当前模型不可用，切换到下一梯: "
+                        audit_print(
+                            f"[WARN] 当前模型不可用，切换到下一梯: "
                             f"{tier.display_name} -> {next_tier.display_name} ({exc})"
                         )
                         continue
@@ -926,8 +979,8 @@ class RunCoordinator:
                         to_tier_model=next_tier.display_name,
                         reason_label="model availability failure",
                     )
-                    print(
-                        f"  [WARN] 当前模型不可用，切换到下一梯: "
+                    audit_print(
+                        f"[WARN] 当前模型不可用，切换到下一梯: "
                         f"{tier.display_name} -> {next_tier.display_name}"
                     )
                     continue
@@ -943,15 +996,11 @@ class RunCoordinator:
             if abort_error:
                 break
             sonar_issue = SonarIssue.from_api_payload(issue)
-            issue_rule = sonar_issue.rule
-            issue_line = sonar_issue.start_line or sonar_issue.line
-            file_path = sonar_issue.file_path.lstrip("/")
-            print(
-                f"\n[{index}/{len(issues)}] 修复: "
-                f"{issue_rule} → {file_path}:{issue_line}"
-            )
+            print()
+            log_issue_start(index=index, total=len(issues), sonar_issue=sonar_issue, second_pass=False)
 
             issue_build_command = resolve_build_command(build_command, solution_path)
+            issue_started_monotonic = time.monotonic()
             try:
                 result = run_issue_with_model_route(
                     issue_payload=issue,
@@ -961,6 +1010,10 @@ class RunCoordinator:
                     seed_retry_feedback="",
                 )
             except Exception as exc:
+                audit_print(
+                    f"{build_issue_marker(index=index, total=len(issues), second_pass=False)} "
+                    f"异常中断: {build_issue_descriptor(sonar_issue)}; 错误={exc}"
+                )
                 mark_target_abort(error=f"issue pipeline failed: {exc}", startup_failure=False)
                 break
 
@@ -972,6 +1025,14 @@ class RunCoordinator:
             if sonar_issue.key not in issue_order:
                 issue_order.append(sonar_issue.key)
             log_issue_outcome(result)
+            log_issue_finish(
+                index=index,
+                total=len(issues),
+                sonar_issue=sonar_issue,
+                second_pass=False,
+                result=result,
+                duration_seconds=time.monotonic() - issue_started_monotonic,
+            )
             refresh_issue_rollup()
             if is_model_availability_result(result):
                 mark_target_abort(
@@ -995,19 +1056,23 @@ class RunCoordinator:
                 if should_retry_in_second_pass(issue_records[issue_key].result)
             ]
             if unresolved_issues:
-                print(f"\n[INFO] 第一轮结束后仍有 {len(unresolved_issues)} 个 unresolved issues，开始第二轮增强修复...")
+                print()
+                audit_print(
+                    f"[INFO] 第一轮结束后仍有 {len(unresolved_issues)} 个 unresolved issues，开始第二轮增强修复..."
+                )
             for index, issue in enumerate(unresolved_issues, 1):
                 if abort_error:
                     break
                 sonar_issue = SonarIssue.from_api_payload(issue)
-                issue_rule = sonar_issue.rule
-                issue_line = sonar_issue.start_line or sonar_issue.line
-                file_path = sonar_issue.file_path.lstrip("/")
-                print(
-                    f"\n[SECOND PASS {index}/{len(unresolved_issues)}] 修复: "
-                    f"{issue_rule} → {file_path}:{issue_line}"
+                print()
+                log_issue_start(
+                    index=index,
+                    total=len(unresolved_issues),
+                    sonar_issue=sonar_issue,
+                    second_pass=True,
                 )
                 issue_build_command = resolve_build_command(build_command, solution_path)
+                issue_started_monotonic = time.monotonic()
                 try:
                     previous_result = issue_records[sonar_issue.key].result
                     result = run_issue_with_model_route(
@@ -1020,6 +1085,10 @@ class RunCoordinator:
                         ),
                     )
                 except Exception as exc:
+                    audit_print(
+                        f"{build_issue_marker(index=index, total=len(unresolved_issues), second_pass=True)} "
+                        f"异常中断: {build_issue_descriptor(sonar_issue)}; 错误={exc}"
+                    )
                     mark_target_abort(error=f"second-pass issue pipeline failed: {exc}", startup_failure=False)
                     break
                 issue_records[sonar_issue.key] = _IssueExecutionRecord(
@@ -1028,6 +1097,14 @@ class RunCoordinator:
                     result=result,
                 )
                 log_issue_outcome(result)
+                log_issue_finish(
+                    index=index,
+                    total=len(unresolved_issues),
+                    sonar_issue=sonar_issue,
+                    second_pass=True,
+                    result=result,
+                    duration_seconds=time.monotonic() - issue_started_monotonic,
+                )
                 refresh_issue_rollup()
                 if is_model_availability_result(result):
                     mark_target_abort(

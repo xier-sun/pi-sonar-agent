@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from pi_sonar_agent.agent.rule_policies import get_rule_policy
+from pi_sonar_agent.agent.rule_validators import validate_rule_fix
 from pi_sonar_agent.core.boundary_runtime import BoundaryRuntime
 from pi_sonar_agent.core.diff_reviewer import ReviewedFileChange, ReviewerResult
 from pi_sonar_agent.core.propagation_verifier import PropagationCheckResult
@@ -460,6 +462,13 @@ class FixVerifier:
                 current_issue_file_content=current_issue_file_content,
                 semantic_precheck_result=semantic_precheck_result,
                 quality_gate_result=quality_gate_result,
+            )
+
+        if build_passed and current_issue_file_content is not None:
+            validator = rule_validator or cls.run_rule_specific_validation
+            rule_validation_message = validator(
+                issue,
+                current_issue_file_content,
             )
 
         post_fix_retry_message = ""

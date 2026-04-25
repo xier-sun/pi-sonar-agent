@@ -1250,6 +1250,7 @@ def test_process_issue_with_retries_retries_build_timeout_as_verification_only(t
         fake_run_local_build,
     )
 
+    lessons_store = LessonsStore(tmp_path / "lessons")
     agent = FakeAgent()
     result = process_issue_with_retries(
         agent=agent,
@@ -1258,7 +1259,7 @@ def test_process_issue_with_retries_retries_build_timeout_as_verification_only(t
         build_command='dotnet build "tracked.sln"',
         repository="repo",
         run_label="run-timeout-recheck",
-        lessons_store=LessonsStore(tmp_path / "lessons"),
+        lessons_store=lessons_store,
         max_build_retries=3,
     )
 
@@ -1268,6 +1269,7 @@ def test_process_issue_with_retries_retries_build_timeout_as_verification_only(t
     assert agent.calls == 1
     assert calls == [EXTENDED_BUILD_TIMEOUT_SECONDS]
     assert "自动使用 600 秒超时重跑并通过" in result.build_output
+    assert lessons_store.success_patterns_path.exists()
 
 
 def test_build_retry_feedback_includes_plan_precheck_conflict(tmp_path) -> None:

@@ -670,13 +670,20 @@ class IssuePromptBuilder:
     @staticmethod
     def _render_compaction_boundary_section(
         working_memory: IssueWorkingMemory | None,
+        *,
+        compact_brief: str = "",
     ) -> str:
         if working_memory is None:
             return ""
         boundary_note = str(getattr(working_memory, "compact_boundary_note", "") or "").strip()
-        if not boundary_note:
+        compact_brief_text = str(compact_brief or "").strip()
+        if not boundary_note and not compact_brief_text:
             return ""
-        lines = ["【上下文压缩边界】", boundary_note]
+        lines = ["【上下文压缩边界】"]
+        if boundary_note:
+            lines.append(boundary_note)
+        if compact_brief_text:
+            lines.extend(["", compact_brief_text])
         compact_path = str(getattr(working_memory, "compact_summary_path", "") or "").strip()
         if compact_path:
             lines.append(f"- 详细压缩摘要见: `{compact_path}`")
@@ -983,20 +990,16 @@ class IssuePromptBuilder:
             model_hint=model_hint,
         )
         if compaction_decision.applied:
-            compact_working_memory = cls._clip_section(
-                render_issue_working_memory(effective_working_memory),
-                "",
-                max_chars=cls.WORKING_MEMORY_MAX_CHARS,
-                max_lines=40,
-                section_name="working_memory_section_compacted",
-                truncated_sections=truncated_sections,
-            )
-            compact_boundary_section = cls._render_compaction_boundary_section(effective_working_memory)
+            compact_working_memory = ""
             latest_retry_feedback_section = cls._render_retry_feedback_section(
                 retry_feedback_text=compaction_decision.latest_failure_excerpt or retry_feedback_text,
                 retry_context=retry_context,
                 working_memory=effective_working_memory,
                 truncated_sections=truncated_sections,
+            )
+            compact_boundary_section = cls._render_compaction_boundary_section(
+                effective_working_memory,
+                compact_brief=compaction_decision.compact_brief,
             )
             retry_feedback_section = "\n".join(
                 item

@@ -60,5 +60,13 @@ def test_issue_compaction_writes_compact_summary_and_updates_working_memory(tmp_
     assert updated_memory.compact_boundary_note
     assert updated_memory.compacted_history_summary
     assert updated_memory.compact_summary_path
+    assert "1. 当前任务目标" in decision.compact_brief
+    assert "2. 已完成的关键动作" in decision.compact_brief
+    assert "3. 已修改或重点查看过的文件" in decision.compact_brief
+    assert "4. 关键决定与约束" in decision.compact_brief
+    assert "5. 下一步应该做什么" in decision.compact_brief
     compact_summary_path = tmp_path / updated_memory.compact_summary_path
     assert compact_summary_path.exists()
+    compact_summary = compact_summary_path.read_text(encoding="utf-8")
+    assert "## Authoritative Compact Brief" in compact_summary
+    assert "1. 当前任务目标" in compact_summary

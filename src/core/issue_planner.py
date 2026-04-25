@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 from pi_sonar_agent.agent.rule_policies import (
@@ -48,7 +48,6 @@ from pi_sonar_agent.core.repair_plan import (
 from pi_sonar_agent.core.retry_context import RetryContext
 from pi_sonar_agent.core.simple_mode import (
     SIMPLE_LOOP_EXECUTION_MODE,
-    is_simple_loop_execution_mode,
     normalize_execution_mode,
 )
 from pi_sonar_agent.core.scope_guard import LegacyScopeGuard
@@ -124,11 +123,87 @@ class IssuePlanner:
     def _normalize_path(file_path: str) -> str:
         return str(file_path or "").replace("\\", "/").lstrip("/")
 
+    @classmethod
+    def _derive_repo_slice(cls, file_path: str) -> str:
+        normalized = cls._normalize_path(file_path)
+        if not normalized:
+            return ""
+        parts = [part for part in normalized.split("/") if part]
+        directories = parts[:-1]
+        if len(directories) >= 2:
+            return "/".join(directories[:2])
+        if directories:
+            return directories[0]
+        return parts[0] if parts else ""
+
+    @staticmethod
+    def _derive_path_shape_tags(normalized_path: str) -> tuple[str, ...]:
+        lowered = f"/{str(normalized_path or '').strip().lower()}"
+        tags: list[str] = []
+        if "/interfaces/" in lowered:
+            tags.append("path:interfaces")
+        if "/controllers/" in lowered or lowered.endswith("/controller.cs"):
+            tags.append("path:controllers")
+        if "/services/" in lowered or lowered.endswith("/service.cs"):
+            tags.append("path:services")
+        return tuple(tags)
+
     @staticmethod
     def _normalize_source_lines(source_lines: tuple[str, ...] | list[str] | None) -> list[str]:
         if not source_lines:
             return []
         return [str(line) for line in source_lines]
+
+    @classmethod
+    def _derive_lesson_shape_tags(
+        cls,
+        *,
+        normalized_path: str,
+        scope_mode: str,
+        boundary_profile: str,
+        allowed_capabilities: tuple[str, ...],
+        source_lines: list[str],
+        issue_line: int,
+        scope_start_line: int,
+        scope_end_line: int,
+    ) -> tuple[str, ...]:
+        tags: list[str] = []
+        normalized_scope_mode = str(scope_mode or "").strip()
+        normalized_boundary_profile = str(boundary_profile or "").strip()
+        if normalized_scope_mode:
+            tags.append(f"scope:{normalized_scope_mode}")
+        if normalized_boundary_profile:
+            tags.append(f"boundary:{normalized_boundary_profile}")
+        for capability in allowed_capabilities:
+            normalized_capability = str(capability or "").strip()
+            if normalized_capability in {
+                HELPER_EXTRACT_CAPABILITY,
+                SIGNATURE_CHANGE_CAPABILITY,
+                MULTI_FILE_REFACTOR_CAPABILITY,
+                METHOD_CLUSTER_DELETE_CAPABILITY,
+            }:
+                tags.append(f"cap:{normalized_capability}")
+        tags.extend(cls._derive_path_shape_tags(normalized_path))
+
+        method_descriptor = cls._find_primary_method_descriptor(
+            source_lines,
+            issue_line,
+            scope_start_line,
+            scope_end_line,
+        )
+        if method_descriptor is not None:
+            access = str(method_descriptor.get("access", "") or "").strip().lower()
+            if access:
+                tags.append(f"access:{access}")
+            tags.append(
+                "async:yes"
+                if bool(method_descriptor.get("is_async"))
+                else "async:no"
+            )
+            return_type = str(method_descriptor.get("return_type", "") or "").strip().lower()
+            if "task" in return_type:
+                tags.append("return:task_like")
+        return cls._dedupe_text(tags)
 
     @staticmethod
     def _directory_roots_for_files(file_paths: tuple[str, ...] | list[str]) -> tuple[str, ...]:
@@ -2159,25 +2234,41 @@ class IssuePlanner:
             allowed_capabilities=allowed_capabilities,
             retry_context=retry_context,
         )
-        planner_lessons: tuple[PlannerLesson, ...] = ()
-        if retry_context is not None:
-            planner_lessons = (lessons_store or LessonsStore()).load_planner_lessons(
-                issue_rule_id=rule_id,
-                failure_kind=retry_context.failure_kind,
-                failure_fingerprints=tuple(
-                    str(item).strip()
-                    for item in getattr(retry_context, "failure_fingerprints", ()) or ()
-                    if str(item).strip()
-                ),
-                scope_mode=normalized_scope_mode,
-                guardrail_mode=guardrail_mode,
-                boundary_failure_code=(
-                    retry_context.boundary_failure.code
-                    if retry_context.boundary_failure is not None
-                    else ""
-                ),
-                quality_gate_rule_ids=tuple(rule.rule_id for rule in quality_gate_rules),
-            )
+        normalized_source_lines = cls._normalize_source_lines(source_lines)
+        lesson_repo_slice = cls._derive_repo_slice(normalized_path)
+        lesson_shape_tags = cls._derive_lesson_shape_tags(
+            normalized_path=normalized_path,
+            scope_mode=normalized_scope_mode,
+            boundary_profile=boundary_profile,
+            allowed_capabilities=allowed_capabilities,
+            source_lines=normalized_source_lines,
+            issue_line=issue_line,
+            scope_start_line=scope_start_line,
+            scope_end_line=scope_end_line,
+        )
+        planner_lessons = (lessons_store or LessonsStore()).load_planner_lessons(
+            issue_rule_id=rule_id,
+            failure_kind=(
+                str(getattr(retry_context, "failure_kind", "") or "").strip()
+                if retry_context is not None
+                else ""
+            ),
+            failure_fingerprints=tuple(
+                str(item).strip()
+                for item in getattr(retry_context, "failure_fingerprints", ()) or ()
+                if str(item).strip()
+            ) if retry_context is not None else (),
+            scope_mode=normalized_scope_mode,
+            guardrail_mode=guardrail_mode,
+            boundary_failure_code=(
+                retry_context.boundary_failure.code
+                if retry_context is not None and retry_context.boundary_failure is not None
+                else ""
+            ),
+            repo_slice=lesson_repo_slice,
+            shape_tags=lesson_shape_tags,
+            quality_gate_rule_ids=tuple(rule.rule_id for rule in quality_gate_rules),
+        )
         symbol = ContractTargetSymbol(
             file=normalized_path,
             symbol=cls._infer_symbol_name(normalized_scope_mode, scope_start_line, scope_end_line),
@@ -2205,14 +2296,23 @@ class IssuePlanner:
         if workspace_rules.strip():
             strategy = f"{strategy}; also respect repository working rules"
         if planner_lessons:
-            strategy = f"{strategy}; avoid the repeated failure patterns captured in recent lessons"
+            has_success_lesson = any(
+                str(getattr(lesson, "source", "") or "").strip() == "success_pattern"
+                for lesson in planner_lessons
+            )
+            if has_success_lesson:
+                strategy = (
+                    f"{strategy}; prefer the most relevant recent successful strategy pattern "
+                    "and avoid the repeated failure patterns captured in recent lessons"
+                )
+            else:
+                strategy = f"{strategy}; avoid the repeated failure patterns captured in recent lessons"
 
         validation_line_range = (
             (validation_start_line, validation_end_line)
             if validation_start_line and validation_end_line
             else ()
         )
-        normalized_source_lines = cls._normalize_source_lines(source_lines)
         allowed_line_ranges, allowed_related_symbols = cls._resolve_contract_ranges(
             normalized_path=normalized_path,
             boundary_profile=boundary_profile,
@@ -2233,91 +2333,6 @@ class IssuePlanner:
         fast_path_enabled = False
         plan_first_enabled = False
         repair_plan = None
-        if not is_simple_loop_execution_mode(normalized_execution_mode):
-            fast_path_enabled = cls._should_enable_fast_path(
-                rule_id=rule_id,
-                retry_context=retry_context,
-                allowed_capabilities=allowed_capabilities,
-                allowed_related_symbols=allowed_related_symbols,
-                performance_flags=effective_performance_flags,
-            )
-            plan_first_enabled = cls._should_enable_plan_first(
-                rule_id=rule_id,
-                retry_context=retry_context,
-                allowed_capabilities=allowed_capabilities,
-                fast_path_enabled=fast_path_enabled,
-                performance_flags=effective_performance_flags,
-            )
-            repair_plan = (
-                cls._build_repair_plan(
-                    rule_id=rule_id,
-                    workspace_path=workspace_path,
-                    normalized_path=normalized_path,
-                    target_symbol=symbol,
-                    allowed_related_symbols=allowed_related_symbols,
-                    allowed_capabilities=allowed_capabilities,
-                    quality_gate_rules=quality_gate_rules,
-                    source_lines=normalized_source_lines,
-                    issue_line=issue_line,
-                    scope_start_line=scope_start_line,
-                    scope_end_line=scope_end_line,
-                    retry_context=retry_context,
-                    planner_lessons=planner_lessons,
-                    enable_archetype_strategy_selection=bool(
-                        getattr(effective_performance_flags, "repair_archetype_strategy_selection", True)
-                    ),
-                    enable_constraint_injection=bool(
-                        getattr(effective_performance_flags, "repair_archetype_constraint_injection", True)
-                    ),
-                )
-                if plan_first_enabled
-                else None
-            )
-        if (
-            repair_plan is not None
-            and repair_plan.requires_signature_change
-        ):
-            propagation_targets = tuple(getattr(repair_plan, "propagation_targets", ()) or ())
-            promoted_capabilities = list(allowed_capabilities)
-            if not propagation_targets and not repair_plan.requires_propagation:
-                promoted_capabilities.append(SIGNATURE_CHANGE_CAPABILITY)
-            elif propagation_targets:
-                promoted_capabilities.append(SIGNATURE_CHANGE_CAPABILITY)
-                if any(target.file and target.file != normalized_path for target in propagation_targets):
-                    promoted_capabilities.append(MULTI_FILE_REFACTOR_CAPABILITY)
-            normalized_promoted_capabilities = tuple(dict.fromkeys(promoted_capabilities))
-            if normalized_promoted_capabilities != allowed_capabilities:
-                auto_upgraded_capabilities = tuple(
-                    capability
-                    for capability in normalized_promoted_capabilities
-                    if capability not in allowed_capabilities
-                )
-                allowed_capabilities = normalized_promoted_capabilities
-                repair_plan = cls._build_repair_plan(
-                    rule_id=rule_id,
-                    workspace_path=workspace_path,
-                    normalized_path=normalized_path,
-                    target_symbol=symbol,
-                    allowed_related_symbols=allowed_related_symbols,
-                    allowed_capabilities=allowed_capabilities,
-                    quality_gate_rules=quality_gate_rules,
-                    source_lines=normalized_source_lines,
-                    issue_line=issue_line,
-                    scope_start_line=scope_start_line,
-                    scope_end_line=scope_end_line,
-                    retry_context=retry_context,
-                    planner_lessons=planner_lessons,
-                    enable_archetype_strategy_selection=bool(
-                        getattr(effective_performance_flags, "repair_archetype_strategy_selection", True)
-                    ),
-                    enable_constraint_injection=bool(
-                        getattr(effective_performance_flags, "repair_archetype_constraint_injection", True)
-                    ),
-                )
-                repair_plan = replace(
-                    repair_plan,
-                    auto_upgraded_capabilities=auto_upgraded_capabilities,
-                )
         plan_precheck = PlanPrecheckResult(
             status="not_applicable",
             blocking=False,
@@ -2327,14 +2342,7 @@ class IssuePlanner:
                 "Structured repair-plan precheck is disabled in simple_loop mode.",
             ),
         )
-        if not is_simple_loop_execution_mode(normalized_execution_mode):
-            plan_precheck = cls._precheck_repair_plan(
-                repair_plan=repair_plan,
-                allowed_capabilities=allowed_capabilities,
-            )
-        execution_profile = "fast_path_short_form" if fast_path_enabled else "full_path"
-        if plan_first_enabled and not fast_path_enabled:
-            execution_profile = "plan_first_full_path"
+        execution_profile = "full_path"
         propagation_symbols = tuple(
             ContractTargetSymbol(
                 file=target.file,
@@ -2435,42 +2443,14 @@ class IssuePlanner:
             plan_precheck=plan_precheck,
             patch_only=True,
         )
-        if fast_path_enabled:
-            strategy = (
-                f"{strategy}; execute in short-form fast path and finish immediately after the patch is complete"
-            )
-        elif plan_first_enabled:
-            strategy = (
-                f"{strategy}; use plan-first execution and honor the structured repair plan before editing"
-            )
-            if plan_precheck.blocking:
-                strategy = (
-                    f"{strategy}; stop before edit if the plan precheck reports a blocking contract or quality-gate conflict"
-                )
         prompt_guidance_sections = [
             cls.render_contract_guidance(edit_contract),
             cls.render_repair_plan_guidance(edit_contract),
         ]
-        repeated_failure_skip_reason = ""
-        retry_failure_fingerprints = cls._retry_failure_fingerprints(retry_context)
-        failure_fingerprint_repetition = int(
-            getattr(retry_context, "failure_fingerprint_repetition", 0) or 0
-        )
-        if (
-            not is_simple_loop_execution_mode(normalized_execution_mode)
-            and cls._should_skip_after_repeated_failure(
-            rule_id=rule_id,
-            failure_fingerprints=retry_failure_fingerprints,
-            failure_fingerprint_repetition=failure_fingerprint_repetition,
-        )):
-            repeated_failure_skip_reason = (
-                "Repeated failure fingerprint indicates this issue is unlikely to converge with another generic agent retry; "
-                "handoff to a specialized engine or manual review."
-            )
         return IssuePlan(
             strategy=strategy,
             edit_contract=edit_contract,
             prompt_guidance="\n\n".join(section for section in prompt_guidance_sections if section),
             validation_plan=validation_plan,
-            skip_reason=repeated_failure_skip_reason,
+            skip_reason="",
         )

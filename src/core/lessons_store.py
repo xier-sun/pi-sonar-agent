@@ -28,6 +28,8 @@ class LessonRecord:
     scope_mode: str = ""
     guardrail_mode: str = ""
     boundary_failure_code: str = ""
+    repo_slice: str = ""
+    shape_tags: tuple[str, ...] = ()
     summary: str = ""
     guidance: tuple[str, ...] = ()
     evidence: tuple[str, ...] = ()
@@ -50,6 +52,8 @@ class LessonPattern:
     scope_mode: str = ""
     guardrail_mode: str = ""
     boundary_failure_code: str = ""
+    repo_slice: str = ""
+    shape_tags: tuple[str, ...] = ()
     count: int = 0
     first_seen_at: str = ""
     last_seen_at: str = ""
@@ -76,6 +80,8 @@ class PlannerLesson:
     scope_mode: str = ""
     guardrail_mode: str = ""
     boundary_failure_code: str = ""
+    repo_slice: str = ""
+    shape_tags: tuple[str, ...] = ()
     quality_gate_rule_ids: tuple[str, ...] = ()
     selection_mode: str = ""
     selection_reason: str = ""
@@ -94,6 +100,7 @@ class LessonsStore:
         self.quality_gate_lessons_path = self.root / "quality_gate_lessons.jsonl"
         self.boundary_patterns_path = self.root / "boundary_failure_patterns.json"
         self.rule_patterns_path = self.root / "rule_failure_patterns.json"
+        self.success_patterns_path = self.root / "successful_strategy_patterns.json"
 
     @staticmethod
     def _dedupe(values: tuple[str, ...] | list[str]) -> tuple[str, ...]:
@@ -116,6 +123,8 @@ class LessonsStore:
                 record.scope_mode or "-",
                 record.guardrail_mode or "-",
                 record.boundary_failure_code or "-",
+                record.repo_slice or "-",
+                ",".join(cls._dedupe(record.shape_tags)) or "-",
             ]
         )
 
@@ -161,6 +170,8 @@ class LessonsStore:
                 scope_mode=str(item.get("scope_mode", "")).strip(),
                 guardrail_mode=str(item.get("guardrail_mode", "")).strip(),
                 boundary_failure_code=str(item.get("boundary_failure_code", "")).strip(),
+                repo_slice=str(item.get("repo_slice", "")).strip(),
+                shape_tags=self._dedupe(tuple(item.get("shape_tags", ()))),
                 count=int(item.get("count", 0) or 0),
                 first_seen_at=str(item.get("first_seen_at", "")).strip(),
                 last_seen_at=str(item.get("last_seen_at", "")).strip(),
@@ -204,9 +215,13 @@ class LessonsStore:
         retry_context: RetryContext,
         scope_mode: str,
         guardrail_mode: str,
+        repo_slice: str,
+        shape_tags: tuple[str, ...],
         quality_gate_rule_ids: tuple[str, ...],
     ) -> tuple[LessonRecord, ...]:
         recorded_at = utc_now_iso()
+        normalized_repo_slice = str(repo_slice or "").strip()
+        normalized_shape_tags = self._dedupe(shape_tags)
         records: list[LessonRecord] = [
             LessonRecord(
                 recorded_at=recorded_at,
@@ -228,6 +243,8 @@ class LessonsStore:
                     if retry_context.boundary_failure is not None
                     else ""
                 ),
+                repo_slice=normalized_repo_slice,
+                shape_tags=normalized_shape_tags,
                 summary=self._build_rule_failure_summary(retry_context),
                 guidance=self._dedupe(retry_context.guidance),
                 evidence=self._dedupe((retry_context.raw_output,)),
@@ -258,6 +275,8 @@ class LessonsStore:
                         if retry_context.boundary_failure is not None
                         else ""
                     ),
+                    repo_slice=normalized_repo_slice,
+                    shape_tags=normalized_shape_tags,
                     summary=scope_violation.raw_output or "Scope validation rejected the patch.",
                     guidance=self._dedupe(scope_violation.constraints),
                     evidence=self._dedupe(
@@ -293,6 +312,8 @@ class LessonsStore:
                         if retry_context.boundary_failure is not None
                         else ""
                     ),
+                    repo_slice=normalized_repo_slice,
+                    shape_tags=normalized_shape_tags,
                     summary=review_failure.summary or "Diff reviewer rejected the patch.",
                     guidance=self._dedupe(review_failure.constraints),
                     evidence=self._dedupe(tuple(item.reason for item in review_failure.violations)),
@@ -324,6 +345,8 @@ class LessonsStore:
                             if retry_context.boundary_failure is not None
                             else ""
                         ),
+                        repo_slice=normalized_repo_slice,
+                        shape_tags=normalized_shape_tags,
                         summary=violation.message or quality_failure.summary,
                         guidance=self._dedupe((violation.retry_hint,)),
                         evidence=self._dedupe((violation.evidence, violation.symbol)),
@@ -349,6 +372,8 @@ class LessonsStore:
                     scope_mode=record.scope_mode,
                     guardrail_mode=record.guardrail_mode,
                     boundary_failure_code=record.boundary_failure_code,
+                    repo_slice=record.repo_slice,
+                    shape_tags=record.shape_tags,
                     count=1,
                     first_seen_at=record.recorded_at,
                     last_seen_at=record.recorded_at,
@@ -373,6 +398,8 @@ class LessonsStore:
                 scope_mode=current.scope_mode,
                 guardrail_mode=current.guardrail_mode,
                 boundary_failure_code=current.boundary_failure_code or record.boundary_failure_code,
+                repo_slice=current.repo_slice or record.repo_slice,
+                shape_tags=self._dedupe((*current.shape_tags, *record.shape_tags)),
                 count=current.count + 1,
                 first_seen_at=current.first_seen_at or record.recorded_at,
                 last_seen_at=record.recorded_at,
@@ -395,6 +422,8 @@ class LessonsStore:
         retry_context: RetryContext | None,
         scope_mode: str = "",
         guardrail_mode: str = "",
+        repo_slice: str = "",
+        shape_tags: tuple[str, ...] = (),
         quality_gate_rule_ids: tuple[str, ...] = (),
     ) -> None:
         """Persist structured lessons for one failed attempt."""
@@ -410,6 +439,8 @@ class LessonsStore:
             retry_context=retry_context,
             scope_mode=scope_mode,
             guardrail_mode=guardrail_mode,
+            repo_slice=repo_slice,
+            shape_tags=shape_tags,
             quality_gate_rule_ids=quality_gate_rule_ids,
         )
         if not records:
@@ -426,6 +457,52 @@ class LessonsStore:
         rule_records = tuple(record for record in records if record.lesson_kind == "rule_failure")
         if rule_records:
             self._update_pattern_file(self.rule_patterns_path, rule_records)
+
+    def record_success(
+        self,
+        *,
+        repository: str,
+        run_label: str,
+        issue_key: str,
+        issue_rule_id: str,
+        summary: str,
+        guidance: tuple[str, ...] = (),
+        scope_mode: str = "",
+        guardrail_mode: str = "",
+        repo_slice: str = "",
+        shape_tags: tuple[str, ...] = (),
+        quality_gate_rule_ids: tuple[str, ...] = (),
+    ) -> None:
+        """Persist a successful strategy pattern so future issues can start smarter."""
+
+        normalized_rule_id = str(issue_rule_id or "").strip()
+        normalized_summary = str(summary or "").strip()
+        normalized_guidance = self._dedupe(guidance)
+        if not normalized_rule_id or (not normalized_summary and not normalized_guidance):
+            return
+
+        record = LessonRecord(
+            recorded_at=utc_now_iso(),
+            lesson_kind="success_strategy",
+            repository=str(repository or "").strip(),
+            run_label=str(run_label or "").strip(),
+            issue_key=str(issue_key or "").strip(),
+            source_attempt_number=0,
+            issue_rule_id=normalized_rule_id,
+            failure_kind="success",
+            primary_failure_fingerprint="",
+            failure_fingerprints=(),
+            scope_mode=str(scope_mode or "").strip(),
+            guardrail_mode=str(guardrail_mode or "").strip(),
+            boundary_failure_code="",
+            repo_slice=str(repo_slice or "").strip(),
+            shape_tags=self._dedupe(shape_tags),
+            summary=normalized_summary or "Recent successful strategy recorded.",
+            guidance=normalized_guidance,
+            evidence=(),
+            quality_gate_rule_ids=self._dedupe(quality_gate_rule_ids),
+        )
+        self._update_pattern_file(self.success_patterns_path, (record,))
 
     def _load_quality_gate_lessons(self) -> list[LessonRecord]:
         if not self.quality_gate_lessons_path.exists():
@@ -454,6 +531,8 @@ class LessonsStore:
                     scope_mode=str(item.get("scope_mode", "")).strip(),
                     guardrail_mode=str(item.get("guardrail_mode", "")).strip(),
                     boundary_failure_code=str(item.get("boundary_failure_code", "")).strip(),
+                    repo_slice=str(item.get("repo_slice", "")).strip(),
+                    shape_tags=self._dedupe(tuple(item.get("shape_tags", ()))),
                     summary=str(item.get("summary", "")).strip(),
                     guidance=self._dedupe(tuple(item.get("guidance", ()))),
                     evidence=self._dedupe(tuple(item.get("evidence", ()))),
@@ -481,11 +560,154 @@ class LessonsStore:
             scope_mode=pattern.scope_mode,
             guardrail_mode=pattern.guardrail_mode,
             boundary_failure_code=pattern.boundary_failure_code,
+            repo_slice=pattern.repo_slice,
+            shape_tags=pattern.shape_tags,
             quality_gate_rule_ids=pattern.quality_gate_rule_ids,
             selection_mode=selection_mode,
             selection_reason=selection_reason,
             count=pattern.count,
         )
+
+    @staticmethod
+    def _repo_slice_match_score(expected: str, candidate: str) -> int:
+        normalized_expected = str(expected or "").strip()
+        normalized_candidate = str(candidate or "").strip()
+        if not normalized_expected or not normalized_candidate:
+            return 0
+        if normalized_expected == normalized_candidate:
+            return 18
+        if (
+            normalized_expected.startswith(normalized_candidate + "/")
+            or normalized_candidate.startswith(normalized_expected + "/")
+        ):
+            return 10
+        return 0
+
+    @classmethod
+    def _candidate_match_details(
+        cls,
+        candidate: LessonPattern | LessonRecord,
+        *,
+        repo_slice: str,
+        shape_tags: tuple[str, ...],
+        failure_kind: str,
+        primary_failure_fingerprint: str,
+        quality_gate_rule_ids: set[str],
+        scope_mode: str,
+        guardrail_mode: str,
+    ) -> tuple[int, tuple[str, ...]]:
+        score = 0
+        reasons: list[str] = []
+
+        repo_score = cls._repo_slice_match_score(repo_slice, getattr(candidate, "repo_slice", ""))
+        if repo_score:
+            score += repo_score
+            reasons.append(f"repo_slice={str(getattr(candidate, 'repo_slice', '')).strip()}")
+
+        normalized_shape_tags = set(cls._dedupe(shape_tags))
+        candidate_shape_tags = set(
+            cls._dedupe(tuple(getattr(candidate, "shape_tags", ()) or ()))
+        )
+        shape_overlap = tuple(sorted(normalized_shape_tags.intersection(candidate_shape_tags)))
+        if shape_overlap:
+            score += len(shape_overlap) * 7
+            reasons.append("shape_tags=" + ",".join(shape_overlap[:4]))
+
+        normalized_failure_kind = str(failure_kind or "").strip()
+        candidate_failure_kind = str(getattr(candidate, "failure_kind", "") or "").strip()
+        if normalized_failure_kind and candidate_failure_kind == normalized_failure_kind:
+            score += 6
+
+        normalized_fingerprint = str(primary_failure_fingerprint or "").strip()
+        candidate_fingerprints = {
+            str(item).strip()
+            for item in getattr(candidate, "failure_fingerprints", ()) or ()
+            if str(item).strip()
+        }
+        candidate_primary_fingerprint = str(
+            getattr(candidate, "primary_failure_fingerprint", "") or ""
+        ).strip()
+        if normalized_fingerprint and (
+            candidate_primary_fingerprint == normalized_fingerprint
+            or normalized_fingerprint in candidate_fingerprints
+        ):
+            score += 12
+
+        candidate_quality_gate_ids = {
+            str(item).strip()
+            for item in getattr(candidate, "quality_gate_rule_ids", ()) or ()
+            if str(item).strip()
+        }
+        matched_quality_gate_ids = tuple(sorted(quality_gate_rule_ids.intersection(candidate_quality_gate_ids)))
+        if matched_quality_gate_ids:
+            score += 8
+            reasons.append("quality_gate_rules=" + ",".join(matched_quality_gate_ids[:3]))
+
+        normalized_scope_mode = str(scope_mode or "").strip()
+        if normalized_scope_mode and str(getattr(candidate, "scope_mode", "") or "").strip() == normalized_scope_mode:
+            score += 2
+
+        normalized_guardrail_mode = str(guardrail_mode or "").strip()
+        if (
+            normalized_guardrail_mode
+            and str(getattr(candidate, "guardrail_mode", "") or "").strip() == normalized_guardrail_mode
+        ):
+            score += 2
+
+        return score, tuple(reasons)
+
+    @classmethod
+    def _candidate_match_score(
+        cls,
+        candidate: LessonPattern | LessonRecord,
+        *,
+        repo_slice: str,
+        shape_tags: tuple[str, ...],
+        failure_kind: str,
+        primary_failure_fingerprint: str,
+        quality_gate_rule_ids: set[str],
+        scope_mode: str,
+        guardrail_mode: str,
+    ) -> int:
+        score, _ = cls._candidate_match_details(
+            candidate,
+            repo_slice=repo_slice,
+            shape_tags=shape_tags,
+            failure_kind=failure_kind,
+            primary_failure_fingerprint=primary_failure_fingerprint,
+            quality_gate_rule_ids=quality_gate_rule_ids,
+            scope_mode=scope_mode,
+            guardrail_mode=guardrail_mode,
+        )
+        return score
+
+    @classmethod
+    def _build_selection_reason(
+        cls,
+        base_reason: str,
+        candidate: LessonPattern | LessonRecord,
+        *,
+        repo_slice: str,
+        shape_tags: tuple[str, ...],
+        failure_kind: str,
+        primary_failure_fingerprint: str,
+        quality_gate_rule_ids: set[str],
+        scope_mode: str,
+        guardrail_mode: str,
+    ) -> str:
+        score, reasons = cls._candidate_match_details(
+            candidate,
+            repo_slice=repo_slice,
+            shape_tags=shape_tags,
+            failure_kind=failure_kind,
+            primary_failure_fingerprint=primary_failure_fingerprint,
+            quality_gate_rule_ids=quality_gate_rule_ids,
+            scope_mode=scope_mode,
+            guardrail_mode=guardrail_mode,
+        )
+        if score <= 0 or not reasons:
+            return base_reason
+        return base_reason + "; " + "; ".join(reasons)
 
     def load_planner_lessons(
         self,
@@ -496,6 +718,8 @@ class LessonsStore:
         scope_mode: str = "",
         guardrail_mode: str = "",
         boundary_failure_code: str = "",
+        repo_slice: str = "",
+        shape_tags: tuple[str, ...] = (),
         quality_gate_rule_ids: tuple[str, ...] = (),
         limit: int = 2,
     ) -> tuple[PlannerLesson, ...]:
@@ -515,6 +739,64 @@ class LessonsStore:
             )
         )
         primary_failure_fingerprint = normalized_failure_fingerprints[0] if normalized_failure_fingerprints else ""
+        has_active_failure_context = bool(
+            str(failure_kind or "").strip()
+            or primary_failure_fingerprint
+            or str(boundary_failure_code or "").strip()
+        )
+        normalized_repo_slice = str(repo_slice or "").strip()
+        normalized_shape_tags = self._dedupe(shape_tags)
+
+        if len(lessons) < limit and not has_active_failure_context:
+            success_patterns = self._load_patterns(self.success_patterns_path)
+            matching_success_patterns = [
+                pattern
+                for pattern in success_patterns.values()
+                if pattern.issue_rule_id == issue_rule_id
+                and (not scope_mode or pattern.scope_mode == scope_mode)
+                and (not guardrail_mode or pattern.guardrail_mode == guardrail_mode)
+                and (
+                    not normalized_quality_gate_rule_ids
+                    or not pattern.quality_gate_rule_ids
+                    or normalized_quality_gate_rule_ids.intersection(pattern.quality_gate_rule_ids)
+                )
+            ]
+            matching_success_patterns.sort(
+                key=lambda item: (
+                    self._candidate_match_score(
+                        item,
+                        repo_slice=normalized_repo_slice,
+                        shape_tags=normalized_shape_tags,
+                        failure_kind=failure_kind,
+                        primary_failure_fingerprint=primary_failure_fingerprint,
+                        quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                        scope_mode=scope_mode,
+                        guardrail_mode=guardrail_mode,
+                    ),
+                    item.count,
+                    item.last_seen_at,
+                ),
+                reverse=True,
+            )
+            lessons.extend(
+                self._pattern_to_planner_lesson(
+                    pattern,
+                    "success_pattern",
+                    selection_mode="rule_exact_success",
+                    selection_reason=self._build_selection_reason(
+                        f"rule_id={issue_rule_id} successful strategy pattern",
+                        pattern,
+                        repo_slice=normalized_repo_slice,
+                        shape_tags=normalized_shape_tags,
+                        failure_kind=failure_kind,
+                        primary_failure_fingerprint=primary_failure_fingerprint,
+                        quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                        scope_mode=scope_mode,
+                        guardrail_mode=guardrail_mode,
+                    ),
+                )
+                for pattern in matching_success_patterns[:1]
+            )
 
         boundary_patterns = self._load_patterns(self.boundary_patterns_path)
         exact_boundary = [
@@ -528,13 +810,39 @@ class LessonsStore:
             and (not guardrail_mode or pattern.guardrail_mode == guardrail_mode)
             and (not boundary_failure_code or pattern.boundary_failure_code == boundary_failure_code)
         ]
-        exact_boundary.sort(key=lambda item: (item.count, item.last_seen_at), reverse=True)
+        exact_boundary.sort(
+            key=lambda item: (
+                self._candidate_match_score(
+                    item,
+                    repo_slice=normalized_repo_slice,
+                    shape_tags=normalized_shape_tags,
+                    failure_kind=failure_kind,
+                    primary_failure_fingerprint=primary_failure_fingerprint,
+                    quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                    scope_mode=scope_mode,
+                    guardrail_mode=guardrail_mode,
+                ),
+                item.count,
+                item.last_seen_at,
+            ),
+            reverse=True,
+        )
         lessons.extend(
             self._pattern_to_planner_lesson(
                 pattern,
                 "boundary_pattern",
                 selection_mode="rule_plus_fingerprint",
-                selection_reason=f"rule_id={issue_rule_id} and failure_fingerprint={primary_failure_fingerprint}",
+                selection_reason=self._build_selection_reason(
+                    f"rule_id={issue_rule_id} and failure_fingerprint={primary_failure_fingerprint}",
+                    pattern,
+                    repo_slice=normalized_repo_slice,
+                    shape_tags=normalized_shape_tags,
+                    failure_kind=failure_kind,
+                    primary_failure_fingerprint=primary_failure_fingerprint,
+                    quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                    scope_mode=scope_mode,
+                    guardrail_mode=guardrail_mode,
+                ),
             )
             for pattern in exact_boundary[:1]
         )
@@ -548,13 +856,39 @@ class LessonsStore:
             and (not guardrail_mode or pattern.guardrail_mode == guardrail_mode)
             and (not boundary_failure_code or pattern.boundary_failure_code == boundary_failure_code)
         ]
-        matching_boundary.sort(key=lambda item: (item.count, item.last_seen_at), reverse=True)
+        matching_boundary.sort(
+            key=lambda item: (
+                self._candidate_match_score(
+                    item,
+                    repo_slice=normalized_repo_slice,
+                    shape_tags=normalized_shape_tags,
+                    failure_kind=failure_kind,
+                    primary_failure_fingerprint=primary_failure_fingerprint,
+                    quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                    scope_mode=scope_mode,
+                    guardrail_mode=guardrail_mode,
+                ),
+                item.count,
+                item.last_seen_at,
+            ),
+            reverse=True,
+        )
         lessons.extend(
             self._pattern_to_planner_lesson(
                 pattern,
                 "boundary_pattern",
                 selection_mode="rule_exact",
-                selection_reason=f"rule_id={issue_rule_id} and failure_kind={failure_kind or '-'}",
+                selection_reason=self._build_selection_reason(
+                    f"rule_id={issue_rule_id} and failure_kind={failure_kind or '-'}",
+                    pattern,
+                    repo_slice=normalized_repo_slice,
+                    shape_tags=normalized_shape_tags,
+                    failure_kind=failure_kind,
+                    primary_failure_fingerprint=primary_failure_fingerprint,
+                    quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                    scope_mode=scope_mode,
+                    guardrail_mode=guardrail_mode,
+                ),
             )
             for pattern in matching_boundary[:1]
         )
@@ -568,16 +902,93 @@ class LessonsStore:
             and pattern.primary_failure_fingerprint == primary_failure_fingerprint
             and (not failure_kind or pattern.failure_kind == failure_kind)
         ]
-        exact_rule_patterns.sort(key=lambda item: (item.count, item.last_seen_at), reverse=True)
+        exact_rule_patterns.sort(
+            key=lambda item: (
+                self._candidate_match_score(
+                    item,
+                    repo_slice=normalized_repo_slice,
+                    shape_tags=normalized_shape_tags,
+                    failure_kind=failure_kind,
+                    primary_failure_fingerprint=primary_failure_fingerprint,
+                    quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                    scope_mode=scope_mode,
+                    guardrail_mode=guardrail_mode,
+                ),
+                item.count,
+                item.last_seen_at,
+            ),
+            reverse=True,
+        )
         lessons.extend(
             self._pattern_to_planner_lesson(
                 pattern,
                 "rule_pattern",
                 selection_mode="rule_plus_fingerprint",
-                selection_reason=f"rule_id={issue_rule_id} and failure_fingerprint={primary_failure_fingerprint}",
+                selection_reason=self._build_selection_reason(
+                    f"rule_id={issue_rule_id} and failure_fingerprint={primary_failure_fingerprint}",
+                    pattern,
+                    repo_slice=normalized_repo_slice,
+                    shape_tags=normalized_shape_tags,
+                    failure_kind=failure_kind,
+                    primary_failure_fingerprint=primary_failure_fingerprint,
+                    quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                    scope_mode=scope_mode,
+                    guardrail_mode=guardrail_mode,
+                ),
             )
             for pattern in exact_rule_patterns[:1]
         )
+
+        if len(lessons) < limit and has_active_failure_context:
+            success_patterns = self._load_patterns(self.success_patterns_path)
+            matching_success_patterns = [
+                pattern
+                for pattern in success_patterns.values()
+                if pattern.issue_rule_id == issue_rule_id
+                and (not scope_mode or pattern.scope_mode == scope_mode)
+                and (not guardrail_mode or pattern.guardrail_mode == guardrail_mode)
+                and (
+                    not normalized_quality_gate_rule_ids
+                    or not pattern.quality_gate_rule_ids
+                    or normalized_quality_gate_rule_ids.intersection(pattern.quality_gate_rule_ids)
+                )
+            ]
+            matching_success_patterns.sort(
+                key=lambda item: (
+                    self._candidate_match_score(
+                        item,
+                        repo_slice=normalized_repo_slice,
+                        shape_tags=normalized_shape_tags,
+                        failure_kind=failure_kind,
+                        primary_failure_fingerprint=primary_failure_fingerprint,
+                        quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                        scope_mode=scope_mode,
+                        guardrail_mode=guardrail_mode,
+                    ),
+                    item.count,
+                    item.last_seen_at,
+                ),
+                reverse=True,
+            )
+            lessons.extend(
+                self._pattern_to_planner_lesson(
+                    pattern,
+                    "success_pattern",
+                    selection_mode="rule_exact_success",
+                    selection_reason=self._build_selection_reason(
+                        f"rule_id={issue_rule_id} successful strategy pattern",
+                        pattern,
+                        repo_slice=normalized_repo_slice,
+                        shape_tags=normalized_shape_tags,
+                        failure_kind=failure_kind,
+                        primary_failure_fingerprint=primary_failure_fingerprint,
+                        quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                        scope_mode=scope_mode,
+                        guardrail_mode=guardrail_mode,
+                    ),
+                )
+                for pattern in matching_success_patterns[:1]
+            )
 
         if normalized_quality_gate_rule_ids and len(lessons) < limit:
             quality_lessons = [
@@ -586,7 +997,22 @@ class LessonsStore:
                 if record.issue_rule_id == issue_rule_id
                 and normalized_quality_gate_rule_ids.intersection(record.quality_gate_rule_ids)
             ]
-            quality_lessons.sort(key=lambda item: item.recorded_at, reverse=True)
+            quality_lessons.sort(
+                key=lambda item: (
+                    self._candidate_match_score(
+                        item,
+                        repo_slice=normalized_repo_slice,
+                        shape_tags=normalized_shape_tags,
+                        failure_kind=failure_kind,
+                        primary_failure_fingerprint=primary_failure_fingerprint,
+                        quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                        scope_mode=scope_mode,
+                        guardrail_mode=guardrail_mode,
+                    ),
+                    item.recorded_at,
+                ),
+                reverse=True,
+            )
             seen_quality_rules: set[str] = set()
             for record in quality_lessons:
                 quality_rule_id = next(iter(record.quality_gate_rule_ids), "")
@@ -606,10 +1032,20 @@ class LessonsStore:
                         scope_mode=record.scope_mode,
                         guardrail_mode=record.guardrail_mode,
                         boundary_failure_code=record.boundary_failure_code,
+                        repo_slice=record.repo_slice,
+                        shape_tags=record.shape_tags,
                         quality_gate_rule_ids=record.quality_gate_rule_ids,
                         selection_mode="rule_exact",
-                        selection_reason=(
-                            "quality_gate_rules=" + ",".join(sorted(normalized_quality_gate_rule_ids))
+                        selection_reason=self._build_selection_reason(
+                            "quality_gate_rules=" + ",".join(sorted(normalized_quality_gate_rule_ids)),
+                            record,
+                            repo_slice=normalized_repo_slice,
+                            shape_tags=normalized_shape_tags,
+                            failure_kind=failure_kind,
+                            primary_failure_fingerprint=primary_failure_fingerprint,
+                            quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                            scope_mode=scope_mode,
+                            guardrail_mode=guardrail_mode,
                         ),
                         count=1,
                     )
@@ -623,13 +1059,39 @@ class LessonsStore:
             if pattern.issue_rule_id == issue_rule_id
             and (not failure_kind or pattern.failure_kind == failure_kind)
         ]
-        matching_rule_patterns.sort(key=lambda item: (item.count, item.last_seen_at), reverse=True)
+        matching_rule_patterns.sort(
+            key=lambda item: (
+                self._candidate_match_score(
+                    item,
+                    repo_slice=normalized_repo_slice,
+                    shape_tags=normalized_shape_tags,
+                    failure_kind=failure_kind,
+                    primary_failure_fingerprint=primary_failure_fingerprint,
+                    quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                    scope_mode=scope_mode,
+                    guardrail_mode=guardrail_mode,
+                ),
+                item.count,
+                item.last_seen_at,
+            ),
+            reverse=True,
+        )
         lessons.extend(
             self._pattern_to_planner_lesson(
                 pattern,
                 "rule_pattern",
                 selection_mode="rule_exact",
-                selection_reason=f"rule_id={issue_rule_id} and failure_kind={failure_kind or '-'}",
+                selection_reason=self._build_selection_reason(
+                    f"rule_id={issue_rule_id} and failure_kind={failure_kind or '-'}",
+                    pattern,
+                    repo_slice=normalized_repo_slice,
+                    shape_tags=normalized_shape_tags,
+                    failure_kind=failure_kind,
+                    primary_failure_fingerprint=primary_failure_fingerprint,
+                    quality_gate_rule_ids=normalized_quality_gate_rule_ids,
+                    scope_mode=scope_mode,
+                    guardrail_mode=guardrail_mode,
+                ),
             )
             for pattern in matching_rule_patterns[:1]
         )

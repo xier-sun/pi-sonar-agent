@@ -32,6 +32,7 @@ class IssueCompactionDecision:
     compacted_history_summary: str = ""
     latest_failure_excerpt: str = ""
     compact_summary_path: str = ""
+    compact_brief: str = ""
 
 
 def resolve_prompt_token_budget(rule_id: str) -> int:
@@ -153,6 +154,87 @@ def build_latest_failure_excerpt(retry_context: RetryContext | None) -> str:
     return "\n".join(section for section in sections if section).strip()
 
 
+def build_authoritative_compact_brief(
+    working_memory: IssueWorkingMemory | None,
+    retry_context: RetryContext | None,
+) -> str:
+    """Build a deterministic compact brief with the minimum facts needed to continue."""
+
+    if working_memory is None:
+        return ""
+
+    goal = str(getattr(working_memory, "current_goal", "") or "").strip() or "继续修复当前 issue。"
+
+    completed_actions: list[str] = []
+    for item in (
+        str(getattr(working_memory, "latest_strategy_summary", "") or "").strip(),
+        str(getattr(working_memory, "latest_patch_summary", "") or "").strip(),
+        str(getattr(working_memory, "latest_verification", "") or "").strip(),
+        str(getattr(working_memory, "best_known_patch_state", "") or "").strip(),
+    ):
+        if item and item not in completed_actions:
+            completed_actions.append(item)
+    if retry_context is not None:
+        for history_item in getattr(retry_context, "retry_history_items", ()) or ():
+            headline = str(getattr(history_item, "headline", "") or "").strip()
+            if headline and headline not in completed_actions:
+                completed_actions.append(headline)
+            if len(completed_actions) >= 4:
+                break
+    if not completed_actions:
+        completed_actions.append("当前没有可复用的历史动作摘要，请先读取当前文件状态再继续。")
+
+    files = [
+        str(item).strip()
+        for item in getattr(working_memory, "files_inspected", ()) or ()
+        if str(item).strip()
+    ]
+    if retry_context is not None:
+        for item in getattr(retry_context, "changed_files", ()) or ():
+            text = str(item).strip()
+            if text and text not in files:
+                files.append(text)
+    if not files:
+        files.append("当前还没有稳定的文件轨迹，请先读取目标文件。")
+
+    constraints: list[str] = []
+    workspace_state = str(getattr(working_memory, "authoritative_workspace_state", "") or "").strip()
+    if workspace_state:
+        constraints.append(f"当前工作区状态: {workspace_state}")
+    for item in getattr(working_memory, "accepted_constraints", ()) or ():
+        text = str(item).strip()
+        if text and text not in constraints:
+            constraints.append(text)
+    for item in getattr(working_memory, "rejected_strategies", ()) or ():
+        text = str(item).strip()
+        if text and text not in constraints:
+            constraints.append(f"避免: {text}")
+    rollback_reason = str(getattr(working_memory, "rollback_reason", "") or "").strip()
+    if rollback_reason and rollback_reason not in constraints:
+        constraints.append(rollback_reason)
+    if not constraints:
+        constraints.append("继续保持最小改动，优先遵守当前 contract 和质量门禁。")
+
+    next_action = (
+        str(getattr(working_memory, "next_action", "") or "").strip()
+        or "先读取当前文件和目标位置，再决定下一步编辑。"
+    )
+
+    lines = [
+        "1. 当前任务目标",
+        f"- {goal}",
+        "2. 已完成的关键动作",
+        *(f"- {item}" for item in completed_actions[:4]),
+        "3. 已修改或重点查看过的文件",
+        *(f"- {item}" for item in files[:6]),
+        "4. 关键决定与约束",
+        *(f"- {item}" for item in constraints[:6]),
+        "5. 下一步应该做什么",
+        f"- {next_action}",
+    ]
+    return "\n".join(lines).strip()
+
+
 def maybe_compact_issue_prompt(
     *,
     issue_key: str,
@@ -190,6 +272,7 @@ def maybe_compact_issue_prompt(
     )
     compacted_history_summary = build_compacted_history_summary(retry_context)
     latest_failure_excerpt = build_latest_failure_excerpt(retry_context)
+    compact_brief = build_authoritative_compact_brief(working_memory, retry_context)
 
     updated_memory = merge_issue_working_memory(
         working_memory,
@@ -211,6 +294,7 @@ def maybe_compact_issue_prompt(
                 token_budget=token_budget,
                 estimator=estimator,
                 reason=reason,
+                compact_brief=compact_brief,
             ),
         )
         try:
@@ -232,6 +316,7 @@ def maybe_compact_issue_prompt(
         compacted_history_summary=compacted_history_summary,
         latest_failure_excerpt=latest_failure_excerpt,
         compact_summary_path=compact_summary_path,
+        compact_brief=compact_brief,
     )
 
 
@@ -273,6 +358,7 @@ def _build_compact_summary_document(
     token_budget: int,
     estimator: str,
     reason: str,
+    compact_brief: str = "",
 ) -> str:
     lines = [
         f"# Compact Summary for {issue_key}",
@@ -296,6 +382,15 @@ def _build_compact_summary_document(
         f"- compacted_history_summary: {updated_memory.compacted_history_summary}",
         f"- next_action: {updated_memory.next_action}",
     ]
+    if compact_brief:
+        lines.extend(
+            [
+                "",
+                "## Authoritative Compact Brief",
+                "",
+                compact_brief,
+            ]
+        )
     if retry_context is not None:
         lines.extend(
             [

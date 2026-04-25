@@ -247,6 +247,11 @@ def test_user_prompt_adds_compaction_boundary_after_retry_depth(tmp_path: Path) 
 
     assert result.compaction_applied is True
     assert "【上下文压缩边界】" in result.prompt
+    assert "1. 当前任务目标" in result.prompt
+    assert "2. 已完成的关键动作" in result.prompt
+    assert "3. 已修改或重点查看过的文件" in result.prompt
+    assert "4. 关键决定与约束" in result.prompt
+    assert "5. 下一步应该做什么" in result.prompt
     assert result.issue_working_memory is not None
     assert result.issue_working_memory.compaction_generation == 1
 

@@ -121,3 +121,9 @@ def format_removed_workspaces(paths: Sequence[Path]) -> list[str]:
     """Format removed workspace paths for user-facing logging."""
 
     return [str(path).replace("\\", "/") for path in paths]
+
+
+def current_run_timestamp() -> str:
+    """Return the current local timestamp for run-log audit lines."""
+
+    return time.strftime("%Y-%m-%d %H:%M:%S")

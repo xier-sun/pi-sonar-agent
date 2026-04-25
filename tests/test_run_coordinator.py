@@ -1199,6 +1199,11 @@ def test_run_coordinator_retries_unresolved_issues_in_second_pass_with_tier2_fir
     tmp_path,
     capsys,
 ) -> None:
+    monkeypatch.setattr(
+        run_coordinator_module,
+        "current_run_timestamp",
+        lambda: "2026-04-24 10:11:12",
+    )
     runtime_env = RuntimeEnvironment(
         sonar_host="https://sonar.example",
         sonar_token="sonar-token",
@@ -1358,6 +1363,10 @@ def test_run_coordinator_retries_unresolved_issues_in_second_pass_with_tier2_fir
     assert "第一轮最终状态: no_change" in call_records[1][1]
     output = capsys.readouterr().out
     assert "第二轮增强修复" in output
+    assert "[2026-04-24 10:11:12] [1/1] 开始修复:" in output
+    assert "[2026-04-24 10:11:12] [1/1] 修复结束:" in output
+    assert "[2026-04-24 10:11:12] [SECOND PASS 1/1] 开始修复:" in output
+    assert "[2026-04-24 10:11:12] [SECOND PASS 1/1] 修复完成:" in output
 
 
 def test_run_coordinator_fails_over_to_tier2_when_first_tier_times_out(
