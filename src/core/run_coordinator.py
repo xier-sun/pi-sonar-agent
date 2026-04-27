@@ -6,6 +6,7 @@ import json
 import shutil
 import time
 from dataclasses import dataclass, replace
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -150,6 +151,229 @@ class RunCoordinator:
         pr_auto_complete_identity_override = str(
             project_env.get("ADO_PR_AUTO_COMPLETE_IDENTITY_ID", "")
         ).strip()
+
+        def parse_iso_datetime(value: str) -> datetime | None:
+            raw = str(value or "").strip()
+            if not raw:
+                return None
+            try:
+                return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except ValueError:
+                return None
+
+        def persist_pr_business_records(
+            *,
+            pr_id: int | None,
+            pr_url: str,
+            pr_title: str,
+            pr_status: str,
+            source_branch: str,
+            pr_description_path: str,
+            pr_attachment_name: str,
+            pr_attachment_url: str,
+            auto_complete_set_succeeded: bool,
+        ) -> None:
+            db_client = getattr(self.state_store, "db_client", None)
+            if db_client is None:
+                return
+            try:
+                attempted_count = successful + skipped + failed
+                effective_fix_rate_value = (
+                    round(successful / attempted_count, 4)
+                    if attempted_count > 0
+                    else None
+                )
+                second_pass_issue_count_value = sum(
+                    1
+                    for record in issue_records.values()
+                    if getattr(record.result, "issue_state", None) is not None
+                    and any(
+                        str(attempt.performance_metrics.get("model_route_pass", "") or "").strip() == "second_pass"
+                        for attempt in record.result.issue_state.attempts
+                    )
+                )
+                target_state_value = (
+                    getattr(getattr(self.state_store, "target_state", None), "status", None)
+                    or (issue_states and derive_target_status(
+                        total_issues=total_issues,
+                        successful=successful,
+                        skipped=skipped,
+                        failed=failed,
+                        build_passed=build_passed,
+                    ))
+                )
+                target_status_text = (
+                    str(getattr(target_state_value, "value", target_state_value or "")).strip()
+                    or ("partial" if abort_error else ("succeeded" if build_passed else "failed"))
+                )
+                pr_record_id = db_client.insert_pull_request_record(
+                    run_label=options.run_label,
+                    project_key=target_config.project_key,
+                    repository=target_config.repository,
+                    author=target_config.author,
+                    base_branch=target_config.base_branch,
+                    source_branch=source_branch,
+                    pr_id=pr_id,
+                    pr_url=pr_url,
+                    pr_title=pr_title,
+                    pr_status=pr_status,
+                    pr_description_path=pr_description_path,
+                    pr_attachment_name=pr_attachment_name,
+                    pr_attachment_url=pr_attachment_url,
+                    target_status=target_status_text,
+                    partial_pr=bool(abort_error or not build_passed),
+                    build_passed_before_pr=build_passed,
+                    total_issues=total_issues,
+                    successful_issues=successful,
+                    skipped_issues=skipped,
+                    failed_issues=failed,
+                    policy_skipped_issues=policy_skipped,
+                    first_pass_issue_count=len(issues),
+                    second_pass_issue_count=second_pass_issue_count_value,
+                    used_second_pass=bool(
+                        second_pass_allowed and second_pass_issue_count_value > 0
+                    ),
+                    used_abort_publish=bool(abort_error and pr_url),
+                    effective_fix_rate=effective_fix_rate_value,
+                    tier1_model=str(getattr(model_tiers.get("tier1"), "display_name", "") or ""),
+                    tier2_model=str(getattr(model_tiers.get("tier2"), "display_name", "") or ""),
+                    auto_complete_enabled=pr_auto_complete_enabled,
+                    auto_complete_set_succeeded=auto_complete_set_succeeded,
+                    delete_source_branch_on_complete=pr_delete_source_branch_on_complete,
+                    summary_artifact_path=str(local_pr_report_path.as_posix() if local_pr_report_path else ""),
+                    error_message=pr_error or "",
+                    started_at=parse_iso_datetime(target_started_at),
+                    finished_at=parse_iso_datetime(utc_now_iso()),
+                )
+
+                issue_rows: list[dict[str, Any]] = []
+                attempt_rows: list[dict[str, Any]] = []
+                for issue_key in issue_order:
+                    record = issue_records[issue_key]
+                    result = record.result
+                    issue_state = getattr(result, "issue_state", None)
+                    if not isinstance(issue_state, IssueState):
+                        continue
+                    issue_payload = record.issue_payload
+                    issue_summary = next((item for item in issue_summaries if item.issue_key == issue_key), None)
+                    attempts = tuple(issue_state.attempts or ())
+                    first_pass_result = ""
+                    second_pass_result = ""
+                    resolved_in_second_pass = False
+                    final_tier = ""
+                    build_passed_flag = False
+                    post_fix_issue_status = ""
+                    if isinstance(getattr(result, "post_fix_check_result", None), dict):
+                        post_fix_issue_status = str(
+                            result.post_fix_check_result.get("issue_status", "") or ""
+                        ).strip()
+                    for attempt in attempts:
+                        metrics = dict(attempt.performance_metrics or {})
+                        pass_name = str(metrics.get("model_route_pass", "") or "").strip()
+                        tier_name = str(metrics.get("model_route_tier", "") or "").strip()
+                        model_name = str(metrics.get("model_route_model", "") or "").strip()
+                        if pass_name == "first_pass":
+                            first_pass_result = first_pass_result or attempt.status.value
+                        elif pass_name == "second_pass":
+                            second_pass_result = second_pass_result or attempt.status.value
+                        if tier_name:
+                            final_tier = tier_name
+                        build_passed_flag = build_passed_flag or bool(attempt.build_passed)
+                        attempt_rows.append(
+                            {
+                                "run_label": options.run_label,
+                                "issue_key": issue_key,
+                                "attempt_number": attempt.attempt_number,
+                                "pass_name": pass_name or "first_pass",
+                                "tier_name": tier_name or None,
+                                "model_name": model_name or None,
+                                "attempt_status": attempt.status.value,
+                                "failure_kind": attempt.failure_kind or None,
+                                "retry_reason": str(attempt.retry_reason.value if hasattr(attempt.retry_reason, "value") else attempt.retry_reason or "") or None,
+                                "retryable_failure": bool(attempt.retryable_failure),
+                                "build_passed": bool(attempt.build_passed),
+                                "build_verification_failed": bool(attempt.build_verification_failed),
+                                "model_timeout_stage": str(metrics.get("model_timeout_stage", "") or "") or None,
+                                "patch_salvaged": bool(metrics.get("patch_salvaged")),
+                                "fast_path_enabled": bool(metrics.get("fast_path_enabled")),
+                                "execution_profile": str(metrics.get("execution_profile", "") or getattr(result, "execution_profile", "") or "") or None,
+                                "guardrail_mode": str(metrics.get("guardrail_mode", "") or getattr(result, "guardrail_mode", "") or "") or None,
+                                "execution_mode": str(getattr(result, "execution_mode", "") or "") or None,
+                                "changed_files_json": json.dumps(list(attempt.changed_files or ()), ensure_ascii=False),
+                                "performance_metrics_json": json.dumps(metrics, ensure_ascii=False),
+                                "summary": attempt.summary or None,
+                                "error": attempt.error or None,
+                                "skip_reason": attempt.skip_reason or None,
+                                "artifact_dir": attempt.artifact_dir or None,
+                                "attempt_events_path": (
+                                    str(Path(attempt.artifact_dir) / "attempt_events.jsonl")
+                                    if attempt.artifact_dir
+                                    else None
+                                ),
+                                "started_at": parse_iso_datetime(attempt.started_at),
+                                "finished_at": parse_iso_datetime(attempt.finished_at),
+                                "duration_seconds": float(attempt.duration_seconds),
+                            }
+                        )
+                    if issue_state.status.value == "fixed" and second_pass_result == "succeeded":
+                        resolved_in_second_pass = True
+                    issue_rows.append(
+                        {
+                            "run_label": options.run_label,
+                            "project_key": target_config.project_key,
+                            "repository": target_config.repository,
+                            "author": target_config.author,
+                            "issue_key": issue_key,
+                            "rule_id": issue_state.rule_id,
+                            "severity": str(issue_payload.get("severity", "") or "") or None,
+                            "issue_type": str(issue_payload.get("type", "") or "") or None,
+                            "file_path": issue_state.file_path,
+                            "line_number": issue_state.line,
+                            "message": str(issue_payload.get("message", "") or "") or None,
+                            "final_status": issue_state.status.value,
+                            "included_in_pr": issue_state.status.value == "fixed",
+                            "attempt_count": len(attempts),
+                            "final_failure_kind": issue_state.final_failure_kind or None,
+                            "final_error": issue_state.final_error or None,
+                            "final_skip_reason": issue_state.final_skip_reason or None,
+                            "final_summary": issue_state.final_summary or None,
+                            "first_pass_result": first_pass_result or None,
+                            "second_pass_result": second_pass_result or None,
+                            "resolved_in_second_pass": resolved_in_second_pass,
+                            "tier_used_for_final_result": final_tier or None,
+                            "build_passed": build_passed_flag,
+                            "post_fix_issue_status": post_fix_issue_status or None,
+                            "boundary_failure_code": issue_state.final_boundary_failure_code or None,
+                            "secondary_boundary_failure_codes": json.dumps(
+                                list(issue_state.final_secondary_boundary_failure_codes or ()),
+                                ensure_ascii=False,
+                            ),
+                            "quality_gate_status": (
+                                issue_summary.compliance_status if issue_summary else ""
+                            ) or None,
+                            "hard_quality_gate_failures": int(
+                                issue_summary.hard_quality_gate_failures if issue_summary else 0
+                            ),
+                            "soft_quality_gate_findings": int(
+                                issue_summary.soft_quality_gate_findings if issue_summary else 0
+                            ),
+                            "boundary_drift_score": int(
+                                issue_summary.boundary_drift_score if issue_summary else 0
+                            ),
+                            "changed_files_json": json.dumps(
+                                list(issue_summary.changed_files if issue_summary else ()),
+                                ensure_ascii=False,
+                            ),
+                            "issue_artifact_root": issue_state.artifact_root or None,
+                            "issue_log_path": (
+                                issue_summary.issue_log_path if issue_summary else getattr(result, "issue_log_path", "")
+                            ) or None,
+                        }
+                    )
+                db_client.insert_pull_request_issue_records(pr_record_id, issue_rows)
+                db_client.insert_pull_request_attempt_records(pr_record_id, attempt_rows)
+            except Exception as exc:
+                print(f"[WARN] PR 结果落库失败，但不影响当前流程：{exc}")
 
         def finalize_target_result(result: TargetRunResult) -> TargetRunResult:
             rollout_flags = load_performance_flags().enabled_flags()
@@ -1156,7 +1380,15 @@ class RunCoordinator:
         pr_url = ""
         pr_error = ""
         pr_report_markdown = ""
-        if successful > 0:
+        local_pr_report_path: Path | None = None
+        pr_attachment_name = ""
+        pr_attachment_url = ""
+        created_pr_id: int | None = None
+        created_pr_title = ""
+        created_pr_status = ""
+        created_pr_source_branch = ""
+        auto_complete_set_succeeded = False
+        if issue_records:
             pr_description = build_pull_request_description(
                 author=target_config.author,
                 base_branch=target_config.base_branch,
@@ -1240,6 +1472,10 @@ class RunCoordinator:
                     target_branch=target_config.base_branch,
                     reviewer_email=recipients.reviewer_email or None,
                 )
+                created_pr_id = pr.pr_id
+                created_pr_title = pr_title
+                created_pr_status = "created"
+                created_pr_source_branch = branch
                 pr_url = pr.url
                 print(f"  PR: {pr_url}")
                 if pr_auto_complete_enabled and hasattr(ado_client, "set_pull_request_auto_complete"):
@@ -1254,6 +1490,8 @@ class RunCoordinator:
                                 identity_id=auto_complete_identity_id,
                                 delete_source_branch=pr_delete_source_branch_on_complete,
                             )
+                            auto_complete_set_succeeded = True
+                            created_pr_status = "auto_complete_set"
                             delete_text = "，完成后删除源分支" if pr_delete_source_branch_on_complete else ""
                             print(f"[INFO] PR 已设置自动完成{delete_text}")
                         except Exception as exc:
@@ -1265,6 +1503,7 @@ class RunCoordinator:
                     author=target_config.author,
                     run_label=options.run_label,
                 )
+                pr_attachment_name = attachment_name
                 try:
                     attachment = ado_client.upload_pull_request_attachment(
                         repository=target_config.repository,
@@ -1276,6 +1515,8 @@ class RunCoordinator:
                         "[INFO] PR 详细报告附件已上传: "
                         f"{attachment.file_name} -> {attachment.url}"
                     )
+                    pr_attachment_name = attachment.file_name
+                    pr_attachment_url = attachment.url
                     updated_description = build_summary_pull_request_description(
                         author=target_config.author,
                         base_branch=target_config.base_branch,
@@ -1310,10 +1551,41 @@ class RunCoordinator:
                     pr_error = warning
             except Exception as exc:
                 pr_error = str(exc)
+                created_pr_title = pr_title
+                created_pr_status = "failed"
+                created_pr_source_branch = branch
                 print(f"[WARN] PR 创建失败: {pr_error}")
 
         if abort_error and not pr_url and not pr_error:
             pr_error = abort_error
+
+        if issue_records:
+            if not created_pr_status:
+                if should_create_pr:
+                    created_pr_status = "failed" if pr_error else "created"
+                else:
+                    created_pr_status = "not_created"
+            persist_pr_business_records(
+                pr_id=created_pr_id,
+                pr_url=pr_url,
+                pr_title=created_pr_title or (
+                    (
+                        f"Partial Fix: 修复 {successful} 个 SonarQube 问题"
+                        if successful > 0 and (abort_error or not build_passed)
+                        else f"Fix: 修复 {successful} 个 SonarQube 问题"
+                    )
+                    if successful > 0
+                    else f"No PR Created: {target_config.author} Sonar 修复结果留档"
+                ),
+                pr_status=created_pr_status,
+                source_branch=created_pr_source_branch or (
+                    f"fix/sonar-{target_config.author.split('@')[0]}-{options.run_label}"
+                ),
+                pr_description_path=local_pr_report_path.as_posix() if local_pr_report_path else "",
+                pr_attachment_name=pr_attachment_name,
+                pr_attachment_url=pr_attachment_url,
+                auto_complete_set_succeeded=auto_complete_set_succeeded,
+            )
 
         should_notify = bool(dingtalk_client and pr_url)
         if should_notify:

@@ -9,6 +9,8 @@ from pi_sonar_agent.core.model_env import ModelTierConfig
 from pi_sonar_agent.core.perf_flags import PerformanceFlags
 from pi_sonar_agent.core.preflight import RuntimeEnvironment
 from pi_sonar_agent.core.run_coordinator import RunCoordinator, TargetRunOptions
+from pi_sonar_agent.core.state import AttemptState, AttemptStatus, IssueState, IssueStatus
+from pi_sonar_agent.core.state_store import RunStateStore
 from pi_sonar_agent.core.target_config import TargetConfig
 
 
@@ -2087,3 +2089,693 @@ def test_run_coordinator_auto_complete_failure_does_not_block_pr(
     assert result.pr_error == ""
     output = capsys.readouterr().out
     assert "设置 PR 自动完成失败，但不影响当前 PR" in output
+
+
+def test_run_coordinator_persists_pr_business_records(monkeypatch, tmp_path) -> None:
+    runtime_env = RuntimeEnvironment(
+        sonar_host="https://sonar.example",
+        sonar_token="sonar-token",
+        sonar_org="sonar-org",
+        ado_base_url="https://dev.azure.com/acme",
+        ado_org="acme",
+        ado_project="pi",
+        ado_pat="ado-token",
+        workspace_root=tmp_path / "workspaces",
+    )
+    target_config = TargetConfig(
+        project_key="project-a",
+        repository="repo-a",
+        author="alice@example.com",
+        reviewer_email="",
+        dingtalk_userid="",
+        base_branch="develop",
+        base_branch_source="targets.json.base_branch",
+        build_command="dotnet build Foo.sln",
+        test_command=None,
+        solution_path="Foo.sln",
+        max_issues=1,
+    )
+
+    monkeypatch.setattr(run_coordinator_module, "ensure_workspace_writable", lambda workspace_root: None)
+    monkeypatch.setattr(run_coordinator_module, "ensure_remote_branch_exists", lambda **kwargs: None)
+    monkeypatch.setattr(
+        run_coordinator_module,
+        "prune_old_workspaces",
+        lambda workspace_root, keep_latest=1: SimpleNamespace(removed=(), failed=()),
+    )
+
+    class FakeArtifactWriter:
+        def write_target_state(self, target_state):
+            summary_path = tmp_path / "run-artifacts" / "target_summary.json"
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text("{}", encoding="utf-8")
+            return summary_path
+
+    monkeypatch.setattr(run_coordinator_module, "ArtifactWriter", FakeArtifactWriter)
+
+    class FakeGitRepositoryGateway:
+        def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
+            self.remote_url = remote_url
+
+        def clone_branch(self, workspace_path: Path, branch: str, *, depth: int | None = None) -> None:
+            workspace_path.mkdir(parents=True, exist_ok=True)
+
+        def install_local_excludes(self, workspace_path: Path) -> None:
+            return None
+
+        def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
+            return None
+
+    monkeypatch.setattr(run_coordinator_module, "GitRepositoryGateway", FakeGitRepositoryGateway)
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    import pi_sonar_agent.core.db_client as db_client_module
+    import pi_sonar_agent.core.dingtalk as dingtalk_module
+    import pi_sonar_agent.core.issue_retry as issue_retry_module
+    import pi_sonar_agent.core.project_env as project_env_module
+    import pi_sonar_agent.core.recipient_resolution as recipient_module
+    import pi_sonar_agent.fixers.build_gate as build_gate_module
+    import pi_sonar_agent.integrations.ado as ado_module
+    import pi_sonar_agent.integrations.sonar as sonar_module
+
+    monkeypatch.setattr(db_client_module, "create_mysql_client_from_env", lambda: None)
+    monkeypatch.setattr(
+        recipient_module,
+        "resolve_recipients",
+        lambda **kwargs: SimpleNamespace(
+            reviewer_email="",
+            reviewer_source="author",
+            dingtalk_userid="",
+            dingtalk_source="author",
+        ),
+    )
+    monkeypatch.setattr(dingtalk_module, "create_dingtalk_client_from_env", lambda: None)
+    monkeypatch.setattr(project_env_module, "read_project_env", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        build_gate_module,
+        "run_local_build",
+        lambda *args, **kwargs: {
+            "succeeded": True,
+            "build_command": "dotnet build Foo.sln",
+            "test_command": "",
+        },
+    )
+    monkeypatch.setattr(build_gate_module, "resolve_build_command", lambda command, solution_path: command)
+    monkeypatch.setattr(build_gate_module, "format_build_failure_report", lambda *args, **kwargs: "")
+
+    class FakeAdoClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_remote_url(self, repository: str) -> str:
+            return f"https://dev.azure.com/acme/project/_git/{repository}"
+
+        def create_pull_request(self, *args, **kwargs):
+            return SimpleNamespace(
+                pr_id=31,
+                url="https://dev.azure.com/acme/project/_git/repo-a/pullrequest/31",
+                created_by_id="creator-31",
+            )
+
+        def upload_pull_request_attachment(self, *args, **kwargs):
+            return SimpleNamespace(file_name="report.txt", url="https://dev.azure.com/report.txt")
+
+        def update_pull_request_description(self, *args, **kwargs):
+            return SimpleNamespace(pr_id=31)
+
+    class FakeSonarClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_open_issues(self, project_key: str, author: str) -> list[dict]:
+            return [
+                {
+                    "key": "issue-1",
+                    "rule": "csharpsquid:S1125",
+                    "message": "first",
+                    "line": 10,
+                    "component": "project-a:src/Foo.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                }
+            ]
+
+    class FakeClaudeFixAgent:
+        def __init__(self, *args, **kwargs):
+            self.model = kwargs.get("model")
+
+    class FakeDbClient:
+        def __init__(self) -> None:
+            self.ensure_tables_calls = 0
+            self.snapshots: list[dict] = []
+            self.events: list[dict] = []
+            self.run_records: list[tuple[str, str, str, int]] = []
+            self.issue_records: list[tuple[int, str, str, str, int]] = []
+            self.updated_issue_records: list[tuple[str, str, str | None, str | None]] = []
+            self.updated_run_records: list[tuple[int, int | None, int | None, str | None, str | None, str | None]] = []
+            self.pr_records: list[dict] = []
+            self.pr_issue_rows: list[tuple[int, list[dict]]] = []
+            self.pr_attempt_rows: list[tuple[int, list[dict]]] = []
+
+        def ensure_tables(self) -> None:
+            self.ensure_tables_calls += 1
+
+        def insert_run_record(self, author: str, project_key: str, repository: str, total_issues: int) -> int:
+            self.run_records.append((author, project_key, repository, total_issues))
+            return 7
+
+        def update_run_record(self, run_id: int, successful_fixes=None, failed_fixes=None, status=None, error=None, pr_url=None) -> None:
+            self.updated_run_records.append((run_id, successful_fixes, failed_fixes, status, error, pr_url))
+
+        def insert_issue_record(self, run_id: int, issue_key: str, rule_id: str, file_path: str, line_number: int) -> None:
+            self.issue_records.append((run_id, issue_key, rule_id, file_path, line_number))
+
+        def update_issue_record(self, issue_key: str, fix_status: str, fix_engine: str = None, error_message: str = None) -> None:
+            self.updated_issue_records.append((issue_key, fix_status, fix_engine, error_message))
+
+        def upsert_state_snapshot(self, **kwargs) -> None:
+            self.snapshots.append(kwargs)
+
+        def insert_event_record(self, **kwargs) -> None:
+            self.events.append(kwargs)
+
+        def insert_pull_request_record(self, **kwargs) -> int:
+            self.pr_records.append(kwargs)
+            return 101
+
+        def insert_pull_request_issue_records(self, pr_record_id: int, rows: list[dict]) -> None:
+            self.pr_issue_rows.append((pr_record_id, rows))
+
+        def insert_pull_request_attempt_records(self, pr_record_id: int, rows: list[dict]) -> None:
+            self.pr_attempt_rows.append((pr_record_id, rows))
+
+        def disconnect(self) -> None:
+            return None
+
+    monkeypatch.setattr(ado_module, "AzureDevOpsClient", FakeAdoClient)
+    monkeypatch.setattr(sonar_module, "SonarQubeClient", FakeSonarClient)
+    monkeypatch.setattr(claude_agent_module, "ClaudeFixAgent", FakeClaudeFixAgent)
+
+    def fake_process_issue_with_retries(**kwargs):
+        attempt_state = AttemptState(
+            attempt_number=1,
+            status=AttemptStatus.SUCCEEDED,
+            started_at="2026-04-27T15:46:03+08:00",
+            finished_at="2026-04-27T15:46:03+08:00",
+            duration_seconds=0.0,
+            summary="Fixed the issue",
+            changed_files=("src/Foo.cs",),
+            artifact_dir=str(tmp_path / "issue-artifacts" / "attempt-01"),
+            performance_metrics={
+                "model_route_tier": "tier1",
+                "model_route_model": "tier1-model",
+                "model_route_pass": "first_pass",
+            },
+            build_passed=True,
+        )
+        issue_state = IssueState(
+            issue_key="issue-1",
+            repository="repo-a",
+            run_label="20260427160000",
+            rule_id="csharpsquid:S1125",
+            file_path="/src/Foo.cs",
+            line=10,
+            status=IssueStatus.FIXED,
+            attempts=(attempt_state,),
+            final_summary="Fixed the issue",
+            artifact_root=str(tmp_path / "issue-artifacts" / "issue-1"),
+        )
+        return FixResult(
+            success=True,
+            issue_key="issue-1",
+            file_path="src/Foo.cs",
+            summary="Fixed the issue",
+            attempts=1,
+            changes=[{"file": "src/Foo.cs"}],
+            build_passed=True,
+            performance_metrics={
+                "model_route_tier": "tier1",
+                "model_route_model": "tier1-model",
+                "model_route_pass": "first_pass",
+            },
+            issue_state=issue_state,
+            issue_log_path="logs/issue.log",
+        )
+
+    monkeypatch.setattr(
+        issue_retry_module,
+        "process_issue_with_retries",
+        fake_process_issue_with_retries,
+    )
+
+    fake_db = FakeDbClient()
+    coordinator = RunCoordinator(runtime_env)
+    coordinator.state_store = RunStateStore(db_client=fake_db)
+    result = coordinator.run_target(
+        target_config,
+        TargetRunOptions(run_label="20260427160000", show_banner=False),
+    )
+
+    assert result.ok is True
+    assert result.pr_url.endswith("/31")
+    assert len(fake_db.pr_records) == 1
+    assert fake_db.pr_records[0]["pr_id"] == 31
+    assert fake_db.pr_records[0]["successful_issues"] == 1
+    assert fake_db.pr_records[0]["pr_status"] == "created"
+    assert len(fake_db.pr_issue_rows) == 1
+    assert fake_db.pr_issue_rows[0][0] == 101
+    assert fake_db.pr_issue_rows[0][1][0]["issue_key"] == "issue-1"
+    assert fake_db.pr_issue_rows[0][1][0]["final_status"] == "fixed"
+    assert len(fake_db.pr_attempt_rows) == 1
+    assert fake_db.pr_attempt_rows[0][1][0]["attempt_number"] == 1
+    assert fake_db.pr_attempt_rows[0][1][0]["tier_name"] == "tier1"
+
+
+def test_run_coordinator_persists_failed_pr_business_record(monkeypatch, tmp_path) -> None:
+    runtime_env = RuntimeEnvironment(
+        sonar_host="https://sonar.example",
+        sonar_token="sonar-token",
+        sonar_org="sonar-org",
+        ado_base_url="https://dev.azure.com/acme",
+        ado_org="acme",
+        ado_project="pi",
+        ado_pat="ado-token",
+        workspace_root=tmp_path / "workspaces",
+    )
+    target_config = TargetConfig(
+        project_key="project-a",
+        repository="repo-a",
+        author="alice@example.com",
+        reviewer_email="",
+        dingtalk_userid="",
+        base_branch="develop",
+        base_branch_source="targets.json.base_branch",
+        build_command="dotnet build Foo.sln",
+        test_command=None,
+        solution_path="Foo.sln",
+        max_issues=1,
+    )
+
+    monkeypatch.setattr(run_coordinator_module, "ensure_workspace_writable", lambda workspace_root: None)
+    monkeypatch.setattr(run_coordinator_module, "ensure_remote_branch_exists", lambda **kwargs: None)
+    monkeypatch.setattr(
+        run_coordinator_module,
+        "prune_old_workspaces",
+        lambda workspace_root, keep_latest=1: SimpleNamespace(removed=(), failed=()),
+    )
+
+    class FakeArtifactWriter:
+        def write_target_state(self, target_state):
+            summary_path = tmp_path / "run-artifacts" / "target_summary.json"
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text("{}", encoding="utf-8")
+            return summary_path
+
+    monkeypatch.setattr(run_coordinator_module, "ArtifactWriter", FakeArtifactWriter)
+
+    class FakeGitRepositoryGateway:
+        def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
+            self.remote_url = remote_url
+
+        def clone_branch(self, workspace_path: Path, branch: str, *, depth: int | None = None) -> None:
+            workspace_path.mkdir(parents=True, exist_ok=True)
+
+        def install_local_excludes(self, workspace_path: Path) -> None:
+            return None
+
+        def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
+            return None
+
+    monkeypatch.setattr(run_coordinator_module, "GitRepositoryGateway", FakeGitRepositoryGateway)
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    import pi_sonar_agent.core.db_client as db_client_module
+    import pi_sonar_agent.core.dingtalk as dingtalk_module
+    import pi_sonar_agent.core.issue_retry as issue_retry_module
+    import pi_sonar_agent.core.project_env as project_env_module
+    import pi_sonar_agent.core.recipient_resolution as recipient_module
+    import pi_sonar_agent.fixers.build_gate as build_gate_module
+    import pi_sonar_agent.integrations.ado as ado_module
+    import pi_sonar_agent.integrations.sonar as sonar_module
+
+    monkeypatch.setattr(db_client_module, "create_mysql_client_from_env", lambda: None)
+    monkeypatch.setattr(
+        recipient_module,
+        "resolve_recipients",
+        lambda **kwargs: SimpleNamespace(
+            reviewer_email="",
+            reviewer_source="author",
+            dingtalk_userid="",
+            dingtalk_source="author",
+        ),
+    )
+    monkeypatch.setattr(dingtalk_module, "create_dingtalk_client_from_env", lambda: None)
+    monkeypatch.setattr(project_env_module, "read_project_env", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        build_gate_module,
+        "run_local_build",
+        lambda *args, **kwargs: {
+            "succeeded": True,
+            "build_command": "dotnet build Foo.sln",
+            "test_command": "",
+        },
+    )
+    monkeypatch.setattr(build_gate_module, "resolve_build_command", lambda command, solution_path: command)
+    monkeypatch.setattr(build_gate_module, "format_build_failure_report", lambda *args, **kwargs: "")
+
+    class FakeAdoClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_remote_url(self, repository: str) -> str:
+            return f"https://dev.azure.com/acme/project/_git/{repository}"
+
+        def create_pull_request(self, *args, **kwargs):
+            raise RuntimeError("ado pr failed")
+
+    class FakeSonarClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_open_issues(self, project_key: str, author: str) -> list[dict]:
+            return [
+                {
+                    "key": "issue-1",
+                    "rule": "csharpsquid:S1125",
+                    "message": "first",
+                    "line": 10,
+                    "component": "project-a:src/Foo.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                }
+            ]
+
+    class FakeClaudeFixAgent:
+        def __init__(self, *args, **kwargs):
+            return None
+
+    class FakeDbClient:
+        def __init__(self) -> None:
+            self.pr_records: list[dict] = []
+            self.pr_issue_rows: list[tuple[int, list[dict]]] = []
+            self.pr_attempt_rows: list[tuple[int, list[dict]]] = []
+
+        def ensure_tables(self) -> None:
+            return None
+
+        def insert_run_record(self, *args, **kwargs) -> int:
+            return 7
+
+        def update_run_record(self, *args, **kwargs) -> None:
+            return None
+
+        def insert_issue_record(self, *args, **kwargs) -> None:
+            return None
+
+        def update_issue_record(self, *args, **kwargs) -> None:
+            return None
+
+        def upsert_state_snapshot(self, **kwargs) -> None:
+            return None
+
+        def insert_event_record(self, **kwargs) -> None:
+            return None
+
+        def insert_pull_request_record(self, **kwargs) -> int:
+            self.pr_records.append(kwargs)
+            return 101
+
+        def insert_pull_request_issue_records(self, pr_record_id: int, rows: list[dict]) -> None:
+            self.pr_issue_rows.append((pr_record_id, rows))
+
+        def insert_pull_request_attempt_records(self, pr_record_id: int, rows: list[dict]) -> None:
+            self.pr_attempt_rows.append((pr_record_id, rows))
+
+        def disconnect(self) -> None:
+            return None
+
+    attempt_state = AttemptState(
+        attempt_number=1,
+        status=AttemptStatus.SUCCEEDED,
+        started_at="2026-04-27T15:46:03+08:00",
+        finished_at="2026-04-27T15:46:03+08:00",
+        duration_seconds=0.0,
+        summary="Fixed the issue",
+        changed_files=("src/Foo.cs",),
+        artifact_dir=str(tmp_path / "issue-artifacts" / "attempt-01"),
+        build_passed=True,
+        performance_metrics={
+            "model_route_tier": "tier1",
+            "model_route_model": "tier1-model",
+            "model_route_pass": "first_pass",
+        },
+    )
+    issue_state = IssueState(
+        issue_key="issue-1",
+        repository="repo-a",
+        run_label="20260427161000",
+        rule_id="csharpsquid:S1125",
+        file_path="/src/Foo.cs",
+        line=10,
+        status=IssueStatus.FIXED,
+        attempts=(attempt_state,),
+        final_summary="Fixed the issue",
+        artifact_root=str(tmp_path / "issue-artifacts" / "issue-1"),
+    )
+
+    monkeypatch.setattr(ado_module, "AzureDevOpsClient", FakeAdoClient)
+    monkeypatch.setattr(sonar_module, "SonarQubeClient", FakeSonarClient)
+    monkeypatch.setattr(claude_agent_module, "ClaudeFixAgent", FakeClaudeFixAgent)
+    monkeypatch.setattr(
+        issue_retry_module,
+        "process_issue_with_retries",
+        lambda **kwargs: FixResult(
+            success=True,
+            issue_key="issue-1",
+            file_path="src/Foo.cs",
+            summary="Fixed the issue",
+            attempts=1,
+            changes=[{"file": "src/Foo.cs"}],
+            build_passed=True,
+            issue_state=issue_state,
+        ),
+    )
+
+    fake_db = FakeDbClient()
+    coordinator = RunCoordinator(runtime_env)
+    coordinator.state_store = RunStateStore(db_client=fake_db)
+    result = coordinator.run_target(
+        target_config,
+        TargetRunOptions(run_label="20260427161000", show_banner=False),
+    )
+
+    assert result.ok is True
+    assert result.pr_url == ""
+    assert len(fake_db.pr_records) == 1
+    assert fake_db.pr_records[0]["pr_status"] == "failed"
+
+
+def test_run_coordinator_persists_not_created_pr_business_record(monkeypatch, tmp_path) -> None:
+    runtime_env = RuntimeEnvironment(
+        sonar_host="https://sonar.example",
+        sonar_token="sonar-token",
+        sonar_org="sonar-org",
+        ado_base_url="https://dev.azure.com/acme",
+        ado_org="acme",
+        ado_project="pi",
+        ado_pat="ado-token",
+        workspace_root=tmp_path / "workspaces",
+    )
+    target_config = TargetConfig(
+        project_key="project-a",
+        repository="repo-a",
+        author="alice@example.com",
+        reviewer_email="",
+        dingtalk_userid="",
+        base_branch="develop",
+        base_branch_source="targets.json.base_branch",
+        build_command="dotnet build Foo.sln",
+        test_command=None,
+        solution_path="Foo.sln",
+        max_issues=1,
+    )
+
+    monkeypatch.setattr(run_coordinator_module, "ensure_workspace_writable", lambda workspace_root: None)
+    monkeypatch.setattr(run_coordinator_module, "ensure_remote_branch_exists", lambda **kwargs: None)
+    monkeypatch.setattr(
+        run_coordinator_module,
+        "prune_old_workspaces",
+        lambda workspace_root, keep_latest=1: SimpleNamespace(removed=(), failed=()),
+    )
+
+    class FakeArtifactWriter:
+        def write_target_state(self, target_state):
+            summary_path = tmp_path / "run-artifacts" / "target_summary.json"
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text("{}", encoding="utf-8")
+            return summary_path
+
+    monkeypatch.setattr(run_coordinator_module, "ArtifactWriter", FakeArtifactWriter)
+
+    class FakeGitRepositoryGateway:
+        def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
+            self.remote_url = remote_url
+
+        def clone_branch(self, workspace_path: Path, branch: str, *, depth: int | None = None) -> None:
+            workspace_path.mkdir(parents=True, exist_ok=True)
+
+        def install_local_excludes(self, workspace_path: Path) -> None:
+            return None
+
+        def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
+            raise AssertionError("publish_branch should not be called")
+
+    monkeypatch.setattr(run_coordinator_module, "GitRepositoryGateway", FakeGitRepositoryGateway)
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    import pi_sonar_agent.core.db_client as db_client_module
+    import pi_sonar_agent.core.dingtalk as dingtalk_module
+    import pi_sonar_agent.core.issue_retry as issue_retry_module
+    import pi_sonar_agent.core.project_env as project_env_module
+    import pi_sonar_agent.core.recipient_resolution as recipient_module
+    import pi_sonar_agent.integrations.ado as ado_module
+    import pi_sonar_agent.integrations.sonar as sonar_module
+
+    monkeypatch.setattr(db_client_module, "create_mysql_client_from_env", lambda: None)
+    monkeypatch.setattr(
+        recipient_module,
+        "resolve_recipients",
+        lambda **kwargs: SimpleNamespace(
+            reviewer_email="",
+            reviewer_source="author",
+            dingtalk_userid="",
+            dingtalk_source="author",
+        ),
+    )
+    monkeypatch.setattr(dingtalk_module, "create_dingtalk_client_from_env", lambda: None)
+    monkeypatch.setattr(project_env_module, "read_project_env", lambda *args, **kwargs: {})
+
+    class FakeAdoClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_remote_url(self, repository: str) -> str:
+            return f"https://dev.azure.com/acme/project/_git/{repository}"
+
+    class FakeSonarClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_open_issues(self, project_key: str, author: str) -> list[dict]:
+            return [
+                {
+                    "key": "issue-1",
+                    "rule": "csharpsquid:S1125",
+                    "message": "first",
+                    "line": 10,
+                    "component": "project-a:src/Foo.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                }
+            ]
+
+    class FakeClaudeFixAgent:
+        def __init__(self, *args, **kwargs):
+            return None
+
+    class FakeDbClient:
+        def __init__(self) -> None:
+            self.pr_records: list[dict] = []
+
+        def ensure_tables(self) -> None:
+            return None
+
+        def insert_run_record(self, *args, **kwargs) -> int:
+            return 7
+
+        def update_run_record(self, *args, **kwargs) -> None:
+            return None
+
+        def insert_issue_record(self, *args, **kwargs) -> None:
+            return None
+
+        def update_issue_record(self, *args, **kwargs) -> None:
+            return None
+
+        def upsert_state_snapshot(self, **kwargs) -> None:
+            return None
+
+        def insert_event_record(self, **kwargs) -> None:
+            return None
+
+        def insert_pull_request_record(self, **kwargs) -> int:
+            self.pr_records.append(kwargs)
+            return 101
+
+        def insert_pull_request_issue_records(self, pr_record_id: int, rows: list[dict]) -> None:
+            return None
+
+        def insert_pull_request_attempt_records(self, pr_record_id: int, rows: list[dict]) -> None:
+            return None
+
+        def disconnect(self) -> None:
+            return None
+
+    attempt_state = AttemptState(
+        attempt_number=1,
+        status=AttemptStatus.SKIPPED,
+        started_at="2026-04-27T15:46:03+08:00",
+        finished_at="2026-04-27T15:46:03+08:00",
+        duration_seconds=0.0,
+        skip_reason="policy skip",
+        artifact_dir=str(tmp_path / "issue-artifacts" / "attempt-01"),
+        performance_metrics={
+            "model_route_tier": "tier1",
+            "model_route_model": "tier1-model",
+            "model_route_pass": "first_pass",
+        },
+    )
+    issue_state = IssueState(
+        issue_key="issue-1",
+        repository="repo-a",
+        run_label="20260427162000",
+        rule_id="csharpsquid:S1125",
+        file_path="/src/Foo.cs",
+        line=10,
+        status=IssueStatus.SKIPPED,
+        attempts=(attempt_state,),
+        final_skip_reason="policy skip",
+        artifact_root=str(tmp_path / "issue-artifacts" / "issue-1"),
+    )
+
+    monkeypatch.setattr(ado_module, "AzureDevOpsClient", FakeAdoClient)
+    monkeypatch.setattr(sonar_module, "SonarQubeClient", FakeSonarClient)
+    monkeypatch.setattr(claude_agent_module, "ClaudeFixAgent", FakeClaudeFixAgent)
+    monkeypatch.setattr(
+        issue_retry_module,
+        "process_issue_with_retries",
+        lambda **kwargs: FixResult(
+            success=False,
+            issue_key="issue-1",
+            file_path="src/Foo.cs",
+            summary="Skipped by policy",
+            attempts=1,
+            skipped=True,
+            skip_reason="policy skip",
+            failure_kind="policy_skip",
+            issue_state=issue_state,
+        ),
+    )
+
+    fake_db = FakeDbClient()
+    coordinator = RunCoordinator(runtime_env)
+    coordinator.state_store = RunStateStore(db_client=fake_db)
+    result = coordinator.run_target(
+        target_config,
+        TargetRunOptions(run_label="20260427162000", show_banner=False, skip_build=True),
+    )
+
+    assert result.ok is True
+    assert result.pr_url == ""
+    assert len(fake_db.pr_records) == 1
+    assert fake_db.pr_records[0]["pr_status"] == "not_created"
