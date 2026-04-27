@@ -8,6 +8,7 @@ from pi_sonar_agent.agent.claude_agent import FixResult, SonarIssue
 from pi_sonar_agent.core.issue_retry import (
     EXTENDED_BUILD_TIMEOUT_SECONDS,
     _summarize_model_timeout,
+    _invoke_fix_issue,
     build_retry_context,
     build_retry_feedback,
     capture_workspace_baseline,
@@ -187,6 +188,53 @@ def test_process_issue_with_retries_skips_after_three_build_failures(tmp_path) -
     assert (Path(result.artifact_root) / "attempt-01" / "build_result.json").exists()
     assert (Path(result.artifact_root) / "attempt-01" / "patch.diff").exists()
     assert (Path(result.artifact_root) / "compliance_summary.json").exists()
+
+
+def test_invoke_fix_issue_forwards_second_pass_when_agent_supports_it(tmp_path) -> None:
+    issue = SonarIssue(
+        key="issue-second-pass",
+        rule="csharpsquid:S107",
+        message="参数过多",
+        line=1,
+        component="BI:tracked.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+    received: list[bool] = []
+
+    class FakeAgent:
+        def fix_issue(
+            self,
+            issue,
+            workspace_path,
+            build_command="dotnet build",
+            retry_feedback="",
+            retry_context=None,
+            working_memory=None,
+            second_pass=False,
+        ):
+            received.append(bool(second_pass))
+            return FixResult(
+                success=False,
+                issue_key=issue.key,
+                file_path=str(workspace_path / "tracked.cs"),
+                skipped=True,
+                failure_kind="no_change",
+            )
+
+    result = _invoke_fix_issue(
+        FakeAgent(),
+        issue,
+        tmp_path,
+        "dotnet build",
+        retry_feedback="",
+        retry_context=None,
+        working_memory=None,
+        second_pass=True,
+    )
+
+    assert result.failure_kind == "no_change"
+    assert received == [True]
 
 
 def test_process_issue_with_retries_defaults_to_five_attempts(tmp_path) -> None:

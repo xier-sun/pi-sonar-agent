@@ -68,3 +68,27 @@ def test_engine_router_keeps_s3776_on_agent(monkeypatch) -> None:
     assert decision.should_skip is False
     assert decision.resolved_engine == "agent"
     assert decision.requires_roslyn is False
+
+
+def test_engine_router_uses_agent_fallback_for_s107_in_second_pass(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "pi_sonar_agent.core.engine_router.inspect_roslyn_availability",
+        lambda: (True, ()),
+    )
+
+    decision = route_engine_for_issue(
+        rule_id="csharpsquid:S107",
+        edit_contract=EditContract(
+            issue_key="ISSUE-S107",
+            rule_id="csharpsquid:S107",
+            guardrail_mode="contract_review",
+            target_files=("src/Foo.cs",),
+        ),
+        second_pass=True,
+    )
+
+    assert decision.should_skip is False
+    assert decision.resolved_engine == "agent"
+    assert decision.fallback_allowed is True
+    assert "Second-pass S107 agent fallback enabled" in decision.fallback_reason
+    assert decision.requires_roslyn is False

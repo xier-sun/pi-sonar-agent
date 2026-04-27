@@ -481,14 +481,7 @@ class RunCoordinator:
         def should_retry_in_second_pass(result: Any) -> bool:
             if bool(getattr(result, "success", False)):
                 return False
-            if str(getattr(result, "failure_kind", "") or "").strip() in {
-                "policy_skip",
-                "engine_router_skip",
-                "roslyn_cannot_fix_safely",
-                "roslyn_candidate_not_applied",
-            }:
-                return False
-            return True
+            return str(getattr(result, "failure_kind", "") or "").strip() != "policy_skip"
 
         def _clip_handoff_text(value: str, *, max_chars: int = 420, max_lines: int = 14) -> str:
             text = str(value or "").replace("\r\n", "\n").strip()
@@ -944,6 +937,7 @@ class RunCoordinator:
                         project_key=target_config.project_key,
                         state_store=self.state_store,
                         seed_retry_feedback=handoff_feedback,
+                        second_pass=second_pass,
                     )
                 except Exception as exc:
                     if is_model_availability_exception(exc) and route_index < len(route):

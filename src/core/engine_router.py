@@ -35,6 +35,7 @@ def route_engine_for_issue(
     *,
     rule_id: str,
     edit_contract: EditContract | None = None,
+    second_pass: bool = False,
 ) -> EngineRoutingDecision:
     """Resolve which engine should be used for the current rule at runtime."""
 
@@ -52,6 +53,19 @@ def route_engine_for_issue(
     roslyn_reason_text = "; ".join(roslyn_reasons)
 
     if str(rule_id or "").strip() == "csharpsquid:S107":
+        if second_pass:
+            return EngineRoutingDecision(
+                primary_engine=primary_engine,
+                resolved_engine="agent",
+                fallback_allowed=True,
+                fallback_reason=(
+                    "Second-pass S107 agent fallback enabled after the first-pass "
+                    "Roslyn attempt did not resolve the issue."
+                ),
+                skip_reason="",
+                requires_roslyn=False,
+                capability_blockers=capability_blockers,
+            )
         if not roslyn_available:
             skip_reason = "S107 requires Roslyn engine, but it is unavailable."
             if roslyn_reason_text:

@@ -1582,12 +1582,23 @@ def _invoke_fix_issue(
     retry_feedback: str,
     retry_context: RetryContext | None,
     working_memory: IssueWorkingMemory | None,
+    second_pass: bool = False,
 ) -> FixResult:
     """Invoke agent.fix_issue while remaining compatible with legacy test doubles."""
 
     fix_issue_params = signature(agent.fix_issue).parameters
     if "retry_context" in fix_issue_params:
         if "working_memory" in fix_issue_params:
+            if "second_pass" in fix_issue_params:
+                return agent.fix_issue(
+                    issue,
+                    workspace_path,
+                    build_command,
+                    retry_feedback=retry_feedback,
+                    retry_context=retry_context,
+                    working_memory=working_memory,
+                    second_pass=second_pass,
+                )
             return agent.fix_issue(
                 issue,
                 workspace_path,
@@ -1595,6 +1606,15 @@ def _invoke_fix_issue(
                 retry_feedback=retry_feedback,
                 retry_context=retry_context,
                 working_memory=working_memory,
+            )
+        if "second_pass" in fix_issue_params:
+            return agent.fix_issue(
+                issue,
+                workspace_path,
+                build_command,
+                retry_feedback=retry_feedback,
+                retry_context=retry_context,
+                second_pass=second_pass,
             )
         return agent.fix_issue(
             issue,
@@ -1604,12 +1624,29 @@ def _invoke_fix_issue(
             retry_context=retry_context,
         )
     if "working_memory" in fix_issue_params:
+        if "second_pass" in fix_issue_params:
+            return agent.fix_issue(
+                issue,
+                workspace_path,
+                build_command,
+                retry_feedback=retry_feedback,
+                working_memory=working_memory,
+                second_pass=second_pass,
+            )
         return agent.fix_issue(
             issue,
             workspace_path,
             build_command,
             retry_feedback=retry_feedback,
             working_memory=working_memory,
+        )
+    if "second_pass" in fix_issue_params:
+        return agent.fix_issue(
+            issue,
+            workspace_path,
+            build_command,
+            retry_feedback=retry_feedback,
+            second_pass=second_pass,
         )
     return agent.fix_issue(
         issue,
@@ -2181,6 +2218,7 @@ def process_issue_with_retries(
     lessons_store: LessonsStore | None = None,
     max_build_retries: int = DEFAULT_MAX_BUILD_RETRIES,
     seed_retry_feedback: str = "",
+    second_pass: bool = False,
 ) -> FixResult:
     """Retry a single issue fix on build failure, then roll back only that issue if needed."""
 
@@ -2356,6 +2394,7 @@ def process_issue_with_retries(
                 retry_feedback=retry_feedback,
                 retry_context=retry_context,
                 working_memory=current_working_memory,
+                second_pass=second_pass,
             )
             result.attempts = attempt
             result.issue_log_path = str(logger.log_path)

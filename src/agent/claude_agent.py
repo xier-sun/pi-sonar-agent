@@ -3800,6 +3800,7 @@ class ClaudeFixAgent:
         retry_feedback: str = "",
         retry_context: RetryContext | None = None,
         working_memory: IssueWorkingMemory | None = None,
+        second_pass: bool = False,
     ) -> FixResult:
         """Fix a single SonarQube issue using Claude Code."""
         # Prepare workspace
@@ -3880,6 +3881,7 @@ class ClaudeFixAgent:
         engine_routing_decision = route_engine_for_issue(
             rule_id=issue.rule,
             edit_contract=edit_contract,
+            second_pass=second_pass,
         )
         guardrail_mode = edit_contract.guardrail_mode
         default_max_turns = self._resolve_issue_max_turns(issue)

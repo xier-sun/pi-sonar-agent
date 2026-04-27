@@ -20,6 +20,10 @@ __pycache__/
 .venv/
 venv/
 
+# .NET build outputs
+fix_engine/bin/
+fix_engine/obj/
+
 # Scratch, smoke, and temporary workspaces
 .tmp/
 .tmp_*/
