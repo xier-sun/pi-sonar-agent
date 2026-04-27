@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import time
 from dataclasses import dataclass, replace
@@ -360,6 +361,10 @@ class RunCoordinator:
                             "boundary_drift_score": int(
                                 issue_summary.boundary_drift_score if issue_summary else 0
                             ),
+                            "rule_review_summary_json": json.dumps(
+                                list(issue_summary.rule_review_summary if issue_summary else ()),
+                                ensure_ascii=False,
+                            ),
                             "changed_files_json": json.dumps(
                                 list(issue_summary.changed_files if issue_summary else ()),
                                 ensure_ascii=False,
@@ -490,6 +495,287 @@ class RunCoordinator:
                     continue
             return summary, tuple(dict.fromkeys(item for item in findings if item)), drift_score
 
+        def extract_s3776_review_summary(result) -> tuple[str, ...]:
+            issue_state = getattr(result, "issue_state", None)
+            if str(getattr(issue_state, "rule_id", "") or "").strip() != "csharpsquid:S3776":
+                return ()
+
+            def parse_patch_summary_facts(summary_text: str) -> dict[str, str]:
+                facts: dict[str, str] = {}
+                for raw_line in str(summary_text or "").splitlines():
+                    line = str(raw_line or "").strip()
+                    if not line or "=" not in line:
+                        continue
+                    key, value = line.split("=", 1)
+                    normalized_key = str(key or "").strip().lower()
+                    normalized_value = str(value or "").strip()
+                    if normalized_key and normalized_value:
+                        facts[normalized_key] = normalized_value
+                return facts
+
+            def load_json_file(path: Path) -> dict[str, Any]:
+                if not path.exists():
+                    return {}
+                try:
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    return {}
+                return payload if isinstance(payload, dict) else {}
+
+            def parse_method_name_from_prefetched_context(content: str) -> str:
+                for raw_line in str(content or "").splitlines():
+                    line = re.sub(r"^\s*\d+\s*\|\s*", "", str(raw_line or "").strip())
+                    match = re.search(
+                        r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+                        line,
+                    )
+                    if (
+                        match
+                        and any(
+                            token in line
+                            for token in ("public ", "private ", "protected ", "internal ")
+                        )
+                    ):
+                        return str(match.group(1) or "").strip()
+                return ""
+
+            def parse_patch_diff(diff_text: str, *, target_method_name: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+                helper_names: list[str] = []
+                call_names: list[str] = []
+                normalized_target = str(target_method_name or "").strip()
+                for raw_line in str(diff_text or "").splitlines():
+                    if not raw_line.startswith("+") or raw_line.startswith("+++"):
+                        continue
+                    line = raw_line[1:].strip()
+                    declaration_match = re.match(
+                        r"(?:private|public|protected|internal)\s+(?:static\s+)?(?:async\s+)?[^\(]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+                        line,
+                    )
+                    if declaration_match:
+                        helper_name = str(declaration_match.group(1) or "").strip()
+                        if helper_name and helper_name != normalized_target and helper_name not in helper_names:
+                            helper_names.append(helper_name)
+                        continue
+                    call_match = re.search(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", line)
+                    if call_match:
+                        call_name = str(call_match.group(1) or "").strip()
+                        if call_name and call_name != normalized_target and call_name not in call_names:
+                            call_names.append(call_name)
+                return tuple(helper_names), tuple(call_names)
+
+            notes: list[str] = []
+            primary_method_name = ""
+            repair_plan = getattr(result, "repair_plan", None) or getattr(
+                getattr(result, "edit_contract", None),
+                "repair_plan",
+                None,
+            )
+            if repair_plan is not None:
+                primary_method_name = str(
+                    getattr(repair_plan, "primary_method_name", "") or ""
+                ).strip()
+                if primary_method_name:
+                    notes.append(f"主要收口方法: {primary_method_name}")
+                selected_archetype = str(getattr(repair_plan, "selected_archetype", "") or "").strip()
+                if selected_archetype:
+                    notes.append(f"采用策略: {selected_archetype}")
+                fallback_archetype = str(getattr(repair_plan, "fallback_archetype", "") or "").strip()
+                if fallback_archetype:
+                    notes.append(f"备用策略: {fallback_archetype}")
+                new_helpers = tuple(str(item).strip() for item in getattr(repair_plan, "new_helpers", ()) if str(item).strip())
+                if new_helpers:
+                    notes.append("新增/拆分 helper: " + ", ".join(new_helpers))
+                notes.append(
+                    "签名变更: " + ("是" if bool(getattr(repair_plan, "requires_signature_change", False)) else "否")
+                )
+                notes.append(
+                    "新增类型: " + ("是" if bool(getattr(repair_plan, "requires_new_type", False)) else "否")
+                )
+                impact_summary = str(getattr(repair_plan, "impact_summary", "") or "").strip()
+                if impact_summary:
+                    notes.append(f"影响摘要: {impact_summary}")
+
+            issue_check_method_name = ""
+            post_fix_check = getattr(result, "post_fix_check_result", None)
+            if isinstance(post_fix_check, dict):
+                issue_check = post_fix_check.get("issue_check")
+                if isinstance(issue_check, dict):
+                    metrics = issue_check.get("metrics")
+                    if isinstance(metrics, dict):
+                        issue_check_method_name = str(metrics.get("method_name", "") or "").strip()
+                        try:
+                            complexity = int(metrics.get("estimated_cognitive_complexity"))
+                            fail_threshold = int(metrics.get("fail_threshold"))
+                        except (TypeError, ValueError):
+                            complexity = 0
+                            fail_threshold = 0
+                        if complexity > 0 and fail_threshold > 0:
+                            notes.append(
+                                f"本地复杂度估计: {complexity}/{fail_threshold}"
+                            )
+                issue_status = str(post_fix_check.get("issue_status", "") or "").strip().upper()
+                if issue_status:
+                    notes.append(f"本地规则判定: {issue_status}")
+
+            working_memory = getattr(result, "issue_working_memory", None)
+            patch_summary_text = ""
+            if working_memory is not None:
+                patch_summary_text = str(
+                    getattr(working_memory, "latest_patch_summary", "") or ""
+                ).strip()
+                if not patch_summary_text:
+                    patch_summary_text = str(
+                        getattr(working_memory, "best_known_patch_state", "") or ""
+                    ).strip()
+            patch_facts = parse_patch_summary_facts(patch_summary_text)
+            fallback_primary_method = (
+                primary_method_name
+                or issue_check_method_name
+                or str(patch_facts.get("target_method", "") or "").strip()
+            )
+            if fallback_primary_method and not any(
+                note.startswith("主要收口方法: ") for note in notes
+            ):
+                notes.append(f"主要收口方法: {fallback_primary_method}")
+
+            changed_methods = tuple(
+                item.strip()
+                for item in str(patch_facts.get("changed_methods", "") or "").split(",")
+                if item.strip()
+            )
+            if changed_methods:
+                notes.append("触达方法: " + ", ".join(changed_methods))
+
+            scope = str(patch_facts.get("scope", "") or "").strip().lower()
+            scope_label = {
+                "target_method_only": "仅目标方法内收口",
+                "target_file_expanded": "目标文件内扩展到相邻方法",
+                "cross_file": "跨文件联动修改",
+                "target_file_unclear": "目标文件内改动，精确范围待复核",
+            }.get(scope, "")
+            if scope_label:
+                notes.append(f"改动范围: {scope_label}")
+
+            risk_flags = tuple(
+                item.strip().lower()
+                for item in str(patch_facts.get("risk_flags", "") or "").split(",")
+                if item.strip()
+            )
+            if "helper_added" in risk_flags:
+                notes.append("新增/拆分 helper: 是")
+            elif changed_methods:
+                notes.append(
+                    "新增/拆分 helper: "
+                    + ("否" if len(changed_methods) <= 1 else "需结合代码复核")
+                )
+
+            target_preview = str(patch_facts.get("target_preview", "") or "").strip()
+            if target_preview:
+                notes.append(f"局部改动预览: {target_preview}")
+
+            if "helper_added" in risk_flags:
+                notes.append(
+                    "重点审阅: 确认目标方法与新增 helper 之间只是搬移局部分支/循环逻辑，未改变业务判断条件和返回结果。"
+                )
+            elif scope == "target_method_only":
+                notes.append(
+                    "重点审阅: 确认复杂度下降主要来自条件扁平化、早返回或局部重排，而不是业务逻辑变化。"
+                )
+            elif scope == "target_file_expanded":
+                notes.append(
+                    "重点审阅: 除目标方法外被触达的相邻方法是否只是配套收口，没有扩散到额外业务逻辑。"
+                )
+
+            performance_metrics = dict(getattr(result, "performance_metrics", {}) or {})
+            route_tier = str(performance_metrics.get("model_route_tier", "") or "").strip()
+            route_pass = str(performance_metrics.get("model_route_pass", "") or "").strip()
+
+            artifact_target_method = ""
+            artifact_helper_names: tuple[str, ...] = ()
+            artifact_call_names: tuple[str, ...] = ()
+            latest_attempt = None
+            if issue_state is not None:
+                attempts = tuple(getattr(issue_state, "attempts", ()) or ())
+                if attempts:
+                    latest_attempt = attempts[-1]
+            attempt_artifact_dir = Path(str(getattr(latest_attempt, "artifact_dir", "") or "").strip())
+            if attempt_artifact_dir.exists():
+                prompt_context_payload = load_json_file(attempt_artifact_dir / "prompt_context.json")
+                prefetched_context = prompt_context_payload.get("prefetched_context")
+                if isinstance(prefetched_context, list):
+                    for item in prefetched_context:
+                        if not isinstance(item, dict):
+                            continue
+                        if str(item.get("label", "") or "").strip() != "target_method_full":
+                            continue
+                        artifact_target_method = parse_method_name_from_prefetched_context(
+                            str(item.get("content", "") or "")
+                        )
+                        if artifact_target_method:
+                            break
+                patch_diff_path = attempt_artifact_dir / "patch.diff"
+                if patch_diff_path.exists():
+                    try:
+                        patch_diff_text = patch_diff_path.read_text(encoding="utf-8", errors="replace")
+                    except OSError:
+                        patch_diff_text = ""
+                    artifact_helper_names, artifact_call_names = parse_patch_diff(
+                        patch_diff_text,
+                        target_method_name=(
+                            fallback_primary_method
+                            or artifact_target_method
+                            or issue_check_method_name
+                        ),
+                    )
+
+            effective_primary_method = (
+                fallback_primary_method
+                or artifact_target_method
+                or issue_check_method_name
+            )
+            if effective_primary_method and not any(
+                note.startswith("主要收口方法: ") for note in notes
+            ):
+                notes.append(f"主要收口方法: {effective_primary_method}")
+
+            effective_changed_methods = changed_methods or artifact_call_names
+            if effective_changed_methods and not any(
+                note.startswith("触达方法: ") for note in notes
+            ):
+                notes.append("触达方法: " + ", ".join(effective_changed_methods))
+
+            if artifact_helper_names and not any(
+                note.startswith("提取私有方法: ") for note in notes
+            ):
+                notes.append("提取私有方法: " + ", ".join(artifact_helper_names))
+
+            if artifact_call_names and not any(
+                note.startswith("目标方法现在通过调用: ") for note in notes
+            ):
+                notes.append("目标方法现在通过调用: " + ", ".join(artifact_call_names))
+
+            if artifact_helper_names and effective_primary_method and not any(
+                note.startswith("主要修改: ") for note in notes
+            ):
+                notes.append(
+                    "主要修改: 将 "
+                    f"{effective_primary_method} 中的复杂逻辑下沉到私有 helper，主方法改为编排式调用。"
+                )
+
+            if artifact_helper_names and not any(
+                note.startswith("重点审阅: ") for note in notes
+            ):
+                notes.append(
+                    "重点审阅: 确认目标方法与新增 helper 之间只是搬移局部分支/循环逻辑，未改变业务判断条件、数据聚合顺序和返回结果。"
+                )
+
+            if route_tier:
+                notes.append(f"最终模型梯次: {route_tier}")
+            if route_pass == "second_pass":
+                notes.append("该复杂度问题在第二轮增强修复中收敛。")
+
+            return tuple(dict.fromkeys(item for item in notes if item))
+
         def mark_target_abort(*, error: str, startup_failure: bool = False) -> None:
             nonlocal abort_error, abort_startup_failure, abort_before_first_issue
             normalized_error = str(error).strip() or "target aborted"
@@ -584,6 +870,7 @@ class RunCoordinator:
                             boundary_audit_summary=boundary_audit_summary,
                             boundary_audit_findings=boundary_audit_findings,
                             boundary_drift_score=boundary_drift_score,
+                            rule_review_summary=extract_s3776_review_summary(result),
                         )
                     )
                     continue
@@ -618,6 +905,7 @@ class RunCoordinator:
                             boundary_audit_summary=boundary_audit_summary,
                             boundary_audit_findings=boundary_audit_findings,
                             boundary_drift_score=boundary_drift_score,
+                            rule_review_summary=extract_s3776_review_summary(result),
                         )
                     )
                     continue
@@ -645,6 +933,7 @@ class RunCoordinator:
                         boundary_audit_summary=boundary_audit_summary,
                         boundary_audit_findings=boundary_audit_findings,
                         boundary_drift_score=boundary_drift_score,
+                        rule_review_summary=extract_s3776_review_summary(result),
                     )
                 )
             return summaries

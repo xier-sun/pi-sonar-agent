@@ -33,6 +33,7 @@ class PullRequestIssueSummary:
     boundary_audit_summary: str = ""
     boundary_audit_findings: tuple[str, ...] = field(default_factory=tuple)
     boundary_drift_score: int = 0
+    rule_review_summary: tuple[str, ...] = field(default_factory=tuple)
 
 
 def _dedupe_preserve_order(values: tuple[str, ...]) -> tuple[str, ...]:
@@ -113,6 +114,10 @@ def _render_issue_item(index: int, item: PullRequestIssueSummary) -> list[str]:
         lines.append(
             "   - 漂移记录: " + "；".join(_dedupe_preserve_order(item.boundary_audit_findings))
         )
+    if item.rule_review_summary:
+        lines.append("   - 规则专项摘要:")
+        for note in _dedupe_preserve_order(item.rule_review_summary):
+            lines.append(f"     * {note}")
     if item.skip_reason:
         lines.append(f"   - 跳过原因: {item.skip_reason}")
     if item.issue_log_path:

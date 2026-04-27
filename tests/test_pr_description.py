@@ -52,6 +52,12 @@ def test_build_pull_request_description_lists_issue_outcomes() -> None:
                 message="Cognitive complexity too high",
                 issue_key="issue-skipped-1",
                 attempts=3,
+                rule_review_summary=(
+                    "主要收口方法: CalculatePenalty",
+                    "采用策略: guard_clause_flatten",
+                    "本地复杂度估计: 18/30",
+                    "签名变更: 否",
+                ),
                 skip_reason="Build verification failed after 3 attempt(s)",
                 issue_log_path="logs/issue_attempts/example.log",
             ),
@@ -77,6 +83,10 @@ def test_build_pull_request_description_lists_issue_outcomes() -> None:
     assert "## 已跳过 Issues" in description
     assert "1. csharpsquid:S3776" in description
     assert "Issue Key: issue-skipped-1" in description
+    assert "规则专项摘要:" in description
+    assert "主要收口方法: CalculatePenalty" in description
+    assert "采用策略: guard_clause_flatten" in description
+    assert "本地复杂度估计: 18/30" in description
     assert "跳过原因: Build verification failed after 3 attempt(s)" in description
     assert "重试日志: logs/issue_attempts/example.log" in description
 

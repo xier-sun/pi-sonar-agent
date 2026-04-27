@@ -239,6 +239,7 @@ class MySQLClient:
                 hard_quality_gate_failures INT NOT NULL DEFAULT 0,
                 soft_quality_gate_findings INT NOT NULL DEFAULT 0,
                 boundary_drift_score INT NOT NULL DEFAULT 0,
+                rule_review_summary_json LONGTEXT NULL,
                 changed_files_json LONGTEXT NULL,
                 issue_artifact_root VARCHAR(1000) NULL,
                 issue_log_path VARCHAR(1000) NULL,
@@ -254,6 +255,16 @@ class MySQLClient:
                 KEY idx_pr_issue_repo_author (repository, author)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+
+        try:
+            cursor.execute(
+                """
+                ALTER TABLE fix_pull_request_issue_records
+                ADD COLUMN IF NOT EXISTS rule_review_summary_json LONGTEXT NULL
+                """
+            )
+        except mysql.connector.Error:
+            pass
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS fix_pull_request_attempt_records (
@@ -766,6 +777,7 @@ class MySQLClient:
                 int(row.get("hard_quality_gate_failures", 0) or 0),
                 int(row.get("soft_quality_gate_findings", 0) or 0),
                 int(row.get("boundary_drift_score", 0) or 0),
+                row.get("rule_review_summary_json"),
                 row.get("changed_files_json"),
                 row.get("issue_artifact_root"),
                 row.get("issue_log_path"),
@@ -784,7 +796,8 @@ class MySQLClient:
                 build_passed, post_fix_issue_status, boundary_failure_code,
                 secondary_boundary_failure_codes, quality_gate_status,
                 hard_quality_gate_failures, soft_quality_gate_findings,
-                boundary_drift_score, changed_files_json, issue_artifact_root, issue_log_path
+                boundary_drift_score, rule_review_summary_json, changed_files_json,
+                issue_artifact_root, issue_log_path
             )
             VALUES
             (
@@ -796,7 +809,7 @@ class MySQLClient:
                 %s, %s, %s,
                 %s, %s,
                 %s, %s,
-                %s, %s, %s, %s
+                %s, %s, %s, %s, %s
             )
             """,
             payload,

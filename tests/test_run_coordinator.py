@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -2779,3 +2780,567 @@ def test_run_coordinator_persists_not_created_pr_business_record(monkeypatch, tm
     assert result.pr_url == ""
     assert len(fake_db.pr_records) == 1
     assert fake_db.pr_records[0]["pr_status"] == "not_created"
+
+
+def test_run_coordinator_persists_s3776_rule_review_summary(monkeypatch, tmp_path) -> None:
+    runtime_env = RuntimeEnvironment(
+        sonar_host="https://sonar.example",
+        sonar_token="sonar-token",
+        sonar_org="sonar-org",
+        ado_base_url="https://dev.azure.com/acme",
+        ado_org="acme",
+        ado_project="pi",
+        ado_pat="ado-token",
+        workspace_root=tmp_path / "workspaces",
+    )
+    target_config = TargetConfig(
+        project_key="project-a",
+        repository="repo-a",
+        author="alice@example.com",
+        reviewer_email="",
+        dingtalk_userid="",
+        base_branch="develop",
+        base_branch_source="targets.json.base_branch",
+        build_command="dotnet build Foo.sln",
+        test_command=None,
+        solution_path="Foo.sln",
+        max_issues=1,
+    )
+
+    monkeypatch.setattr(run_coordinator_module, "ensure_workspace_writable", lambda workspace_root: None)
+    monkeypatch.setattr(run_coordinator_module, "ensure_remote_branch_exists", lambda **kwargs: None)
+    monkeypatch.setattr(
+        run_coordinator_module,
+        "prune_old_workspaces",
+        lambda workspace_root, keep_latest=1: SimpleNamespace(removed=(), failed=()),
+    )
+
+    class FakeArtifactWriter:
+        def write_target_state(self, target_state):
+            summary_path = tmp_path / "run-artifacts" / "target_summary.json"
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text("{}", encoding="utf-8")
+            return summary_path
+
+    monkeypatch.setattr(run_coordinator_module, "ArtifactWriter", FakeArtifactWriter)
+
+    class FakeGitRepositoryGateway:
+        def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
+            self.remote_url = remote_url
+
+        def clone_branch(self, workspace_path: Path, branch: str, *, depth: int | None = None) -> None:
+            workspace_path.mkdir(parents=True, exist_ok=True)
+
+        def install_local_excludes(self, workspace_path: Path) -> None:
+            return None
+
+        def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
+            return None
+
+    monkeypatch.setattr(run_coordinator_module, "GitRepositoryGateway", FakeGitRepositoryGateway)
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    import pi_sonar_agent.core.db_client as db_client_module
+    import pi_sonar_agent.core.dingtalk as dingtalk_module
+    import pi_sonar_agent.core.issue_retry as issue_retry_module
+    import pi_sonar_agent.core.project_env as project_env_module
+    import pi_sonar_agent.core.recipient_resolution as recipient_module
+    import pi_sonar_agent.fixers.build_gate as build_gate_module
+    import pi_sonar_agent.integrations.ado as ado_module
+    import pi_sonar_agent.integrations.sonar as sonar_module
+
+    monkeypatch.setattr(db_client_module, "create_mysql_client_from_env", lambda: None)
+    monkeypatch.setattr(
+        recipient_module,
+        "resolve_recipients",
+        lambda **kwargs: SimpleNamespace(
+            reviewer_email="",
+            reviewer_source="author",
+            dingtalk_userid="",
+            dingtalk_source="author",
+        ),
+    )
+    monkeypatch.setattr(dingtalk_module, "create_dingtalk_client_from_env", lambda: None)
+    monkeypatch.setattr(project_env_module, "read_project_env", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        build_gate_module,
+        "run_local_build",
+        lambda *args, **kwargs: {
+            "succeeded": True,
+            "build_command": "dotnet build Foo.sln",
+            "test_command": "",
+        },
+    )
+    monkeypatch.setattr(build_gate_module, "resolve_build_command", lambda command, solution_path: command)
+    monkeypatch.setattr(build_gate_module, "format_build_failure_report", lambda *args, **kwargs: "")
+
+    class FakeAdoClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_remote_url(self, repository: str) -> str:
+            return f"https://dev.azure.com/acme/project/_git/{repository}"
+
+        def create_pull_request(self, *args, **kwargs):
+            return SimpleNamespace(
+                pr_id=32,
+                url="https://dev.azure.com/acme/project/_git/repo-a/pullrequest/32",
+                created_by_id="creator-32",
+            )
+
+        def upload_pull_request_attachment(self, *args, **kwargs):
+            return SimpleNamespace(file_name="report.txt", url="https://dev.azure.com/report.txt")
+
+        def update_pull_request_description(self, *args, **kwargs):
+            return SimpleNamespace(pr_id=32)
+
+    class FakeSonarClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_open_issues(self, project_key: str, author: str) -> list[dict]:
+            return [
+                {
+                    "key": "issue-s3776",
+                    "rule": "csharpsquid:S3776",
+                    "message": "Cognitive complexity too high",
+                    "line": 22,
+                    "component": "project-a:src/Foo.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                }
+            ]
+
+    class FakeClaudeFixAgent:
+        def __init__(self, *args, **kwargs):
+            return None
+
+    class FakeDbClient:
+        def __init__(self) -> None:
+            self.pr_issue_rows: list[tuple[int, list[dict]]] = []
+
+        def ensure_tables(self) -> None:
+            return None
+
+        def insert_run_record(self, *args, **kwargs) -> int:
+            return 7
+
+        def update_run_record(self, *args, **kwargs) -> None:
+            return None
+
+        def insert_issue_record(self, *args, **kwargs) -> None:
+            return None
+
+        def update_issue_record(self, *args, **kwargs) -> None:
+            return None
+
+        def upsert_state_snapshot(self, **kwargs) -> None:
+            return None
+
+        def insert_event_record(self, **kwargs) -> None:
+            return None
+
+        def insert_pull_request_record(self, **kwargs) -> int:
+            return 101
+
+        def insert_pull_request_issue_records(self, pr_record_id: int, rows: list[dict]) -> None:
+            self.pr_issue_rows.append((pr_record_id, rows))
+
+        def insert_pull_request_attempt_records(self, pr_record_id: int, rows: list[dict]) -> None:
+            return None
+
+        def disconnect(self) -> None:
+            return None
+
+    attempt_state = AttemptState(
+        attempt_number=1,
+        status=AttemptStatus.SUCCEEDED,
+        started_at="2026-04-27T15:46:03+08:00",
+        finished_at="2026-04-27T15:46:03+08:00",
+        duration_seconds=0.0,
+        summary="Fixed S3776",
+        changed_files=("src/Foo.cs",),
+        artifact_dir=str(tmp_path / "issue-artifacts" / "attempt-01"),
+        build_passed=True,
+        performance_metrics={
+            "model_route_tier": "tier2",
+            "model_route_model": "tier2-model",
+            "model_route_pass": "second_pass",
+        },
+    )
+    issue_state = IssueState(
+        issue_key="issue-s3776",
+        repository="repo-a",
+        run_label="20260427163000",
+        rule_id="csharpsquid:S3776",
+        file_path="/src/Foo.cs",
+        line=22,
+        status=IssueStatus.FIXED,
+        attempts=(attempt_state,),
+        final_summary="Fixed S3776",
+        artifact_root=str(tmp_path / "issue-artifacts" / "issue-s3776"),
+    )
+
+    monkeypatch.setattr(ado_module, "AzureDevOpsClient", FakeAdoClient)
+    monkeypatch.setattr(sonar_module, "SonarQubeClient", FakeSonarClient)
+    monkeypatch.setattr(claude_agent_module, "ClaudeFixAgent", FakeClaudeFixAgent)
+    monkeypatch.setattr(
+        issue_retry_module,
+        "process_issue_with_retries",
+        lambda **kwargs: FixResult(
+            success=True,
+            issue_key="issue-s3776",
+            file_path="src/Foo.cs",
+            summary="Fixed S3776",
+            attempts=1,
+            changes=[{"file": "src/Foo.cs"}],
+            build_passed=True,
+            issue_state=issue_state,
+            repair_plan=SimpleNamespace(
+                primary_method_name="CalculateFoo",
+                selected_archetype="guard_clause_flatten",
+                fallback_archetype="local_block_reorder",
+                new_helpers=("NormalizeFoo",),
+                requires_signature_change=False,
+                requires_new_type=False,
+                impact_summary="Reduce nested branching in the current method.",
+            ),
+            post_fix_check_result={
+                "issue_status": "PASS",
+                "issue_check": {
+                    "metrics": {
+                        "estimated_cognitive_complexity": 18,
+                        "fail_threshold": 30,
+                    }
+                },
+            },
+            performance_metrics={
+                "model_route_tier": "tier2",
+                "model_route_model": "tier2-model",
+                "model_route_pass": "second_pass",
+            },
+        ),
+    )
+
+    fake_db = FakeDbClient()
+    coordinator = RunCoordinator(runtime_env)
+    coordinator.state_store = RunStateStore(db_client=fake_db)
+    result = coordinator.run_target(
+        target_config,
+        TargetRunOptions(run_label="20260427163000", show_banner=False),
+    )
+
+    assert result.ok is True
+    assert len(fake_db.pr_issue_rows) == 1
+    row = fake_db.pr_issue_rows[0][1][0]
+    summary_items = json.loads(row["rule_review_summary_json"])
+    assert "主要收口方法: CalculateFoo" in summary_items
+    assert "采用策略: guard_clause_flatten" in summary_items
+    assert "本地复杂度估计: 18/30" in summary_items
+    assert any(item.startswith("最终模型梯次: ") for item in summary_items)
+
+
+def test_run_coordinator_builds_s3776_review_summary_from_patch_facts_without_repair_plan(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    runtime_env = RuntimeEnvironment(
+        sonar_host="https://sonar.example",
+        sonar_token="sonar-token",
+        sonar_org="sonar-org",
+        ado_base_url="https://dev.azure.com/acme",
+        ado_org="acme",
+        ado_project="pi",
+        ado_pat="ado-token",
+        workspace_root=tmp_path / "workspaces",
+    )
+    target_config = TargetConfig(
+        project_key="project-a",
+        repository="repo-a",
+        author="alice@example.com",
+        reviewer_email="",
+        dingtalk_userid="",
+        base_branch="develop",
+        base_branch_source="targets.json.base_branch",
+        build_command="dotnet build Foo.sln",
+        test_command=None,
+        solution_path="Foo.sln",
+        max_issues=1,
+    )
+
+    monkeypatch.setattr(run_coordinator_module, "ensure_workspace_writable", lambda workspace_root: None)
+    monkeypatch.setattr(run_coordinator_module, "ensure_remote_branch_exists", lambda **kwargs: None)
+    monkeypatch.setattr(
+        run_coordinator_module,
+        "prune_old_workspaces",
+        lambda workspace_root, keep_latest=1: SimpleNamespace(removed=(), failed=()),
+    )
+
+    class FakeArtifactWriter:
+        def write_target_state(self, target_state):
+            summary_path = tmp_path / "run-artifacts" / "target_summary.json"
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text("{}", encoding="utf-8")
+            return summary_path
+
+    monkeypatch.setattr(run_coordinator_module, "ArtifactWriter", FakeArtifactWriter)
+
+    class FakeGitRepositoryGateway:
+        def __init__(self, *, remote_url: str, pat: str | None = None, command_runner=None):
+            self.remote_url = remote_url
+
+        def clone_branch(self, workspace_path: Path, branch: str, *, depth: int | None = None) -> None:
+            workspace_path.mkdir(parents=True, exist_ok=True)
+
+        def install_local_excludes(self, workspace_path: Path) -> None:
+            return None
+
+        def publish_branch(self, workspace_path: Path, branch: str, commit_message: str) -> None:
+            return None
+
+    monkeypatch.setattr(run_coordinator_module, "GitRepositoryGateway", FakeGitRepositoryGateway)
+
+    import pi_sonar_agent.agent.claude_agent as claude_agent_module
+    import pi_sonar_agent.core.db_client as db_client_module
+    import pi_sonar_agent.core.dingtalk as dingtalk_module
+    import pi_sonar_agent.core.issue_retry as issue_retry_module
+    import pi_sonar_agent.core.project_env as project_env_module
+    import pi_sonar_agent.core.recipient_resolution as recipient_module
+    import pi_sonar_agent.fixers.build_gate as build_gate_module
+    import pi_sonar_agent.integrations.ado as ado_module
+    import pi_sonar_agent.integrations.sonar as sonar_module
+
+    monkeypatch.setattr(db_client_module, "create_mysql_client_from_env", lambda: None)
+    monkeypatch.setattr(
+        recipient_module,
+        "resolve_recipients",
+        lambda **kwargs: SimpleNamespace(
+            reviewer_email="",
+            reviewer_source="author",
+            dingtalk_userid="",
+            dingtalk_source="author",
+        ),
+    )
+    monkeypatch.setattr(dingtalk_module, "create_dingtalk_client_from_env", lambda: None)
+    monkeypatch.setattr(project_env_module, "read_project_env", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        build_gate_module,
+        "run_local_build",
+        lambda *args, **kwargs: {
+            "succeeded": True,
+            "build_command": "dotnet build Foo.sln",
+            "test_command": "",
+        },
+    )
+    monkeypatch.setattr(build_gate_module, "resolve_build_command", lambda command, solution_path: command)
+    monkeypatch.setattr(build_gate_module, "format_build_failure_report", lambda *args, **kwargs: "")
+
+    class FakeAdoClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_remote_url(self, repository: str) -> str:
+            return f"https://dev.azure.com/acme/project/_git/{repository}"
+
+        def create_pull_request(self, *args, **kwargs):
+            return SimpleNamespace(
+                pr_id=32,
+                url="https://dev.azure.com/acme/project/_git/repo-a/pullrequest/32",
+                created_by_id="creator-32",
+            )
+
+        def upload_pull_request_attachment(self, *args, **kwargs):
+            return SimpleNamespace(file_name="report.txt", url="https://dev.azure.com/report.txt")
+
+        def update_pull_request_description(self, *args, **kwargs):
+            return SimpleNamespace(pr_id=32)
+
+    class FakeSonarClient:
+        def __init__(self, *args, **kwargs):
+            return None
+
+        def get_open_issues(self, project_key: str, author: str) -> list[dict]:
+            return [
+                {
+                    "key": "issue-s3776",
+                    "rule": "csharpsquid:S3776",
+                    "message": "Cognitive complexity too high",
+                    "line": 22,
+                    "component": "project-a:src/Foo.cs",
+                    "severity": "MAJOR",
+                    "type": "CODE_SMELL",
+                }
+            ]
+
+    class FakeClaudeFixAgent:
+        def __init__(self, *args, **kwargs):
+            return None
+
+    class FakeDbClient:
+        def __init__(self) -> None:
+            self.pr_issue_rows: list[tuple[int, list[dict]]] = []
+
+        def ensure_tables(self) -> None:
+            return None
+
+        def insert_run_record(self, *args, **kwargs) -> int:
+            return 7
+
+        def update_run_record(self, *args, **kwargs) -> None:
+            return None
+
+        def insert_issue_record(self, *args, **kwargs) -> None:
+            return None
+
+        def update_issue_record(self, *args, **kwargs) -> None:
+            return None
+
+        def upsert_state_snapshot(self, **kwargs) -> None:
+            return None
+
+        def insert_event_record(self, **kwargs) -> None:
+            return None
+
+        def insert_pull_request_record(self, **kwargs) -> int:
+            return 101
+
+        def insert_pull_request_issue_records(self, pr_record_id: int, rows: list[dict]) -> None:
+            self.pr_issue_rows.append((pr_record_id, rows))
+
+        def insert_pull_request_attempt_records(self, pr_record_id: int, rows: list[dict]) -> None:
+            return None
+
+        def disconnect(self) -> None:
+            return None
+
+    attempt_artifact_dir = tmp_path / "issue-artifacts" / "issue-s3776" / "attempt-01"
+    attempt_artifact_dir.mkdir(parents=True, exist_ok=True)
+    (attempt_artifact_dir / "prompt_context.json").write_text(
+        json.dumps(
+            {
+                "prefetched_context": [
+                    {
+                        "label": "target_method_full",
+                        "content": (
+                            " 455 |         /// 批量加载收款数据\n"
+                            " 456 |         /// </summary>\n"
+                            " 457 |         private async Task<Dictionary<int, List<ReceiptForOrder>>> LoadReceiptDataAsync(List<int> orderIds)\n"
+                            " 458 |         {\n"
+                            " 459 |             var receiptDict = new Dictionary<int, List<ReceiptForOrder>>();"
+                        ),
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (attempt_artifact_dir / "patch.diff").write_text(
+        """--- a/src/Foo.cs
++++ b/src/Foo.cs
+@@
+-            var orderToInv1Entries = new Dictionary<int, List<int>>();
++            var orderToInv1Entries = BuildOrderToInv1Entries(orderIds, dln1EntriesDict, inv1EntriesDict);
++            AppendIndirectReceipts(orderIds, orderToInv1Entries, allRct2, directDocNums, indirectReceiptsDict, receiptDict);
++            AppendDirectReceipts(orderIds, directReceiptsByOrder, receiptDict);
++            receiptDict = SortAndDeduplicateReceipts(receiptDict);
++
++        private Dictionary<int, List<int>> BuildOrderToInv1Entries(List<int> orderIds, Dictionary<int, List<int>> dln1EntriesDict, Dictionary<int, List<int>> inv1EntriesDict)
++        {
++        }
++
++        private void AppendIndirectReceipts(List<int> orderIds, Dictionary<int, List<int>> orderToInv1Entries, List<(int DocNum, int InvDocEntry, decimal SumApplied, decimal AppliedFC)> allRct2, HashSet<int> directDocNums, Dictionary<int, ORCT> indirectReceiptsDict, Dictionary<int, List<ReceiptForOrder>> receiptDict)
++        {
++        }
++
++        private void AppendDirectReceipts(List<int> orderIds, Dictionary<int, List<ORCT>> directReceiptsByOrder, Dictionary<int, List<ReceiptForOrder>> receiptDict)
++        {
++        }
++
++        private Dictionary<int, List<ReceiptForOrder>> SortAndDeduplicateReceipts(Dictionary<int, List<ReceiptForOrder>> receiptDict)
++        {
++        }
+""",
+        encoding="utf-8",
+    )
+
+    attempt_state = AttemptState(
+        attempt_number=1,
+        status=AttemptStatus.SUCCEEDED,
+        started_at="2026-04-27T18:16:03+08:00",
+        finished_at="2026-04-27T18:16:03+08:00",
+        duration_seconds=0.0,
+        summary="Fixed S3776",
+        changed_files=("src/Foo.cs",),
+        artifact_dir=str(attempt_artifact_dir),
+        build_passed=True,
+        performance_metrics={
+            "model_route_tier": "tier1",
+            "model_route_model": "tier1-model",
+            "model_route_pass": "first_pass",
+        },
+    )
+    issue_state = IssueState(
+        issue_key="issue-s3776",
+        repository="repo-a",
+        run_label="20260427181600",
+        rule_id="csharpsquid:S3776",
+        file_path="/src/Foo.cs",
+        line=22,
+        status=IssueStatus.FIXED,
+        attempts=(attempt_state,),
+        final_summary="Fixed S3776",
+        artifact_root=str(tmp_path / "issue-artifacts" / "issue-s3776"),
+    )
+
+    monkeypatch.setattr(ado_module, "AzureDevOpsClient", FakeAdoClient)
+    monkeypatch.setattr(sonar_module, "SonarQubeClient", FakeSonarClient)
+    monkeypatch.setattr(claude_agent_module, "ClaudeFixAgent", FakeClaudeFixAgent)
+    monkeypatch.setattr(
+        issue_retry_module,
+        "process_issue_with_retries",
+        lambda **kwargs: FixResult(
+            success=True,
+            issue_key="issue-s3776",
+            file_path="src/Foo.cs",
+            summary="Fixed S3776",
+            attempts=1,
+            changes=[{"file": "src/Foo.cs"}],
+            build_passed=True,
+            issue_state=issue_state,
+            post_fix_check_result={
+                "issue_status": "PASS",
+                "issue_check": {
+                    "metrics": {
+                        "method_name": "LoadReceiptDataAsync",
+                        "estimated_cognitive_complexity": 19,
+                        "fail_threshold": 30,
+                    }
+                },
+            },
+            performance_metrics={
+                "model_route_tier": "tier1",
+                "model_route_model": "tier1-model",
+                "model_route_pass": "first_pass",
+            },
+        ),
+    )
+
+    fake_db = FakeDbClient()
+    coordinator = RunCoordinator(runtime_env)
+    coordinator.state_store = RunStateStore(db_client=fake_db)
+    result = coordinator.run_target(
+        target_config,
+        TargetRunOptions(run_label="20260427181600", show_banner=False),
+    )
+
+    assert result.ok is True
+    assert len(fake_db.pr_issue_rows) == 1
+    row = fake_db.pr_issue_rows[0][1][0]
+    summary_items = json.loads(row["rule_review_summary_json"])
+    assert "主要收口方法: LoadReceiptDataAsync" in summary_items
+    assert "提取私有方法: BuildOrderToInv1Entries, AppendIndirectReceipts, AppendDirectReceipts, SortAndDeduplicateReceipts" in summary_items
+    assert "目标方法现在通过调用: BuildOrderToInv1Entries, AppendIndirectReceipts, AppendDirectReceipts, SortAndDeduplicateReceipts" in summary_items
+    assert "主要修改: 将 LoadReceiptDataAsync 中的复杂逻辑下沉到私有 helper，主方法改为编排式调用。" in summary_items
+    assert "本地复杂度估计: 19/30" in summary_items
+    assert any(item.startswith("重点审阅: ") for item in summary_items)
