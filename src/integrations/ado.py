@@ -26,6 +26,7 @@ class PullRequest:
     target_branch: str
     url: str
     state: str
+    created_by_id: str = ""
 
 
 @dataclass
@@ -184,14 +185,11 @@ class AzureDevOpsClient:
             if reviewer_id:
                 self.add_reviewer(repository, pr_id, reviewer_id)
 
-        return PullRequest(
-            pr_id=pr_id,
-            title=data.get("title", ""),
-            description=data.get("description", ""),
-            source_branch=source_branch,
-            target_branch=target_branch,
-            url=web_url,
-            state=data.get("status", ""),
+        return self._parse_pull_request_response(
+            data,
+            repository=repository,
+            fallback_source_branch=source_branch,
+            fallback_target_branch=target_branch,
         )
 
     def update_pull_request_description(
@@ -212,20 +210,46 @@ class AzureDevOpsClient:
             json={"description": description},
         )
         self._raise_for_status_with_details(response, action=f"更新 PR 描述失败: PR {pull_request_id}")
-        data = response.json()
-        web_url = (
-            data.get("_links", {}).get("web", {}).get("href", "")
-            or data.get("links", {}).get("web", {}).get("href", "")
-            or self._build_pr_web_url(repository, int(data.get("pullRequestId", 0)))
+        return self._parse_pull_request_response(
+            response.json(),
+            repository=repository,
         )
-        return PullRequest(
-            pr_id=int(data.get("pullRequestId", 0)),
-            title=data.get("title", ""),
-            description=data.get("description", ""),
-            source_branch=data.get("sourceRefName", ""),
-            target_branch=data.get("targetRefName", ""),
-            url=web_url,
-            state=data.get("status", ""),
+
+    def set_pull_request_auto_complete(
+        self,
+        repository: str,
+        pull_request_id: int,
+        *,
+        identity_id: str,
+        delete_source_branch: bool = False,
+    ) -> PullRequest:
+        """Enable auto-complete for a PR, optionally deleting the source branch."""
+
+        normalized_identity_id = str(identity_id or "").strip()
+        if not normalized_identity_id:
+            raise ValueError("identity_id is required to enable auto-complete")
+
+        url = (
+            f"{self._api_url}/_apis/git/repositories/{repository}/pullrequests/{pull_request_id}"
+            "?api-version=7.1"
+        )
+        response = self._request(
+            "patch",
+            url,
+            json={
+                "autoCompleteSetBy": {"id": normalized_identity_id},
+                "completionOptions": {
+                    "deleteSourceBranch": bool(delete_source_branch),
+                },
+            },
+        )
+        self._raise_for_status_with_details(
+            response,
+            action=f"设置 PR 自动完成失败: PR {pull_request_id}",
+        )
+        return self._parse_pull_request_response(
+            response.json(),
+            repository=repository,
         )
 
     def upload_pull_request_attachment(
@@ -352,6 +376,36 @@ class AzureDevOpsClient:
         response = self._request("put", url, params=params, json=body)
         self._raise_for_status_with_details(response, action=f"添加 PR 审阅人失败: PR {pull_request_id}")
         return response.json()
+
+    def _parse_pull_request_response(
+        self,
+        data: dict[str, Any],
+        *,
+        repository: str,
+        fallback_source_branch: str = "",
+        fallback_target_branch: str = "",
+    ) -> PullRequest:
+        pr_id = int(data.get("pullRequestId", 0) or 0)
+        web_url = (
+            data.get("_links", {}).get("web", {}).get("href", "")
+            or data.get("links", {}).get("web", {}).get("href", "")
+            or self._build_pr_web_url(repository, pr_id)
+        )
+        source_branch = str(data.get("sourceRefName", "")).strip() or fallback_source_branch
+        target_branch = str(data.get("targetRefName", "")).strip() or fallback_target_branch
+        source_branch = source_branch.removeprefix("refs/heads/")
+        target_branch = target_branch.removeprefix("refs/heads/")
+        created_by_id = str((data.get("createdBy", {}) or {}).get("id", "")).strip()
+        return PullRequest(
+            pr_id=pr_id,
+            title=data.get("title", ""),
+            description=data.get("description", ""),
+            source_branch=source_branch,
+            target_branch=target_branch,
+            url=web_url,
+            state=data.get("status", ""),
+            created_by_id=created_by_id,
+        )
 
     @staticmethod
     def _extract_error_text(response: requests.Response) -> str:

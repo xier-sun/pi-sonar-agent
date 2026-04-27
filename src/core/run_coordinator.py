@@ -94,6 +94,7 @@ class RunCoordinator:
             resolve_model_tiers,
             second_pass_enabled,
         )
+        from pi_sonar_agent.core.project_env import read_project_env
         from pi_sonar_agent.core.pr_description import (
             PullRequestIssueSummary,
             build_local_pr_report_path,
@@ -139,6 +140,16 @@ class RunCoordinator:
         abort_startup_failure = False
         abort_before_first_issue = True
         abort_publish_allowed = abort_publish_enabled()
+        project_env = read_project_env()
+        pr_auto_complete_enabled = str(
+            project_env.get("ADO_PR_AUTO_COMPLETE_ENABLED", "false")
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        pr_delete_source_branch_on_complete = str(
+            project_env.get("ADO_PR_DELETE_SOURCE_BRANCH_ON_COMPLETE", "false")
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        pr_auto_complete_identity_override = str(
+            project_env.get("ADO_PR_AUTO_COMPLETE_IDENTITY_ID", "")
+        ).strip()
 
         def finalize_target_result(result: TargetRunResult) -> TargetRunResult:
             rollout_flags = load_performance_flags().enabled_flags()
@@ -1231,6 +1242,24 @@ class RunCoordinator:
                 )
                 pr_url = pr.url
                 print(f"  PR: {pr_url}")
+                if pr_auto_complete_enabled and hasattr(ado_client, "set_pull_request_auto_complete"):
+                    auto_complete_identity_id = (
+                        pr_auto_complete_identity_override or str(getattr(pr, "created_by_id", "") or "").strip()
+                    )
+                    if auto_complete_identity_id:
+                        try:
+                            ado_client.set_pull_request_auto_complete(
+                                repository=target_config.repository,
+                                pull_request_id=pr.pr_id,
+                                identity_id=auto_complete_identity_id,
+                                delete_source_branch=pr_delete_source_branch_on_complete,
+                            )
+                            delete_text = "，完成后删除源分支" if pr_delete_source_branch_on_complete else ""
+                            print(f"[INFO] PR 已设置自动完成{delete_text}")
+                        except Exception as exc:
+                            print(f"[WARN] 设置 PR 自动完成失败，但不影响当前 PR：{exc}")
+                    else:
+                        print("[WARN] 未解析到可用的 ADO identity，跳过 PR 自动完成设置")
                 attachment_name = build_pr_attachment_name(
                     repository=target_config.repository,
                     author=target_config.author,

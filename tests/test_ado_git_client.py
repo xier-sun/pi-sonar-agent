@@ -146,6 +146,7 @@ def test_create_pull_request_retries_after_connection_reset(monkeypatch) -> None
                 "title": "Fix PR",
                 "description": "summary",
                 "status": "active",
+                "createdBy": {"id": "creator-42"},
                 "_links": {"web": {"href": "https://dev.azure.com/acme/project/_git/repo/pullrequest/42"}},
             }
 
@@ -189,6 +190,7 @@ def test_create_pull_request_retries_after_connection_reset(monkeypatch) -> None
     )
 
     assert pr.pr_id == 42
+    assert pr.created_by_id == "creator-42"
     assert len(calls) == 2
     assert calls[0][0] == "post"
     assert calls[1][0] == "post"
@@ -228,3 +230,70 @@ def test_create_pull_request_raises_after_exhausting_transport_retries(monkeypat
         raise AssertionError("expected AzureDevOpsRequestError")
     except ado_module.AzureDevOpsRequestError as exc:
         assert "3 次尝试后仍未成功" in str(exc)
+
+
+def test_set_pull_request_auto_complete_patches_completion_options() -> None:
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        status_code = 200
+        text = ""
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "pullRequestId": 42,
+                "title": "Fix PR",
+                "description": "summary",
+                "status": "active",
+                "sourceRefName": "refs/heads/feature/pr",
+                "targetRefName": "refs/heads/master",
+                "createdBy": {"id": "creator-42"},
+                "_links": {"web": {"href": "https://dev.azure.com/acme/project/_git/repo/pullrequest/42"}},
+            }
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.headers: dict[str, str] = {}
+
+        def request(self, method: str, url: str, timeout=None, **kwargs):
+            captured["method"] = method
+            captured["url"] = url
+            captured["json"] = kwargs.get("json")
+            captured["timeout"] = timeout
+            return FakeResponse()
+
+        def close(self) -> None:
+            return None
+
+    client = ado_module.AzureDevOpsClient(
+        "https://dev.azure.com/acme",
+        "project",
+        "ado-token",
+        organization="acme",
+        timeout=15,
+    )
+    client.session = FakeSession()
+
+    pr = client.set_pull_request_auto_complete(
+        repository="repo",
+        pull_request_id=42,
+        identity_id="creator-42",
+        delete_source_branch=True,
+    )
+
+    assert pr.pr_id == 42
+    assert pr.created_by_id == "creator-42"
+    assert pr.source_branch == "feature/pr"
+    assert pr.target_branch == "master"
+    assert captured == {
+        "method": "patch",
+        "url": "https://dev.azure.com/acme/project/_apis/git/repositories/repo/pullrequests/42?api-version=7.1",
+        "json": {
+            "autoCompleteSetBy": {"id": "creator-42"},
+            "completionOptions": {"deleteSourceBranch": True},
+        },
+        "timeout": 15,
+    }
