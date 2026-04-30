@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 from typing import Any
 
 from pi_sonar_agent.core.memory.child_agent_memory import (
@@ -16,23 +15,22 @@ from pi_sonar_agent.core.memory.issue_working_memory import (
     render_issue_working_memory,
 )
 from pi_sonar_agent.core.prompt_pipeline import PromptPipelineBuilder
+from pi_sonar_agent.core.skill_loader import (
+    load_quality_gate_skill_digest,
+    load_rule_skill_section,
+)
 from pi_sonar_agent.core.attempt_todo import (
     AttemptTodoState,
     render_attempt_todo_prompt_section,
 )
 
-QUALITY_GATE_SKILL_PATH = Path(r"C:\Users\neware\.claude\skills\csharp-quality-gate\SKILL.md")
 S107_FIX_GUIDE_RELATIVE_PATH = ".pi-sonar-agent-runtime/s107-fix-guide.md"
 
 
 def load_quality_gate_fix_digest() -> str:
     """Load the minimal quality-gate constraints that should guide the fix agent."""
 
-    try:
-        QUALITY_GATE_SKILL_PATH.read_text(encoding="utf-8")
-    except Exception:
-        pass
-    return "\n".join(
+    return load_quality_gate_skill_digest(role="fix") or "\n".join(
         [
             "- 只吸收与当前 issue 直接相关的最小质量约束；不要顺手补 XML 注释、中文注释、sealed、DI 或命名统一化。",
             "- 对 S3776 等复杂度问题，优先在目标方法体内做最小重写、提前返回、条件扁平化，不要顺手做整段架构重构。",
@@ -46,11 +44,7 @@ def load_quality_gate_fix_digest() -> str:
 def load_quality_gate_review_digest() -> str:
     """Load a compact review-only digest derived from the quality-gate skill."""
 
-    try:
-        QUALITY_GATE_SKILL_PATH.read_text(encoding="utf-8")
-    except Exception:
-        pass
-    return "\n".join(
+    return load_quality_gate_skill_digest(role="review") or "\n".join(
         [
             "- 只审查当前 patch 是否值得进入编译，不做修复设计，不扩大发散范围。",
             "- 重点看当前 issue 是否真正改到目标方法，而不是只移动变量、改调用点或做无关整理。",
@@ -65,11 +59,7 @@ def load_quality_gate_review_digest() -> str:
 def load_quality_gate_main_digest() -> str:
     """Load the minimal compile-gating policy used by the main decision agent."""
 
-    try:
-        QUALITY_GATE_SKILL_PATH.read_text(encoding="utf-8")
-    except Exception:
-        pass
-    return "\n".join(
+    return load_quality_gate_skill_digest(role="main") or "\n".join(
         [
             "- 只判断当前 patch 是否值得进入编译，不重做 review，也不设计修法。",
             "- 只有当 patch 已改到当前 issue 目标方法、没有明显语法/类型/async/签名硬风险时，才允许 compile。",
@@ -81,7 +71,11 @@ def load_quality_gate_main_digest() -> str:
 
 
 def _build_rule_specific_fix_requirements(issue: Any) -> str:
-    if str(getattr(issue, "rule", "") or "").strip() != "csharpsquid:S107":
+    issue_rule = str(getattr(issue, "rule", "") or "").strip()
+    section = load_rule_skill_section(issue_rule=issue_rule, role="fix")
+    if section is not None and issue_rule == "csharpsquid:S107":
+        return "【当前规则的硬约束】\n" + section.content
+    if issue_rule != "csharpsquid:S107":
         return ""
     return "\n".join(
         [
@@ -133,8 +127,22 @@ def _render_planner_lessons_section(planner_lessons: tuple[Any, ...] | list[Any]
     return "\n".join(lines)
 
 
+def _render_role_skill_section(*, issue: Any, role: str) -> str:
+    issue_rule = str(getattr(issue, "rule", "") or "").strip()
+    section = load_rule_skill_section(issue_rule=issue_rule, role=role)
+    if section is None:
+        return ""
+    if issue_rule == "csharpsquid:S107":
+        return ""
+    return section.render()
+
+
 def _build_rule_specific_review_requirements(issue: Any) -> str:
-    if str(getattr(issue, "rule", "") or "").strip() != "csharpsquid:S107":
+    issue_rule = str(getattr(issue, "rule", "") or "").strip()
+    section = load_rule_skill_section(issue_rule=issue_rule, role="review")
+    if section is not None and issue_rule == "csharpsquid:S107":
+        return "【当前规则的审查要点】\n" + section.content
+    if issue_rule != "csharpsquid:S107":
         return ""
     return "\n".join(
         [
@@ -147,7 +155,11 @@ def _build_rule_specific_review_requirements(issue: Any) -> str:
 
 
 def _build_rule_specific_main_requirements(issue: Any) -> str:
-    if str(getattr(issue, "rule", "") or "").strip() != "csharpsquid:S107":
+    issue_rule = str(getattr(issue, "rule", "") or "").strip()
+    section = load_rule_skill_section(issue_rule=issue_rule, role="main")
+    if section is not None and issue_rule == "csharpsquid:S107":
+        return "【当前规则的编译门槛】\n" + section.content
+    if issue_rule != "csharpsquid:S107":
         return ""
     return "\n".join(
         [
@@ -326,6 +338,9 @@ def build_fix_role_user_prompt(
     planner_lessons_section = _render_planner_lessons_section(planner_lessons)
     if planner_lessons_section:
         support_sections.append(planner_lessons_section)
+    role_skill_section = _render_role_skill_section(issue=issue, role="fix")
+    if role_skill_section:
+        support_sections.append(role_skill_section)
     dynamic_sections = [
         render_issue_working_memory(working_memory),
         render_attempt_todo_prompt_section(
@@ -401,6 +416,9 @@ def build_review_role_user_prompt(
         support_sections.append("【Review 门禁要点】\n" + quality_gate)
     if rule_specific_requirements:
         support_sections.append(rule_specific_requirements)
+    role_skill_section = _render_role_skill_section(issue=issue, role="review")
+    if role_skill_section:
+        support_sections.append(role_skill_section)
     dynamic_sections = [state_digest]
     return _render_role_prompt(
         intro="请只做 patch 审查，判断当前 patch 是否已经足够进入编译阶段。",
@@ -532,6 +550,9 @@ def build_main_role_user_prompt(
         support_sections.append("【Main 裁决门禁】\n" + quality_gate)
     if rule_specific_requirements:
         support_sections.append(rule_specific_requirements)
+    role_skill_section = _render_role_skill_section(issue=issue, role="main")
+    if role_skill_section:
+        support_sections.append(role_skill_section)
     dynamic_sections = [
         render_issue_working_memory(working_memory),
         render_child_agent_memory(main_memory),

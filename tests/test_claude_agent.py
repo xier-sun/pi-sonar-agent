@@ -561,6 +561,31 @@ def test_fix_role_prompt_surfaces_cross_issue_lessons() -> None:
     assert "命中原因" in prompt
 
 
+def test_fix_role_prompt_includes_s3776_skill_section() -> None:
+    issue = SonarIssue(
+        key="issue-fix-s3776-skill",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=32,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = build_fix_role_user_prompt(
+        issue=issue,
+        code_context="  32 | if (flag) { if (other) { Process(); } }",
+        file_path_candidates=("src/Foo.cs",),
+        working_memory=None,
+        fix_memory=None,
+        retry_feedback="",
+    )
+
+    assert "【Skill: S3776 复杂度修复】" in prompt
+    assert "只有当目标方法内收口明显不够时，才提取 private helper" in prompt
+    assert "提取 helper 后，目标方法应变成更清晰的编排式调用" in prompt
+
+
 def test_resolve_issue_max_turns_uses_global_floor_of_16() -> None:
     agent = ClaudeFixAgent(sonar_host="https://sonar.example", sonar_token="token")
     issue = SonarIssue(
@@ -609,6 +634,31 @@ def test_review_role_prompt_adds_s107_count_gate() -> None:
     assert "只有当目标方法当前签名参数总数已 <=7 时才能 approve" in prompt
     assert "方向正确" in prompt
     assert "重数顶层参数个数" in prompt
+
+
+def test_review_role_prompt_includes_s3776_skill_section() -> None:
+    issue = SonarIssue(
+        key="issue-review-s3776-skill",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=18,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = build_review_role_user_prompt(
+        issue=issue,
+        code_context="18 | if (flag) { if (other) { Process(); } }",
+        patch_summary="target_method=ProcessOrder\ntouched_target_method=yes",
+        current_file_content="\n".join(f"line {index}" for index in range(1, 80)),
+        working_memory=None,
+        review_memory=None,
+    )
+
+    assert "【Skill: S3776 复杂度修复】" in prompt
+    assert "重点看复杂度下降是否来自目标方法本身" in prompt
+    assert "不要求 patch 提供“复杂度计算证明”" in prompt
 
 
 def test_build_patch_summary_focuses_on_issue_target_method() -> None:
@@ -726,6 +776,34 @@ def test_main_role_prompt_uses_compile_gate_policy() -> None:
     assert "不重做 review，也不设计修法" in prompt
     assert "不要因为 XML 注释、sealed、static、中文注释等非当前 issue 必要项而拒绝进入编译" in prompt
     assert "如果 review 已 approve" in prompt
+
+
+def test_main_role_prompt_includes_s3776_skill_section() -> None:
+    issue = SonarIssue(
+        key="issue-main-s3776-skill",
+        rule="csharpsquid:S3776",
+        message="认知复杂度过高",
+        line=42,
+        component="BI:src/Foo.cs",
+        severity="MAJOR",
+        issue_type="CODE_SMELL",
+    )
+
+    prompt = build_main_role_user_prompt(
+        issue=issue,
+        patch_summary="target_file=src/Foo.cs\ntarget_method=TargetMethod\ntouched_target_method=yes",
+        review_result={
+            "decision": "approve",
+            "summary": "主方法结构已明显收口。",
+            "findings": ["已改到目标方法"],
+            "constraints": [],
+        },
+        working_memory=None,
+        main_memory=None,
+    )
+
+    assert "【Skill: S3776 复杂度修复】" in prompt
+    assert "如果当前 patch 只是搬移代码、没有明显简化目标方法结构，优先 retry" in prompt
 
 
 def test_main_role_prompt_adds_s107_compile_gate() -> None:
