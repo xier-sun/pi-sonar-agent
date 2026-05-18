@@ -178,6 +178,7 @@ OPENAI_MODEL=glm-5
 - `reviewer_email`
 - `dingtalk_userid`
 - `issue_keys`
+- `skip_issue_keys`
 - `max_issues`
 - `base_branch`
 - `build_command`
@@ -193,6 +194,10 @@ OPENAI_MODEL=glm-5
 
 - 单目标入口要保留工作区时，请用 CLI 参数 `--keep-workspace`
 - 单目标入口要跳过最终构建时，请用 CLI 参数 `--skip-build`
+- `issue_keys` 用于“只处理这些 issue key”
+- `skip_issue_keys` 用于“显式跳过这些 issue key，不做修复”
+- 如果同时配置了 `issue_keys` 和 `skip_issue_keys`，执行顺序是：先按 `issue_keys` 选中候选 issue，再从候选集合中剔除 `skip_issue_keys`
+- `skip_issue_keys` 只对当前 target 生效，不会影响其他 target
 
 ### 3.5 可选数据库配置
 

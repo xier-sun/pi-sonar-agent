@@ -1295,6 +1295,33 @@ class RunCoordinator:
                         preview += f" ... (+{len(missing_issue_keys) - 5} more)"
                     print(f"[WARN] issue_keys 中有 {len(missing_issue_keys)} 个未命中当前 Sonar issues: {preview}")
 
+            if target_config.skip_issue_keys:
+                skip_issue_key_set = set(target_config.skip_issue_keys)
+                issue_by_key_before_skip = {
+                    str(item.get("key", "")).strip(): item
+                    for item in issues
+                    if str(item.get("key", "")).strip()
+                }
+                pre_filter_count = len(issues)
+                issues = [
+                    item
+                    for item in issues
+                    if str(item.get("key", "")).strip() not in skip_issue_key_set
+                ]
+                print(f"按 skip_issue_keys 排除后保留 {len(issues)} 个")
+                missing_skip_issue_keys = [
+                    key
+                    for key in target_config.skip_issue_keys
+                    if key not in issue_by_key_before_skip
+                ]
+                if missing_skip_issue_keys:
+                    preview = ", ".join(missing_skip_issue_keys[:5])
+                    if len(missing_skip_issue_keys) > 5:
+                        preview += f" ... (+{len(missing_skip_issue_keys) - 5} more)"
+                    print(
+                        f"[WARN] skip_issue_keys 中有 {len(missing_skip_issue_keys)} 个未命中当前待处理 issues: {preview}"
+                    )
+
             if target_config.max_issues > 0:
                 issues = issues[:target_config.max_issues]
                 print(f"限制处理 {len(issues)} 个")

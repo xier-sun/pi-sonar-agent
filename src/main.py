@@ -83,6 +83,7 @@ def load_default_target() -> dict[str, object]:
                     "solution_path": str(item.get("solution_path", "")).strip(),
                     "max_issues": str(item.get("max_issues", "")).strip(),
                     "issue_keys": item.get("issue_keys", ()),
+                    "skip_issue_keys": item.get("skip_issue_keys", ()),
                 }
     except Exception:
         return {}

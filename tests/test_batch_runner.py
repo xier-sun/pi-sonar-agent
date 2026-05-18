@@ -34,6 +34,7 @@ def test_run_for_target_delegates_to_shared_coordinator() -> None:
             "author": "alice@example.com",
             "base_branch": "release/2026.04",
             "issue_keys": ["issue-1", "issue-2"],
+            "skip_issue_keys": ["issue-3", "issue-4"],
             "keep_workspace": "true",
             "skip_build_gate": "1",
         },
@@ -49,6 +50,7 @@ def test_run_for_target_delegates_to_shared_coordinator() -> None:
     assert config.author == "alice@example.com"
     assert config.base_branch == "release/2026.04"
     assert config.issue_keys == ("issue-1", "issue-2")
+    assert config.skip_issue_keys == ("issue-3", "issue-4")
     assert options.run_label == "20260403120000-01"
     assert options.keep_workspace is True
     assert options.skip_build is True

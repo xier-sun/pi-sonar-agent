@@ -10,6 +10,9 @@
     "keep_workspace": false,
     "issue_keys": [
       "your-issue-key"
+    ],
+    "skip_issue_keys": [
+      "issue-key-you-want-to-skip"
     ]
   }
 ]

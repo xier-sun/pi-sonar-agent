@@ -26,6 +26,7 @@ class TargetConfig:
     solution_path: str | None
     max_issues: int
     issue_keys: tuple[str, ...] = ()
+    skip_issue_keys: tuple[str, ...] = ()
 
 
 def resolve_cli_target_config(
@@ -90,6 +91,7 @@ def resolve_cli_target_config(
         ),
         max_issues=max_issues,
         issue_keys=_normalize_issue_keys(target_defaults.get("issue_keys")),
+        skip_issue_keys=_normalize_issue_keys(target_defaults.get("skip_issue_keys")),
     )
 
 
@@ -122,6 +124,7 @@ def resolve_batch_target_config(
         solution_path=_none_if_empty(_text_value(target.get("solution_path"))),
         max_issues=max_issues,
         issue_keys=_normalize_issue_keys(target.get("issue_keys")),
+        skip_issue_keys=_normalize_issue_keys(target.get("skip_issue_keys")),
     )
 
 
