@@ -10,6 +10,7 @@ authors = [
 ]
 dependencies = [
     "claude-agent-sdk>=0.1.0",
+    "dingtalk-stream>=0.16.0",
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
     "anyio>=4.0.0",
@@ -28,6 +29,9 @@ dev = [
 
 [project.scripts]
 pi-sonar-agent = "pi_sonar_agent.main:main"
+pi-sonar-dingtalk-gateway = "pi_sonar_agent.dingtalk_gateway:main"
+pi-sonar-dingtalk-stream = "pi_sonar_agent.dingtalk_stream_service:main"
+pi-sonar-dingtalk-worker = "pi_sonar_agent.dingtalk_worker:main"
 
 [build-system]
 requires = ["hatchling"]

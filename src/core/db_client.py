@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime
+from collections.abc import Mapping
 from typing import Any
 
 import mysql.connector
@@ -25,6 +26,60 @@ class RunRecord:
     status: str
     error: str
     pr_url: str
+
+
+@dataclass(frozen=True)
+class RunJobRow:
+    """Raw run job row returned from MySQL."""
+
+    id: int
+    job_id: str
+    status: str
+    trigger_source: str
+    trigger_user_id: str
+    trigger_user_name: str
+    conversation_type: str
+    conversation_id: str
+    repository: str
+    project_key: str
+    author: str
+    base_branch: str
+    issue_keys_json: str
+    skip_issue_keys_json: str
+    max_issues: int
+    reviewer_email: str
+    dingtalk_userid: str
+    target_payload_json: str
+    confirmation_token: str
+    confirmation_card_instance_id: str
+    confirmed_at: str
+    queued_at: str
+    started_at: str
+    finished_at: str
+    run_label: str
+    result_status: str
+    pr_url: str
+    target_summary_path: str
+    run_log_path: str
+    error_message: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class DingTalkCommandRow:
+    """Raw DingTalk command row returned from MySQL."""
+
+    id: int
+    job_id: str
+    message_id: str
+    sender_staff_id: str
+    sender_nick: str
+    raw_text: str
+    parsed_command_json: str
+    parse_status: str
+    parse_error: str
+    created_at: str
 
 
 class MySQLClient:
@@ -61,6 +116,38 @@ class MySQLClient:
         if self._conn:
             self._conn.close()
             self._conn = None
+
+    def _column_exists(self, cursor, table_name: str, column_name: str) -> bool:
+        """Return whether one column already exists in the current schema."""
+
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = %s
+              AND TABLE_NAME = %s
+              AND COLUMN_NAME = %s
+            """,
+            (self.config["database"], table_name, column_name),
+        )
+        row = cursor.fetchone()
+        return bool(row and int(row[0] or 0) > 0)
+
+    def _ensure_column(
+        self,
+        cursor,
+        *,
+        table_name: str,
+        column_name: str,
+        definition_sql: str,
+    ) -> None:
+        """Add one missing column without relying on MySQL IF NOT EXISTS syntax support."""
+
+        if self._column_exists(cursor, table_name, column_name):
+            return
+        cursor.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition_sql}"
+        )
 
     def ensure_tables(self) -> None:
         """Ensure required tables exist."""
@@ -256,15 +343,12 @@ class MySQLClient:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
 
-        try:
-            cursor.execute(
-                """
-                ALTER TABLE fix_pull_request_issue_records
-                ADD COLUMN IF NOT EXISTS rule_review_summary_json LONGTEXT NULL
-                """
-            )
-        except mysql.connector.Error:
-            pass
+        self._ensure_column(
+            cursor,
+            table_name="fix_pull_request_issue_records",
+            column_name="rule_review_summary_json",
+            definition_sql="LONGTEXT NULL",
+        )
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS fix_pull_request_attempt_records (
@@ -309,6 +393,75 @@ class MySQLClient:
                 KEY idx_pr_attempt_tier (tier_name),
                 KEY idx_pr_attempt_status (attempt_status),
                 KEY idx_pr_attempt_failure_kind (failure_kind)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS run_jobs (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                job_id VARCHAR(64) NOT NULL,
+                status VARCHAR(32) NOT NULL,
+                trigger_source VARCHAR(64) NOT NULL,
+                trigger_user_id VARCHAR(128),
+                trigger_user_name VARCHAR(255),
+                conversation_type VARCHAR(32),
+                conversation_id VARCHAR(255),
+                repository VARCHAR(255) NOT NULL,
+                project_key VARCHAR(255) NOT NULL,
+                author VARCHAR(255) NOT NULL,
+                base_branch VARCHAR(255) NOT NULL,
+                issue_keys_json LONGTEXT,
+                skip_issue_keys_json LONGTEXT,
+                max_issues INT NOT NULL DEFAULT 0,
+                reviewer_email VARCHAR(255),
+                dingtalk_userid VARCHAR(128),
+                target_payload_json LONGTEXT,
+                confirmation_token VARCHAR(128),
+                confirmation_card_instance_id VARCHAR(128),
+                confirmed_at DATETIME NULL,
+                queued_at DATETIME NULL,
+                started_at DATETIME NULL,
+                finished_at DATETIME NULL,
+                run_label VARCHAR(64),
+                result_status VARCHAR(32),
+                pr_url VARCHAR(1000),
+                target_summary_path VARCHAR(1000),
+                run_log_path VARCHAR(1000),
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_run_job_id (job_id),
+                UNIQUE KEY uniq_run_job_confirmation_token (confirmation_token),
+                KEY idx_run_job_status (status),
+                KEY idx_run_job_author (author),
+                KEY idx_run_job_repo_author (repository, author),
+                KEY idx_run_job_run_label (run_label),
+                KEY idx_run_job_created_at (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        self._ensure_column(
+            cursor,
+            table_name="run_jobs",
+            column_name="confirmation_card_instance_id",
+            definition_sql="VARCHAR(128) NULL",
+        )
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dingtalk_command_records (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                job_id VARCHAR(64),
+                message_id VARCHAR(255),
+                sender_staff_id VARCHAR(255),
+                sender_nick VARCHAR(255),
+                raw_text TEXT NOT NULL,
+                parsed_command_json LONGTEXT,
+                parse_status VARCHAR(32) NOT NULL,
+                parse_error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_dingtalk_command_job (job_id),
+                KEY idx_dingtalk_command_sender (sender_staff_id),
+                KEY idx_dingtalk_command_message (message_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
 
@@ -892,6 +1045,429 @@ class MySQLClient:
         )
         self._conn.commit()
         cursor.close()
+
+    def insert_run_job(
+        self,
+        *,
+        job_id: str,
+        status: str,
+        trigger_source: str,
+        trigger_user_id: str = "",
+        trigger_user_name: str = "",
+        conversation_type: str = "",
+        conversation_id: str = "",
+        repository: str,
+        project_key: str,
+        author: str,
+        base_branch: str,
+        issue_keys_json: str = "",
+        skip_issue_keys_json: str = "",
+        max_issues: int = 0,
+        reviewer_email: str = "",
+        dingtalk_userid: str = "",
+        target_payload_json: str = "",
+        confirmation_token: str = "",
+        confirmation_card_instance_id: str = "",
+        confirmed_at: datetime | None = None,
+        queued_at: datetime | None = None,
+    ) -> int:
+        """Insert one job row and return its DB primary key."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO run_jobs
+            (
+                job_id, status, trigger_source, trigger_user_id, trigger_user_name,
+                conversation_type, conversation_id, repository, project_key, author,
+                base_branch, issue_keys_json, skip_issue_keys_json, max_issues,
+                reviewer_email, dingtalk_userid, target_payload_json,
+                confirmation_token, confirmation_card_instance_id, confirmed_at, queued_at
+            )
+            VALUES
+            (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s, %s
+            )
+            """,
+            (
+                job_id,
+                status,
+                trigger_source,
+                trigger_user_id or None,
+                trigger_user_name or None,
+                conversation_type or None,
+                conversation_id or None,
+                repository,
+                project_key,
+                author,
+                base_branch,
+                issue_keys_json or None,
+                skip_issue_keys_json or None,
+                max_issues,
+                reviewer_email or None,
+                dingtalk_userid or None,
+                target_payload_json or None,
+                confirmation_token or None,
+                confirmation_card_instance_id or None,
+                confirmed_at,
+                queued_at,
+            ),
+        )
+        self._conn.commit()
+        row_id = cursor.lastrowid
+        cursor.close()
+        return int(row_id)
+
+    def insert_dingtalk_command_record(
+        self,
+        *,
+        job_id: str = "",
+        message_id: str = "",
+        sender_staff_id: str = "",
+        sender_nick: str = "",
+        raw_text: str,
+        parsed_command_json: str = "",
+        parse_status: str,
+        parse_error: str = "",
+    ) -> int:
+        """Insert one DingTalk command audit record."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO dingtalk_command_records
+            (
+                job_id, message_id, sender_staff_id, sender_nick, raw_text,
+                parsed_command_json, parse_status, parse_error
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                job_id or None,
+                message_id or None,
+                sender_staff_id or None,
+                sender_nick or None,
+                raw_text,
+                parsed_command_json or None,
+                parse_status,
+                parse_error or None,
+            ),
+        )
+        self._conn.commit()
+        row_id = cursor.lastrowid
+        cursor.close()
+        return int(row_id)
+
+    def get_run_job_by_job_id(self, job_id: str) -> dict[str, Any] | None:
+        """Fetch one run job by job_id."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM run_jobs WHERE job_id = %s LIMIT 1", (job_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        return dict(row) if row else None
+
+    def get_run_job_by_confirmation_token(self, token: str) -> dict[str, Any] | None:
+        """Fetch one run job by confirmation token."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT * FROM run_jobs WHERE confirmation_token = %s LIMIT 1",
+            (token,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return dict(row) if row else None
+
+    def get_run_job_by_confirmation_card_instance_id(self, card_instance_id: str) -> dict[str, Any] | None:
+        """Fetch one run job by confirmation card instance id."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT * FROM run_jobs WHERE confirmation_card_instance_id = %s LIMIT 1",
+            (card_instance_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return dict(row) if row else None
+
+    def get_latest_run_job_for_user(self, trigger_user_id: str) -> dict[str, Any] | None:
+        """Fetch the most recent run job created by one trigger user."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT *
+            FROM run_jobs
+            WHERE trigger_user_id = %s
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """,
+            (trigger_user_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return dict(row) if row else None
+
+    def get_dingtalk_command_record_by_message_id(self, message_id: str) -> dict[str, Any] | None:
+        """Fetch one DingTalk command record by message_id."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT *
+            FROM dingtalk_command_records
+            WHERE message_id = %s
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (message_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return dict(row) if row else None
+
+    def list_run_jobs(
+        self,
+        *,
+        status: str = "",
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """List recent run jobs, optionally filtered by status."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor(dictionary=True)
+        if status:
+            cursor.execute(
+                """
+                SELECT *
+                FROM run_jobs
+                WHERE status = %s
+                ORDER BY created_at DESC, id DESC
+                LIMIT %s
+                """,
+                (status, limit),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT *
+                FROM run_jobs
+                ORDER BY created_at DESC, id DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+        rows = [dict(row) for row in cursor.fetchall()]
+        cursor.close()
+        return rows
+
+    def count_run_jobs(
+        self,
+        *,
+        trigger_user_id: str = "",
+        statuses: tuple[str, ...] = (),
+        created_after: datetime | None = None,
+    ) -> int:
+        """Count run_jobs rows under one optional trigger/status/time filter."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor()
+        clauses: list[str] = ["1=1"]
+        params: list[Any] = []
+
+        if trigger_user_id:
+            clauses.append("trigger_user_id = %s")
+            params.append(trigger_user_id)
+        normalized_statuses = tuple(str(item).strip() for item in statuses if str(item).strip())
+        if normalized_statuses:
+            placeholders = ", ".join(["%s"] * len(normalized_statuses))
+            clauses.append(f"status IN ({placeholders})")
+            params.extend(normalized_statuses)
+        if created_after is not None:
+            clauses.append("created_at >= %s")
+            params.append(created_after)
+
+        cursor.execute(
+            f"SELECT COUNT(*) FROM run_jobs WHERE {' AND '.join(clauses)}",
+            tuple(params),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return 0
+        return int(row[0] or 0)
+
+    def update_run_job_fields(self, job_id: str, updates: Mapping[str, Any]) -> int:
+        """Update a run job with a validated set of fields."""
+
+        if not self._conn:
+            self.connect()
+
+        allowed_fields = {
+            "status",
+            "trigger_source",
+            "trigger_user_id",
+            "trigger_user_name",
+            "conversation_type",
+            "conversation_id",
+            "repository",
+            "project_key",
+            "author",
+            "base_branch",
+            "issue_keys_json",
+            "skip_issue_keys_json",
+            "max_issues",
+            "reviewer_email",
+            "dingtalk_userid",
+            "target_payload_json",
+            "confirmation_token",
+            "confirmation_card_instance_id",
+            "confirmed_at",
+            "queued_at",
+            "started_at",
+            "finished_at",
+            "run_label",
+            "result_status",
+            "pr_url",
+            "target_summary_path",
+            "run_log_path",
+            "error_message",
+        }
+        filtered = {key: value for key, value in updates.items() if key in allowed_fields}
+        if not filtered:
+            return 0
+
+        assignments = [f"{field} = %s" for field in filtered]
+        params = list(filtered.values())
+        params.append(job_id)
+
+        cursor = self._conn.cursor()
+        cursor.execute(
+            f"UPDATE run_jobs SET {', '.join(assignments)} WHERE job_id = %s",
+            params,
+        )
+        self._conn.commit()
+        rowcount = cursor.rowcount
+        cursor.close()
+        return int(rowcount)
+
+    def claim_next_run_job(self) -> dict[str, Any] | None:
+        """Atomically claim the next queued job and mark it running."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor(dictionary=True)
+        started_at = datetime.now()
+        try:
+            self._conn.start_transaction()
+            cursor.execute(
+                """
+                SELECT *
+                FROM run_jobs
+                WHERE status = 'queued'
+                ORDER BY
+                    CASE WHEN queued_at IS NULL THEN 1 ELSE 0 END,
+                    queued_at ASC,
+                    created_at ASC,
+                    id ASC
+                LIMIT 1
+                FOR UPDATE
+                """
+            )
+            row = cursor.fetchone()
+            if not row:
+                self._conn.rollback()
+                cursor.close()
+                return None
+
+            cursor.execute(
+                """
+                UPDATE run_jobs
+                SET status = 'running',
+                    started_at = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND status = 'queued'
+                """,
+                (started_at, row["id"]),
+            )
+            if cursor.rowcount != 1:
+                self._conn.rollback()
+                cursor.close()
+                return None
+
+            self._conn.commit()
+            claimed = self.get_run_job_by_job_id(str(row["job_id"]))
+            cursor.close()
+            return claimed
+        except Exception:
+            self._conn.rollback()
+            cursor.close()
+            raise
+
+    def mark_stale_running_jobs_timed_out(
+        self,
+        *,
+        timeout_before: datetime,
+        error_message: str,
+    ) -> int:
+        """Mark stale running jobs as timeout jobs."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            UPDATE run_jobs
+            SET status = 'timeout',
+                result_status = 'timeout',
+                finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP),
+                error_message = CASE
+                    WHEN error_message IS NULL OR error_message = '' THEN %s
+                    ELSE error_message
+                END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE status = 'running'
+              AND started_at IS NOT NULL
+              AND started_at < %s
+            """,
+            (error_message, timeout_before),
+        )
+        self._conn.commit()
+        rowcount = cursor.rowcount
+        cursor.close()
+        return int(rowcount)
 
 
 def create_mysql_client_from_env() -> MySQLClient | None:

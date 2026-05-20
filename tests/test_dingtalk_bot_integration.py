@@ -1,0 +1,248 @@
+from __future__ import annotations
+
+from pi_sonar_agent.integrations.dingtalk_bot import (
+    build_job_status_reply,
+    build_recent_job_reply,
+    build_rerun_pre_confirmation_reply,
+    build_confirmation_callback_reply,
+    build_confirmation_card,
+    build_pre_confirmation_reply,
+    DingTalkConfirmJobCommand,
+    DingTalkCancelJobCommand,
+    DingTalkRerunJobCommand,
+    DingTalkShowJobCommand,
+    DingTalkShowRecentJobCommand,
+    extract_card_action,
+    extract_incoming_message,
+    parse_dingtalk_command,
+)
+
+
+def test_extract_incoming_message_handles_common_payload_shape() -> None:
+    payload = {
+        "msgId": "MSG-1",
+        "senderStaffId": "staff-1",
+        "senderNick": "Alice",
+        "conversationType": "group_chat",
+        "conversationId": "conv-1",
+        "text": {"content": "修复 BI alice@example.com"},
+    }
+
+    message = extract_incoming_message(payload)
+
+    assert message.message_id == "MSG-1"
+    assert message.sender_staff_id == "staff-1"
+    assert message.sender_nick == "Alice"
+    assert message.conversation_type == "group_chat"
+    assert message.conversation_id == "conv-1"
+    assert message.text == "修复 BI alice@example.com"
+
+
+def test_parse_dingtalk_command_supports_optional_fix_args() -> None:
+    result = parse_dingtalk_command(
+        "修复 BI alice@example.com "
+        "base_branch=develop issue_keys=a,b skip_issue_keys=c，d "
+        "max_issues=5 reviewer_email=rv@example.com project_key=sonar-bi"
+    )
+
+    assert result.parse_status == "parsed"
+    assert result.command is not None
+    assert result.command.repository == "BI"
+    assert result.command.author == "alice@example.com"
+    assert result.command.base_branch == "develop"
+    assert result.command.issue_keys == ("a", "b")
+    assert result.command.skip_issue_keys == ("c", "d")
+    assert result.command.max_issues == 5
+    assert result.command.reviewer_email == "rv@example.com"
+    assert result.command.project_key == "sonar-bi"
+
+
+def test_parse_dingtalk_command_rejects_duplicate_or_bad_args() -> None:
+    duplicate = parse_dingtalk_command(
+        "修复 BI alice@example.com issue_keys=a issue_keys=b"
+    )
+    bad_int = parse_dingtalk_command(
+        "修复 BI alice@example.com max_issues=abc"
+    )
+
+    assert duplicate.parse_status == "parse_error"
+    assert "重复参数" in duplicate.parse_error
+    assert bad_int.parse_status == "parse_error"
+    assert "max_issues 必须是整数" in bad_int.parse_error
+
+
+def test_parse_dingtalk_command_supports_cancel_job() -> None:
+    result = parse_dingtalk_command("取消任务 JOB-20260518-001")
+
+    assert result.parse_status == "parsed"
+    assert result.command_type == "cancel_job"
+    assert isinstance(result.command, DingTalkCancelJobCommand)
+    assert result.command.job_id == "JOB-20260518-001"
+
+
+def test_parse_dingtalk_command_supports_confirm_job() -> None:
+    result = parse_dingtalk_command("确认任务 JOB-20260518-001")
+
+    assert result.parse_status == "parsed"
+    assert result.command_type == "confirm_job"
+    assert isinstance(result.command, DingTalkConfirmJobCommand)
+    assert result.command.job_id == "JOB-20260518-001"
+
+
+def test_parse_dingtalk_command_supports_show_job_and_recent_and_rerun() -> None:
+    show_job = parse_dingtalk_command("查看任务 JOB-20260518-002")
+    show_recent = parse_dingtalk_command("查看我最近一次修复")
+    rerun = parse_dingtalk_command("重跑任务 JOB-20260518-003")
+
+    assert show_job.parse_status == "parsed"
+    assert isinstance(show_job.command, DingTalkShowJobCommand)
+    assert show_job.command.job_id == "JOB-20260518-002"
+    assert show_recent.parse_status == "parsed"
+    assert isinstance(show_recent.command, DingTalkShowRecentJobCommand)
+    assert rerun.parse_status == "parsed"
+    assert isinstance(rerun.command, DingTalkRerunJobCommand)
+    assert rerun.command.job_id == "JOB-20260518-003"
+
+
+def test_build_pre_confirmation_reply_contains_key_fields() -> None:
+    reply = build_pre_confirmation_reply(
+        job_id="JOB-1",
+        repository="BI",
+        author="alice@example.com",
+        project_key="sonar-bi",
+        base_branch="develop",
+        issue_keys=("i1", "i2"),
+        skip_issue_keys=("i3",),
+        max_issues=5,
+    )
+
+    assert "JOB-1" in reply
+    assert "仓库: BI" in reply
+    assert "作者: alice@example.com" in reply
+    assert "项目: sonar-bi" in reply
+    assert "issue_keys: i1, i2" in reply
+    assert "确认任务 JOB-1" in reply
+
+
+def test_build_job_status_and_recent_and_rerun_replies_include_follow_up_actions() -> None:
+    status_reply = build_job_status_reply(
+        job_id="JOB-9",
+        status="awaiting_confirmation",
+        repository="BI",
+        author="alice@example.com",
+        base_branch="develop",
+        issue_keys=("i1",),
+        skip_issue_keys=("i2",),
+    )
+    recent_reply = build_recent_job_reply(sender_nick="Alice", reply_text=status_reply)
+    rerun_reply = build_rerun_pre_confirmation_reply(
+        original_job_id="JOB-1",
+        new_job_id="JOB-2",
+        repository="BI",
+        author="alice@example.com",
+        project_key="sonar-bi",
+        base_branch="develop",
+        issue_keys=("i1",),
+        skip_issue_keys=("i2",),
+        max_issues=5,
+    )
+
+    assert "确认任务 JOB-9" in status_reply
+    assert "Alice" in recent_reply
+    assert "历史任务 JOB-1" in rerun_reply
+    assert "任务编号: JOB-2" in rerun_reply
+
+
+def test_build_confirmation_card_contains_fields_and_actions() -> None:
+    card = build_confirmation_card(
+        job_id="JOB-1",
+        repository="BI",
+        author="alice@example.com",
+        project_key="sonar-bi",
+        base_branch="develop",
+        issue_keys=("i1", "i2"),
+        skip_issue_keys=("i3",),
+        max_issues=5,
+        trigger_user_name="Alice",
+        confirmation_token="token-1",
+    )
+
+    assert card["card_type"] == "sonar_manual_fix_confirmation"
+    assert card["title"] == "确认执行 Sonar 自动修复"
+    assert any(field["label"] == "仓库" and field["value"] == "BI" for field in card["fields"])
+    assert card["actions"][0]["action"] == "confirm_fix_job"
+    assert card["actions"][1]["action"] == "cancel_fix_job"
+
+
+def test_extract_card_action_handles_common_callback_payload() -> None:
+    action = extract_card_action(
+        {
+            "messageId": "MSG-9",
+            "senderStaffId": "staff-1",
+            "senderNick": "Alice",
+            "conversationId": "conv-1",
+            "cardPrivateData": {
+                "action": "confirm_fix_job",
+                "job_id": "JOB-1",
+                "confirmation_token": "token-1",
+            },
+        }
+    )
+
+    assert action.action == "confirm_fix_job"
+    assert action.job_id == "JOB-1"
+    assert action.confirmation_token == "token-1"
+    assert action.message_id == "MSG-9"
+    assert action.sender_staff_id == "staff-1"
+
+
+def test_extract_card_action_handles_card_instance_callback_payload() -> None:
+    action = extract_card_action(
+        {
+            "outTrackId": "card-1",
+            "userId": "staff-1",
+            "content": {
+                "cardPrivateData": {
+                    "actionIds": ["confirm_fix_job"],
+                }
+            },
+        }
+    )
+
+    assert action.action == "confirm_fix_job"
+    assert action.card_instance_id == "card-1"
+    assert action.sender_staff_id == "staff-1"
+
+
+def test_extract_card_action_handles_stream_template_action_payload() -> None:
+    action = extract_card_action(
+        {
+            "outTrackId": "card-2",
+            "userId": "staff-2",
+            "content": {
+                "action": "accept",
+            },
+        }
+    )
+
+    assert action.action == "accept"
+    assert action.card_instance_id == "card-2"
+    assert action.sender_staff_id == "staff-2"
+
+
+def test_build_confirmation_callback_reply_returns_terminal_hints() -> None:
+    confirmed = build_confirmation_callback_reply(
+        status="confirmed",
+        job_id="JOB-1",
+        repository="BI",
+        author="alice@example.com",
+    )
+    cancelled = build_confirmation_callback_reply(
+        status="cancelled",
+        job_id="JOB-1",
+        repository="BI",
+        author="alice@example.com",
+    )
+
+    assert "已确认执行" in confirmed
+    assert "已取消执行请求" in cancelled
