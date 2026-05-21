@@ -47,6 +47,38 @@ class _FakeJobStore:
         jobs.sort(key=lambda item: item.job_id, reverse=True)
         return jobs[0]
 
+    def get_latest_awaiting_confirmation_job_for_user(self, trigger_user_id: str, *, conversation_id: str = ""):
+        jobs = [
+            job
+            for job in self.job_rows.values()
+            if job.trigger_user_id == trigger_user_id
+            and job.status == "awaiting_confirmation"
+            and (
+                not conversation_id
+                or job.conversation_id == conversation_id
+            )
+        ]
+        if not jobs:
+            return None
+        jobs.sort(key=lambda item: item.job_id, reverse=True)
+        return jobs[0]
+
+    def get_latest_active_job_for_user(self, trigger_user_id: str, *, conversation_id: str = ""):
+        jobs = [
+            job
+            for job in self.job_rows.values()
+            if job.trigger_user_id == trigger_user_id
+            and job.status in {"awaiting_confirmation", "queued", "running"}
+            and (
+                not conversation_id
+                or job.conversation_id == conversation_id
+            )
+        ]
+        if not jobs:
+            return None
+        jobs.sort(key=lambda item: item.job_id, reverse=True)
+        return jobs[0]
+
     def count_active_jobs_for_user(self, trigger_user_id: str) -> int:
         return sum(
             1
@@ -106,6 +138,29 @@ class _FakeJobStore:
             **{
                 **job.__dict__,
                 "confirmation_card_instance_id": confirmation_card_instance_id,
+            }
+        )
+        self.job_rows[job_id] = updated
+        return updated
+
+    def update_awaiting_confirmation_job(self, job_id: str, **kwargs):
+        job = self.job_rows.get(job_id)
+        if job is None or job.status != "awaiting_confirmation":
+            return None
+        updated = RunJob(
+            **{
+                **job.__dict__,
+                "repository": kwargs["repository"],
+                "project_key": kwargs["project_key"],
+                "author": kwargs["author"],
+                "base_branch": kwargs["base_branch"],
+                "issue_keys": tuple(kwargs.get("issue_keys", ()) or ()),
+                "skip_issue_keys": tuple(kwargs.get("skip_issue_keys", ()) or ()),
+                "max_issues": int(kwargs.get("max_issues", 0) or 0),
+                "reviewer_email": kwargs.get("reviewer_email", ""),
+                "dingtalk_userid": kwargs.get("dingtalk_userid", ""),
+                "target_payload": dict(kwargs.get("target_payload", {}) or {}),
+                "confirmation_card_instance_id": "",
             }
         )
         self.job_rows[job_id] = updated
@@ -326,6 +381,193 @@ def test_gateway_creates_awaiting_confirmation_job_and_records_command(tmp_path:
     assert store.jobs[0]["dingtalk_userid"] == "staff-1"
     assert store.commands[0]["job_id"] == "JOB-1"
     assert store.commands[0]["parse_status"] == "parsed"
+    assert "审阅者账号:" in result.reply_text
+
+
+def test_gateway_updates_existing_waiting_job_with_follow_up_options(tmp_path: Path) -> None:
+    targets_file = tmp_path / "targets.json"
+    targets_file.write_text(
+        json.dumps(
+            [
+                {
+                    "project_key": "sonar-bi",
+                    "repository": "BI",
+                    "author": "alice@example.com",
+                    "base_branch": "develop",
+                    "solution_path": "Foo.sln",
+                    "max_issues": 50,
+                }
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    store = _FakeJobStore()
+    gateway = DingTalkGateway(job_store=store, targets_path=targets_file)
+    created = store.create_job(
+        repository="BI",
+        project_key="sonar-bi",
+        author="alice@example.com",
+        base_branch="develop",
+        max_issues=50,
+        trigger_user_id="staff-1",
+        trigger_user_name="Alice",
+        conversation_type="group_chat",
+        conversation_id="conv-1",
+        await_confirmation=True,
+    )
+
+    result = gateway.handle_event_payload(
+        {
+            "msgId": "MSG-update-1",
+            "senderStaffId": "staff-1",
+            "senderNick": "Alice",
+            "conversationType": "group_chat",
+            "conversationId": "conv-1",
+            "text": {
+                "content": "skip_issue_keys=i3 reviewer_email=rv@example.com max_issues=3"
+            },
+        }
+    )
+
+    assert result.status == "awaiting_confirmation"
+    assert result.job_id == created.job_id
+    updated = store.get_job(created.job_id)
+    assert updated is not None
+    assert updated.skip_issue_keys == ("i3",)
+    assert updated.reviewer_email == "rv@example.com"
+    assert updated.max_issues == 3
+    assert "已更新待确认任务" in result.reply_text
+    assert "本次补充/修改:" in result.reply_text
+
+
+def test_gateway_explicit_new_author_rebases_waiting_job_from_target_defaults(tmp_path: Path) -> None:
+    targets_file = tmp_path / "targets.json"
+    targets_file.write_text(
+        json.dumps(
+            [
+                {
+                    "project_key": "sonar-bi",
+                    "repository": "BI",
+                    "author": "alice@example.com",
+                    "base_branch": "develop",
+                    "solution_path": "Foo.sln",
+                    "max_issues": 50,
+                    "issue_keys": ["i1"],
+                    "skip_issue_keys": ["s1"],
+                    "reviewer_email": "alice-reviewer@example.com",
+                },
+                {
+                    "project_key": "sonar-bi",
+                    "repository": "BI",
+                    "author": "bob@example.com",
+                    "base_branch": "release",
+                    "solution_path": "Foo.sln",
+                    "max_issues": 120,
+                },
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    store = _FakeJobStore()
+    gateway = DingTalkGateway(job_store=store, targets_path=targets_file)
+    created = store.create_job(
+        repository="BI",
+        project_key="sonar-bi",
+        author="alice@example.com",
+        base_branch="develop",
+        issue_keys=("i1",),
+        skip_issue_keys=("s1",),
+        max_issues=50,
+        reviewer_email="alice-reviewer@example.com",
+        trigger_user_id="staff-1",
+        trigger_user_name="Alice",
+        conversation_type="group_chat",
+        conversation_id="conv-1",
+        await_confirmation=True,
+    )
+
+    result = gateway.handle_event_payload(
+        {
+            "msgId": "MSG-update-2",
+            "senderStaffId": "staff-1",
+            "senderNick": "Alice",
+            "conversationType": "group_chat",
+            "conversationId": "conv-1",
+            "text": {"content": "修复 BI bob@example.com"},
+        }
+    )
+
+    assert result.status == "awaiting_confirmation"
+    assert result.job_id == created.job_id
+    updated = store.get_job(created.job_id)
+    assert updated is not None
+    assert updated.author == "bob@example.com"
+    assert updated.base_branch == "release"
+    assert updated.issue_keys == ()
+    assert updated.skip_issue_keys == ()
+    assert updated.max_issues == 120
+    assert updated.reviewer_email == "bob@example.com"
+    assert "作者: bob@example.com" in result.reply_text
+    assert "skip_issue_keys: (未指定)" in result.reply_text
+    assert "max_issues: 120" in result.reply_text
+    assert "审阅者账号: bob@example.com" in result.reply_text
+
+
+def test_gateway_requests_missing_required_fields_before_creating_job(tmp_path: Path) -> None:
+    targets_file = tmp_path / "targets.json"
+    targets_file.write_text("[]", encoding="utf-8")
+    store = _FakeJobStore()
+    gateway = DingTalkGateway(job_store=store, targets_path=targets_file)
+
+    result = gateway.handle_event_payload(
+        {
+            "msgId": "MSG-partial-1",
+            "senderStaffId": "staff-1",
+            "senderNick": "Alice",
+            "conversationType": "group_chat",
+            "conversationId": "conv-1",
+            "text": {"content": "修复 BI"},
+        }
+    )
+
+    assert result.status == "need_more_context"
+    assert "还缺: author" in result.reply_text
+    assert not store.jobs
+
+
+def test_gateway_partial_fix_command_does_not_inherit_author_from_existing_draft(tmp_path: Path) -> None:
+    targets_file = tmp_path / "targets.json"
+    targets_file.write_text("[]", encoding="utf-8")
+    store = _FakeJobStore()
+    store.create_job(
+        repository="BI",
+        project_key="sonar-bi",
+        author="alice@example.com",
+        base_branch="develop",
+        trigger_user_id="staff-1",
+        trigger_user_name="Alice",
+        conversation_type="group_chat",
+        conversation_id="conv-1",
+        await_confirmation=True,
+    )
+    gateway = DingTalkGateway(job_store=store, targets_path=targets_file)
+
+    result = gateway.handle_event_payload(
+        {
+            "msgId": "MSG-partial-2",
+            "senderStaffId": "staff-1",
+            "senderNick": "Alice",
+            "conversationType": "group_chat",
+            "conversationId": "conv-1",
+            "text": {"content": "修复 BI"},
+        }
+    )
+
+    assert result.status == "need_more_context"
+    assert "还缺: author" in result.reply_text
+    assert "当前作者:" not in result.reply_text
 
 
 def test_gateway_rejects_duplicate_message_without_creating_new_job(tmp_path: Path) -> None:
@@ -657,6 +899,84 @@ def test_gateway_cancel_command_requires_creator_or_admin(tmp_path: Path) -> Non
     )
     assert allowed.status == "cancelled"
     assert store.get_job("JOB-1").status == "cancelled"
+
+
+def test_gateway_cancel_current_job_alias_cancels_latest_active_draft(tmp_path: Path) -> None:
+    targets_file = tmp_path / "targets.json"
+    targets_file.write_text("[]", encoding="utf-8")
+    store = _FakeJobStore()
+    store.create_job(
+        repository="BI",
+        project_key="sonar-bi",
+        author="alice@example.com",
+        base_branch="develop",
+        trigger_user_id="staff-1",
+        conversation_type="group_chat",
+        conversation_id="conv-1",
+        await_confirmation=True,
+    )
+    gateway = DingTalkGateway(
+        job_store=store,
+        targets_path=targets_file,
+        access_policy=DingTalkAccessPolicy(allowed_staff_ids=("staff-1",)),
+    )
+
+    result = gateway.handle_event_payload(
+        {
+            "msgId": "MSG-cancel-current-1",
+            "senderStaffId": "staff-1",
+            "senderNick": "Alice",
+            "conversationType": "group_chat",
+            "conversationId": "conv-1",
+            "text": {"content": "停止修复"},
+        }
+    )
+
+    assert result.status == "cancelled"
+    assert result.job_id == "JOB-1"
+    assert store.get_job("JOB-1").status == "cancelled"
+
+
+def test_gateway_cancel_current_job_alias_reports_running_job_not_interruptible(tmp_path: Path) -> None:
+    targets_file = tmp_path / "targets.json"
+    targets_file.write_text("[]", encoding="utf-8")
+    store = _FakeJobStore()
+    store.create_job(
+        repository="BI",
+        project_key="sonar-bi",
+        author="alice@example.com",
+        base_branch="develop",
+        trigger_user_id="staff-1",
+        conversation_type="group_chat",
+        conversation_id="conv-1",
+        await_confirmation=False,
+    )
+    store.job_rows["JOB-1"] = RunJob(
+        **{
+            **store.job_rows["JOB-1"].__dict__,
+            "status": "running",
+        }
+    )
+    gateway = DingTalkGateway(
+        job_store=store,
+        targets_path=targets_file,
+        access_policy=DingTalkAccessPolicy(allowed_staff_ids=("staff-1",)),
+    )
+
+    result = gateway.handle_event_payload(
+        {
+            "msgId": "MSG-cancel-current-2",
+            "senderStaffId": "staff-1",
+            "senderNick": "Alice",
+            "conversationType": "group_chat",
+            "conversationId": "conv-1",
+            "text": {"content": "取消"},
+        }
+    )
+
+    assert result.status == "cannot_cancel"
+    assert "暂不支持强制中断" in result.reply_text
+    assert store.get_job("JOB-1").status == "running"
 
 
 def test_gateway_confirm_command_requires_creator_or_admin(tmp_path: Path) -> None:

@@ -1231,6 +1231,74 @@ class MySQLClient:
         cursor.close()
         return dict(row) if row else None
 
+    def get_latest_awaiting_confirmation_job_for_user(
+        self,
+        trigger_user_id: str,
+        *,
+        conversation_id: str = "",
+    ) -> dict[str, Any] | None:
+        """Fetch the latest awaiting-confirmation job for one user and optional conversation."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor(dictionary=True)
+        clauses = [
+            "trigger_user_id = %s",
+            "status = 'awaiting_confirmation'",
+        ]
+        params: list[Any] = [trigger_user_id]
+        if str(conversation_id or "").strip():
+            clauses.append("conversation_id = %s")
+            params.append(conversation_id)
+        cursor.execute(
+            f"""
+            SELECT *
+            FROM run_jobs
+            WHERE {' AND '.join(clauses)}
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """,
+            tuple(params),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return dict(row) if row else None
+
+    def get_latest_active_run_job_for_user(
+        self,
+        trigger_user_id: str,
+        *,
+        conversation_id: str = "",
+    ) -> dict[str, Any] | None:
+        """Fetch the latest active job for one user and optional conversation."""
+
+        if not self._conn:
+            self.connect()
+
+        cursor = self._conn.cursor(dictionary=True)
+        clauses = [
+            "trigger_user_id = %s",
+            "status IN ('awaiting_confirmation', 'queued', 'running')",
+        ]
+        params: list[Any] = [trigger_user_id]
+        if str(conversation_id or "").strip():
+            clauses.append("conversation_id = %s")
+            params.append(conversation_id)
+        cursor.execute(
+            f"""
+            SELECT *
+            FROM run_jobs
+            WHERE {' AND '.join(clauses)}
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            """,
+            tuple(params),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return dict(row) if row else None
+
     def get_dingtalk_command_record_by_message_id(self, message_id: str) -> dict[str, Any] | None:
         """Fetch one DingTalk command record by message_id."""
 

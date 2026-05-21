@@ -13,12 +13,15 @@ from pi_sonar_agent.core.dingtalk_access_policy import (
     create_dingtalk_access_policy_from_env,
 )
 from pi_sonar_agent.core.job_store import JobStore, create_job_store_from_env
+from pi_sonar_agent.core.project_env import read_project_env
 from pi_sonar_agent.integrations.dingtalk_bot import (
     build_job_status_reply,
     build_recent_job_reply,
     build_confirmation_callback_reply,
     build_confirmation_card,
+    build_fix_follow_up_reply,
     DingTalkCancelJobCommand,
+    DingTalkCancelCurrentJobCommand,
     DingTalkConfirmJobCommand,
     DingTalkFixCommand,
     DingTalkIncomingMessage,
@@ -54,10 +57,12 @@ class DingTalkGateway:
         job_store: JobStore,
         targets_path: Path | str = "data/targets.json",
         access_policy: DingTalkAccessPolicy | None = None,
+        confirmation_card_enabled: bool = True,
     ) -> None:
         self.job_store = job_store
         self.targets_path = Path(targets_path)
         self.access_policy = access_policy
+        self.confirmation_card_enabled = confirmation_card_enabled
 
     def handle_event_payload(self, payload: dict[str, Any]) -> DingTalkGatewayResult:
         """Handle one DingTalk event payload and create an awaiting-confirmation job."""
@@ -107,15 +112,55 @@ class DingTalkGateway:
         if isinstance(parsed.command, DingTalkCancelJobCommand):
             return self._handle_cancel_command(incoming, parsed.command)
 
-        decision = self._evaluate_trigger_access(incoming)
-        if not decision.allowed:
+        if isinstance(parsed.command, DingTalkCancelCurrentJobCommand):
+            return self._handle_cancel_current_job_command(incoming)
+
+        active_draft = self.job_store.get_latest_awaiting_confirmation_job_for_user(
+            incoming.sender_staff_id,
+            conversation_id=incoming.conversation_id,
+        )
+        if _should_merge_with_draft_context(parsed.command, active_draft):
+            merged_command = _merge_fix_command_with_draft_context(parsed.command, active_draft)
+        else:
+            merged_command = parsed.command
+        missing_fields = _missing_required_fix_fields(merged_command)
+        if missing_fields:
+            reply = build_fix_follow_up_reply(
+                repository=merged_command.repository,
+                author=merged_command.author,
+                active_job_id=active_draft.job_id if active_draft is not None else "",
+                missing_fields=missing_fields,
+            )
             self.job_store.record_command(
-                job_id="",
+                job_id=active_draft.job_id if active_draft is not None else "",
                 message_id=incoming.message_id,
                 sender_staff_id=incoming.sender_staff_id,
                 sender_nick=incoming.sender_nick,
                 raw_text=incoming.text,
-                parsed_command=_command_to_dict(parsed.command),
+                parsed_command=_command_to_dict(merged_command),
+                parse_status="need_more_context",
+                parse_error=f"缺少必要字段: {', '.join(missing_fields)}",
+            )
+            return DingTalkGatewayResult(
+                status="need_more_context",
+                job_id=active_draft.job_id if active_draft is not None else "",
+                reply_text=reply,
+                parse_error=f"缺少必要字段: {', '.join(missing_fields)}",
+                command_recorded=True,
+            )
+
+        if active_draft is None:
+            decision = self._evaluate_trigger_access(incoming)
+        else:
+            decision = self._evaluate_source_only_access(incoming)
+        if not decision.allowed:
+            self.job_store.record_command(
+                job_id=active_draft.job_id if active_draft is not None else "",
+                message_id=incoming.message_id,
+                sender_staff_id=incoming.sender_staff_id,
+                sender_nick=incoming.sender_nick,
+                raw_text=incoming.text,
+                parsed_command=_command_to_dict(merged_command),
                 parse_status=decision.status,
                 parse_error=decision.message,
             )
@@ -128,17 +173,17 @@ class DingTalkGateway:
 
         try:
             resolved_target = resolve_fix_request_against_targets(
-                parsed.command,  # type: ignore[arg-type]
+                merged_command,
                 load_targets_registry(self.targets_path),
             )
         except ValueError as exc:
             self.job_store.record_command(
-                job_id="",
+                job_id=active_draft.job_id if active_draft is not None else "",
                 message_id=incoming.message_id,
                 sender_staff_id=incoming.sender_staff_id,
                 sender_nick=incoming.sender_nick,
                 raw_text=incoming.text,
-                parsed_command=_command_to_dict(parsed.command),
+                parsed_command=_command_to_dict(merged_command),
                 parse_status="target_unresolved",
                 parse_error=str(exc),
             )
@@ -154,31 +199,53 @@ class DingTalkGateway:
             incoming.sender_staff_id,
         )
         resolved_target["dingtalk_userid"] = resolved_dingtalk_userid
-        job = self.job_store.create_job(
-            repository=str(resolved_target.get("repository", "") or ""),
-            project_key=str(resolved_target.get("project_key", "") or ""),
-            author=str(resolved_target.get("author", "") or ""),
-            base_branch=str(resolved_target.get("base_branch", "") or "develop"),
-            issue_keys=tuple(resolved_target.get("issue_keys", ()) or ()),
-            skip_issue_keys=tuple(resolved_target.get("skip_issue_keys", ()) or ()),
-            max_issues=int(resolved_target.get("max_issues", 0) or 0),
-            reviewer_email=str(resolved_target.get("reviewer_email", "") or ""),
-            dingtalk_userid=resolved_dingtalk_userid,
-            target_payload=resolved_target,
-            trigger_source="dingtalk_bot",
-            trigger_user_id=incoming.sender_staff_id,
-            trigger_user_name=incoming.sender_nick,
-            conversation_type=incoming.conversation_type,
-            conversation_id=incoming.conversation_id,
-            await_confirmation=True,
-        )
+        if active_draft is not None:
+            previous_summary = _snapshot_confirmation_fields(active_draft)
+            job = self.job_store.update_awaiting_confirmation_job(
+                active_draft.job_id,
+                repository=str(resolved_target.get("repository", "") or ""),
+                project_key=str(resolved_target.get("project_key", "") or ""),
+                author=str(resolved_target.get("author", "") or ""),
+                base_branch=str(resolved_target.get("base_branch", "") or "develop"),
+                issue_keys=tuple(resolved_target.get("issue_keys", ()) or ()),
+                skip_issue_keys=tuple(resolved_target.get("skip_issue_keys", ()) or ()),
+                max_issues=int(resolved_target.get("max_issues", 0) or 0),
+                reviewer_email=str(resolved_target.get("reviewer_email", "") or ""),
+                dingtalk_userid=resolved_dingtalk_userid,
+                target_payload=resolved_target,
+            )
+            if job is None:
+                raise RuntimeError(f"更新待确认任务失败: {active_draft.job_id}")
+            change_summary = _describe_confirmation_changes(previous_summary, job)
+            intro = "已更新待确认任务，以下为当前完整配置。"
+        else:
+            job = self.job_store.create_job(
+                repository=str(resolved_target.get("repository", "") or ""),
+                project_key=str(resolved_target.get("project_key", "") or ""),
+                author=str(resolved_target.get("author", "") or ""),
+                base_branch=str(resolved_target.get("base_branch", "") or "develop"),
+                issue_keys=tuple(resolved_target.get("issue_keys", ()) or ()),
+                skip_issue_keys=tuple(resolved_target.get("skip_issue_keys", ()) or ()),
+                max_issues=int(resolved_target.get("max_issues", 0) or 0),
+                reviewer_email=str(resolved_target.get("reviewer_email", "") or ""),
+                dingtalk_userid=resolved_dingtalk_userid,
+                target_payload=resolved_target,
+                trigger_source="dingtalk_bot",
+                trigger_user_id=incoming.sender_staff_id,
+                trigger_user_name=incoming.sender_nick,
+                conversation_type=incoming.conversation_type,
+                conversation_id=incoming.conversation_id,
+                await_confirmation=True,
+            )
+            change_summary = ()
+            intro = "已收到修复请求，任务已进入待确认状态。"
         self.job_store.record_command(
             job_id=job.job_id,
             message_id=incoming.message_id,
             sender_staff_id=incoming.sender_staff_id,
             sender_nick=incoming.sender_nick,
             raw_text=incoming.text,
-            parsed_command=_command_to_dict(parsed.command),
+            parsed_command=_command_to_dict(merged_command),
             parse_status="parsed",
             parse_error="",
         )
@@ -191,6 +258,11 @@ class DingTalkGateway:
             issue_keys=job.issue_keys,
             skip_issue_keys=job.skip_issue_keys,
             max_issues=job.max_issues,
+            reviewer_email=job.reviewer_email,
+            dingtalk_userid=job.dingtalk_userid,
+            intro=intro,
+            change_summary=change_summary,
+            confirmation_card_enabled=self.confirmation_card_enabled,
         )
         reply_card = build_confirmation_card(
             job_id=job.job_id,
@@ -201,6 +273,7 @@ class DingTalkGateway:
             issue_keys=job.issue_keys,
             skip_issue_keys=job.skip_issue_keys,
             max_issues=job.max_issues,
+            reviewer_email=job.reviewer_email,
             trigger_user_name=job.trigger_user_name,
             confirmation_token=job.confirmation_token,
         )
@@ -551,6 +624,9 @@ class DingTalkGateway:
                 issue_keys=rerun_job.issue_keys,
                 skip_issue_keys=rerun_job.skip_issue_keys,
                 max_issues=rerun_job.max_issues,
+                reviewer_email=rerun_job.reviewer_email,
+                dingtalk_userid=rerun_job.dingtalk_userid,
+                confirmation_card_enabled=self.confirmation_card_enabled,
             ),
             command_recorded=True,
             reply_card=build_confirmation_card(
@@ -562,6 +638,7 @@ class DingTalkGateway:
                 issue_keys=rerun_job.issue_keys,
                 skip_issue_keys=rerun_job.skip_issue_keys,
                 max_issues=rerun_job.max_issues,
+                reviewer_email=rerun_job.reviewer_email,
                 trigger_user_name=rerun_job.trigger_user_name,
                 confirmation_token=rerun_job.confirmation_token,
             ),
@@ -689,6 +766,119 @@ class DingTalkGateway:
             status="cancelled",
             job_id=cancelled.job_id,
             reply_text=f"已取消任务 {cancelled.job_id}。",
+            command_recorded=True,
+        )
+
+    def _handle_cancel_current_job_command(
+        self,
+        incoming: DingTalkIncomingMessage,
+    ) -> DingTalkGatewayResult:
+        decision = self._evaluate_source_only_access(incoming)
+        if not decision.allowed:
+            self.job_store.record_command(
+                job_id="",
+                message_id=incoming.message_id,
+                sender_staff_id=incoming.sender_staff_id,
+                sender_nick=incoming.sender_nick,
+                raw_text=incoming.text,
+                parsed_command={"command": "cancel_current_job"},
+                parse_status=decision.status,
+                parse_error=decision.message,
+            )
+            return DingTalkGatewayResult(
+                status=decision.status,
+                reply_text=decision.message,
+                parse_error=decision.message,
+                command_recorded=True,
+            )
+
+        job = self.job_store.get_latest_active_job_for_user(
+            incoming.sender_staff_id,
+            conversation_id=incoming.conversation_id,
+        )
+        if job is None:
+            self.job_store.record_command(
+                job_id="",
+                message_id=incoming.message_id,
+                sender_staff_id=incoming.sender_staff_id,
+                sender_nick=incoming.sender_nick,
+                raw_text=incoming.text,
+                parsed_command={"command": "cancel_current_job"},
+                parse_status="job_not_found",
+                parse_error="当前没有可停止的修复任务。",
+            )
+            return DingTalkGatewayResult(
+                status="job_not_found",
+                reply_text="当前没有可停止的修复任务。",
+                parse_error="当前没有可停止的修复任务。",
+                command_recorded=True,
+            )
+
+        if not self._can_cancel_job(job, incoming.sender_staff_id):
+            self.job_store.record_command(
+                job_id=job.job_id,
+                message_id=incoming.message_id,
+                sender_staff_id=incoming.sender_staff_id,
+                sender_nick=incoming.sender_nick,
+                raw_text=incoming.text,
+                parsed_command={"command": "cancel_current_job"},
+                parse_status="unauthorized",
+                parse_error="当前用户没有取消该任务的权限。",
+            )
+            return DingTalkGatewayResult(
+                status="unauthorized",
+                job_id=job.job_id,
+                reply_text="当前用户没有取消该任务的权限。",
+                parse_error="当前用户没有取消该任务的权限。",
+                command_recorded=True,
+            )
+
+        if job.status == "running":
+            self.job_store.record_command(
+                job_id=job.job_id,
+                message_id=incoming.message_id,
+                sender_staff_id=incoming.sender_staff_id,
+                sender_nick=incoming.sender_nick,
+                raw_text=incoming.text,
+                parsed_command={"command": "cancel_current_job"},
+                parse_status="cannot_cancel",
+                parse_error="任务已开始执行，当前版本暂不支持强制中断。可发送：查看任务 "
+                f"{job.job_id}",
+            )
+            return DingTalkGatewayResult(
+                status="cannot_cancel",
+                job_id=job.job_id,
+                reply_text=(
+                    f"任务 {job.job_id} 正在执行，当前版本暂不支持强制中断。"
+                    f"可发送：查看任务 {job.job_id}"
+                ),
+                parse_error="任务正在执行，当前版本暂不支持强制中断。",
+                command_recorded=True,
+            )
+
+        cancelled = self.job_store.cancel_job_by_job_id(job_id=job.job_id)
+        self.job_store.record_command(
+            job_id=job.job_id,
+            message_id=incoming.message_id,
+            sender_staff_id=incoming.sender_staff_id,
+            sender_nick=incoming.sender_nick,
+            raw_text=incoming.text,
+            parsed_command={"command": "cancel_current_job"},
+            parse_status="parsed",
+            parse_error="",
+        )
+        if cancelled is None:
+            return DingTalkGatewayResult(
+                status="cannot_cancel",
+                job_id=job.job_id,
+                reply_text=f"任务 {job.job_id} 当前不能取消。",
+                parse_error=f"任务 {job.job_id} 当前不能取消。",
+                command_recorded=True,
+            )
+        return DingTalkGatewayResult(
+            status="cancelled",
+            job_id=cancelled.job_id,
+            reply_text=f"已取消当前任务 {cancelled.job_id}。",
             command_recorded=True,
         )
 
@@ -1053,7 +1243,9 @@ def resolve_fix_request_against_targets(
 
     merged_target = dict(candidates[0])
     merged_target["reviewer_email"] = _first_non_empty(
-        *(item.get("reviewer_email", "") for item in candidates)
+        command.reviewer_email,
+        *(item.get("reviewer_email", "") for item in candidates),
+        command.author,
     )
     merged_target["dingtalk_userid"] = _first_non_empty(
         command.dingtalk_userid,
@@ -1078,8 +1270,6 @@ def resolve_fix_request_against_targets(
         merged_target["max_issues"] = int(command.max_issues)
     else:
         merged_target["max_issues"] = int(merged_target.get("max_issues", 0) or 0)
-    if command.reviewer_email:
-        merged_target["reviewer_email"] = command.reviewer_email
     return merged_target
 
 
@@ -1092,10 +1282,12 @@ def create_dingtalk_gateway_from_env(
     job_store = create_job_store_from_env()
     if job_store is None:
         return None
+    env = read_project_env()
     return DingTalkGateway(
         job_store=job_store,
         targets_path=targets_path,
         access_policy=create_dingtalk_access_policy_from_env(),
+        confirmation_card_enabled=bool(env.get("DINGTALK_CONFIRMATION_CARD_TEMPLATE_ID", "").strip()),
     )
 
 
@@ -1175,11 +1367,81 @@ def _normalize_issue_keys(value: Any) -> tuple[str, ...]:
     return ()
 
 
+def _merge_fix_command_with_draft_context(
+    command: DingTalkFixCommand,
+    draft: Any | None,
+) -> DingTalkFixCommand:
+    if draft is None:
+        return command
+    return DingTalkFixCommand(
+        repository=command.repository.strip() or str(getattr(draft, "repository", "") or "").strip(),
+        author=command.author.strip() or str(getattr(draft, "author", "") or "").strip(),
+        base_branch=command.base_branch.strip() or str(getattr(draft, "base_branch", "") or "").strip(),
+        issue_keys=command.issue_keys or tuple(getattr(draft, "issue_keys", ()) or ()),
+        skip_issue_keys=command.skip_issue_keys or tuple(getattr(draft, "skip_issue_keys", ()) or ()),
+        max_issues=command.max_issues if command.max_issues is not None else int(getattr(draft, "max_issues", 0) or 0),
+        reviewer_email=command.reviewer_email.strip() or str(getattr(draft, "reviewer_email", "") or "").strip(),
+        dingtalk_userid=command.dingtalk_userid.strip() or str(getattr(draft, "dingtalk_userid", "") or "").strip(),
+        project_key=command.project_key.strip() or str(getattr(draft, "project_key", "") or "").strip(),
+    )
+
+
+def _should_merge_with_draft_context(
+    command: DingTalkFixCommand,
+    draft: Any | None,
+) -> bool:
+    if draft is None:
+        return False
+    return not str(command.repository or "").strip() and not str(command.author or "").strip()
+
+
+def _missing_required_fix_fields(command: DingTalkFixCommand) -> tuple[str, ...]:
+    missing: list[str] = []
+    if not str(command.repository or "").strip():
+        missing.append("repository")
+    if not str(command.author or "").strip():
+        missing.append("author")
+    return tuple(missing)
+
+
+def _snapshot_confirmation_fields(job: Any) -> dict[str, Any]:
+    return {
+        "repository": str(getattr(job, "repository", "") or "").strip(),
+        "author": str(getattr(job, "author", "") or "").strip(),
+        "project_key": str(getattr(job, "project_key", "") or "").strip(),
+        "base_branch": str(getattr(job, "base_branch", "") or "").strip(),
+        "issue_keys": tuple(getattr(job, "issue_keys", ()) or ()),
+        "skip_issue_keys": tuple(getattr(job, "skip_issue_keys", ()) or ()),
+        "max_issues": int(getattr(job, "max_issues", 0) or 0),
+        "reviewer_email": str(getattr(job, "reviewer_email", "") or "").strip(),
+    }
+
+
+def _describe_confirmation_changes(previous: dict[str, Any], job: Any) -> tuple[str, ...]:
+    current = _snapshot_confirmation_fields(job)
+    labels = {
+        "repository": "仓库",
+        "author": "作者",
+        "project_key": "项目",
+        "base_branch": "基线分支",
+        "issue_keys": "issue_keys",
+        "skip_issue_keys": "skip_issue_keys",
+        "max_issues": "max_issues",
+        "reviewer_email": "审阅者账号",
+    }
+    changed: list[str] = []
+    for key, label in labels.items():
+        if previous.get(key) != current.get(key):
+            changed.append(label)
+    return tuple(changed)
+
+
 def _command_to_dict(
     command: (
         DingTalkFixCommand
         | DingTalkConfirmJobCommand
         | DingTalkCancelJobCommand
+        | DingTalkCancelCurrentJobCommand
         | DingTalkShowJobCommand
         | DingTalkShowRecentJobCommand
         | DingTalkRerunJobCommand
@@ -1189,6 +1451,8 @@ def _command_to_dict(
         return {"job_id": command.job_id}
     if isinstance(command, DingTalkCancelJobCommand):
         return {"job_id": command.job_id}
+    if isinstance(command, DingTalkCancelCurrentJobCommand):
+        return {"command": "cancel_current_job"}
     if isinstance(command, DingTalkShowJobCommand):
         return {"job_id": command.job_id}
     if isinstance(command, DingTalkShowRecentJobCommand):

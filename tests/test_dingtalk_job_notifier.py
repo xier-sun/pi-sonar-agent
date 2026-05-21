@@ -41,6 +41,7 @@ def test_notify_job_started_builds_running_message() -> None:
     assert title.startswith("[RUNNING]")
     assert "任务编号" in text
     assert "run_label" in text
+    assert "运行日志" not in text
     assert userid == "ding-user"
 
 
@@ -69,6 +70,7 @@ def test_notify_job_finished_builds_terminal_message() -> None:
     title, text, userid = client.calls[0]
     assert title.startswith("[WARN]")
     assert "PR 链接" in text
-    assert "运行摘要" in text
+    assert "运行摘要" not in text
+    assert "运行日志" not in text
     assert "partial completion" in text
     assert userid is None

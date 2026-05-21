@@ -185,6 +185,11 @@ OPENAI_MODEL=glm-5
 - `test_command`
 - `solution_path`
 
+说明：
+
+- `reviewer_email` 不配置时，运行时会默认回退到当前 target 的 `author`
+- `dingtalk_userid` 不配置时，钉钉手动触发链路会优先回推给当前发消息的人
+
 #### 仅批量入口生效的字段
 
 - `keep_workspace`
@@ -292,7 +297,8 @@ LIMIT 1
 注意：
 
 - `base_branch` 当前不从 `.env` 读取
-- `reviewer_email` / `dingtalk_userid` 当前优先取 `targets.json` 显式值
+- `reviewer_email` 当前优先级：显式输入 > `targets.json.reviewer_email` > `author`
+- `dingtalk_userid` 当前优先级：显式输入 > `targets.json.dingtalk_userid` > 当前钉钉发起人
 
 ### 4.2 批量入口
 
@@ -370,6 +376,10 @@ endpoint is ...
 
 如果你还没有配置自己的卡片模板或没有开通 `Card.Instance.Write`，当前默认会走文本确认 fallback，而不是发送示例审批卡片。
 
+正式卡片模板字段设计请参考：
+
+- [dingtalk-confirmation-card-template-design-20260521.md](D:/MyProjects/pi-sonar-agent/docs/dingtalk-confirmation-card-template-design-20260521.md)
+
 在钉钉里建议按下面顺序验证：
 
 1. 发起修复：
@@ -377,6 +387,62 @@ endpoint is ...
 ```text
 修复 BI pengxiru@neware.com.cn
 ```
+
+当前也支持更灵活一点的输入方式：
+
+- 直接带参数：
+
+```text
+修复 BI pengxiru@neware.com.cn max_issues=3 reviewer_email=someone@example.com
+```
+
+- 先发起，再补参数：
+
+```text
+修复 BI pengxiru@neware.com.cn
+skip_issue_keys=f00c0210-75dd-4924-b17e-9dd05c948a08 max_issues=3
+```
+
+- 如果只给了一部分必要信息，机器人会追问缺少的字段，例如：
+
+```text
+修复 BI
+```
+
+机器人会提示继续补 `author`。
+
+- 如果当前会话里已经有一条待确认任务：
+  - 只回复 `key=value` 参数，会在原任务上累加/修改
+  - 如果重新显式发送 `修复 <repository> <author>`，系统会按这个新 target 重新套用默认值，不再沿用上一位作者的 `issue_keys / skip_issue_keys / max_issues`
+
+- 也支持更短的停止/取消别名：
+
+```text
+停止修复
+取消修复
+停止
+取消
+```
+
+说明：
+
+- 这些别名会作用到“当前会话里你最近的一条活跃任务”
+- 如果任务还在 `awaiting_confirmation` / `queued`，会直接取消
+- 如果任务已经进入 `running`，当前版本会明确提示“暂不支持强制中断”
+
+- `issue_keys` / `skip_issue_keys` 同时支持：
+
+```text
+skip_issue_keys=a,b
+```
+
+和：
+
+```text
+skip_issue_keys=["a","b"]
+```
+
+如果当前用户在当前会话里已经有一条 `awaiting_confirmation` 任务，后续补发的参数会累加到这条待确认任务中，机器人会回最新的完整确认信息，而不是重新丢失前面的配置。
 
 2. 收到待确认文本后，继续确认：
 

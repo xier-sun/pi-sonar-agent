@@ -56,6 +56,11 @@ class DingTalkCancelJobCommand:
 
 
 @dataclass(frozen=True)
+class DingTalkCancelCurrentJobCommand:
+    """Parsed `停止修复` / `取消修复` style command for the current active task."""
+
+
+@dataclass(frozen=True)
 class DingTalkConfirmJobCommand:
     """Parsed `确认任务 ...` command payload."""
 
@@ -91,6 +96,7 @@ class DingTalkCommandParseResult:
     command: (
         DingTalkFixCommand
         | DingTalkCancelJobCommand
+        | DingTalkCancelCurrentJobCommand
         | DingTalkConfirmJobCommand
         | DingTalkShowJobCommand
         | DingTalkShowRecentJobCommand
@@ -240,6 +246,14 @@ def parse_dingtalk_command(text: str) -> DingTalkCommandParseResult:
             command=DingTalkRerunJobCommand(job_id=tokens[1].strip()),
         )
 
+    if raw_text in {"停止修复", "取消修复", "停止", "取消", "停止当前任务", "取消当前任务"}:
+        return DingTalkCommandParseResult(
+            parse_status="parsed",
+            command_type="cancel_current_job",
+            raw_text=raw_text,
+            command=DingTalkCancelCurrentJobCommand(),
+        )
+
     if raw_text.startswith("取消任务 ") or raw_text.startswith("取消 "):
         tokens = raw_text.split()
         if len(tokens) != 2 or not tokens[1].strip():
@@ -256,63 +270,72 @@ def parse_dingtalk_command(text: str) -> DingTalkCommandParseResult:
             command=DingTalkCancelJobCommand(job_id=tokens[1].strip()),
         )
 
-    if not raw_text.startswith("修复 "):
+    option_only_command, option_only_error = _try_parse_option_only_fix_command(raw_text)
+    if option_only_command is not None:
+        return DingTalkCommandParseResult(
+            parse_status="parsed",
+            command_type="fix",
+            raw_text=raw_text,
+            command=option_only_command,
+        )
+    if option_only_error:
+        return DingTalkCommandParseResult(
+            parse_status="parse_error",
+            command_type="fix",
+            raw_text=raw_text,
+            parse_error=option_only_error,
+        )
+
+    if not raw_text.startswith("修复"):
         return DingTalkCommandParseResult(
             parse_status="unsupported_command",
             command_type="unsupported",
             raw_text=raw_text,
             parse_error=(
                 "当前支持：修复 <repository> <author> ... / 确认任务 <job_id> / "
-                "取消任务 <job_id> / 查看任务 <job_id> / 查看我最近一次修复 / 重跑任务 <job_id>"
+                "取消任务 <job_id> / 停止修复 / 取消修复 / 查看任务 <job_id> / 查看我最近一次修复 / 重跑任务 <job_id>"
             ),
         )
 
-    tokens = raw_text.split()
-    if len(tokens) < 3:
+    raw_tokens = raw_text.split()
+    tokens = raw_tokens[1:]
+    repository = ""
+    author = ""
+    positional_values: list[str] = []
+    option_tokens: list[str] = []
+    for token in tokens:
+        if "=" in token:
+            option_tokens.append(token)
+        else:
+            positional_values.append(token.strip())
+
+    options, parse_error = _parse_fix_options(option_tokens)
+    if parse_error:
         return DingTalkCommandParseResult(
             parse_status="parse_error",
             command_type="fix",
             raw_text=raw_text,
-            parse_error="修复命令至少需要 repository 和 author，例如：修复 BI alice@example.com",
+            parse_error=parse_error,
         )
 
-    repository = tokens[1].strip()
-    author = tokens[2].strip()
-    if not repository or not author:
+    for token in positional_values:
+        if not token:
+            continue
+        if _looks_like_author(token) and not author:
+            author = token
+            continue
+        if not repository:
+            repository = token
+            continue
+        if not author:
+            author = token
+            continue
         return DingTalkCommandParseResult(
             parse_status="parse_error",
             command_type="fix",
             raw_text=raw_text,
-            parse_error="repository 或 author 为空，无法执行修复",
+            parse_error=f"无法识别的参数片段：{token}",
         )
-
-    options: dict[str, str] = {}
-    for token in tokens[3:]:
-        if "=" not in token:
-            return DingTalkCommandParseResult(
-                parse_status="parse_error",
-                command_type="fix",
-                raw_text=raw_text,
-                parse_error=f"无法识别的参数片段：{token}",
-            )
-        key, value = token.split("=", 1)
-        key = key.strip()
-        value = value.strip()
-        if key not in SUPPORTED_COMMAND_KEYS:
-            return DingTalkCommandParseResult(
-                parse_status="parse_error",
-                command_type="fix",
-                raw_text=raw_text,
-                parse_error=f"不支持的参数：{key}",
-            )
-        if key in options:
-            return DingTalkCommandParseResult(
-                parse_status="parse_error",
-                command_type="fix",
-                raw_text=raw_text,
-                parse_error=f"重复参数：{key}",
-            )
-        options[key] = value
 
     try:
         max_issues = (
@@ -364,13 +387,48 @@ def build_pre_confirmation_reply(
     issue_keys: tuple[str, ...],
     skip_issue_keys: tuple[str, ...],
     max_issues: int,
+    reviewer_email: str = "",
+    dingtalk_userid: str = "",
+    intro: str = "",
+    change_summary: tuple[str, ...] = (),
+    confirmation_card_enabled: bool = True,
 ) -> str:
     """Build a user-facing pre-confirmation preview text."""
 
     issue_keys_text = ", ".join(issue_keys) if issue_keys else "(未指定)"
     skip_issue_keys_text = ", ".join(skip_issue_keys) if skip_issue_keys else "(未指定)"
+    reviewer_text = (
+        reviewer_email
+        if reviewer_email
+        else "(未指定，可继续回复 reviewer_email=someone@example.com)"
+    )
+    dingtalk_user_text = (
+        dingtalk_userid
+        if dingtalk_userid
+        else "(未解析，将尝试回推给当前发起人)"
+    )
+    intro_text = intro or "已收到修复请求，任务已进入待确认状态。"
+    changed_text = (
+        f"本次补充/修改: {', '.join(change_summary)}\n"
+        if change_summary
+        else ""
+    )
+    confirmation_hint = (
+        "下一步操作：\n"
+        "1. 优先在确认卡片中点击“确认执行”或“取消”。\n"
+        "2. 如果当前通道未展示卡片，可直接发送：\n"
+        f"   确认任务 {job_id}\n"
+        f"   取消任务 {job_id}"
+        if confirmation_card_enabled
+        else (
+            "下一步操作：\n"
+            f"1. 开始执行：发送 确认任务 {job_id}\n"
+            f"2. 放弃本次：发送 取消任务 {job_id}"
+        )
+    )
     return (
-        "已收到修复请求，任务已进入待确认状态。\n"
+        f"{intro_text}\n"
+        f"{changed_text}"
         f"任务编号: {job_id}\n"
         f"仓库: {repository}\n"
         f"作者: {author}\n"
@@ -379,7 +437,9 @@ def build_pre_confirmation_reply(
         f"issue_keys: {issue_keys_text}\n"
         f"skip_issue_keys: {skip_issue_keys_text}\n"
         f"max_issues: {max_issues}\n"
-        f"请在确认卡片中点击“确认执行”或“取消”；如果当前通道未展示卡片，可发送：确认任务 {job_id} / 取消任务 {job_id}"
+        f"审阅者账号: {reviewer_text}\n"
+        f"结果通知账号: {dingtalk_user_text}\n"
+        f"{confirmation_hint}"
     )
 
 
@@ -454,6 +514,9 @@ def build_rerun_pre_confirmation_reply(
     issue_keys: tuple[str, ...],
     skip_issue_keys: tuple[str, ...],
     max_issues: int,
+    reviewer_email: str = "",
+    dingtalk_userid: str = "",
+    confirmation_card_enabled: bool = True,
 ) -> str:
     """Build one pre-confirmation preview for a rerun request."""
 
@@ -466,6 +529,9 @@ def build_rerun_pre_confirmation_reply(
         issue_keys=issue_keys,
         skip_issue_keys=skip_issue_keys,
         max_issues=max_issues,
+        reviewer_email=reviewer_email,
+        dingtalk_userid=dingtalk_userid,
+        confirmation_card_enabled=confirmation_card_enabled,
     )
     return f"已基于历史任务 {original_job_id} 创建重跑请求。\n{preview}"
 
@@ -480,6 +546,7 @@ def build_confirmation_card(
     issue_keys: tuple[str, ...],
     skip_issue_keys: tuple[str, ...],
     max_issues: int,
+    reviewer_email: str = "",
     trigger_user_name: str = "",
     confirmation_token: str,
 ) -> dict[str, Any]:
@@ -500,6 +567,10 @@ def build_confirmation_card(
             {"label": "issue_keys", "value": issue_keys_text},
             {"label": "skip_issue_keys", "value": skip_issue_keys_text},
             {"label": "max_issues", "value": str(max_issues)},
+            {
+                "label": "审阅者账号",
+                "value": reviewer_email or "(未指定)",
+            },
             {"label": "触发人", "value": trigger_user_name or "(未知)"},
         ],
         "actions": [
@@ -655,6 +726,30 @@ def build_confirmation_callback_reply(
     return f"当前操作未生效。\n{base}"
 
 
+def build_fix_follow_up_reply(
+    *,
+    repository: str = "",
+    author: str = "",
+    active_job_id: str = "",
+    missing_fields: tuple[str, ...] = (),
+) -> str:
+    """Build one follow-up reply when more fix parameters are still needed."""
+
+    hints: list[str] = []
+    if repository:
+        hints.append(f"当前仓库: {repository}")
+    if author:
+        hints.append(f"当前作者: {author}")
+    if active_job_id:
+        hints.append(f"当前待确认任务: {active_job_id}")
+    if missing_fields:
+        hints.append(f"还缺: {', '.join(missing_fields)}")
+    hints.append("你可以继续直接回复缺少或要修改的内容。")
+    hints.append("示例1: 修复 BI pengxiru@neware.com.cn")
+    hints.append("示例2: max_issues=3 reviewer_email=someone@example.com")
+    return "\n".join(hints)
+
+
 def _extract_message_text(payload: dict[str, Any], message: dict[str, Any]) -> str:
     candidates: list[object] = [
         _nested_dict(payload, "text").get("content"),
@@ -692,10 +787,72 @@ def _split_csv(value: str) -> tuple[str, ...]:
         normalized = normalized[1:-1]
 
     items = [
-        item.strip().strip("\"'").strip()
+        _normalize_list_item_token(item)
         for item in normalized.split(",")
     ]
     return tuple(dict.fromkeys(item for item in items if item))
+
+
+def _normalize_list_item_token(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    # Tolerate half-written list syntax from chat input, e.g.
+    # skip_issue_keys=["abc" or skip_issue_keys=[abc]
+    while text and text[0] in "[\"'":
+        text = text[1:].strip()
+    while text and text[-1] in "]\"'":
+        text = text[:-1].strip()
+    return text
+
+
+def _try_parse_option_only_fix_command(
+    raw_text: str,
+) -> tuple[DingTalkFixCommand | None, str]:
+    tokens = raw_text.split()
+    if not tokens or any("=" not in token for token in tokens):
+        return None, ""
+    options, parse_error = _parse_fix_options(tokens)
+    if parse_error:
+        return None, parse_error
+    return (
+        DingTalkFixCommand(
+            repository="",
+            author="",
+            base_branch=options.get("base_branch", "").strip(),
+            issue_keys=_split_csv(options.get("issue_keys", "")),
+            skip_issue_keys=_split_csv(options.get("skip_issue_keys", "")),
+            max_issues=(
+                int(options["max_issues"])
+                if "max_issues" in options and options["max_issues"] != ""
+                else None
+            ),
+            reviewer_email=options.get("reviewer_email", "").strip(),
+            dingtalk_userid=options.get("dingtalk_userid", "").strip(),
+            project_key=options.get("project_key", "").strip(),
+        ),
+        "",
+    )
+
+
+def _parse_fix_options(tokens: list[str]) -> tuple[dict[str, str], str]:
+    options: dict[str, str] = {}
+    for token in tokens:
+        if "=" not in token:
+            return {}, f"无法识别的参数片段：{token}"
+        key, value = token.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if key not in SUPPORTED_COMMAND_KEYS:
+            return {}, f"不支持的参数：{key}"
+        if key in options:
+            return {}, f"重复参数：{key}"
+        options[key] = value
+    return options, ""
+
+
+def _looks_like_author(value: str) -> bool:
+    return "@" in str(value or "")
 
 
 def _first_non_empty(*values: object) -> str:
@@ -748,7 +905,8 @@ def _normalize_action_ids(*values: object) -> tuple[str, ...]:
 __all__ = [
     "DingTalkCardAction",
     "DingTalkConfirmJobCommand",
-    "DingTalkCancelJobCommand",
+        "DingTalkCancelJobCommand",
+    "DingTalkCancelCurrentJobCommand",
     "DingTalkCommandParseResult",
     "DingTalkFixCommand",
     "DingTalkIncomingMessage",
@@ -761,6 +919,7 @@ __all__ = [
     "build_confirmation_callback_reply",
     "build_confirmation_card",
     "build_pre_confirmation_reply",
+    "build_fix_follow_up_reply",
     "extract_card_action",
     "extract_incoming_message",
     "parse_dingtalk_command",

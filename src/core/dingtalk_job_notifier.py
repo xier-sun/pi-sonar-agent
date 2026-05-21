@@ -32,8 +32,6 @@ class DingTalkJobNotifier:
             f"- **基线分支**: {job.base_branch}\n"
             f"- **run_label**: {run_label}\n"
         )
-        if run_log_path:
-            text += f"- **运行日志**: `{run_log_path}`\n"
         return self.client.send_markdown_message(
             title,
             text,
@@ -68,10 +66,6 @@ class DingTalkJobNotifier:
         )
         if pr_url:
             text += f"- **PR 链接**: [查看 PR]({pr_url})\n"
-        if target_summary_path:
-            text += f"- **运行摘要**: `{target_summary_path}`\n"
-        if run_log_path:
-            text += f"- **运行日志**: `{run_log_path}`\n"
         if error_message:
             text += f"- **附加说明**: {error_message}\n"
         return self.client.send_markdown_message(

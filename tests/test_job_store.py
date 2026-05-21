@@ -86,6 +86,38 @@ class _FakeDbClient:
         rows.sort(key=lambda row: row["job_id"], reverse=True)
         return rows[0]
 
+    def get_latest_awaiting_confirmation_job_for_user(self, trigger_user_id: str, *, conversation_id: str = ""):
+        rows = [
+            dict(row)
+            for row in self.jobs.values()
+            if row.get("trigger_user_id", "") == trigger_user_id
+            and row.get("status", "") == "awaiting_confirmation"
+            and (
+                not conversation_id
+                or row.get("conversation_id", "") == conversation_id
+            )
+        ]
+        if not rows:
+            return None
+        rows.sort(key=lambda row: row["job_id"], reverse=True)
+        return rows[0]
+
+    def get_latest_active_run_job_for_user(self, trigger_user_id: str, *, conversation_id: str = ""):
+        rows = [
+            dict(row)
+            for row in self.jobs.values()
+            if row.get("trigger_user_id", "") == trigger_user_id
+            and row.get("status", "") in {"awaiting_confirmation", "queued", "running"}
+            and (
+                not conversation_id
+                or row.get("conversation_id", "") == conversation_id
+            )
+        ]
+        if not rows:
+            return None
+        rows.sort(key=lambda row: row["job_id"], reverse=True)
+        return rows[0]
+
     def list_run_jobs(self, *, status: str = "", limit: int = 50):
         rows = list(self.jobs.values())
         if status:
@@ -419,3 +451,72 @@ def test_job_store_attaches_and_reads_confirmation_card_instance() -> None:
     assert updated.confirmation_card_instance_id == "card-1"
     assert by_card is not None
     assert by_card.job_id == original.job_id
+
+
+def test_job_store_updates_awaiting_confirmation_job_in_place() -> None:
+    fake_db = _FakeDbClient()
+    store = JobStore(fake_db)
+    original = store.create_job(
+        repository="BI",
+        project_key="sonar-bi",
+        author="alice@example.com",
+        base_branch="develop",
+        max_issues=50,
+        trigger_user_id="staff-1",
+        conversation_id="conv-1",
+        await_confirmation=True,
+    )
+
+    updated = store.update_awaiting_confirmation_job(
+        original.job_id,
+        repository="BI",
+        project_key="sonar-bi",
+        author="alice@example.com",
+        base_branch="develop",
+        issue_keys=("i1",),
+        skip_issue_keys=("i2",),
+        max_issues=3,
+        reviewer_email="rv@example.com",
+        dingtalk_userid="ding-user",
+        target_payload={"solution_path": "Foo.sln"},
+    )
+
+    assert updated is not None
+    assert updated.job_id == original.job_id
+    assert updated.issue_keys == ("i1",)
+    assert updated.skip_issue_keys == ("i2",)
+    assert updated.max_issues == 3
+    assert updated.reviewer_email == "rv@example.com"
+    assert updated.dingtalk_userid == "ding-user"
+    assert fake_db.updated_jobs[-1][0] == original.job_id
+
+
+def test_job_store_returns_latest_active_job_for_user() -> None:
+    fake_db = _FakeDbClient()
+    store = JobStore(fake_db)
+    store.create_job(
+        repository="BI",
+        project_key="sonar-bi",
+        author="alice@example.com",
+        base_branch="develop",
+        trigger_user_id="staff-1",
+        conversation_id="conv-1",
+        await_confirmation=True,
+        job_id="JOB-1",
+    )
+    store.create_job(
+        repository="BI",
+        project_key="sonar-bi",
+        author="alice@example.com",
+        base_branch="develop",
+        trigger_user_id="staff-1",
+        conversation_id="conv-1",
+        await_confirmation=False,
+        job_id="JOB-2",
+    )
+    fake_db.jobs["JOB-2"]["status"] = "running"
+
+    latest = store.get_latest_active_job_for_user("staff-1", conversation_id="conv-1")
+
+    assert latest is not None
+    assert latest.job_id == "JOB-2"

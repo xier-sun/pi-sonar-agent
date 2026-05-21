@@ -226,6 +226,34 @@ class JobStore:
         row = self.db_client.get_latest_run_job_for_user(trigger_user_id)
         return _row_to_job(row) if row else None
 
+    def get_latest_awaiting_confirmation_job_for_user(
+        self,
+        trigger_user_id: str,
+        *,
+        conversation_id: str = "",
+    ) -> RunJob | None:
+        """Read the latest awaiting-confirmation draft for one user and optional conversation."""
+
+        row = self.db_client.get_latest_awaiting_confirmation_job_for_user(
+            trigger_user_id,
+            conversation_id=conversation_id,
+        )
+        return _row_to_job(row) if row else None
+
+    def get_latest_active_job_for_user(
+        self,
+        trigger_user_id: str,
+        *,
+        conversation_id: str = "",
+    ) -> RunJob | None:
+        """Read the latest active job for one user and optional conversation."""
+
+        row = self.db_client.get_latest_active_run_job_for_user(
+            trigger_user_id,
+            conversation_id=conversation_id,
+        )
+        return _row_to_job(row) if row else None
+
     def list_jobs(self, *, status: str = "", limit: int = 50) -> list[RunJob]:
         """List recent jobs."""
 
@@ -300,6 +328,63 @@ class JobStore:
         self.db_client.update_run_job_fields(
             job_id,
             {"confirmation_card_instance_id": confirmation_card_instance_id},
+        )
+        return self.get_job(job_id)
+
+    def update_awaiting_confirmation_job(
+        self,
+        job_id: str,
+        *,
+        repository: str,
+        project_key: str,
+        author: str,
+        base_branch: str,
+        issue_keys: tuple[str, ...] = (),
+        skip_issue_keys: tuple[str, ...] = (),
+        max_issues: int = 0,
+        reviewer_email: str = "",
+        dingtalk_userid: str = "",
+        target_payload: dict[str, Any] | None = None,
+    ) -> RunJob | None:
+        """Update one awaiting-confirmation draft job in place."""
+
+        job = self.get_job(job_id)
+        if job is None or job.status != "awaiting_confirmation":
+            return None
+
+        normalized_issue_keys = _normalize_issue_keys(issue_keys)
+        normalized_skip_issue_keys = _normalize_issue_keys(skip_issue_keys)
+        payload = dict(target_payload or {})
+        payload.update(
+            {
+                "repository": repository,
+                "project_key": project_key,
+                "author": author,
+                "base_branch": base_branch,
+                "issue_keys": list(normalized_issue_keys),
+                "skip_issue_keys": list(normalized_skip_issue_keys),
+                "max_issues": int(max_issues),
+                "reviewer_email": reviewer_email,
+                "dingtalk_userid": dingtalk_userid,
+            }
+        )
+        self.db_client.update_run_job_fields(
+            job_id,
+            {
+                "repository": repository,
+                "project_key": project_key,
+                "author": author,
+                "base_branch": base_branch,
+                "issue_keys_json": json.dumps(list(normalized_issue_keys), ensure_ascii=False),
+                "skip_issue_keys_json": json.dumps(
+                    list(normalized_skip_issue_keys), ensure_ascii=False
+                ),
+                "max_issues": int(max_issues),
+                "reviewer_email": reviewer_email or None,
+                "dingtalk_userid": dingtalk_userid or None,
+                "target_payload_json": json.dumps(payload, ensure_ascii=False),
+                "confirmation_card_instance_id": "",
+            },
         )
         return self.get_job(job_id)
 
