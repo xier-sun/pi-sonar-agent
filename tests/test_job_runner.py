@@ -4,7 +4,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import core.job_runner as legacy_job_runner_module
-from pi_sonar_agent.core.job_runner import JobRunner, build_target_config_from_job
+from pi_sonar_agent.core.job_runner import (
+    JobRunner,
+    build_job_run_label,
+    build_target_config_from_job,
+)
 from pi_sonar_agent.core.state import TargetState, TargetStatus
 
 
@@ -39,6 +43,15 @@ def test_build_target_config_from_job_uses_job_payload_defaults() -> None:
     assert config.test_command == "dotnet test Foo.sln"
     assert config.solution_path == "Foo.sln"
     assert config.base_branch_source == "run_jobs.base_branch"
+
+
+def test_build_job_run_label_uses_millisecond_timestamp_and_job_suffix() -> None:
+    run_label = build_job_run_label("JOB-20260521-ABC123")
+
+    timestamp, suffix = run_label.split("_", 1)
+    assert len(timestamp) == 17
+    assert timestamp.isdigit()
+    assert suffix == "ABC123"
 
 
 def test_job_runner_executes_existing_run_target_flow(monkeypatch, tmp_path) -> None:
@@ -136,9 +149,11 @@ def test_job_runner_executes_existing_run_target_flow(monkeypatch, tmp_path) -> 
     assert result.pr_url == "https://example/pr/2"
     assert started
     assert started[0][1].endswith(".log")
+    assert started[0][0].endswith("_JOB1")
     assert run_target_calls
     assert run_target_calls[0][0].issue_keys == ("issue-1",)
     assert run_target_calls[0][1].skip_build is True
+    assert run_target_calls[0][1].prune_workspaces is False
     assert recorded_events[0] == "run_started"
     assert recorded_events[-1] == "run_finished"
     assert written_run_states

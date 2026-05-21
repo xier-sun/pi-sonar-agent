@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import time
+from datetime import datetime
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -61,7 +61,7 @@ class JobRunner:
         """Execute one claimed job and return the final outcome."""
 
         payload = dict(getattr(job, "target_payload", {}) or {})
-        run_label = time.strftime("%Y%m%d%H%M%S")
+        run_label = build_job_run_label(str(getattr(job, "job_id", "") or ""))
         run_started_at = utc_now_iso()
         runtime_env = self.runtime_loader(
             default_workspace_root=str(payload.get("workspace_root", "") or ""),
@@ -111,6 +111,7 @@ class JobRunner:
                             payload.get("skip_build_gate", payload.get("skip_build"))
                         ),
                         show_banner=False,
+                        prune_workspaces=False,
                     ),
                 )
                 target_states = (result.target_state,) if result.target_state is not None else ()
@@ -212,6 +213,17 @@ def build_target_config_from_job(job: Any) -> TargetConfig:
     )
 
 
+def build_job_run_label(job_id: str) -> str:
+    """Build a collision-safe run label for queued manual jobs."""
+
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+    normalized_job_id = "".join(
+        char for char in str(job_id or "").strip().upper() if char.isalnum()
+    )
+    suffix = normalized_job_id[-6:] if normalized_job_id else "JOB"
+    return f"{timestamp}_{suffix}"
+
+
 def _bool_flag(value: object) -> bool:
     if isinstance(value, bool):
         return value
@@ -244,4 +256,5 @@ __all__ = [
     "JobExecutionResult",
     "JobRunner",
     "build_target_config_from_job",
+    "build_job_run_label",
 ]

@@ -6,6 +6,7 @@ import argparse
 import importlib
 import json
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ class DingTalkStreamServiceConfig:
     chatbot_topic: str = DINGTALK_STREAM_CHATBOT_TOPIC
     card_callback_topic: str = DINGTALK_STREAM_CARD_CALLBACK_TOPIC
     confirmation_card_template_id: str = ""
+    reconnect_delay_seconds: int = 5
 
 
 class DingTalkStreamService:
@@ -51,8 +53,23 @@ class DingTalkStreamService:
     def start_forever(self) -> None:
         """Start the DingTalk stream client forever."""
 
-        client = self.build_client()
-        client.start_forever()
+        reconnect_delay_seconds = max(int(self.config.reconnect_delay_seconds or 5), 1)
+        while True:
+            try:
+                client = self.build_client()
+                client.start_forever()
+                print(
+                    "[WARN] DingTalk Stream 连接已退出，"
+                    f"{reconnect_delay_seconds}s 后尝试重新连接..."
+                )
+            except KeyboardInterrupt:
+                raise
+            except Exception as exc:
+                print(
+                    "[WARN] DingTalk Stream 运行异常，"
+                    f"{reconnect_delay_seconds}s 后尝试重新连接: {exc}"
+                )
+            time.sleep(reconnect_delay_seconds)
 
     def build_client(self) -> Any:
         """Build one registered DingTalk stream client instance."""
@@ -271,6 +288,9 @@ def create_dingtalk_stream_service_from_env(
             confirmation_card_template_id=env.get(
                 "DINGTALK_CONFIRMATION_CARD_TEMPLATE_ID", ""
             ).strip(),
+            reconnect_delay_seconds=int(
+                env.get("DINGTALK_STREAM_RECONNECT_DELAY_SECONDS", "5") or 5
+            ),
         ),
         stream_module=stream_module,
     )

@@ -41,6 +41,7 @@ class TargetRunOptions:
     keep_workspace: bool = False
     skip_build: bool = False
     show_banner: bool = False
+    prune_workspaces: bool = True
 
 
 @dataclass(frozen=True)
@@ -1351,15 +1352,18 @@ class RunCoordinator:
             )
 
         print("[INFO] 准备仓库...")
-        prune_result = prune_old_workspaces(self.runtime_env.workspace_root, keep_latest=1)
-        if prune_result.removed:
-            print(f"已清理 {len(prune_result.removed)} 个旧工作区")
-            for removed in format_removed_workspaces(prune_result.removed):
-                print(f"  - {removed}")
-        if prune_result.failed:
-            print(f"[WARN] 有 {len(prune_result.failed)} 个旧工作区目录未能删除，请关闭占用进程后重试")
-            for failed_workspace in format_removed_workspaces(prune_result.failed):
-                print(f"  - {failed_workspace}")
+        if options.prune_workspaces:
+            prune_result = prune_old_workspaces(self.runtime_env.workspace_root, keep_latest=1)
+            if prune_result.removed:
+                print(f"已清理 {len(prune_result.removed)} 个旧工作区")
+                for removed in format_removed_workspaces(prune_result.removed):
+                    print(f"  - {removed}")
+            if prune_result.failed:
+                print(f"[WARN] 有 {len(prune_result.failed)} 个旧工作区目录未能删除，请关闭占用进程后重试")
+                for failed_workspace in format_removed_workspaces(prune_result.failed):
+                    print(f"  - {failed_workspace}")
+        else:
+            print("[INFO] 当前任务已启用并行安全模式，跳过全局工作区清理")
         self.runtime_env.workspace_root.mkdir(parents=True, exist_ok=True)
         workspace = self.runtime_env.workspace_root / f"fix_{target_config.repository}_{options.run_label}"
         performance_flags = load_performance_flags()

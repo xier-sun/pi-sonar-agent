@@ -321,3 +321,39 @@ def test_create_stream_service_from_env_uses_stream_or_app_credentials(monkeypat
     assert service.config.client_id == "stream-cid"
     assert service.config.client_secret == "stream-secret"
     assert service.config.confirmation_card_template_id == ""
+
+
+def test_stream_service_start_forever_retries_after_network_exception(monkeypatch) -> None:
+    attempts: list[str] = []
+    sleeps: list[int] = []
+
+    class _FailingClient:
+        def start_forever(self) -> None:
+            attempts.append("fail")
+            raise RuntimeError("network down")
+
+    class _StoppingClient:
+        def start_forever(self) -> None:
+            attempts.append("stop")
+            raise KeyboardInterrupt()
+
+    service = DingTalkStreamService(
+        gateway=SimpleNamespace(),
+        config=DingTalkStreamServiceConfig(
+            client_id="cid",
+            client_secret="secret",
+            reconnect_delay_seconds=3,
+        ),
+        stream_module=_FakeStreamModule,
+    )
+    clients = [_FailingClient(), _StoppingClient()]
+    monkeypatch.setattr(service, "build_client", lambda: clients.pop(0))
+    monkeypatch.setattr(stream_service_module.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    try:
+        service.start_forever()
+    except KeyboardInterrupt:
+        pass
+
+    assert attempts == ["fail", "stop"]
+    assert sleeps == [3]

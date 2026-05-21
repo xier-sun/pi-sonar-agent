@@ -502,6 +502,31 @@ mkdir D:\MyProjects\pi-sonar-agent\logs\services -Force
 4. 关闭之前手工启动的 Worker / Stream 终端
 5. 用“管理员身份”打开 PowerShell
 
+#### 5.6.0 并行执行建议
+
+当前版本已经做了并行安全收口：
+
+- 手动任务的 `run_label` 会带毫秒时间和 `job_id` 后缀
+- 每个任务的工作区、运行日志、修复分支都会随之隔离
+- DingTalk 手动任务默认跳过“启动前全局工作区清理”，避免并行任务互删工作区
+
+如果你想提高吞吐量，推荐的方式是：
+
+- **只保留一个 `stream` 服务**
+- **按需增加多个 `worker` 服务实例**
+
+例如：
+
+- `pi-sonar-dingtalk-stream-prod`
+- `pi-sonar-dingtalk-worker-prod-1`
+- `pi-sonar-dingtalk-worker-prod-2`
+
+注意：
+
+- 不要同时运行多个指向同一钉钉应用的 `stream` 服务，否则同一条消息可能被重复消费
+- 多个 `worker` 可以安全共享同一个 `run_jobs` 队列，任务会按数据库原子领取
+- 如果两个任务修的是同一个 `repository + author + base_branch`，虽然技术上也能并发，但业务上仍可能出现重复修复同一批 issue 的情况，建议人为规避
+
 #### 5.6.2 准备路径变量
 
 在管理员 PowerShell 中先执行：
