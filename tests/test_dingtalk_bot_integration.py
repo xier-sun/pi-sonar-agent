@@ -57,6 +57,29 @@ def test_parse_dingtalk_command_supports_optional_fix_args() -> None:
     assert result.command.project_key == "sonar-bi"
 
 
+def test_parse_dingtalk_command_supports_json_style_issue_key_lists() -> None:
+    result = parse_dingtalk_command(
+        '修复 BI alice@example.com issue_keys=["a","b"] '
+        'skip_issue_keys=["c"] max_issues=1'
+    )
+
+    assert result.parse_status == "parsed"
+    assert result.command is not None
+    assert result.command.issue_keys == ("a", "b")
+    assert result.command.skip_issue_keys == ("c",)
+
+
+def test_parse_dingtalk_command_supports_bracketed_plain_issue_key_lists() -> None:
+    result = parse_dingtalk_command(
+        "修复 BI alice@example.com "
+        "skip_issue_keys=[f00c0210-75dd-4924-b17e-9dd05c948a08]"
+    )
+
+    assert result.parse_status == "parsed"
+    assert result.command is not None
+    assert result.command.skip_issue_keys == ("f00c0210-75dd-4924-b17e-9dd05c948a08",)
+
+
 def test_parse_dingtalk_command_rejects_duplicate_or_bad_args() -> None:
     duplicate = parse_dingtalk_command(
         "修复 BI alice@example.com issue_keys=a issue_keys=b"

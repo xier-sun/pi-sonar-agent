@@ -672,8 +672,29 @@ def _extract_message_text(payload: dict[str, Any], message: dict[str, Any]) -> s
 
 
 def _split_csv(value: str) -> tuple[str, ...]:
-    normalized = str(value or "").replace("，", ",")
-    items = [item.strip() for item in normalized.split(",")]
+    text = str(value or "").strip()
+    if not text:
+        return ()
+
+    normalized = text.replace("，", ",")
+    if normalized.startswith("[") and normalized.endswith("]"):
+        try:
+            parsed = json.loads(normalized)
+        except Exception:
+            parsed = None
+        if isinstance(parsed, list):
+            cleaned = [
+                str(item or "").strip()
+                for item in parsed
+                if str(item or "").strip()
+            ]
+            return tuple(dict.fromkeys(cleaned))
+        normalized = normalized[1:-1]
+
+    items = [
+        item.strip().strip("\"'").strip()
+        for item in normalized.split(",")
+    ]
     return tuple(dict.fromkeys(item for item in items if item))
 
 

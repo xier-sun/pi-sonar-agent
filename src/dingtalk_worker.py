@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 
 from pi_sonar_agent.core.dingtalk_job_notifier import (
@@ -165,9 +166,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _configure_stdio_for_services() -> None:
+    """Force UTF-8 stdio so NSSM redirected logs stay readable on Windows."""
+
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+
+
 def main() -> None:
     """CLI entry for the serial DingTalk worker."""
 
+    _configure_stdio_for_services()
     args = parse_args()
     job_store = create_job_store_from_env()
     if job_store is None:

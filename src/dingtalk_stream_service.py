@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -287,9 +288,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _configure_stdio_for_services() -> None:
+    """Force UTF-8 stdio so NSSM redirected logs stay readable on Windows."""
+
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+
+
 def main() -> None:
     """CLI entry for the DingTalk stream bridge."""
 
+    _configure_stdio_for_services()
     args = parse_args()
     service = create_dingtalk_stream_service_from_env(targets_path=args.targets_file)
     if service is None:

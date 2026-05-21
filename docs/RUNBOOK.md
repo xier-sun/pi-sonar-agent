@@ -239,11 +239,28 @@ LIMIT 1
 
 当前收件人解析优先级：
 
-1. `targets.json.dingtalk_userid`
-2. MySQL `author` 反查
-3. `unresolved`
+1. 命令里显式传入的 `dingtalk_userid`
+2. `targets.json.dingtalk_userid`
+3. 本次钉钉消息发起人的 `sender_staff_id`
+4. MySQL `author` 反查
+5. `unresolved`
 
 如果企业应用能力可用并且解析出了 `dingtalk_userid`，系统会优先尝试私信；否则走 webhook。
+
+如果要启用真实钉钉 Stream 手动触发，还建议额外配置：
+
+- `DINGTALK_STREAM_CLIENT_ID`
+- `DINGTALK_STREAM_CLIENT_SECRET`
+
+如果不单独配置 `DINGTALK_STREAM_CLIENT_ID/SECRET`，系统会自动回退到：
+
+- `DINGTALK_APPKEY`
+- `DINGTALK_APPSECRET`
+
+如果要启用真正可点击的“确认执行/取消”卡片，而不是文本确认 fallback，还需要：
+
+- `DINGTALK_CONFIRMATION_CARD_TEMPLATE_ID`
+- 钉钉应用权限：`Card.Instance.Write`
 
 ### 3.7 常用运行时 / 性能开关
 
@@ -327,6 +344,262 @@ LIMIT 1
 ```
 
 `--skip-build` 只建议在链路排障时使用，不建议作为常规运行方式。
+
+### 5.5 钉钉手动触发，本地临时启动
+
+如果只是联调或短时间测试，可以先直接开两个终端。
+
+终端 1，启动 Worker：
+
+```powershell
+.\.venv\Scripts\python.exe -m pi_sonar_agent.dingtalk_worker
+```
+
+终端 2，启动 Stream 接入：
+
+```powershell
+.\.venv\Scripts\python.exe -m pi_sonar_agent.dingtalk_stream_service --targets-file data/targets.json
+```
+
+启动成功后，Stream 日志里通常会看到类似：
+
+```text
+open connection, url=...
+endpoint is ...
+```
+
+如果你还没有配置自己的卡片模板或没有开通 `Card.Instance.Write`，当前默认会走文本确认 fallback，而不是发送示例审批卡片。
+
+在钉钉里建议按下面顺序验证：
+
+1. 发起修复：
+
+```text
+修复 BI pengxiru@neware.com.cn
+```
+
+2. 收到待确认文本后，继续确认：
+
+```text
+确认任务 JOB-xxxxxxxxxxxxxxxx
+```
+
+3. 查询状态：
+
+```text
+查看任务 JOB-xxxxxxxxxxxxxxxx
+```
+
+4. 如需取消：
+
+```text
+取消任务 JOB-xxxxxxxxxxxxxxxx
+```
+
+### 5.6 钉钉手动触发，本地常驻启动（NSSM）
+
+如果要在本机给小组成员连续测试，不建议长期手开两个命令行窗口；更稳的方式是把 Stream 和 Worker 注册成 Windows 服务。
+
+下面的示例默认你的仓库根目录是：
+
+```text
+D:\MyProjects\pi-sonar-agent
+```
+
+并且你已经把 `nssm-2.24-101-g897c7ad.zip` 解压到了：
+
+```text
+D:\Tools\nssm
+```
+
+最终 `nssm.exe` 路径示例：
+
+```text
+D:\Tools\nssm\win64\nssm.exe
+```
+
+#### 5.6.1 前置准备
+
+1. 确保 `.env` 和 `data/targets.json` 已经是可用配置
+2. 确保已经执行过：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
+3. 建好服务日志目录：
+
+```powershell
+mkdir D:\MyProjects\pi-sonar-agent\logs\services -Force
+```
+
+4. 关闭之前手工启动的 Worker / Stream 终端
+5. 用“管理员身份”打开 PowerShell
+
+#### 5.6.2 准备路径变量
+
+在管理员 PowerShell 中先执行：
+
+```powershell
+$nssm = "D:\Tools\nssm\win64\nssm.exe"
+$py = "D:\MyProjects\pi-sonar-agent\.venv\Scripts\python.exe"
+$app = "D:\MyProjects\pi-sonar-agent"
+```
+
+如果你的实际路径不同，把上面 3 个变量改成自己的路径。
+
+#### 5.6.3 注册 Worker 服务
+
+执行：
+
+```powershell
+& $nssm install pi-sonar-dingtalk-worker $py "-m pi_sonar_agent.dingtalk_worker"
+& $nssm set pi-sonar-dingtalk-worker AppDirectory $app
+& $nssm set pi-sonar-dingtalk-worker AppStdout "$app\logs\services\dingtalk-worker.out.log"
+& $nssm set pi-sonar-dingtalk-worker AppStderr "$app\logs\services\dingtalk-worker.err.log"
+& $nssm set pi-sonar-dingtalk-worker AppRotateFiles 1
+& $nssm set pi-sonar-dingtalk-worker AppRotateOnline 1
+```
+
+#### 5.6.4 注册 Stream 服务
+
+执行：
+
+```powershell
+& $nssm install pi-sonar-dingtalk-stream $py "-m pi_sonar_agent.dingtalk_stream_service --targets-file D:\MyProjects\pi-sonar-agent\data\targets.json"
+& $nssm set pi-sonar-dingtalk-stream AppDirectory $app
+& $nssm set pi-sonar-dingtalk-stream AppStdout "$app\logs\services\dingtalk-stream.out.log"
+& $nssm set pi-sonar-dingtalk-stream AppStderr "$app\logs\services\dingtalk-stream.err.log"
+& $nssm set pi-sonar-dingtalk-stream AppRotateFiles 1
+& $nssm set pi-sonar-dingtalk-stream AppRotateOnline 1
+```
+
+#### 5.6.5 启动服务
+
+执行：
+
+```powershell
+& $nssm start pi-sonar-dingtalk-worker
+& $nssm start pi-sonar-dingtalk-stream
+```
+
+查看状态：
+
+```powershell
+& $nssm status pi-sonar-dingtalk-worker
+& $nssm status pi-sonar-dingtalk-stream
+```
+
+如果看到 `SERVICE_RUNNING`，说明服务已经起来了。
+
+#### 5.6.6 查看日志
+
+先看 Stream 是否连上钉钉：
+
+```powershell
+Get-Content D:\MyProjects\pi-sonar-agent\logs\services\dingtalk-stream.out.log -Tail 50
+```
+
+正常情况下会看到：
+
+```text
+open connection, url=...
+endpoint is ...
+```
+
+再看 Worker：
+
+```powershell
+Get-Content D:\MyProjects\pi-sonar-agent\logs\services\dingtalk-worker.out.log -Tail 50
+```
+
+如果服务启动失败，优先看错误日志：
+
+- `logs/services/dingtalk-stream.err.log`
+- `logs/services/dingtalk-worker.err.log`
+
+#### 5.6.7 在钉钉中验证完整链路
+
+1. 发起任务：
+
+```text
+修复 BI pengxiru@neware.com.cn
+```
+
+2. 如果当前仍是文本确认模式，继续发：
+
+```text
+确认任务 JOB-xxxxxxxxxxxxxxxx
+```
+
+3. 查看结果：
+
+```text
+查看任务 JOB-xxxxxxxxxxxxxxxx
+```
+
+#### 5.6.8 修改、重启、删除服务
+
+重启服务：
+
+```powershell
+& $nssm restart pi-sonar-dingtalk-worker
+& $nssm restart pi-sonar-dingtalk-stream
+```
+
+停止服务：
+
+```powershell
+& $nssm stop pi-sonar-dingtalk-worker
+& $nssm stop pi-sonar-dingtalk-stream
+```
+
+如果参数填错了，可以打开编辑界面：
+
+```powershell
+& $nssm edit pi-sonar-dingtalk-worker
+& $nssm edit pi-sonar-dingtalk-stream
+```
+
+如果要删除后重装：
+
+```powershell
+& $nssm remove pi-sonar-dingtalk-worker confirm
+& $nssm remove pi-sonar-dingtalk-stream confirm
+```
+
+#### 5.6.9 服务账户建议
+
+第一次本地测试时，优先让服务使用你当前 Windows 登录账号，而不是 `LocalSystem`。
+
+原因是当前链路通常会依赖：
+
+- 仓库本地路径访问
+- `.venv`
+- `.env`
+- Git 用户目录
+- 当前账号下的 Claude / provider 配置
+
+如果直接改成 `LocalSystem`，很容易出现：
+
+- 找不到虚拟环境
+- 读不到用户目录配置
+- 模型认证或 Git 环境不一致
+- 钉钉/数据库配置明明存在但服务读不到
+
+先改服务账户
+在 services.msc 里分别打开：
+
+pi-sonar-dingtalk-worker
+pi-sonar-dingtalk-stream
+然后：
+
+· 属性
+· 登录
+· 选 此账户
+· 填你当前 Windows 账号和密码
+· 应用
+· 再重启服务。
 
 ## 6. 运行时会发生什么
 
@@ -446,6 +719,41 @@ request snapshot 里会声明完整 fix tool surface，但第三方 provider / C
 - request snapshot 里的 `tools` / `allowed_tools`
 - SDK `init` 里的 `tools`
 - 是否实际出现 `No such tool available` 或 provider 兼容限制
+
+### 8.6 DingTalk 卡片发送 `Card.Instance.Write` 权限错误
+
+如果日志里出现：
+
+```text
+Forbidden.AccessDenied.AccessTokenPermissionDenied
+requiredScopes: [Card.Instance.Write]
+```
+
+说明当前钉钉应用还没有开通可点击卡片实例写权限。
+
+这不会影响：
+
+- Stream 连接
+- 文本命令解析
+- 文本确认 fallback
+- Worker 执行和结果回推
+
+但会影响：
+
+- 真正可点击的“确认执行 / 取消”卡片
+
+处理方式：
+
+1. 去钉钉开发者平台的当前应用中申请 `Card.Instance.Write`
+2. 权限通过后重新发布应用
+3. 在 `.env` 中配置真实 `DINGTALK_CONFIRMATION_CARD_TEMPLATE_ID`
+4. 重启本地 Worker / Stream 或 NSSM 服务
+
+如果当前没有自己的模板或没有这项权限，系统默认建议继续用文本确认：
+
+```text
+确认任务 JOB-xxxxxxxxxxxxxxxx
+```
 
 ## 9. 本地验证
 

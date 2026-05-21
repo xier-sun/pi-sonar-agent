@@ -24,6 +24,7 @@
 
 - [PROJECT_GUIDE.md](PROJECT_GUIDE.md): 当前项目结构、共享运行骨架、模块职责
 - [docs/RUNBOOK.md](docs/RUNBOOK.md): 安装、配置、运行、排障手册
+- [docs/RUNBOOK.md](docs/RUNBOOK.md): 如果要在本机通过钉钉给小组做持续测试，重点看 `5.5` 和 `5.6` 的本地启动 / NSSM 常驻说明
 - [docs/ENGINEERING_MEMORY.md](docs/ENGINEERING_MEMORY.md): 已踩问题、当前工程约定、常见误区
 - [docs/AGENT_REFACTOR_PLAN.md](docs/AGENT_REFACTOR_PLAN.md): 重构与优化升级的当前状态快照
 - [docs/s107-fix-guide.md](docs/s107-fix-guide.md): `csharpsquid:S107` 专项修复指南
@@ -171,6 +172,11 @@ OPENAI_MODEL=glm-5
 ```powershell
 .\.venv\Scripts\python.exe -m pi_sonar_agent.batch_runner data\targets.json
 ```
+
+如果要在本机打开钉钉手动触发闭环，请直接看 [docs/RUNBOOK.md](docs/RUNBOOK.md) 的：
+
+- `5.5 钉钉手动触发，本地临时启动`
+- `5.6 钉钉手动触发，本地常驻启动（NSSM）`
 
 ## 当前架构要点
 
